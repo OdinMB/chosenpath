@@ -9,6 +9,8 @@ import {
   makeArm,
   OPTIONS_CONTINUITY_PROMPT_STATE,
   OPTIONS_CONTINUITY_RETEST_CASES,
+  OPTIONS_O2_CASES,
+  OPTIONS_O2_PROMPT_STATE,
   pipelinePlans,
   productionArm,
   referenceKey,
@@ -368,17 +370,18 @@ describe("budget caps", () => {
       "final-check": 0.6,
       "stage-scoping": 0.4,
       "options-continuity": 1.4,
+      "options-o2": 0.7,
     });
-    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping", "options-continuity"]);
+    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping", "options-continuity", "options-o2"]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
       expect(LEDGER_STAGES).toContain(stage);
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all eight caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all nine caps still fit
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(4.0);
+    expect(caps).toBeCloseTo(4.7);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -451,6 +454,33 @@ describe("budget caps", () => {
     expect(STAGE_CAP_REASONS["options-continuity"]).toMatch(/turnOC/);
     // The ledger read $34.02 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
     expect(34.02 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["options-continuity"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("runs version O2 (options-o2, 2026-09-30) beside production's form under its own prompt state: Luna medium, twice on the stored rolled chapter steps, interleaved", () => {
+    const plans = armsFor("options-o2", "beat");
+    const [production, o2] = ["adopted", "turnO2"].map((variant) => `gpt-6-luna@medium/${variant}`);
+    expect(plans.map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source, p.caseIds])).toEqual([
+      [production, 1, 2, "single-player", "stored", OPTIONS_O2_CASES],
+      [o2, 1, 2, "single-player", "stored", OPTIONS_O2_CASES],
+    ]);
+    // The 32 stored rolled chapter steps: the only turns whose request O2 changes; none from the round cases
+    expect(OPTIONS_O2_CASES.length).toBe(32);
+    expect(new Set(OPTIONS_O2_CASES).size).toBe(32);
+    expect(OPTIONS_O2_CASES.every((id) => /^(cont|synth)-/.test(id))).toBe(true);
+    // Arm O's retest cases are among them
+    for (const id of OPTIONS_CONTINUITY_RETEST_CASES) expect(OPTIONS_O2_CASES).toContain(id);
+    for (const role of ["setup", "switch", "thread", "iteration"] as const) expect(armsFor("options-o2", role)).toEqual([]);
+    expect(pipelinePlans("options-o2")).toEqual([]);
+    expect(stageInterleavesArms("options-o2")).toBe(true);
+    expect(OPTIONS_O2_PROMPT_STATE).toBe("adopted3");
+    // Against production's form beside it, with arm O and its retest second; priced from the retest, the form it builds on
+    expect(referenceKey(o2)).toBe(production);
+    expect(secondReferenceKeys(o2)).toEqual(["gpt-6-luna@medium/turnO", "gpt-6-luna@medium/turnOb"]);
+    expect(estimateBaseKey(o2)).toBe("gpt-6-luna@medium/turnOb");
+    expect(STAGE_CAP_REASONS["options-o2"]).toMatch(/turnO2/);
+    expect(STAGE_CAP_REASONS["options-o2"]).toMatch(/2026-09-30/);
+    // The ledger read $35.40 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
+    expect(35.4 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["options-o2"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {

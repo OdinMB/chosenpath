@@ -22,6 +22,7 @@ import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricin
 import {
   FINAL_CHECK_SETUP_PREMISES,
   FINAL_CHECK_TEMPLATE_PREMISES,
+  OPTIONS_O2_CASES,
   ROUND2_SWITCH_CHAIN_CASES,
   ROUND3_PROBLEM_TURN,
   ROUND3_REPLAY_CASES,
@@ -505,6 +506,21 @@ describe("planJobs: the round stages and the migration check", () => {
     // Other stages keep their plan order: one arm's cases and samples, then the next arm's
     const gate = planJobs(cases, { stage: "form-gate", promptState: "adopted1", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
     expect(gate.map((j) => `${j.caseId} ${j.armKey.split("/")[1]}`)).toEqual(["sp adopted", "sp-later adopted", "sp adoptedSplit", "sp-later adoptedSplit"]);
+  });
+
+  it("plans version O2 (2026-09-30) beside production's form on its rolled steps only, interleaved, with production's single-player turn limits", () => {
+    const [first, second] = OPTIONS_O2_CASES;
+    const cases = [
+      evalCase(first, "beat", { state: threadBeat(1, { id: "story-a" }).getState() }),
+      evalCase(second, "beat", { state: threadBeat(1, { id: "story-z" }).getState() }),
+      evalCase("sp-other", "beat", { state: threadBeat(1, { id: "story-b" }).getState() }),
+    ];
+    const jobs = planJobs(cases, { stage: "options-o2", promptState: "adopted3", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
+    expect(jobs.map((j) => `${j.caseId} s${j.sample} ${j.armKey.split("/")[1]}`)).toEqual(
+      [1, 2].flatMap((s) => [first, second].flatMap((id) => ["adopted", "turnO2"].map((v) => `${id} s${s} ${v}`)))
+    );
+    for (const job of jobs) expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    expect(planJobs(cases, { stage: "options-o2", promptState: "adopted3", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
   });
 
   it("plans the group round (B10): the sharpened note twice on the stored group turns, today's group form's sample 2 beside it", () => {

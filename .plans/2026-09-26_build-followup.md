@@ -1438,3 +1438,37 @@ No calls, no spend (ledger $33.74 of $40; the dry run's per-stage figures). The 
 - **Checks:** the builder's `metadataLeaks` and `htmlLeaks` clean; `--rerender-page c286f17b82` byte-identical; a temporary Jest check (since deleted) parsed the page: 16 items, each with A, B and "About the same", the title, text, options, mechanics and changes rows (mechanics open at load), the context folds with the chapter's earlier turns in full, the five questions, no key token; a synthetic all-A export scored by `scorePairwise` (candidate `turnO`, 14 regular items, 7 wins, the repeat read as a different result). No browser check: Playwright failed to connect.
 - **Report:** `2026-09-30_options-continuity-report.md` rewritten around the page: the blind section first, the owner's checks before and after in one table, what the page compares after the rating.
 - **Spend:** $0; the ledger $35.40 of $40.
+
+## Version O2, the build (implementer, 2026-09-30)
+
+- **What was built, no calls, $0:** `turnO2` (`o2` in `turnOptionsContinuity.ts`), in arm O's place on production's single-player turn form: O's stat variety with the lever option left out of the bonus count, O's retest sentence, B6's negative base said to hold, and a lever line that invites a reward until the chapter has offered one (sacrifices as arm O's `chapterLeverRule`). Its readings (`mainStatsDistinctLeverApart`, `leverFollowsO2Line`, `rewardWhereInvitedShare`), a stage `options-o2` (cap $0.70, reason recorded) under a new prompt state `adopted3`, interleaved, on `OPTIONS_O2_CASES`. Test-first; production's request byte for byte wherever O2 doesn't apply, and O2's edits undone give it back on every frozen single-player turn.
+- **Why O and OC cut rewards (read from the run's 64 rolled sets an arm, a temp probe, deleted):**
+  - Arm O's stats line. "At most one has no stat bonus" left no room for a bare sensible option beside a bare lever: production had 4 sets with two bonus-less options, all lever sets; arm O had none. 6 of production's 7 reward options carry no bonus (a reward turns aside from the goal). So the reward was squeezed out, or the sensible option took a bonus at base 0 (normal options at base 0 or above carrying a bonus: 81 → 102). That second effect is the negative-base drop. An arm O plan says it outright: "The three normal approaches can draw on distinct current bonuses without spending a resource or diverting from planning." (Sacrifices carrying a bonus: production 5 of 10, O 4 of 11, so not O's own.)
+  - Arm O's lever line. Where today's rate gives none after a chapter sacrifice, O's line ends "No reward this turn.". Production's 3 rewards on `cont-6edd813c-t2` (s1 of each case) broke its own "none this turn". Arm O's explicit sentence stopped them ("the instructions call for no reward this turn", an OC plan). So 3 of the 5 missing rewards were rule-breaks the explicit sentence closed.
+  - Where a lever fit (10 turns, `cont-7492b211-t2` left out), rewards and sacrifices were: production 4 and 1, O 2 and 2, OC 1 and 5, C 4 and 4. OC's further drop fits O's cause. Ten turns can't separate C's share of it.
+- **How O2 avoids them (my wording calls):**
+  - "The options also draw on different stats" instead of "Each option also draws…" (a reward draws on none).
+  - "At most one option that is neither a sacrifice nor a reward has no stat bonus". The brief's "at most one with no stat bonus" is kept for the normal options.
+  - "A sacrifice or reward option needs no stat bonus: what it spends or gains already sets it apart." This also answers "Risk alone never tells two options apart" for a reward, whose base is -30.
+  - The line invites a reward first and never says "No reward" while the chapter has offered none.
+  - The negative base, my call on the brief's "restore B6's trade-off wherever O weakened it": "Drawing on different stats doesn't change basePoints: the option that plays to the character's strength still takes -5 to -15, even when every option earns a bonus." I didn't write "every option with a bonus pays a negative base": B6's +5 for "one that uses something the story has established (… an ally's promise)" can carry a Contacts bonus, so that would contradict the scale. The main fix for the negative base is structural: a bare sensible option is allowed again beside a lever.
+- **The reward invitation, the brief's call made concrete:** a reward is invited wherever the chapter has offered none, whatever today's rate says. The build's earlier "I kept it under the rate" is superseded by the brief ("where a stat's rules allow one and the chapter hasn't offered one"). On the stored steps this changes the line on all 32 rolled steps (no stored chapter offered a reward before its turn), 21 of them where production says "none this turn". The risk to read in the run: the lever share can rise, since a reward is no longer spaced from a sacrifice by the rate. The sacrifice half is arm O's rule unchanged (a test holds it).
+- **Read end to end** (the O2 prompt, the schema unchanged and byte for byte production's):
+  - a chapter's first step with the rate at none (`cont-8988006e-t5-o0`: "a reward fits … No sacrifice this turn.");
+  - a step after a taken sacrifice (`cont-6edd813c-t2-o1`: invitation plus the strong-reason clause);
+  - a step where a reward fits and nothing was offered (`cont-2ee343b6-t2-o0`, `cont-checkpoi-t1-o0`: "a reward fits this turn if a stat allows it, and so does a sacrifice.");
+  - a last step after a reward, built in memory from `cont-8988006e-t7-o1` with the chapter's sacrifices made rewards: today's "none this turn" (reward closed, no first sacrifice by the rate).
+  - A switch turn and the ending are production's byte for byte (tests).
+  - Checked against B6's three ways, its weak and good examples (the good example's sacrifice names the stat it pays, which the retest sentence allows: "its bonus"), the modifiers line (no bonus for the stat a lever spends or gains: O's count pressed a lever toward a bonus, O2's says it needs none), the base-point field, NO_DOUBLE_SACRIFICE and the 0-or-1 lever rule. Nothing contradicts.
+- **Checks:**
+  - `mainStatsDistinctLeverApart` reads O2's own rule. `primaryStatsDistinct` stays the owner's variety reading, and it fails O2's allowed [bare, strength, bare lever] shape, so read both.
+  - `leverFollowsO2Line` is reported only where the line forbids a lever.
+  - `rewardWhereInvitedShare` covers the rolled sets whose chapter offered no reward yet.
+  - Baselines on the run's replies: `mainStatsDistinctLeverApart` production 23% ±3, O 39%, OC 48%; `rewardWhereInvitedShare` production 11% ±3 (7 of 64), C 9%, O 3%, OC 2%; `leverFollowsO2Line` binds only on `cont-8988006e-t5` (6 sets).
+  - `check-baselines.md` was re-rendered with them.
+- **The stage, my calls:**
+  - Only the 32 stored rolled steps, since O2 sends production's request byte for byte everywhere else.
+  - Production runs beside O2 at samples 1 and 2 under `adopted3`, so the waits compare in the same hour, as the report's "about $0.15 with production beside it" advised.
+  - Second references are `turnO` and `turnOb` (stored `adopted2`), and O2 is priced from `turnOb`.
+- **Dry run** (`--prompt-state adopted3`): 128 jobs, est $0.48 of $0.70 (`adopted` 64, $0.234; `turnO2` 64, $0.245), at least 13 min; that leaves room for the judge (about $0.03) and one fix and retest (O2 once on the 32, about $0.11).
+- **Spend:** $0; the ledger $35.41 of $40.

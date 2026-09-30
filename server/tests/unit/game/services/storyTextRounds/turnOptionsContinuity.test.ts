@@ -11,11 +11,14 @@ import {
   chapterLeverLine,
   chapterLeverRule,
   chapterLevers,
+  o2LeverLine,
+  o2LeverRule,
   optionsContinuityRequest,
   previousBeatBlock,
   productionTurnForm,
 } from "../../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
+import { OPTIONS_O2_CASES } from "../../../../../src/evals/textModelEval/arms.js";
 import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
@@ -450,14 +453,160 @@ describe("arm O's fix-and-retest (turnOb): the option's words never name the sta
   });
 });
 
+describe("version O2: O's stat variety with the lever option left out of it, O's retest sentence, B6's negative base kept, and a reward invited once a chapter", () => {
+  // The coordinator's brief after the run of 2026-09-30: O's variety gain without its wrong-way moves. O's
+  // "at most one has no stat bonus" left no room for a bonus-less sensible option beside a bonus-less lever (production
+  // 4 such sets of 64, all lever sets, arm O none), and 6 of production's 7 rewards had no bonus; O's line also said
+  // "No reward this turn." where today's rate gives none, which stopped the 3 rewards production offered there
+  const O2 = { options: true, continuity: false, o2: true };
+  const withoutO2 = (story: Story, prompt: string) =>
+    prompt
+      .replace(`${OPTIONS_CONTINUITY_TEXT.o2Stats}\n${OPTIONS_CONTINUITY_TEXT.o2NegativeBase}\n`, "")
+      .replace(`${OPTIONS_CONTINUITY_TEXT.riskOnlyWeak}\n`, "")
+      .replace(`--- ${o2LeverLine(story, "player1")}\n`, `--- ${sacrificeRewardLine(story, "player1")}\n`);
+
+  it("is worded as the brief asks: O's rule with the lever option left out, the retest sentence, and the negative base kept", () => {
+    expect(OPTIONS_CONTINUITY_TEXT.o2Stats).toBe(
+      "--- The options also draw on different stats: no two take their main stat bonus from the same stat, and at most one option that is neither a sacrifice nor a reward has no stat bonus (as far as the stats' current values give bonuses). A sacrifice or reward option needs no stat bonus: what it spends or gains already sets it apart. Risk alone never tells two options apart. An option's words say what the character does; they never name the stat its bonus comes from."
+    );
+    expect(OPTIONS_CONTINUITY_TEXT.o2NegativeBase).toBe(
+      "--- Drawing on different stats doesn't change basePoints: the option that plays to the character's strength still takes -5 to -15, even when every option earns a bonus."
+    );
+    // O's retest sentence word for word, closing the stats line as it closed O's
+    expect(OPTIONS_CONTINUITY_TEXT.o2Stats.endsWith(` ${OPTIONS_CONTINUITY_TEXT.statsUnnamed}`)).toBe(true);
+  });
+
+  it.each([
+    ["a chapter's first step", () => chapterStep("challenge", 0)],
+    ["a chapter's middle step", () => chapterStep("challenge", 1)],
+    ["a chapter's last step", () => chapterStep("challenge", 2)],
+    ["a step after a sacrifice", () => withHistory([switchBeat(), challengeBeat(["sacrifice"])], 1, [], 3)],
+    ["a step after a reward", () => withHistory([switchBeat(), challengeBeat(["reward"]), challengeBeat(), challengeBeat()])],
+  ] as const)("%s: production's request with O2's two lines after B6's third way, O's risk-only weak example and O2's lever line, and nothing else", (_, build) => {
+    const story = build();
+    const { prompt, schema } = optionsContinuityRequest(story, O2);
+    const base = productionTurnForm(story).prompt;
+    expect(occurrences(prompt, OPTIONS_CONTINUITY_TEXT.o2Stats)).toBe(1);
+    expect(occurrences(prompt, OPTIONS_CONTINUITY_TEXT.o2NegativeBase)).toBe(1);
+    expect(occurrences(prompt, OPTIONS_CONTINUITY_TEXT.riskOnlyWeak)).toBe(1);
+    // Right after the third way, before B6's weak example
+    expect(prompt).toContain(`--- one costs or risks something the others don't (a sacrifice, a chased reward, a relationship put on the line), or serves a different stake of the character's.\n${OPTIONS_CONTINUITY_TEXT.o2Stats}\n${OPTIONS_CONTINUITY_TEXT.o2NegativeBase}\n--- Weak: "Use your speech skill to`);
+    // O's own stats line, which left no room for a bonus-less lever, is not sent
+    expect(prompt).not.toContain(OPTIONS_CONTINUITY_TEXT.drawsOnStats);
+    expect(prompt).toContain(`--- ${o2LeverLine(story, "player1")}\n`);
+    expect(occurrences(prompt, "Sacrifice or reward: ")).toBe(1);
+    expect(withoutO2(story, prompt)).toBe(base);
+    expect(json(schema)).toBe(json(productionTurnForm(story).schema));
+  });
+
+  it.each([
+    ["the first turn", () => firstSwitchBeat(1)],
+    ["a switch after a chapter", switchAfterChapter],
+    ["an exploration step", () => chapterStep("exploration", 1)],
+    ["the ending", () => endingBeat(1)],
+  ] as const)("%s: no rolled options, so the base exactly", (_, build) => {
+    const story = build();
+    expect(optionsContinuityRequest(story, O2).prompt).toBe(productionTurnForm(story).prompt);
+    expect(json(optionsContinuityRequest(story, O2).schema)).toBe(json(productionTurnForm(story).schema));
+  });
+
+  it("needs arm O's place and carries the retest sentence itself", () => {
+    expect(() => optionsContinuityRequest(chapterStep("challenge", 1), { options: false, continuity: false, o2: true })).toThrow(/O2/);
+    expect(() => optionsContinuityRequest(chapterStep("challenge", 1), { options: true, continuity: false, o2: true, statsUnnamed: true })).toThrow(/O2/);
+  });
+
+  (frozen.length ? it : it.skip)("every frozen single-player turn: production's request with O2's edits on the rolled steps, the base elsewhere", () => {
+    const cases = frozen.filter((c) => c.role === "beat" && !c.tags.multiplayer);
+    let edited = 0;
+    for (const c of cases) {
+      const story = caseStory(c);
+      const { prompt } = optionsContinuityRequest(story, O2);
+      const base = productionTurnForm(story).prompt;
+      expect({ id: c.id, undone: withoutO2(story, prompt) === base }).toEqual({ id: c.id, undone: true });
+      if (prompt !== base) {
+        edited++;
+        expect({ id: c.id, lines: occurrences(prompt, "Sacrifice or reward: ") }).toEqual({ id: c.id, lines: 1 });
+      }
+    }
+    // Where arm O edits: the 32 rolled steps among the 44 stored turns, and the built rolled step among the round cases
+    expect(edited).toBe(33);
+    // The stage runs it on exactly the stored ones
+    const storedEdited = cases.filter((c) => c.tags.source !== "round" &&optionsContinuityRequest(caseStory(c), O2).prompt !== productionTurnForm(caseStory(c)).prompt).map((c) => c.id);
+    expect([...storedEdited].sort()).toEqual([...OPTIONS_O2_CASES].sort());
+  });
+});
+
+describe("o2LeverRule and o2LeverLine: a reward invited until the chapter offered one, sacrifices as arm O counts them", () => {
+  const earlier = () => endedChapter(ENCLAVE, 2, 1, "The enclave listens");
+
+  it("invites a reward whenever the chapter has offered none, whatever today's rate says; a sacrifice as arm O allows it", () => {
+    const cases: [string, Story, { reward: boolean; sacrifice: string }][] = [
+      ["no lever yet, today's rate fits", withHistory([switchBeat(), challengeBeat()]), { reward: true, sacrifice: "fits" }],
+      // The chapter before offered a sacrifice in the player's last two rolled turns: today's rate gives none
+      ["a lever in the chapter before", withHistory([switchBeat(), challengeBeat(), challengeBeat(["sacrifice"]), switchBeat()], 4, [earlier()]), { reward: true, sacrifice: "none" }],
+      ["after a sacrifice", withHistory([switchBeat(), challengeBeat(["sacrifice"])], 1, [], 3), { reward: true, sacrifice: "strongReason" }],
+      ["after a reward, today's rate fits again", withHistory([switchBeat(), challengeBeat(["reward"]), challengeBeat(), challengeBeat()]), { reward: false, sacrifice: "fits" }],
+      ["right after a reward", withHistory([switchBeat(), challengeBeat(["reward"])], 1, [], 3), { reward: false, sacrifice: "none" }],
+      ["after a reward and a sacrifice", withHistory([switchBeat(), challengeBeat(["reward"]), challengeBeat(["sacrifice"], 1)]), { reward: false, sacrifice: "strongReason" }],
+    ];
+    for (const [label, story, rule] of cases) expect({ label, rule: o2LeverRule(story, "player1") }).toEqual({ label, rule });
+    // The sacrifice half is arm O's rule, unchanged
+    for (const [, story] of cases) expect(o2LeverRule(story, "player1").sacrifice).toBe(chapterLeverRule(story, "player1").sacrifice);
+  });
+
+  it("puts the invitation first in the brief's words, and never says there is no reward while the chapter has offered none", () => {
+    const fits = withHistory([switchBeat(), challengeBeat()]);
+    expect(o2LeverLine(fits, "player1")).toBe("Sacrifice or reward: a reward fits this turn if a stat allows it, and so does a sacrifice.");
+    const noSacrifice = withHistory([switchBeat(), challengeBeat(), challengeBeat(["sacrifice"]), switchBeat()], 4, [earlier()]);
+    expect(o2LeverLine(noSacrifice, "player1")).toBe("Sacrifice or reward: a reward fits this turn if a stat allows it. No sacrifice this turn.");
+    const taken = withHistory([switchBeat(), challengeBeat(["sacrifice"])], 1, [], 3);
+    expect(o2LeverLine(taken, "player1")).toBe(
+      "Sacrifice or reward: a reward fits this turn if a stat allows it. This thread already offered a sacrifice, which the player took, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text."
+    );
+    const twice = withHistory([switchBeat(), challengeBeat(["sacrifice"], 1), challengeBeat(["normal", "sacrifice"], 0)], 1, [], 3);
+    expect(o2LeverLine(twice, "player1")).toBe(
+      "Sacrifice or reward: a reward fits this turn if a stat allows it. This thread already offered two sacrifices, and the player took none of them, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text."
+    );
+    for (const story of [fits, noSacrifice, taken, twice]) {
+      expect(o2LeverLine(story, "player1")).not.toMatch(/No reward/);
+      expect(o2LeverLine(story, "player1")).toMatch(/^Sacrifice or reward: a reward fits this turn if a stat allows it/);
+    }
+  });
+
+  it("closes the reward once the chapter offered one, chosen or not", () => {
+    const again = withHistory([switchBeat(), challengeBeat(["reward"]), challengeBeat(), challengeBeat()]);
+    expect(o2LeverLine(again, "player1")).toBe("Sacrifice or reward: a sacrifice fits this turn if a stat allows it. No reward: this thread already offered one.");
+    const declined = withHistory([switchBeat(), challengeBeat(["normal", "reward"], 0)], 1, [], 3);
+    expect(o2LeverLine(declined, "player1")).toBe("Sacrifice or reward: none this turn.");
+    const both = withHistory([switchBeat(), challengeBeat(["reward"]), challengeBeat(["sacrifice"], 1)]);
+    expect(o2LeverLine(both, "player1")).toBe(
+      "Sacrifice or reward: this thread already offered a sacrifice, which the player didn't take, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text. No reward: this thread already offered one."
+    );
+    for (const story of [again, declined, both]) expect(o2LeverLine(story, "player1")).not.toMatch(/a reward fits|again\b/);
+  });
+
+  (frozen.length ? it : it.skip)("on the frozen rolled steps: invites a reward on every one, since no stored chapter offered a reward before its turn", () => {
+    const rolled = frozen
+      .filter((c) => c.role === "beat" && !c.tags.multiplayer)
+      .map((c) => ({ id: c.id, story: caseStory(c) }))
+      .filter(({ story }) => optionsContinuityRequest(story, O).prompt !== productionTurnForm(story).prompt);
+    expect(rolled.length).toBe(33);
+    for (const { id, story } of rolled) {
+      expect({ id, reward: o2LeverRule(story, "player1").reward }).toEqual({ id, reward: true });
+      expect({ id, sacrifice: o2LeverRule(story, "player1").sacrifice }).toEqual({ id, sacrifice: chapterLeverRule(story, "player1").sacrifice });
+    }
+  });
+});
+
 describe("the eval's variants", () => {
-  it("turnO, turnC, turnOC and turnOb build the arms with production's single-player turn limits", () => {
+  it("turnO, turnC, turnOC, turnOb and turnO2 build the arms with production's single-player turn limits", () => {
     const story = chapterStep("challenge", 0);
     for (const [variant, arm] of [
       ["turnO", O],
       ["turnC", C],
       ["turnOC", OC],
       ["turnOb", { options: true, continuity: false, statsUnnamed: true }],
+      ["turnO2", { options: true, continuity: false, o2: true }],
     ] as const) {
       const request = requestFor(variant, { role: "beat", story });
       expect(requestText(request)).toBe(optionsContinuityRequest(story, arm).prompt);

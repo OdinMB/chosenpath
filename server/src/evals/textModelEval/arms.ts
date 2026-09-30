@@ -33,10 +33,20 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * paid final check on production's own code, each with the arms its phase
  * set (armsFor, pipelinePlans). The owner's feedback of 2026-09-29 adds the
  * stage scoping (planner v2d and its judged stage check), and that of
- * 2026-09-30 the options and continuity arms on production's turn form. Their
- * caps and reasons are in budget.ts.
+ * 2026-09-30 the options and continuity arms on production's turn form, then
+ * version O2 beside production's form. Their caps and reasons are in budget.ts.
  */
-export const FEEDBACK_STAGES = ["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping", "options-continuity"] as const;
+export const FEEDBACK_STAGES = [
+  "plan-refresh",
+  "reruns",
+  "setup-retests",
+  "groups",
+  "form-gate",
+  "final-check",
+  "stage-scoping",
+  "options-continuity",
+  "options-o2",
+] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
 export const STAGES: Stage[] = ["0", "1-2", "3", "4", "setup-rounds", "turn-rounds", "migration", ...FEEDBACK_STAGES];
@@ -175,18 +185,22 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   turnOC: "adopted",
   // Arm O's one fix-and-retest (after the run of 2026-09-30) against production's form too, arm O second
   turnOb: "adopted",
+  // Version O2 (the coordinator's brief after that run) against production's form, which runs beside it
+  turnO2: "adopted",
 };
 
 /**
  * The earlier form each variant re-runs with one change, whose measured
  * outputs price it until it has its own: the Stage 4 forms of the count fix,
- * and arm O for its fix-and-retest.
+ * arm O for its fix-and-retest, and that retest for version O2 (whose
+ * sentence O2 carries, measured on rolled steps only, as O2 runs).
  */
 const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   rewrite2: "rewrite",
   rewrite2Slim: "rewriteSlim",
   rewrite2ZeroShot: "rewriteZeroShot",
   turnOb: "turnO",
+  turnO2: "turnOb",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -270,6 +284,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_MEDIUM, "turnOC")]: [armKey(LUNA_MEDIUM, "turnO"), armKey(LUNA_MEDIUM, "turnC")],
   // Arm O's fix-and-retest against arm O, the text it fixes
   [armKey(LUNA_MEDIUM, "turnOb")]: [armKey(LUNA_MEDIUM, "turnO")],
+  // Version O2 against arm O (its gain and its wrong-way moves) and the retest whose sentence it carries (stored, adopted2)
+  [armKey(LUNA_MEDIUM, "turnO2")]: [armKey(LUNA_MEDIUM, "turnO"), armKey(LUNA_MEDIUM, "turnOb")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
   // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
   // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
@@ -462,6 +478,8 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return stageScopingArms(role);
     case "options-continuity":
       return optionsContinuityArms(role);
+    case "options-o2":
+      return optionsO2Arms(role);
     default:
       return [];
   }
@@ -526,8 +544,57 @@ export const OPTIONS_CONTINUITY_RETEST_CASES = [
   "synth-8988006e-t7-pregeneration_6_player1_2",
 ];
 
+/**
+ * The prompt state of version O2's run (2026-09-30): production's own code,
+ * unchanged since adopted2 (only eval code moved), under a tag of its own so
+ * production's form runs at samples 1 and 2 beside O2 in the same hour; arm O
+ * and its retest stay adopted2's records, read as stored references (today's
+ * code rebuilds their requests byte for byte).
+ */
+export const OPTIONS_O2_PROMPT_STATE = "adopted3";
+
+/**
+ * Version O2's cases: the 32 stored rolled chapter steps (a single player's
+ * challenge and contest steps), the only stored turns whose request O2
+ * changes (elsewhere it sends production's byte for byte), so production's
+ * form beside it runs only where the two differ. The three cont-7492b211-t2
+ * cases (a played step whose options were typed as exploration, a state
+ * production never stores) are read with and without.
+ */
+export const OPTIONS_O2_CASES = [
+  "cont-2ee343b6-t2-o0",
+  "cont-2ee343b6-t2-o1",
+  "cont-2ee343b6-t2-o2",
+  "cont-6edd813c-t2-o0",
+  "cont-6edd813c-t2-o1",
+  "cont-6edd813c-t2-o2",
+  "cont-6edd813c-t3-o0",
+  "cont-6edd813c-t3-o1",
+  "cont-6edd813c-t3-o2",
+  "cont-checkpoi-t1-o0",
+  "cont-checkpoi-t1-o1",
+  ...OPTIONS_CONTINUITY_RETEST_CASES,
+];
+
+/**
+ * Version O2's run (the coordinator's brief after the run of 2026-09-30):
+ * production's single-player turn form (adopted) and O2 (turnO2) on Luna
+ * medium, production's single-player turn model, twice on OPTIONS_O2_CASES,
+ * interleaved, so both meet the same server pace.
+ */
+function optionsO2Arms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return (["adopted", "turnO2"] as const).map((variant) => ({
+    arm: adoptedDefault("beat", variant),
+    samples: 2,
+    scope: "single-player" as const,
+    source: "stored" as const,
+    caseIds: OPTIONS_O2_CASES,
+  }));
+}
+
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
-const INTERLEAVED_STAGES: Stage[] = ["options-continuity"];
+const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2"];
 
 export function stageInterleavesArms(stage: Stage): boolean {
   return INTERLEAVED_STAGES.includes(stage);

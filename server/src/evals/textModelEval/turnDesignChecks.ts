@@ -7,7 +7,7 @@ import { expectedOptionType } from "../../game/services/beatRepairs.js";
 import { outcomeIdsNamed, resultKind } from "../../game/services/planChecks.js";
 import { allowedLengths, chaptersThatFit, outcomeNeeds, stageOf, turnsLeft } from "../../game/services/storyTextRounds/pacing.js";
 import { sacrificeRewardLine } from "../../game/services/storyTextRounds/turnRound2.js";
-import { chapterLeverRule, chapterLevers } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
+import { chapterLeverRule, chapterLevers, o2LeverRule } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
 import { canAddMilestones } from "../../game/services/storyTextSteps.js";
 import { playerParagraphs } from "./playerText.js";
 import type { CheckResult } from "./textChecks.js";
@@ -672,13 +672,25 @@ export function reusedFromPrevious(previousText: string, text: string): { pairs:
  * heuristic, for the hand read); arm O's lever line (chapterLeverRule) reads
  * as leverFollowsChapterLine, no lever it gives none of, and today's rate as
  * leverFollowsRateLine, which a second sacrifice arm O allows for a strong
- * reason fails by design. On every turn after the first, the sentences and the
- * opening told again from the player's previous beat. Counts that pool into
- * shares are reported on every reply.
+ * reason fails by design. Version O2's own readings: its stat rule
+ * (mainStatsDistinctLeverApart, a sacrifice or reward option left out of the
+ * "at most one without a bonus"), its lever line (leverFollowsO2Line, where it
+ * forbids a lever) and the sets where it invites a reward, with those that
+ * carry one (rewardWhereInvitedShare), read on every arm. On every turn after
+ * the first, the sentences and the opening told again from the player's
+ * previous beat. Counts that pool into shares are reported on every reply.
  */
 function feedbackChecks(story: Story, reply: SetOfBeatGenerationSchema): CheckResult {
   const checks: Record<string, boolean> = {};
-  const counts: Record<string, number> = { sameStatsOnlyRiskSets: 0, secondSacrificeSets: 0, unreasonedSecondSacrifices: 0, reusedSentences: 0, turnSentences: 0 };
+  const counts: Record<string, number> = {
+    sameStatsOnlyRiskSets: 0,
+    secondSacrificeSets: 0,
+    unreasonedSecondSacrifices: 0,
+    rewardInvitedSets: 0,
+    rewardWhereInvitedSets: 0,
+    reusedSentences: 0,
+    turnSentences: 0,
+  };
   const rolled = story.getCurrentBeatType() === "thread";
   const and = (name: string, ok: boolean) => {
     checks[name] = (checks[name] ?? true) && ok;
@@ -695,6 +707,9 @@ function feedbackChecks(story: Story, reply: SetOfBeatGenerationSchema): CheckRe
       const named = mains.filter((m): m is string => m !== undefined);
       add("distinctPrimaryStats", new Set(named).size);
       and("primaryStatsDistinct", new Set(named).size === named.length && mains.length - named.length <= 1);
+      // Version O2's rule: a sacrifice or reward option is left out of the "at most one without a bonus" count
+      const bareNormal = options.filter((o, i) => o.resourceType === "normal" && mains[i] === undefined).length;
+      and("mainStatsDistinctLeverApart", new Set(named).size === named.length && bareNormal <= 1);
       if (options.some((a, i) => options.some((b, j) => i < j && onlyRiskApart(a, b)))) add("sameStatsOnlyRiskSets", 1);
     }
     if (rolled && expectedOptionType(story, slot) === "challenge") {
@@ -708,6 +723,15 @@ function feedbackChecks(story: Story, reply: SetOfBeatGenerationSchema): CheckRe
       const rule = chapterLeverRule(story, slot);
       if (rule.sacrifice === "none" || !rule.reward) {
         and("leverFollowsChapterLine", (rule.sacrifice !== "none" || sacrifices.length === 0) && (rule.reward || rewards === 0));
+      }
+      // Version O2's line: a reward invited until the chapter offered one (whatever today's rate says), sacrifices as arm O's
+      const o2 = o2LeverRule(story, slot);
+      if (o2.reward) {
+        add("rewardInvitedSets", 1);
+        if (rewards > 0) add("rewardWhereInvitedSets", 1);
+      }
+      if (o2.sacrifice === "none" || !o2.reward) {
+        and("leverFollowsO2Line", (o2.sacrifice !== "none" || sacrifices.length === 0) && (o2.reward || rewards === 0));
       }
       if (levers.sacrifices > 0 && sacrifices.length > 0) {
         add("secondSacrificeSets", 1);

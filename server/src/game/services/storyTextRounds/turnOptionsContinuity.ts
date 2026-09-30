@@ -30,6 +30,10 @@ import { sacrificeRewardLine, todaysFormWithB6Request } from "./turnRound2.js";
  *   exactly where" lines of the prompt and the text field: pick up where the
  *   previous beat ended and move the story forward.
  * - Arm OC: both.
+ * - Version O2 (the coordinator's brief after the run): arm O's place, with its
+ *   stats line reworded so a sacrifice or reward option needs no stat bonus,
+ *   O's retest sentence, B6's negative base said to hold, and a lever line that
+ *   invites a reward until the chapter has offered one (sacrifices as arm O).
  * Edits are anchored on production's wording, each exactly once (roundEdits.ts).
  * Model-facing text says "thread" and "beat".
  */
@@ -39,9 +43,10 @@ const LABEL = "Options and continuity turn";
 /**
  * Which arm: O's options, C's continuity, both; `statsUnnamed` is arm O's one
  * fix-and-retest after the run of 2026-09-30 (turnOb), one sentence closing its
- * stats line.
+ * stats line; `o2` is version O2 in arm O's place (the coordinator's brief
+ * after that run), which carries the retest sentence itself.
  */
-export type OptionsContinuityArm = { options: boolean; continuity: boolean; statsUnnamed?: boolean };
+export type OptionsContinuityArm = { options: boolean; continuity: boolean; statsUnnamed?: boolean; o2?: boolean };
 
 // ---------------------------------------------------------------- the base: production's form
 
@@ -78,6 +83,26 @@ const RISK_ONLY_WEAK = "--- Weak: three options that each earn +10 from Nerve an
 // Arm O's fix-and-retest (turnOb): in the run of 2026-09-30 its options named their stat ("Use your Technical skill to…" /
 // "Use your Creative skill to…"), B6's one approach three times; "its bonus", since a sacrifice's text names the stat it pays
 const STATS_UNNAMED = "An option's words say what the character does; they never name the stat its bonus comes from.";
+
+/*
+ * Version O2 (the coordinator's brief after the run of 2026-09-30): arm O's stat
+ * variety without the two things that cut its rewards and weakened B6's
+ * trade-off. Arm O's "at most one has no stat bonus" left no room for a
+ * bonus-less sensible option beside a bonus-less lever: production had 4 such
+ * sets of 64 (all lever sets), arm O none, and 6 of production's 7 rewards had
+ * no bonus, so the reward was the option squeezed out ("The three normal
+ * approaches can draw on distinct current bonuses without spending a resource",
+ * an arm O plan) or the sensible option took a bonus at 0 (normal options at
+ * base 0 or above with a bonus 81 → 102). So the lever option is left out of
+ * the count and needs no bonus (the modifiers line already says a lever's own
+ * stat gives none), the options "draw on different stats" rather than "each
+ * option" (a reward draws on none), and B6's negative base for the option that
+ * plays to the strength is said to hold whatever the others draw on. O's
+ * retest sentence closes the stats line as it closed turnOb's.
+ */
+const O2_STATS = `--- The options also draw on different stats: no two take their main stat bonus from the same stat, and at most one option that is neither a sacrifice nor a reward has no stat bonus (as far as the stats' current values give bonuses). A sacrifice or reward option needs no stat bonus: what it spends or gains already sets it apart. Risk alone never tells two options apart. ${STATS_UNNAMED}`;
+const O2_NEGATIVE_BASE =
+  "--- Drawing on different stats doesn't change basePoints: the option that plays to the character's strength still takes -5 to -15, even when every option earns a bonus.";
 
 function threadOf(story: Story, slot: string): Thread | undefined {
   return story.getCurrentThreadAnalysis()?.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
@@ -159,10 +184,48 @@ export function chapterLeverLine(story: Story, slot: string): string {
   return `Sacrifice or reward: ${sacrifice} ${reward}`;
 }
 
-function optionEdits(instructions: string, story: Story, statsUnnamed: boolean): string {
-  let edited = replaceOnce(LABEL, instructions, THIRD_WAY, `${THIRD_WAY}${DRAWS_ON_STATS}${statsUnnamed ? ` ${STATS_UNNAMED}` : ""}\n`);
+/**
+ * Version O2's rule: a reward invited wherever the chapter (thread) has offered
+ * none yet, whatever today's rate says (the brief: the line invites a reward
+ * where a stat's rules allow one and the chapter hasn't offered one), and never
+ * a second; sacrifices as arm O counts them (chapterLeverRule).
+ */
+export function o2LeverRule(story: Story, slot: string): ChapterLeverRule {
+  return { reward: chapterLevers(story, slot).rewards === 0, sacrifice: chapterLeverRule(story, slot).sacrifice };
+}
+
+const REWARD_FITS = "a reward fits this turn if a stat allows it";
+const NO_REWARD_OFFERED = "No reward: this thread already offered one.";
+
+/**
+ * Version O2's lever line: the reward invitation first while the chapter has
+ * offered no reward, then the sacrifice as arm O allows it (fits, none, or a
+ * second only for a strong reason stated in the option's text); once the
+ * chapter offered a reward, the sacrifice alone and "No reward", or today's
+ * "none this turn" where no sacrifice fits either. It never says there is no
+ * reward while the chapter has offered none (arm O's "No reward this turn."
+ * stopped every reward production offered against today's "none this turn").
+ */
+export function o2LeverLine(story: Story, slot: string): string {
+  const levers = chapterLevers(story, slot);
+  const rule = o2LeverRule(story, slot);
+  const strongReason = `this thread already offered ${sacrificesSoFar(levers)}, ${STRONG_REASON}.`;
+  if (rule.reward) {
+    if (rule.sacrifice === "fits") return `Sacrifice or reward: ${REWARD_FITS}, and so does a sacrifice.`;
+    if (rule.sacrifice === "none") return `Sacrifice or reward: ${REWARD_FITS}. No sacrifice this turn.`;
+    return `Sacrifice or reward: ${REWARD_FITS}. ${strongReason.charAt(0).toUpperCase()}${strongReason.slice(1)}`;
+  }
+  if (rule.sacrifice === "fits") return `Sacrifice or reward: a sacrifice fits this turn if a stat allows it. ${NO_REWARD_OFFERED}`;
+  if (rule.sacrifice === "none") return NONE_THIS_TURN;
+  return `Sacrifice or reward: ${strongReason} ${NO_REWARD_OFFERED}`;
+}
+
+function optionEdits(instructions: string, story: Story, arm: OptionsContinuityArm): string {
+  const stats = arm.o2 ? `${O2_STATS}\n${O2_NEGATIVE_BASE}` : `${DRAWS_ON_STATS}${arm.statsUnnamed ? ` ${STATS_UNNAMED}` : ""}`;
+  const line = arm.o2 ? o2LeverLine(story, "player1") : chapterLeverLine(story, "player1");
+  let edited = replaceOnce(LABEL, instructions, THIRD_WAY, `${THIRD_WAY}${stats}\n`);
   edited = replaceOnce(LABEL, edited, WEAK_ONE_APPROACH, `${WEAK_ONE_APPROACH}${RISK_ONLY_WEAK}\n`);
-  return replaceOnce(LABEL, edited, `--- ${sacrificeRewardLine(story, "player1")}\n`, `--- ${chapterLeverLine(story, "player1")}\n`);
+  return replaceOnce(LABEL, edited, `--- ${sacrificeRewardLine(story, "player1")}\n`, `--- ${line}\n`);
 }
 
 // ---------------------------------------------------------------- arm C: continuity
@@ -216,12 +279,13 @@ function continuitySchema(schema: unknown): z.AnyZodObject {
 export function optionsContinuityRequest(story: Story, arm: OptionsContinuityArm): TextRequest {
   if (story.isMultiplayer()) throw new Error(`${LABEL}: the arms are single-player (group turns stay on production's group form)`);
   if (arm.statsUnnamed && !arm.options) throw new Error(`${LABEL}: statsUnnamed closes arm O's stats line, so it needs arm O`);
+  if (arm.o2 && (!arm.options || arm.statsUnnamed)) throw new Error(`${LABEL}: O2 takes arm O's place (options) and carries the retest sentence itself (no statsUnnamed)`);
   const base = productionTurnForm(story);
   const options = arm.options && rollsOptions(story);
   const continuity = arm.continuity && !story.isFirstBeat();
   if (!options && !continuity) return base;
   const { instructions, state } = splitAtState(LABEL, base.prompt);
-  let edited = options ? optionEdits(instructions, story, arm.statsUnnamed === true) : instructions;
+  let edited = options ? optionEdits(instructions, story, arm) : instructions;
   if (continuity) edited = replaceOnce(LABEL, edited, OLD_TEXT_START, `Text\n${PICK_UP}\n- The first paragraph must\n`);
   return {
     prompt: edited + (continuity ? continuityState(state, story) : state),
@@ -234,6 +298,8 @@ export const OPTIONS_CONTINUITY_TEXT = {
   drawsOnStats: DRAWS_ON_STATS,
   riskOnlyWeak: RISK_ONLY_WEAK,
   statsUnnamed: STATS_UNNAMED,
+  o2Stats: O2_STATS,
+  o2NegativeBase: O2_NEGATIVE_BASE,
   pickUp: PICK_UP,
   previousBeatHeading: PREVIOUS_BEAT_HEADING,
   oldContinue: OLD_CONTINUE,

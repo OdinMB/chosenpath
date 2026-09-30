@@ -691,6 +691,46 @@ describe("checkBeatDesign", () => {
       expect(checkBeatDesign(firstSwitchBeat(1), reward, reward).checks).not.toHaveProperty("leverFollowsChapterLine");
     });
 
+    it("reads version O2's stat rule: the main stats distinct, and at most one option without a bonus that is neither a sacrifice nor a reward", () => {
+      const story = threadBeat(1);
+      // O2's lever set: a bonus-less sensible option beside a strength option and a bonus-less reward (arm O's rule fails it)
+      const leverSet = withChallenge([{}, { modifiersToSuccessRate: [bonus("player1_nerve", 10)], basePoints: -10 }, { resourceType: "reward", basePoints: -30 }]);
+      expect(checkBeatDesign(story, leverSet, leverSet).checks).toMatchObject({ primaryStatsDistinct: false, mainStatsDistinctLeverApart: true });
+      // Two options on the same main stat, a lever beside them
+      const sameStat = withChallenge([{ modifiersToSuccessRate: [bonus("player1_nerve", 10)] }, { modifiersToSuccessRate: [bonus("player1_nerve", 15)] }, { resourceType: "reward", basePoints: -30 }]);
+      expect(checkBeatDesign(story, sameStat, sameStat).checks.mainStatsDistinctLeverApart).toBe(false);
+      // Two normal options without a bonus
+      const twoBare = withChallenge([{}, {}, { modifiersToSuccessRate: [bonus("player1_nerve", 10)] }]);
+      expect(checkBeatDesign(story, twoBare, twoBare).checks.mainStatsDistinctLeverApart).toBe(false);
+      // A lever's own bonus still counts against the others' main stats
+      const leverShares = withChallenge([{ modifiersToSuccessRate: [bonus("player1_nerve", 10)] }, {}, { resourceType: "sacrifice", basePoints: 30, modifiersToSuccessRate: [bonus("player1_nerve", 5)] }]);
+      expect(checkBeatDesign(story, leverShares, leverShares).checks.mainStatsDistinctLeverApart).toBe(false);
+      // Three normal options on three stats, or one of them bare: both rules pass
+      const three = withChallenge([{ modifiersToSuccessRate: [bonus("player1_nerve", 10)] }, { modifiersToSuccessRate: [bonus("player1_wits", 10)] }, {}]);
+      expect(checkBeatDesign(story, three, three).checks).toMatchObject({ primaryStatsDistinct: true, mainStatsDistinctLeverApart: true });
+      expect(checkBeatDesign(firstSwitchBeat(1), beatSet(1), beatSet(1)).checks).not.toHaveProperty("mainStatsDistinctLeverApart");
+    });
+
+    it("reads version O2's lever line: a reward invited where the chapter offered none, no lever it closes", () => {
+      const sacrifice = withChallenge([{ resourceType: "sacrifice", basePoints: 30, text: "Burn your last favor with Gruk (-10% Trust) before the patrol reaches the door" }, {}, {}]);
+      const reward = withChallenge([{}, {}, { resourceType: "reward", basePoints: -30 }]);
+      const plain = withChallenge([{}, {}, {}]);
+      // After a sacrifice: O2 invites a reward and allows a reasoned second sacrifice, so it forbids nothing
+      const afterSacrifice = chapterWith([opening(), past(["sacrifice"])]);
+      expect(checkBeatDesign(afterSacrifice, reward, reward).checks).not.toHaveProperty("leverFollowsO2Line");
+      expect(checkBeatDesign(afterSacrifice, reward, reward).counts).toMatchObject({ rewardInvitedSets: 1, rewardWhereInvitedSets: 1 });
+      expect(checkBeatDesign(afterSacrifice, plain, plain).counts).toMatchObject({ rewardInvitedSets: 1, rewardWhereInvitedSets: 0 });
+      // After a reward, right away: no second reward, and today's rate gives no first sacrifice
+      const afterReward = chapterWith([opening(), past(["reward"])]);
+      expect(checkBeatDesign(afterReward, reward, reward).checks.leverFollowsO2Line).toBe(false);
+      expect(checkBeatDesign(afterReward, sacrifice, sacrifice).checks.leverFollowsO2Line).toBe(false);
+      expect(checkBeatDesign(afterReward, plain, plain).checks.leverFollowsO2Line).toBe(true);
+      expect(checkBeatDesign(afterReward, reward, reward).counts).toMatchObject({ rewardInvitedSets: 0, rewardWhereInvitedSets: 0 });
+      // Reported on every reply, zero where it doesn't apply, so the share pools
+      expect(checkBeatDesign(firstSwitchBeat(1), reward, reward).counts).toMatchObject({ rewardInvitedSets: 0, rewardWhereInvitedSets: 0 });
+      expect(checkBeatDesign(firstSwitchBeat(1), reward, reward).checks).not.toHaveProperty("leverFollowsO2Line");
+    });
+
     describe("sentences and openings reused from the previous beat", () => {
       const previous = "You step onto the café terrace, collar up against the rain. Rain drums on the striped awning above the tables.\n\nMaya slides the demand sheet across the table toward you and waits. 'Read it,' she says.";
       const after = (text: string) => edited(threadBeat(1), (state) => {

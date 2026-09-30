@@ -173,6 +173,10 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * story forward), and both; single player only. "turnOb" is arm O's one
  * fix-and-retest after the run of 2026-09-30: arm O with one sentence closing
  * its stats line (an option's words never name the stat its bonus comes from).
+ * "turnO2" is version O2 (the coordinator's brief after that run), in arm O's
+ * place: the stats line with a sacrifice or reward option left out of the
+ * bonus count, the retest sentence, B6's negative base said to hold, and a
+ * lever line that invites a reward until the chapter has offered one.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -222,7 +226,8 @@ export type VariantId =
   | "turnO"
   | "turnC"
   | "turnOC"
-  | "turnOb";
+  | "turnOb"
+  | "turnO2";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -269,6 +274,7 @@ export const VARIANTS: VariantId[] = [
   "turnC",
   "turnOC",
   "turnOb",
+  "turnO2",
 ];
 
 /**
@@ -615,6 +621,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   turnC: optionsContinuity("turnC", { options: false, continuity: true }),
   turnOC: optionsContinuity("turnOC", { options: true, continuity: true }),
   turnOb: optionsContinuity("turnOb", { options: true, continuity: false, statsUnnamed: true }),
+  turnO2: optionsContinuity("turnO2", { options: true, continuity: false, o2: true }),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

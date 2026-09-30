@@ -122,6 +122,8 @@ export const RATIOS: { name: string; numerator: string; denominator: string }[] 
   { name: "secondSacrificeShare", numerator: "secondSacrificeSets", denominator: "challengeSets" },
   // Arm O allows a second sacrifice for a strong reason: the owner's criterion is the one without
   { name: "unreasonedSecondSacrificeShare", numerator: "unreasonedSecondSacrifices", denominator: "challengeSets" },
+  // Version O2 (2026-09-30): the rolled sets where its line invites a reward (the chapter offered none yet) that carry one
+  { name: "rewardWhereInvitedShare", numerator: "rewardWhereInvitedSets", denominator: "rewardInvitedSets" },
   { name: "reusedSentenceShare", numerator: "reusedSentences", denominator: "turnSentences" },
 ];
 
