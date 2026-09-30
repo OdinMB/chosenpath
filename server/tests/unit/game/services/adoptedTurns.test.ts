@@ -12,14 +12,9 @@ import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 import { stat, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
-import {
-  CHAPTER_RULES_HEADING,
-  SCOREBOARD_ENDING_RULE,
-  SHARED_OUTCOMES_LINE,
-  adoptedTurn,
-  adoptedTurnPrompt,
-  isScoreboardEnding,
-} from "../../../helpers/adoptedDeltas.js";
+import { CHAPTER_RULES_HEADING, adoptedTurn } from "../../../helpers/adoptedDeltas.js";
+import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../../../src/game/services/storyTextRounds/endingState.js";
+import { SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -28,10 +23,19 @@ import {
  * every other single-player turn, and every group turn (B6 was never built or
  * measured for groups), is today's request (the frozen round0 form), byte
  * for byte, on the stories the tests build and on every frozen beat case,
- * apart from the logged turn deltas (adoptedDeltas.ts): the scoreboard rule
- * on a scored contest's ending, and, since the owner's feedback of
- * 2026-09-28, no chapter rules on a switch turn.
+ * apart from the logged turn delta (adoptedDeltas.ts): since the owner's
+ * feedback of 2026-09-28, no chapter rules on a switch turn. Every ending,
+ * since the owner's decision of 2026-09-30, is the measured variant
+ * endingStateB byte for byte (each outcome told as its milestones leave it,
+ * the scoreboard rule with its unfinished half); until then an ending was
+ * today's form with the scoreboard rule on a scored contest's ending.
  */
+
+/** The measured request production must send: the ending as endingStateB, else a single player's turnB6 or a group's today's form. */
+function measuredTurn(story: Story): { prompt: string; schema: Parameters<typeof toJsonSchema>[0] } {
+  if (story.getCurrentBeatType() === "ending") return endingStateRequest(story);
+  return story.isMultiplayer() ? round0BeatStep.request(story) : todaysFormWithB6Request(story);
+}
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);
 
@@ -92,10 +96,10 @@ function expectSame(production: { prompt: string; schema: Parameters<typeof toJs
 /** The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. */
 const asAdopted = <T extends { prompt: string }>(measured: T, story: Story): T => ({ ...measured, prompt: adoptedTurn(measured.prompt, story) });
 
-describe("single-player turns: today's form with B6 as measured", () => {
+describe("single-player turns: today's form with B6 as measured, the ending as endingStateB", () => {
   it.each(SINGLE_PLAYER)("%s", (_, build) => {
     const story = build();
-    expectSame(beatStep.request(story), asAdopted(todaysFormWithB6Request(story), story));
+    expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
   });
 
   it("gives a challenge step B6's lines and a single player's other turns none", () => {
@@ -108,7 +112,7 @@ describe("single-player turns: today's form with B6 as measured", () => {
     expect(cases.length).toBeGreaterThan(40);
     for (const c of cases) {
       const story = caseStory(c);
-      expectSame(beatStep.request(story), asAdopted(todaysFormWithB6Request(story), story));
+      expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
     }
   });
 });
@@ -162,12 +166,12 @@ describe("the chapter rules: the planners' only", () => {
 });
 
 /*
- * The scoreboard ending rule (decision 3, settled; it lands without B8's
- * full ending format): the one line production adds to today's form, on the
- * ending of a story with a contested outcome, two players or two camps
- * (adoptedDeltas.ts).
+ * The ending (the owner's decision of 2026-09-30, measured as endingStateB):
+ * each outcome told as its milestones leave it, the game's standing of every
+ * outcome after the ending, and on a scored contest's ending (two players or
+ * two camps) the scoreboard rule with its unfinished half, in place of the
+ * rule production added to today's form on 2026-09-28 (decision 3).
  */
-const withEndingRule = (prompt: string) => adoptedTurnPrompt(prompt, true);
 
 /** The contest's scoreboard, a shared opposites stat, as a contest setup writes it. */
 const SCOREBOARD = stat("shared_voice_score", { name: "Enclave's Voice|Printers' Voice", type: "opposites", initialValue: 50 });
@@ -196,29 +200,32 @@ function contestEnding(players: number, mode: GameMode = GameModes.Competitive, 
   return scoreboard ? story.clone({ sharedStats: [SCOREBOARD], sharedStatValues: [{ statId: SCOREBOARD.id, value: 40 }] }) : story;
 }
 
-describe("group turns: today's form, and the scoreboard ending rule on a contest's ending", () => {
+describe("group turns: today's form, the ending as endingStateB", () => {
   it.each(GROUPS)("%s", (_, build) => {
     const story = build();
-    expectSame(beatStep.request(story), asAdopted(round0BeatStep.request(story), story));
+    expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
   });
 
   it.each([
     ["two players, competitive", () => contestEnding(2)],
     ["two players, cooperative-competitive", () => contestEnding(2, GameModes.CooperativeCompetitive)],
     ["three players (two camps)", () => contestEnding(3)],
-  ] as const)("the ending of a contest, %s: today's form plus the scoreboard rule, once", (_, build) => {
+  ] as const)("the ending of a contest, %s: endingStateB, the scoreboard rule with its unfinished half once", (_, build) => {
     const story = build();
     const production = beatStep.request(story);
-    const today = round0BeatStep.request(story);
-    expect(today.prompt.split(SHARED_OUTCOMES_LINE)).toHaveLength(2);
-    expect(production.prompt).toBe(withEndingRule(today.prompt));
-    expect(json(production.schema)).toBe(json(today.schema));
+    expectSame(production, endingStateRequest(story));
+    expect(production.prompt.split(SCOREBOARD_ENDING_RULE)).toHaveLength(2);
+    expect(SCOREBOARD_ENDING_RULE).toBe(ENDING_STATE_TEXT.contestRule);
+    expect(SCOREBOARD_ENDING_RULE).toContain("While it is unfinished, no side has won yet");
+    // The rule production sent until the adoption is gone
+    expect(production.prompt).not.toContain(ENDING_STATE_TEXT.measuredScoreboardRule);
   });
 
   it("prints the rule on no other turn of a contest, and on no ending without one", () => {
     const beforeEnding = contestEnding(2).clone({ maxTurns: 20 });
     expect(beforeEnding.getCurrentBeatType()).not.toBe("ending");
     expect(beatStep.request(beforeEnding).prompt).not.toContain(SCOREBOARD_ENDING_RULE);
+    expect(beatStep.request(beforeEnding).prompt).not.toContain(ENDING_STATE_TEXT.tellAsLeft);
     expect(beatStep.request(endingBeat(2)).prompt).not.toContain(SCOREBOARD_ENDING_RULE);
     expect(beatStep.request(endingBeat(1)).prompt).not.toContain(SCOREBOARD_ENDING_RULE);
   });
@@ -228,20 +235,21 @@ describe("group turns: today's form, and the scoreboard ending rule on a contest
     ["a cooperative story", () => contestEnding(2, GameModes.Cooperative)],
     ["a single player's story", () => contestEnding(1, GameModes.SinglePlayer)],
     ["a contest without a scoreboard (no shared opposites stat)", () => contestEnding(2, GameModes.Competitive, false)],
-  ] as const)("prints no rule on the ending of %s that holds a contested outcome: today's form", (_, build) => {
+  ] as const)("prints no contest rule on the ending of %s that holds a contested outcome, the outcome lines still", (_, build) => {
     const story = build();
     expect(story.getCurrentBeatType()).toBe("ending");
-    expect(isScoreboardEnding(story)).toBe(false);
-    expectSame(beatStep.request(story), round0BeatStep.request(story));
+    expect(scoreboardEnding(story)).toBe(false);
+    expectSame(beatStep.request(story), endingStateRequest(story));
+    expect(beatStep.request(story).prompt).not.toContain(SCOREBOARD_ENDING_RULE);
+    expect(beatStep.request(story).prompt).toContain(ENDING_STATE_TEXT.tellAsLeft);
   });
 
-  (frozen.length ? it : it.skip)("every frozen group turn: today's form, the rule only on a scored contest's ending", () => {
+  (frozen.length ? it : it.skip)("every frozen group turn: today's form, the ending as endingStateB", () => {
     const cases = frozen.filter((c) => c.role === "beat" && c.tags.multiplayer);
     expect(cases.length).toBeGreaterThan(10);
     for (const c of cases) {
       const story = caseStory(c);
-      const today = round0BeatStep.request(story);
-      expectSame(beatStep.request(story), asAdopted(today, story));
+      expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
     }
   });
 });

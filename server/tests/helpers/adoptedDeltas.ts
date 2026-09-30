@@ -1,7 +1,8 @@
 /*
  * The deliberate differences between production and the eval variants it
  * adopted on 2026-09-28 (setupR3, planV2b for the switch, planV2c for the
- * chapter, turnB6), the one place the adoption tests read them from. Each is
+ * chapter, turnB6; since 2026-09-30 planV2e for the chapter and endingStateB
+ * for every ending), the one place the adoption tests read them from. Each is
  * a logged adoption item, a settled decision that no round measured, or (the
  * kids stat examples) a retested passage measured in another variant;
  * everything else production sends is the variant's request byte for byte
@@ -54,30 +55,14 @@ export function adoptedSetupPrompt(measured: string, players: number, mode: Game
   return isContestSetup(players, mode) ? SCOREBOARD_SENTENCES.reduce((text, [from, to]) => text.split(from).join(to), kids) : kids;
 }
 
-/** Turns (step 5): the scoreboard ending rule, the one line on the ending of a story with a contested outcome. */
-export const SHARED_OUTCOMES_LINE = "--- For shared outcomes, touch on how the outcome affects the other players.\n";
-export const SCOREBOARD_ENDING_RULE =
-  "- For a contested outcome, the side ahead on its scoreboard wins unless its milestones clearly say otherwise; a score between 45 and 55 is a draw (the mixed resolution). The scoreboard is the shared opposites stat its resonance names (\"Scored by …\"), and its first side is side A (with three players, player1's camp).\n";
-
-/**
- * The endings that take the rule: a contest mode with two or more players, a
- * contested shared outcome, and a shared opposites stat to keep its score. A
- * template can hold a contest in a mode without contests, or no scoreboard;
- * the rule would then name a side or a stat the story doesn't have.
+/*
+ * Turns (step 5, until 2026-09-30): the scoreboard ending rule, one line on
+ * the ending of a story with a contested outcome, was a logged delta on
+ * today's form. Since the ending told as its milestones leave it was adopted
+ * (the owner's decision of 2026-09-30), production's every ending is the
+ * measured variant endingStateB byte for byte, which carries the rule with its
+ * unfinished half, so no ending delta is left.
  */
-export function isScoreboardEnding(story: Story): boolean {
-  return (
-    story.getCurrentBeatType() === "ending" &&
-    isContestSetup(story.getNumberOfPlayers(), story.getGameMode()) &&
-    story.getSharedOutcomes().some((o) => "sideAWins" in o.possibleResolutions) &&
-    story.getSharedStats().some((s) => s.type === "opposites")
-  );
-}
-
-/** The measured turn prompt as production sends it: the rule on a contest's ending. */
-export function adoptedTurnPrompt(measured: string, contestEnding: boolean): string {
-  return contestEnding ? measured.replace(SHARED_OUTCOMES_LINE, `${SHARED_OUTCOMES_LINE}${SCOREBOARD_ENDING_RULE}`) : measured;
-}
 
 /** The chapter rules as the measured switch turn printed them: the story's thread types and switch/thread instructions. */
 export const CHAPTER_RULES_HEADING = "SPECIAL SWITCH/THREAD INSTRUCTIONS:";
@@ -96,7 +81,7 @@ export function withoutChapterRules(measured: string, story: Story): string {
   return measured.slice(0, -tail.length);
 }
 
-/** Every turn delta: the scoreboard rule on a scored contest's ending, and no chapter rules on a switch turn. */
+/** Every turn delta: no chapter rules on a switch turn (endings are measured whole, as endingStateB). */
 export function adoptedTurn(measured: string, story: Story): string {
-  return withoutChapterRules(adoptedTurnPrompt(measured, isScoreboardEnding(story)), story);
+  return withoutChapterRules(measured, story);
 }

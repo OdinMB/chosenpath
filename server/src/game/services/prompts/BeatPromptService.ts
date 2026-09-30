@@ -6,6 +6,7 @@ import {
 import { POINTS_FOR_SACRIFICE, POINTS_FOR_REWARD } from "core/config.js";
 import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, THREE_WAYS, sacrificeRewardLine, takesOptionRules } from "../optionRules.js";
 import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadiness.js";
+import { outcomeStateLines } from "../endingStates.js";
 
 /**
  * The scoreboard ending rule (the setup document's decision 3, question 1,
@@ -14,10 +15,28 @@ import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadines
  * its milestones clearly say otherwise, 45 to 55 a draw. Contests have two
  * sides, with three players two camps (an accepted engine limit), so the
  * rule reads every contest the same way. The setup's form names the
- * scoreboard in the contested outcome's resonance ("Scored by …").
+ * scoreboard in the contested outcome's resonance ("Scored by …"). Since the
+ * owner's decision of 2026-09-30 (measured as the eval's endingStateB) it
+ * decides only a complete contest; an unfinished one has no winner, and the
+ * ending tells who is ahead.
  */
 export const SCOREBOARD_ENDING_RULE =
-  "- For a contested outcome, the side ahead on its scoreboard wins unless its milestones clearly say otherwise; a score between 45 and 55 is a draw (the mixed resolution). The scoreboard is the shared opposites stat its resonance names (\"Scored by …\"), and its first side is side A (with three players, player1's camp).\n";
+  "- For a contested outcome, once it is complete, the side ahead on its scoreboard wins unless its milestones clearly say otherwise; a score between 45 and 55 is a draw (the mixed resolution). While it is unfinished, no side has won yet: tell which side is ahead (neither, between 45 and 55) and that the contest isn't settled. The scoreboard is the shared opposites stat its resonance names (\"Scored by …\"), and its first side is side A (with three players, player1's camp).\n";
+
+/**
+ * Each outcome told at the ending as its milestones leave it (the owner's
+ * decision of 2026-09-30: "Unfinished outcomes should be narrated in their
+ * current state, even if that state is inconclusive"; measured as the eval's
+ * endingStateB): the rule, the game's standing of every outcome after the
+ * ending's milestones (endingStates.ts) between it and what each kind gets,
+ * and the rule's words kept out of the prose (the smoke's drafts wrote
+ * "milestone" and "favorable outcome" into it).
+ */
+export const ENDING_OUTCOME_RULE = "- Tell each outcome as its milestones leave it, counting the milestones this beat adds.\n";
+export const ENDING_OUTCOME_KINDS =
+  "--- A complete outcome is resolved: narrate the possible resolution its milestones point to.\n" +
+  "--- An unfinished outcome is told in its current state, even if that state is inconclusive: what its milestones so far have settled, and what is still open. Never resolve it beyond its milestones: none of its possible resolutions has been reached yet.\n" +
+  "--- Either way, tell it in the story's own words: the text never mentions milestones, outcomes or resolutions.\n";
 
 /**
  * Whether a story's ending takes the scoreboard rule: it plays contests (two
@@ -221,7 +240,11 @@ ${
       "- Touch on each individual and shared outcome that affects the player.\n" +
       "--- Use the information why the outcome resonates with the player / why the outcome is important to them.\n" +
       "--- For shared outcomes, touch on how the outcome affects the other players.\n" +
-      // The scoreboard decides a contest (decision 3; two sides, with three players two camps)
+      // Each outcome as its milestones leave it, with the game's standing of each (the owner's decision of 2026-09-30)
+      ENDING_OUTCOME_RULE +
+      outcomeStateLines(story) +
+      ENDING_OUTCOME_KINDS +
+      // The scoreboard decides a complete contest (decision 3; two sides, with three players two camps)
       (takesScoreboardEndingRule(story) ? SCOREBOARD_ENDING_RULE : "") +
       "- Include any individual and shared stats that you think are worth mentioning in the ending.\n"
     : story.getCurrentBeatType() === "switch"

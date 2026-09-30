@@ -10,7 +10,8 @@ import { requestFor, requestText, type EvalRequest, type RequestInput, type Vari
 import { SCOREBOARD_ENDING_RULE as PRODUCTION_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
 import { ROUND3_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
-import { SCOREBOARD_ENDING_RULE, adoptedSetupPrompt, adoptedTurn } from "../../../helpers/adoptedDeltas.js";
+import { ENDING_STATE_TEXT } from "../../../../src/game/services/storyTextRounds/endingState.js";
+import { adoptedSetupPrompt, adoptedTurn } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * The adoption's free final test (rounds status note, section 9, step 3):
@@ -20,7 +21,9 @@ import { SCOREBOARD_ENDING_RULE, adoptedSetupPrompt, adoptedTurn } from "../../.
  * v2 with two-sided contests (planV2b) for the switch and planner v2e (the
  * nearer chapter question of 2026-09-28, the outcome's stages and each step
  * once, 2026-09-30) for the chapter, today's turn form with B6 alone
- * (turnB6) for a single player and today's form (prod) for groups, and AI
+ * (turnB6) for a single player and today's form (prod) for groups, every
+ * ending as the ending told as its milestones leave it (endingStateB,
+ * 2026-09-30), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -48,6 +51,8 @@ function measuredVariant(input: RequestInput): VariantId {
       // Planner v2e since 2026-09-30 (planner v2c with the outcome's stages and each step once); planner v2c until then
       return "planV2e";
     case "beat":
+      // Every ending since 2026-09-30: the ending told as its milestones leave it
+      if (input.story.getCurrentBeatType() === "ending") return "endingStateB";
       return input.story.isMultiplayer() ? "prod" : "turnB6";
   }
 }
@@ -75,8 +80,8 @@ function expectAdopted(id: string, input: RequestInput) {
   expect({ id, prompt: requestText(production) === want.prompt, schema: json(production) === want.schema }).toEqual({ id, prompt: true, schema: true });
 }
 
-it("reads the ending rule the tests expect from production's own constant", () => {
-  expect(SCOREBOARD_ENDING_RULE).toBe(PRODUCTION_ENDING_RULE);
+it("sends the measured ending's scoreboard rule, with its unfinished half, from production's own constant", () => {
+  expect(PRODUCTION_ENDING_RULE).toBe(ENDING_STATE_TEXT.contestRule);
 });
 
 whenFrozen("production builds the measured requests on every frozen case", () => {

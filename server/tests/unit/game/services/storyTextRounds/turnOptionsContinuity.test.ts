@@ -6,6 +6,7 @@ import { Story } from "core/models/Story.js";
 import { getThreadType, type Beat, type BeatOption, type ThreadAnalysis } from "core/types/index.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { sacrificeRewardLine } from "../../../../../src/game/services/storyTextRounds/turnRound2.js";
+import { endingStateRequest, productionEndingForm } from "../../../../../src/game/services/storyTextRounds/endingState.js";
 import {
   OPTIONS_CONTINUITY_TEXT,
   chapterLeverLine,
@@ -118,21 +119,35 @@ const SINGLE_PLAYER: [string, () => Story][] = [
   ["the ending", () => endingBeat(1)],
 ];
 
+/**
+ * Production's request as it stood when the arms ran (2026-09-30): the same
+ * as today on every turn but the ending, which production has told as its
+ * milestones leave it since the ending's adoption later that day (endingStateB);
+ * the arms' base keeps the ending they ran beside (today's form).
+ */
+const productionThen = (story: Story) => (story.getCurrentBeatType() === "ending" ? productionEndingForm(story) : beatStep.request(story));
+
 describe("the base: production's single-player turn form, built from the frozen copy", () => {
-  it.each(SINGLE_PLAYER)("%s: production's request byte for byte", (_, build) => {
+  it.each(SINGLE_PLAYER)("%s: production's request byte for byte (the ending as it stood when the arms ran)", (_, build) => {
     const story = build();
-    const [ours, production] = [productionTurnForm(story), beatStep.request(story)];
+    const [ours, production] = [productionTurnForm(story), productionThen(story)];
     expect(ours.prompt).toBe(production.prompt);
     expect(json(ours.schema)).toBe(json(production.schema));
     expect(optionsContinuityRequest(story, BASE).prompt).toBe(production.prompt);
   });
 
-  (frozen.length ? it : it.skip)("every frozen single-player turn: production's request byte for byte", () => {
+  it("differs from today's production only at the ending, which production now tells as its milestones leave it", () => {
+    const ending = endingBeat(1);
+    expect(beatStep.request(ending).prompt).toBe(endingStateRequest(ending).prompt);
+    expect(productionTurnForm(ending).prompt).not.toBe(beatStep.request(ending).prompt);
+  });
+
+  (frozen.length ? it : it.skip)("every frozen single-player turn: production's request byte for byte (the ending as it stood when the arms ran)", () => {
     const cases = frozen.filter((c) => c.role === "beat" && !c.tags.multiplayer);
     expect(cases.length).toBeGreaterThan(40);
     for (const c of cases) {
       const story = caseStory(c);
-      const [ours, production] = [productionTurnForm(story), beatStep.request(story)];
+      const [ours, production] = [productionTurnForm(story), productionThen(story)];
       expect({ id: c.id, same: ours.prompt === production.prompt }).toEqual({ id: c.id, same: true });
       expect(json(ours.schema)).toBe(json(production.schema));
     }
