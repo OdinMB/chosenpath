@@ -398,6 +398,39 @@ export class GameHandler {
     }
   }
 
+  /**
+   * A player whose connection came back while they stayed on the story's page
+   * (socket.io reconnects by itself after a network drop or a server restart,
+   * and the client then sends rejoin_session with the player's code): the new
+   * connection joins the game as verify_code's does, gets the story as stored
+   * (a turn may have arrived meanwhile) and is told when that story is stuck
+   * on its turn (tellIfTurnStuck: a restart loses the queue). Before, nothing
+   * answered rejoin_session, so the player got no more states, and every
+   * choice or "Try again" failed until they reloaded. Returns the game
+   * rejoined, or null: no code (not on a story's page), or a code that names
+   * no stored story.
+   */
+  async rejoinGame(socket: Socket, code: string | null | undefined): Promise<string | null> {
+    if (!code) return null;
+    const playerInfo = await connectionManager.getPlayerByCode(code);
+    const story = playerInfo ? await this.storyRepository.getStory(playerInfo.storyId) : null;
+    if (!playerInfo || !story) {
+      Logger.Websocket.log(`[GameHandler] Socket ${socket.id} rejoins no game: its code names no stored story`);
+      return null;
+    }
+
+    const { storyId, playerSlot } = playerInfo;
+    connectionManager.addPlayer(storyId, playerSlot, code, socket);
+    await socket.join(storyId);
+    socket.emit("state_update_notification", {
+      type: "state_update_notification",
+      state: story.filterStateForPlayer(playerSlot),
+      trigger: "story_update",
+    } as StateUpdateNotification);
+    await this.tellIfTurnStuck(socket, storyId);
+    return storyId;
+  }
+
   private validateCharacterSelection(
     socketId: string,
     story: Story,

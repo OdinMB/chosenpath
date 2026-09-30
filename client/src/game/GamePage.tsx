@@ -30,6 +30,7 @@ export const GamePage: React.FC = () => {
     setSessionId,
     setIsLoading,
     isRequestPending,
+    clearTurnFailure,
   } = useGameSession();
   const { code: joinCode } = useParams<{ code?: string }>();
   const navigate = useNavigate();
@@ -224,9 +225,11 @@ export const GamePage: React.FC = () => {
       }
       Logger.App.log("Processing player choice:", { optionIndex });
       setIsLoading(true);
+      // A failure this choice answers goes first: its "Try again" would send the choice again
+      clearTurnFailure();
       gameService.makeChoice(optionIndex, beatCountOf(storyState));
     },
-    [storyState, setIsLoading]
+    [storyState, setIsLoading, clearTurnFailure]
   );
 
   const handleCharacterSelected = useCallback(
@@ -240,9 +243,11 @@ export const GamePage: React.FC = () => {
         backgroundIndex,
       });
       setIsLoading(true);
+      // A failure this selection answers goes first: its "Try again" would send the selection again
+      clearTurnFailure();
       gameService.selectCharacter(identityIndex, backgroundIndex);
     },
-    [storyState, setIsLoading]
+    [storyState, setIsLoading, clearTurnFailure]
   );
 
   // Early return if in the process of exiting - THIS MUST BE AFTER ALL HOOKS

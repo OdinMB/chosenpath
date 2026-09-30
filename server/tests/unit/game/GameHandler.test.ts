@@ -16,6 +16,8 @@ const addOperation = jest.fn<(operation: unknown) => Promise<string>>();
 const isTurnOnItsWay = jest.fn<(gameId: string) => boolean>(() => false);
 const getStory = jest.fn<(id: string) => Promise<unknown>>();
 const getPlayerBySocket = jest.fn<(socketId: string) => unknown>();
+const getPlayerByCode = jest.fn<(code: string) => Promise<unknown>>();
+const addPlayer = jest.fn();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockModule = (jest as any).unstable_mockModule;
@@ -33,13 +35,15 @@ await mockModule("../../../src/game/ConnectionManager.js", () => ({
     getActivePlayersInGame: jest.fn(() => [{ playerSlot: "player1" }, { playerSlot: "player2" }]),
     getActiveSockets: jest.fn((_gameId: string, slot: string) => new Set([`socket-${slot}`])),
     getPlayerBySocket,
+    getPlayerByCode,
+    addPlayer,
   },
 }));
 
 const { GameHandler } = await import("../../../src/game/GameHandler.js");
 
-type FakeSocket = { id: string; on: jest.Mock; emit: jest.Mock };
-const socketOf = (id: string): FakeSocket => ({ id, on: jest.fn(), emit: jest.fn() });
+type FakeSocket = { id: string; on: jest.Mock; emit: jest.Mock; join: jest.Mock };
+const socketOf = (id: string): FakeSocket => ({ id, on: jest.fn(), emit: jest.fn(), join: jest.fn() });
 
 const turnFailed = {
   queueId: "game-1",
@@ -260,5 +264,69 @@ describe("GameHandler: a player who arrives at a story stuck on its turn", () =>
     }
 
     expect(sockets[0]!.emit).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * socket.io reconnects by itself after a network drop or a server restart,
+ * and the client then sends rejoin_session with the player's code, which no
+ * handler answered: a player who stayed on the page was never added back to
+ * their game, so they got no more states, kept the spinner of a turn a
+ * restart had lost, and every choice or "Try again" failed ("Player not
+ * found") until they reloaded.
+ */
+describe("GameHandler: a player whose connection comes back while they stay on the page", () => {
+  const rejoining = () => socketOf("socket-player2-new");
+
+  beforeEach(() => {
+    getPlayerByCode.mockReset();
+    getPlayerByCode.mockResolvedValue({ storyId: "game-1", playerSlot: "player2" });
+    addPlayer.mockReset();
+    isTurnOnItsWay.mockReset();
+    isTurnOnItsWay.mockReturnValue(false);
+  });
+
+  it("adds the new connection to the player's game and room, and sends them the story as stored", async () => {
+    const story = storedStory({ choices: [1, -1] });
+    getStory.mockResolvedValue(story);
+    const socket = rejoining();
+
+    await expect(handler.rejoinGame(socket as never, "CODE-2")).resolves.toBe("game-1");
+
+    expect(addPlayer).toHaveBeenCalledWith("game-1", "player2", "CODE-2", socket);
+    expect(socket.join).toHaveBeenCalledWith("game-1");
+    expect(socket.emit).toHaveBeenCalledWith("state_update_notification", {
+      type: "state_update_notification",
+      state: story.filterStateForPlayer("player2"),
+      trigger: "story_update",
+    });
+    expect(socket.emit).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells them, after the story, when it is stuck on a turn the restart lost", async () => {
+    getStory.mockResolvedValue(storedStory());
+    const socket = rejoining();
+
+    await handler.rejoinGame(socket as never, "CODE-2");
+
+    expect(socket.emit.mock.calls.map((call) => call[0])).toEqual(["state_update_notification", "error"]);
+    expect(socket.emit).toHaveBeenLastCalledWith("error", { error: TURN_FAILED, operationType: "moveStoryForward" });
+  });
+
+  it("leaves a connection alone that has no code (not on a story's page) or a code that names no story", async () => {
+    const socket = rejoining();
+    await expect(handler.rejoinGame(socket as never, undefined)).resolves.toBeNull();
+    await expect(handler.rejoinGame(socket as never, null)).resolves.toBeNull();
+
+    getPlayerByCode.mockResolvedValue(undefined);
+    await expect(handler.rejoinGame(socket as never, "WRONG")).resolves.toBeNull();
+
+    getPlayerByCode.mockResolvedValue({ storyId: "game-1", playerSlot: "player2" });
+    getStory.mockResolvedValue(null);
+    await expect(handler.rejoinGame(socket as never, "CODE-2")).resolves.toBeNull();
+
+    expect(addPlayer).not.toHaveBeenCalled();
+    expect(socket.join).not.toHaveBeenCalled();
+    expect(socket.emit).not.toHaveBeenCalled();
   });
 });

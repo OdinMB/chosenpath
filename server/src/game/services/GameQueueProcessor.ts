@@ -65,6 +65,31 @@ const TURN_OPERATIONS: ReadonlySet<GameOperation["type"]> = new Set([
   "recordCharacterSelection",
 ]);
 
+/**
+ * Whether a player's choice is recorded already: the stored story holds a
+ * choice on the beat it was made on, or has moved past that beat.
+ * GameHandler checks a choice against the stored story, which lags the queue,
+ * so a copy sent while the first was queued or running (a second press after
+ * a failure, "Try again" beside the game's own controls, a second tab) is
+ * queued too; recorded twice, it queued the turn twice.
+ */
+function choiceRecorded(stored: Story | null, sent: Story, playerSlot: PlayerSlot): boolean {
+  if (!stored) return false;
+  const beats = stored.getPlayer(playerSlot)?.beatHistory ?? [];
+  const onBeat = sent.getPlayer(playerSlot)?.beatHistory.length ?? 0;
+  return beats.length !== onBeat || beats[beats.length - 1]?.choice !== -1;
+}
+
+/** Whether a player's character is recorded already (or everyone's selection is complete): a copy, as for a choice. */
+function characterRecorded(stored: Story | null, playerSlot: PlayerSlot): boolean {
+  if (!stored) return false;
+  const player = stored.getPlayer(playerSlot);
+  return (
+    stored.getState().characterSelectionCompleted ||
+    (!!player && player.identityChoice > -1 && player.backgroundChoice > -1)
+  );
+}
+
 /** A written turn that could not be stored or sent: it may be stored already, so it is never written again. */
 class TurnDeliveryError extends Error {
   readonly cause: unknown;
@@ -219,6 +244,14 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
     const { playerSlot, optionIndex, story } = input;
 
     try {
+      // A copy of a choice recorded meanwhile: recorded once, so the turn is queued once
+      if (choiceRecorded(await storyRepository.getStory(gameId), story, playerSlot)) {
+        console.log(
+          `[GameQueueProcessor] ${playerSlot}'s choice for game ${gameId} is recorded already; this copy is skipped`
+        );
+        return;
+      }
+
       console.log(
         `[GameQueueProcessor] Recording choice for game: ${gameId}, player: ${playerSlot}, option: ${optionIndex}`
       );
@@ -288,6 +321,15 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
 
     const { gameId, input } = operation;
     const { playerSlot, identityIndex, backgroundIndex, story } = input;
+
+    // A copy of a selection recorded meanwhile: recorded once, so the first turn is queued once
+    // (and the selection is never stored as open again after it completed)
+    if (characterRecorded(await storyRepository.getStory(gameId), playerSlot)) {
+      console.log(
+        `[GameQueueProcessor] ${playerSlot}'s character for game ${gameId} is recorded already; this copy is skipped`
+      );
+      return;
+    }
 
     console.log(
       `[GameQueueProcessor] Processing character selection for ${playerSlot}: identity=${identityIndex}, background=${backgroundIndex}`

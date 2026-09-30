@@ -103,6 +103,17 @@ describe("CharacterSelection", () => {
     expect(html).not.toContain("Processing Character Selection...");
   });
 
+  it("locks Confirm on a selection sent again while it is on its way, whatever failure is still on screen", () => {
+    // The request itself is pending: a second press would send a second selection
+    const html = renderSelection(selectionState(), {
+      turnFailure: { message: "Unable to save your character choice. Please try again.", at: "[]" },
+      isRequestPending: (type) => type === "select_character",
+    });
+
+    expect(html).toContain("Processing Character Selection...");
+    expect(html).not.toContain("Confirm Selection");
+  });
+
   it("shows no alert while nothing failed", () => {
     expect(renderSelection(selectionState())).not.toContain('role="alert"');
   });

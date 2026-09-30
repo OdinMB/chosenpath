@@ -100,6 +100,7 @@ export function gameSession(
     isRequestPending: () => false,
     isOperationRunning: () => false,
     turnFailure: null,
-    tryAgain: noop,
+    tryAgain: () => null,
+    clearTurnFailure: noop,
   };
 }

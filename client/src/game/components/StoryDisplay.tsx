@@ -28,6 +28,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     isViewingLatestBeat,
     navigateToBeat,
     handleChoiceSelected,
+    showChoiceSent,
   } = useStoryBeatState({
     storyState,
     isRequestPending,
@@ -44,6 +45,14 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   const handleChoiceClick = (index: number) => {
     handleChoiceSelected(index);
     onChoiceSelected(index);
+  };
+
+  // "Try again" that sends the player's choice again: the options close on it, as after a click
+  const handleTryAgain = () => {
+    const sent = tryAgain();
+    if (sent?.type === "make_choice") {
+      showChoiceSent(sent.optionIndex);
+    }
   };
 
   // Scroll to top when displayed beat changes
@@ -113,7 +122,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         {turnFailure ? (
           <TurnFailedNotice
             failure={turnFailure}
-            onTryAgain={tryAgain}
+            onTryAgain={handleTryAgain}
             className="mt-2 px-4"
           />
         ) : (
@@ -168,7 +177,10 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
           )}
           {/* Where the story waits (the next beat, or a choice that failed on the latest), never below an earlier beat */}
           {turnFailure && (isShowingPlaceholder || isViewingLatestBeat) && (
-            <TurnFailedNotice failure={turnFailure} onTryAgain={tryAgain} />
+            <TurnFailedNotice
+              failure={turnFailure}
+              onTryAgain={handleTryAgain}
+            />
           )}
         </div>
       </div>

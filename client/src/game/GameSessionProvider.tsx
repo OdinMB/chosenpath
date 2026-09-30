@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useReducer } from "react";
 import type {
   ClientStoryState,
   WSServerMessage,
@@ -9,7 +9,7 @@ import { Logger } from "../shared/logger.js";
 import { useSession } from "../shared/session/useSession.js";
 import { GameSessionContext } from "./GameSessionContext";
 import { gameService } from "./GameService";
-import { stillFailed, turnFailureFrom, type TurnFailure } from "./turnFailure";
+import { failureOnScreen, NO_FAILURE, turnFailureFrom } from "./turnFailure";
 
 // Create a dedicated logger for game session operations
 const logger = Logger.App;
@@ -31,14 +31,17 @@ export function GameSessionProvider({
 
   const [connectionStale, setConnectionStale] = useState<string | null>(null);
   const [gameError, setGameError] = useState<string | null>(null);
-  const [turnFailure, setTurnFailure] = useState<TurnFailure | null>(null);
+  // The failure on screen, and the one the player's last send set aside (failureOnScreen)
+  const [failureState, dispatchFailure] = useReducer(
+    failureOnScreen,
+    NO_FAILURE
+  );
+  const turnFailure = failureState.shown;
 
   // Use refs to track states without causing effect reruns
   const isLoadingRef = useRef(isLoading);
   // The story on screen, for the socket handlers (a failure is placed against it)
   const storyStateRef = useRef<ClientStoryState | null>(null);
-  // The failure the last "Try again" cleared: shown again if that request is rate limited
-  const triedAgainRef = useRef<TurnFailure | null>(null);
 
   const showStory = useCallback((state: ClientStoryState | null) => {
     storyStateRef.current = state;
@@ -48,13 +51,15 @@ export function GameSessionProvider({
   // "Try again": the notice goes, the selection the server failed on stops waiting, and what the story is missing is sent
   const tryAgain = useCallback(() => {
     const state = storyStateRef.current;
-    triedAgainRef.current = turnFailure;
-    setTurnFailure(null);
+    dispatchFailure({ type: "sent" });
     wsService.removeBackgroundOperation("select_character");
-    if (state) {
-      gameService.tryAgain(state);
-    }
-  }, [turnFailure]);
+    return state ? gameService.tryAgain(state) : null;
+  }, []);
+
+  // The player's own choice or character sent again through the game's controls: the notice goes too
+  const clearTurnFailure = useCallback(() => {
+    dispatchFailure({ type: "sent" });
+  }, []);
 
   // Keep the refs updated with the latest values
   useEffect(() => {
@@ -139,10 +144,7 @@ export function GameSessionProvider({
           });
           showStory(data.state);
           // A failure stands until the story moves on (another player's "Try again" included)
-          triedAgainRef.current = null;
-          setTurnFailure((failure) =>
-            failure && stillFailed(failure, data.state) ? failure : null
-          );
+          dispatchFailure({ type: "stateArrived", state: data.state });
           setIsLoading(false);
         }
       }
@@ -163,8 +165,7 @@ export function GameSessionProvider({
       if (data.type === "exit_story_response") {
         logger.info("[GameSessionProvider] Story exit confirmed");
         showStory(null);
-        setTurnFailure(null);
-        triedAgainRef.current = null;
+        dispatchFailure({ type: "exited" });
         setSessionId(null);
         setStoryCodes(null);
         localStorage.removeItem("sessionId");
@@ -176,11 +177,8 @@ export function GameSessionProvider({
         logger.info("[GameSessionProvider] Rate limited:", data.rateLimit);
         setRateLimit(data.rateLimit);
         setIsLoading(false);
-        // A "Try again" that was turned away: the failure still stands
-        if (triedAgainRef.current) {
-          setTurnFailure(triedAgainRef.current);
-          triedAgainRef.current = null;
-        }
+        // A send that was turned away ("Try again", or the player's own): the failure still stands
+        dispatchFailure({ type: "rateLimited" });
       }
     });
 
@@ -195,8 +193,7 @@ export function GameSessionProvider({
           );
           // The selection the server failed on is no longer on its way
           wsService.removeBackgroundOperation("select_character");
-          triedAgainRef.current = null;
-          setTurnFailure(failure);
+          dispatchFailure({ type: "failed", failure });
           setIsLoading(false);
           return;
         }
@@ -321,6 +318,7 @@ export function GameSessionProvider({
     isOperationRunning: (type: string) => wsService.isOperationRunning(type),
     turnFailure,
     tryAgain,
+    clearTurnFailure,
   };
 
   return (

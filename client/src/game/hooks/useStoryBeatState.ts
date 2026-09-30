@@ -19,6 +19,8 @@ interface StoryBeatState {
 
   // Choice management
   handleChoiceSelected: (index: number) => void;
+  /** A choice "Try again" sent again: shown as chosen, as a click on it is, while it is on its way */
+  showChoiceSent: (index: number) => void;
   resetChoice: () => void;
 }
 
@@ -206,6 +208,13 @@ export function useStoryBeatState({
     setLocalSelectedChoice(index);
   };
 
+  // A choice sent again by "Try again" (its request is pending already, so the click's guard would refuse it)
+  const showChoiceSent = (index: number) => {
+    if (isViewingLatestBeat && latestBeat?.choice === -1) {
+      setLocalSelectedChoice(index);
+    }
+  };
+
   // Reset choice
   const resetChoice = () => {
     setLocalSelectedChoice(undefined);
@@ -220,6 +229,7 @@ export function useStoryBeatState({
     latestBeat,
     navigateToBeat,
     handleChoiceSelected,
+    showChoiceSent,
     resetChoice,
   };
 }

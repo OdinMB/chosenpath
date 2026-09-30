@@ -1,6 +1,10 @@
 import { wsService } from "client/game/WebSocketService";
 import type { ClientStoryState } from "core/types";
-import { tryAgainRequest, type LastSent } from "./turnFailure";
+import {
+  tryAgainRequest,
+  type LastSent,
+  type TryAgainRequest,
+} from "./turnFailure";
 // import { isValidPlayerCount } from "core/utils/playerUtils"; // No longer needed if initialize methods are removed
 // import { GameMode } from "core/types"; // No longer needed
 
@@ -33,11 +37,12 @@ class GameService {
     });
   }
 
-  /** "Try again" after a failed turn: sends what the story on screen is missing (tryAgainRequest). */
-  tryAgain(storyState: ClientStoryState) {
+  /** "Try again" after a failed turn: sends what the story on screen is missing (tryAgainRequest), and returns it. */
+  tryAgain(storyState: ClientStoryState): TryAgainRequest {
     const request = tryAgainRequest(storyState, this.lastSent);
     console.log("[GameService] Trying again:", request);
     wsService.sendMessage(request);
+    return request;
   }
 
   exitStory() {

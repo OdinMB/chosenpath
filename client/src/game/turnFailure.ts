@@ -88,6 +88,57 @@ export function stillFailed(
 }
 
 /**
+ * The failure the game screen shows, and the one the player's last send set
+ * aside. Any send that answers the failure hides it: "Try again", or the
+ * player's own choice or character sent again through the game's controls.
+ * Left up beside a send on its way, its "Try again" would send the same
+ * choice or selection a second time. A send that is rate limited brings it
+ * back, since the failure still stands; a state arriving settles it.
+ */
+export interface FailureOnScreen {
+  shown: TurnFailure | null;
+  setAside: TurnFailure | null;
+}
+
+export type FailureEvent =
+  | { type: "failed"; failure: TurnFailure }
+  | { type: "sent" }
+  | { type: "rateLimited" }
+  | { type: "stateArrived"; state: ClientStoryState }
+  | { type: "exited" };
+
+export const NO_FAILURE: FailureOnScreen = { shown: null, setAside: null };
+
+/** The provider's reducer for the failure on screen (FailureOnScreen). */
+export function failureOnScreen(
+  current: FailureOnScreen,
+  event: FailureEvent
+): FailureOnScreen {
+  switch (event.type) {
+    case "failed":
+      return { shown: event.failure, setAside: null };
+    case "sent":
+      return current.shown ? { shown: null, setAside: current.shown } : current;
+    case "rateLimited":
+      return current.setAside
+        ? { shown: current.setAside, setAside: null }
+        : current;
+    case "stateArrived": {
+      // A failure stands until the story moves on (another player's "Try again" included)
+      const shown =
+        current.shown && stillFailed(current.shown, event.state)
+          ? current.shown
+          : null;
+      return shown === current.shown && current.setAside === null
+        ? current
+        : { shown, setAside: null };
+    }
+    case "exited":
+      return NO_FAILURE;
+  }
+}
+
+/**
  * What "Try again" sends, from what the story on screen is missing. While
  * the characters are picked: the player's selection again. When the player's
  * choice on this beat never got stored: that choice again. Otherwise the turn

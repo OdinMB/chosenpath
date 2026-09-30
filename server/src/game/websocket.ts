@@ -507,6 +507,45 @@ export class GameWebSocketServer {
         }
       );
 
+      // A player still on a story's page whose connection came back (GameHandler.rejoinGame);
+      // it looks up a player's code, so it counts against verify_code's limit
+      socket.on(
+        "rejoin_session",
+        async (data: { playerCode?: string | null; requestId?: string } = {}) => {
+          try {
+            if (
+              this.checkAndHandleRateLimit(socket, "verify_code", data.requestId)
+            ) {
+              return;
+            }
+
+            const gameId = await this.gameHandler.rejoinGame(
+              socket,
+              data.playerCode
+            );
+            if (gameId) {
+              this.broadcastActivePlayersUpdate(gameId);
+            }
+            socket.emit("response", {
+              type: "rejoin_session_response",
+              status: ResponseStatus.SUCCESS,
+              requestId: data.requestId || crypto.randomUUID(),
+              timestamp: Date.now(),
+              data: { rejoined: gameId !== null },
+            });
+          } catch (error) {
+            Logger.Websocket.error("[WebSocket] Error rejoining a game:", error);
+            socket.emit("response", {
+              type: "rejoin_session_response",
+              status: ResponseStatus.ERROR,
+              requestId: data.requestId || crypto.randomUUID(),
+              timestamp: Date.now(),
+              errorMessage: "Could not reconnect to the story. Please reload the page.",
+            });
+          }
+        }
+      );
+
       // A player's "Try again" after a turn failed (GameHandler.retryTurn); it costs a turn's calls, so it counts as a choice
       socket.on("retry_turn", async (data: { requestId?: string } = {}) => {
         try {

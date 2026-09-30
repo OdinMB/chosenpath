@@ -63,6 +63,13 @@ describe("gameService.tryAgain", () => {
     expect(sendMessage).toHaveBeenCalledWith({ type: "select_character", identityIndex: 1, backgroundIndex: 2 });
   });
 
+  it("returns what it sent, so the screen can show a choice sent again as chosen", () => {
+    gameService.makeChoice(2, 2);
+
+    expect(gameService.tryAgain(withChoices([1, -1]))).toEqual({ type: "make_choice", optionIndex: 2 });
+    expect(gameService.tryAgain(withChoices([1, 2]))).toEqual({ type: "retry_turn" });
+  });
+
   it("forgets what was sent once the player leaves the story", () => {
     gameService.makeChoice(2, 2);
     gameService.exitStory();

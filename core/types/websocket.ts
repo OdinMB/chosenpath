@@ -53,6 +53,17 @@ export interface RetryTurnMessage extends BaseClientMessage {
   type: "retry_turn";
 }
 
+/**
+ * Sent by the client whenever its connection comes back (socket.io reconnects
+ * by itself): with the player's code while they are on a story's page, the
+ * server adds the new connection to that game and sends the stored story
+ */
+export interface RejoinSessionMessage extends BaseClientMessage {
+  type: "rejoin_session";
+  sessionId: string;
+  playerCode: string | null;
+}
+
 export type WSClientMessage =
   | CreateSessionMessage
   | JoinSessionMessage
@@ -60,7 +71,8 @@ export type WSClientMessage =
   | SelectCharacterMessage
   | VerifyCodeMessage
   | ExitStoryMessage
-  | RetryTurnMessage;
+  | RetryTurnMessage
+  | RejoinSessionMessage;
 
 // ===============================================
 // Server -> Client message types
@@ -138,6 +150,16 @@ export interface RetryTurnResponse
   type: "retry_turn_response";
 }
 
+/**
+ * Rejoin response: rejoined is true when the connection was added to the
+ * player's game (the stored story is sent before it), false without a code
+ * or with one that names no stored story
+ */
+export interface RejoinSessionResponse
+  extends WSSuccessResponse<{ rejoined: boolean }> {
+  type: "rejoin_session_response";
+}
+
 export type WSServerResponse =
   | CreateSessionResponse
   | VerifyCodeResponse
@@ -145,6 +167,7 @@ export type WSServerResponse =
   | MakeChoiceResponse
   | ExitStoryResponse
   | RetryTurnResponse
+  | RejoinSessionResponse
   | WSRateLimitedResponse
   | WSErrorResponse;
 

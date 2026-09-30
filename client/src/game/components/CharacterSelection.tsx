@@ -37,11 +37,12 @@ export function CharacterSelection({
   );
   const stateManager = new ClientStateManager();
 
-  // Check if we're waiting for character selection to process (never once it failed)
+  // Waiting for the selection: always while a request is on its way (a second
+  // press would send it twice); its queued operation counts only while no
+  // failure is up, since the one the server failed on can still be marked
   const isSelectionPending =
-    !turnFailure &&
-    (isRequestPending("select_character") ||
-      isOperationRunning("select_character"));
+    isRequestPending("select_character") ||
+    (!turnFailure && isOperationRunning("select_character"));
 
   // Select the first identity by default
   useEffect(() => {
