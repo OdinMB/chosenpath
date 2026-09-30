@@ -58,6 +58,13 @@ export interface GameOperationExtended {
  */
 export const TURN_RESENDS = 1;
 
+/** The operations that write a turn or queue one (isTurnOnItsWay). */
+const TURN_OPERATIONS: ReadonlySet<GameOperation["type"]> = new Set([
+  "moveStoryForward",
+  "recordChoice",
+  "recordCharacterSelection",
+]);
+
 /** A written turn that could not be stored or sent: it may be stored already, so it is never written again. */
 class TurnDeliveryError extends Error {
   readonly cause: unknown;
@@ -87,6 +94,16 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
 
   protected getQueueId(operation: GameOperation): string {
     return operation.gameId;
+  }
+
+  /**
+   * Whether the game's next turn is being written or will be: a turn is
+   * queued or running (its resend included), or a choice or character
+   * selection is, which queues the turn once it is stored. A player's
+   * "Try again" (GameHandler.retryTurn) queues nothing then.
+   */
+  isTurnOnItsWay(gameId: string): boolean {
+    return this.hasUnfinished(gameId, (operation) => TURN_OPERATIONS.has(operation.type));
   }
 
   protected async processOperation(operation: GameOperation): Promise<void> {

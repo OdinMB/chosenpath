@@ -135,6 +135,47 @@ describe("GameQueueProcessor: a failed turn", () => {
     expect(errors).toEqual([]);
   });
 
+  it("counts a turn as on its way through both its sends, and not once its last send has failed", async () => {
+    const whileWriting: boolean[] = [];
+    handleProgression.mockImplementation(async () => {
+      whileWriting.push(processor.isTurnOnItsWay("game-1"));
+      throw new Error("Failed to generate next beats. Please try again.");
+    });
+    const whenReported: boolean[] = [];
+    processor.events.on("operationError", () => whenReported.push(processor.isTurnOnItsWay("game-1")));
+    await processor.addOperation({ type: "moveStoryForward", gameId: "game-1", input: { story: story() } });
+    await drained();
+
+    expect(whileWriting).toEqual([true, true]);
+    expect(whenReported).toEqual([false]);
+    expect(processor.isTurnOnItsWay("game-1")).toBe(false);
+  });
+
+  it("counts a choice or character selection being recorded as a turn on its way, since it queues the turn", async () => {
+    processChoice.mockRejectedValue(new Error("Choice failed"));
+    // Checked as soon as each is queued: both fail here (a mock choice, a story without character options)
+    void processor.addOperation({ type: "recordChoice", gameId: "game-1", input: { story: story(), playerSlot: "player1", optionIndex: 0 } });
+    expect(processor.isTurnOnItsWay("game-1")).toBe(true);
+    void processor.addOperation({
+      type: "recordCharacterSelection",
+      gameId: "game-2",
+      input: { story: story(), playerSlot: "player1", identityIndex: 0, backgroundIndex: 0 },
+    });
+    expect(processor.isTurnOnItsWay("game-2")).toBe(true);
+
+    await drained();
+    expect(processor.isTurnOnItsWay("game-1")).toBe(false);
+    expect(processor.isTurnOnItsWay("game-2")).toBe(false);
+  });
+
+  it("never counts an image outcome as a turn on its way", async () => {
+    // Checked while it is still queued
+    void processor.addOperation({ type: "attachImageToStory", gameId: "game-1", input: { imageId: "beat-1", caption: "" } });
+
+    expect(processor.isTurnOnItsWay("game-1")).toBe(false);
+    await drained();
+  });
+
   it("never sends a failed choice again", async () => {
     processChoice.mockRejectedValue(new Error("Choice failed"));
     await processor.addOperation({ type: "recordChoice", gameId: "game-1", input: { story: story(), playerSlot: "player1", optionIndex: 0 } });

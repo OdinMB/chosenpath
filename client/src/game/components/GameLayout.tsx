@@ -18,6 +18,7 @@ import { ClientStateManager } from "core/models/ClientStateManager";
 import { PlayerInterlude } from "./PlayerInterlude";
 import { LoadingSpinner } from "components/ui";
 import { DiscordButton } from "shared/components/DiscordButton";
+import { TurnFailedNotice } from "./TurnFailedNotice";
 
 interface Props {
   onExitGame: () => void;
@@ -120,7 +121,7 @@ export function GameLayout({
   onChoiceSelected,
   onCharacterSelected,
 }: Props) {
-  const { storyState } = useGameSession();
+  const { storyState, turnFailure, tryAgain } = useGameSession();
   const [showStats, setShowStats] = useState(false);
   const [showFluff, setShowFluff] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -374,11 +375,19 @@ export function GameLayout({
                 storyState={storyState}
                 className="mt-8 mb-4 sm:mb-8"
               />
-              <LoadingSpinner
-                size="medium"
-                message="Setting up the story..."
-                messageSize="large"
-              />
+              {turnFailure ? (
+                <TurnFailedNotice
+                  failure={turnFailure}
+                  onTryAgain={tryAgain}
+                  className="px-4"
+                />
+              ) : (
+                <LoadingSpinner
+                  size="medium"
+                  message="Setting up the story..."
+                  messageSize="large"
+                />
+              )}
 
               {stateManager.getNumberOfPlayers(storyState) > 1 && (
                 <div className="mt-8 w-full max-w-md flex justify-center">

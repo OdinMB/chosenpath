@@ -2,6 +2,7 @@ import React, { useEffect, useCallback, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGameSession } from "./useGameSession";
 import { gameService } from "./GameService";
+import { beatCountOf } from "./turnFailure";
 import { wsService } from "./WebSocketService";
 import { Logger } from "shared/logger";
 import { GameLayout } from "./components/GameLayout";
@@ -223,7 +224,7 @@ export const GamePage: React.FC = () => {
       }
       Logger.App.log("Processing player choice:", { optionIndex });
       setIsLoading(true);
-      gameService.makeChoice(optionIndex);
+      gameService.makeChoice(optionIndex, beatCountOf(storyState));
     },
     [storyState, setIsLoading]
   );

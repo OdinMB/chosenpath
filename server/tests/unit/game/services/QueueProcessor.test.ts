@@ -123,6 +123,34 @@ describe("BaseQueueProcessor: the failure path", () => {
     expect(errors).toEqual([]);
   });
 
+  it("counts an operation as unfinished from when it is queued until it completes", async () => {
+    await add("other", "image");
+    expect(queue.hasUnfinished("game-1")).toBe(true);
+    expect(queue.hasUnfinished("game-2")).toBe(false);
+
+    await drained();
+    expect(queue.hasUnfinished("game-1")).toBe(false);
+  });
+
+  it("counts nothing once an operation's last send has failed, by the time its failure is reported", async () => {
+    queue.budget = 1;
+    queue.failures.set("turn", 10);
+    const whenReported: boolean[] = [];
+    queue.events.on("operationError", () => whenReported.push(queue.hasUnfinished("game-1")));
+    await add("resent", "turn");
+    await drained();
+
+    expect(queue.sent).toHaveLength(2);
+    expect(whenReported).toEqual([false]);
+  });
+
+  it("counts only the operations the caller asks about", async () => {
+    await add("other", "image");
+
+    expect(queue.hasUnfinished("game-1", (operation) => operation.type === "resent")).toBe(false);
+    expect(queue.hasUnfinished("game-1", (operation) => operation.type === "other")).toBe(true);
+  });
+
   it("logs the resend with the error's class, never its message", async () => {
     const warn = console.warn as jest.MockedFunction<typeof console.warn>;
     queue.budget = 1;

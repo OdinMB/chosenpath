@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import http from "http";
-import { GameHandler } from "game/GameHandler.js";
+import { GameHandler, TURN_FAILED_LINE } from "game/GameHandler.js";
 import {
   ResponseStatus,
   StateUpdateNotification,
@@ -399,6 +399,14 @@ export class GameWebSocketServer {
                 "[WebSocket] verify_code_response with code:",
                 data.code
               );
+
+              // Arriving at a story stuck on its turn: told as the players were when it failed
+              if (playerInfo) {
+                await this.gameHandler.tellIfTurnStuck(
+                  socket,
+                  playerInfo.storyId
+                );
+              }
             } else {
               // Send error response
               Logger.Websocket.error(
@@ -498,6 +506,35 @@ export class GameWebSocketServer {
           }
         }
       );
+
+      // A player's "Try again" after a turn failed (GameHandler.retryTurn); it costs a turn's calls, so it counts as a choice
+      socket.on("retry_turn", async (data: { requestId?: string } = {}) => {
+        try {
+          if (
+            this.checkAndHandleRateLimit(socket, "make_choice", data.requestId)
+          ) {
+            return;
+          }
+
+          const queued = await this.gameHandler.retryTurn(socket);
+          socket.emit("response", {
+            type: "retry_turn_response",
+            status: ResponseStatus.SUCCESS,
+            requestId: data.requestId || crypto.randomUUID(),
+            timestamp: Date.now(),
+            data: { queued },
+          });
+        } catch (error) {
+          Logger.Websocket.error("[WebSocket] Error retrying turn:", error);
+          socket.emit("response", {
+            type: "retry_turn_response",
+            status: ResponseStatus.ERROR,
+            requestId: data.requestId || crypto.randomUUID(),
+            timestamp: Date.now(),
+            errorMessage: TURN_FAILED_LINE,
+          });
+        }
+      });
     });
   }
 

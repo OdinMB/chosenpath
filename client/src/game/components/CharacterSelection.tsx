@@ -15,6 +15,7 @@ import { StoryImage } from "shared/components/StoryImage";
 import { createPlayerIdentityImage } from "shared/utils/imageUtils";
 import { aiGeneratedImageAlt } from "shared/utils/aiImageAlt";
 import { AiNotice } from "shared/components/AiNotice";
+import { TurnFailedNotice } from "./TurnFailedNotice";
 
 interface CharacterSelectionProps {
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;
@@ -23,17 +24,24 @@ interface CharacterSelectionProps {
 export function CharacterSelection({
   onCharacterSelected,
 }: CharacterSelectionProps) {
-  const { storyState, isRequestPending, isOperationRunning } = useGameSession();
+  const {
+    storyState,
+    isRequestPending,
+    isOperationRunning,
+    turnFailure,
+    tryAgain,
+  } = useGameSession();
   const [selectedIdentity, setSelectedIdentity] = useState<number | null>(null);
   const [selectedBackground, setSelectedBackground] = useState<number | null>(
     null
   );
   const stateManager = new ClientStateManager();
 
-  // Check if we're waiting for character selection to process
+  // Check if we're waiting for character selection to process (never once it failed)
   const isSelectionPending =
-    isRequestPending("select_character") ||
-    isOperationRunning("select_character");
+    !turnFailure &&
+    (isRequestPending("select_character") ||
+      isOperationRunning("select_character"));
 
   // Select the first identity by default
   useEffect(() => {
@@ -223,6 +231,13 @@ export function CharacterSelection({
       </div>
 
       <div className="flex flex-col items-center mt-10">
+        {turnFailure && (
+          <TurnFailedNotice
+            failure={turnFailure}
+            onTryAgain={tryAgain}
+            className="mb-6"
+          />
+        )}
         <PrimaryButton
           onClick={handleConfirmSelection}
           disabled={

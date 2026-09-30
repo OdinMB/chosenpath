@@ -8,6 +8,8 @@ import { wsService } from "./WebSocketService.js";
 import { Logger } from "../shared/logger.js";
 import { useSession } from "../shared/session/useSession.js";
 import { GameSessionContext } from "./GameSessionContext";
+import { gameService } from "./GameService";
+import { stillFailed, turnFailureFrom, type TurnFailure } from "./turnFailure";
 
 // Create a dedicated logger for game session operations
 const logger = Logger.App;
@@ -29,9 +31,30 @@ export function GameSessionProvider({
 
   const [connectionStale, setConnectionStale] = useState<string | null>(null);
   const [gameError, setGameError] = useState<string | null>(null);
+  const [turnFailure, setTurnFailure] = useState<TurnFailure | null>(null);
 
   // Use refs to track states without causing effect reruns
   const isLoadingRef = useRef(isLoading);
+  // The story on screen, for the socket handlers (a failure is placed against it)
+  const storyStateRef = useRef<ClientStoryState | null>(null);
+  // The failure the last "Try again" cleared: shown again if that request is rate limited
+  const triedAgainRef = useRef<TurnFailure | null>(null);
+
+  const showStory = useCallback((state: ClientStoryState | null) => {
+    storyStateRef.current = state;
+    setStoryState(state);
+  }, []);
+
+  // "Try again": the notice goes, the selection the server failed on stops waiting, and what the story is missing is sent
+  const tryAgain = useCallback(() => {
+    const state = storyStateRef.current;
+    triedAgainRef.current = turnFailure;
+    setTurnFailure(null);
+    wsService.removeBackgroundOperation("select_character");
+    if (state) {
+      gameService.tryAgain(state);
+    }
+  }, [turnFailure]);
 
   // Keep the refs updated with the latest values
   useEffect(() => {
@@ -114,7 +137,12 @@ export function GameSessionProvider({
             state: data.state,
             trigger: data.trigger,
           });
-          setStoryState(data.state);
+          showStory(data.state);
+          // A failure stands until the story moves on (another player's "Try again" included)
+          triedAgainRef.current = null;
+          setTurnFailure((failure) =>
+            failure && stillFailed(failure, data.state) ? failure : null
+          );
           setIsLoading(false);
         }
       }
@@ -134,7 +162,9 @@ export function GameSessionProvider({
     wsService.onMessage("exit_story_response", (data: WSServerMessage) => {
       if (data.type === "exit_story_response") {
         logger.info("[GameSessionProvider] Story exit confirmed");
-        setStoryState(null);
+        showStory(null);
+        setTurnFailure(null);
+        triedAgainRef.current = null;
         setSessionId(null);
         setStoryCodes(null);
         localStorage.removeItem("sessionId");
@@ -146,10 +176,32 @@ export function GameSessionProvider({
         logger.info("[GameSessionProvider] Rate limited:", data.rateLimit);
         setRateLimit(data.rateLimit);
         setIsLoading(false);
+        // A "Try again" that was turned away: the failure still stands
+        if (triedAgainRef.current) {
+          setTurnFailure(triedAgainRef.current);
+          triedAgainRef.current = null;
+        }
       }
     });
 
     wsService.onMessage("error", (data: WSServerMessage) => {
+      // A failed turn, choice or character selection: shown where the game waited (TurnFailedNotice)
+      if (data.type === "game_error_notification") {
+        const failure = turnFailureFrom(data, storyStateRef.current);
+        if (failure) {
+          logger.warn(
+            `[GameSessionProvider] Turn failed (${data.operationType}):`,
+            data.error
+          );
+          // The selection the server failed on is no longer on its way
+          wsService.removeBackgroundOperation("select_character");
+          triedAgainRef.current = null;
+          setTurnFailure(failure);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       if (data.type === "error") {
         if ("error" in data && typeof data.error === "string") {
           if (data.error === "Session not found") {
@@ -179,7 +231,7 @@ export function GameSessionProvider({
       if (data.type === "verify_code_response") {
         logger.info("[GameSessionProvider] Code verification response:", data);
         if ("data" in data && data.data.state) {
-          setStoryState(data.data.state);
+          showStory(data.data.state);
           setIsLoading(false);
           // setIsConnecting(false); // Ensure this is correctly handled if needed elsewhere
 
@@ -196,7 +248,7 @@ export function GameSessionProvider({
           handleError(data.errorMessage);
           setIsLoading(false);
           // setIsConnecting(false); // No longer needed here
-          setStoryState(null);
+          showStory(null);
         }
       }
     });
@@ -226,7 +278,7 @@ export function GameSessionProvider({
       wsService.unsubscribeFromDisconnect(handleWsRawDisconnect);
       wsService.clearMessageHandlers();
     };
-  }, [sessionId, setSessionId, setIsLoading, handleError]);
+  }, [sessionId, setSessionId, setIsLoading, handleError, showStory]);
 
   useEffect(() => {
     if (rateLimit && rateLimit.timeRemaining > 0) {
@@ -249,7 +301,7 @@ export function GameSessionProvider({
 
   const value = {
     storyState,
-    setStoryState,
+    setStoryState: showStory,
     sessionId,
     setSessionId,
     isLoading,
@@ -267,6 +319,8 @@ export function GameSessionProvider({
     setConnectionStale,
     isRequestPending: (type: string) => wsService.isRequestPending(type),
     isOperationRunning: (type: string) => wsService.isOperationRunning(type),
+    turnFailure,
+    tryAgain,
   };
 
   return (

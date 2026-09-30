@@ -8,13 +8,15 @@ import { PlayerInterlude } from "./PlayerInterlude";
 import { LoadingSpinner } from "components/ui";
 import { AiNotice } from "shared/components/AiNotice";
 import { useBeatAiNotice } from "../hooks/useBeatAiNotice";
+import { TurnFailedNotice } from "./TurnFailedNotice";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
 }
 
 export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
-  const { storyState, isRequestPending } = useGameSession();
+  const { storyState, isRequestPending, turnFailure, tryAgain } =
+    useGameSession();
   const contentRef = React.useRef<HTMLDivElement>(null);
 
   // Use our custom hook for beat state management
@@ -108,13 +110,21 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
           storyState={storyState}
           className="mt-8 mb-4 sm:mb-8"
         />
-        <div className="mt-2">
-          <LoadingSpinner
-            size="medium"
-            message="Setting up the story..."
-            messageSize="large"
+        {turnFailure ? (
+          <TurnFailedNotice
+            failure={turnFailure}
+            onTryAgain={tryAgain}
+            className="mt-2 px-4"
           />
-        </div>
+        ) : (
+          <div className="mt-2">
+            <LoadingSpinner
+              size="medium"
+              message="Setting up the story..."
+              messageSize="large"
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -141,6 +151,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
             <NextBeatPlaceholder
               storyState={storyState}
               previousBeat={beatHistory[beatHistory.length - 1]}
+              isWriting={!turnFailure}
             />
           ) : (
             <BeatContent
@@ -154,6 +165,10 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               isRequestPending={isRequestPending}
               onChoiceSelected={handleChoiceClick}
             />
+          )}
+          {/* Where the story waits (the next beat, or a choice that failed on the latest), never below an earlier beat */}
+          {turnFailure && (isShowingPlaceholder || isViewingLatestBeat) && (
+            <TurnFailedNotice failure={turnFailure} onTryAgain={tryAgain} />
           )}
         </div>
       </div>

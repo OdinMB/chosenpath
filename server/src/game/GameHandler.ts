@@ -8,8 +8,22 @@ import type { OperationErrorEvent } from "./queue.js";
 import type {
   SelectCharacterResponse,
   MakeChoiceResponse,
+  StateUpdateNotification,
 } from "core/types/websocket.js";
 import { Logger } from "shared/logger.js";
+
+/** What the players are told when a turn fails for good; the client shows it with a "Try again" (TurnFailedNotice). */
+export const TURN_FAILED_LINE = "Unable to continue the story. Please try again.";
+
+/**
+ * The stored story is missing its next turn: every player has chosen (before
+ * the first turn: every character is picked) and no newer turn is stored, so
+ * nothing is left for a player to do. At the ending no one chooses, so it
+ * never waits.
+ */
+function waitsForItsTurn(story: Story): boolean {
+  return story.getState().characterSelectionCompleted && story.areAllChoicesSubmitted();
+}
 
 export class GameHandler {
   protected storyRepository: StoryRepository;
@@ -121,7 +135,7 @@ export class GameHandler {
           "Unable to save your character choice. Please try again.";
         break;
       case "moveStoryForward":
-        userFriendlyMessage = "Unable to continue the story. Please try again.";
+        userFriendlyMessage = TURN_FAILED_LINE;
         break;
       // Image outcomes (attachImageToStory, recordImageFailure) never fail
       // the queue: their handler logs errors instead of rethrowing them.
@@ -319,6 +333,68 @@ export class GameHandler {
             : "Failed to process character selection",
       });
       throw error; // Re-throw to allow caller to handle
+    }
+  }
+
+  /**
+   * A player's "Try again" after a turn failed (retry_turn): queues the turn
+   * once more from the stored story, as the queue's own resend does, when the
+   * story waits for it and no turn is on its way. Otherwise (another player
+   * tried first, the turn arrived meanwhile, or the player's own choice was
+   * never stored) it queues nothing and sends the player the story as stored,
+   * so the screen shows where it stands. True when it queued the turn.
+   */
+  async retryTurn(socket: Socket): Promise<boolean> {
+    const playerInfo = connectionManager.getPlayerBySocket(socket.id);
+    const story = playerInfo
+      ? await this.storyRepository.getStory(playerInfo.storyId)
+      : null;
+    if (!playerInfo || !story) {
+      Logger.Websocket.error(
+        `[GameHandler] Cannot retry the turn for socket ${socket.id}: ${
+          playerInfo ? "story not found" : "player not found"
+        }`
+      );
+      throw new Error(TURN_FAILED_LINE);
+    }
+
+    const gameId = playerInfo.storyId;
+    if (waitsForItsTurn(story) && !gameQueueProcessor.isTurnOnItsWay(gameId)) {
+      console.log(`[GameHandler] ${playerInfo.playerSlot} tries the turn again for game: ${gameId}`);
+      await gameQueueProcessor.addOperation({
+        gameId,
+        type: "moveStoryForward",
+        input: { story },
+      });
+      return true;
+    }
+
+    socket.emit("state_update_notification", {
+      type: "state_update_notification",
+      state: story.filterStateForPlayer(playerInfo.playerSlot),
+      trigger: "story_update",
+    } as StateUpdateNotification);
+    return false;
+  }
+
+  /**
+   * A player who arrives (a reload, a second device) at a story whose turn is
+   * missing with nothing on its way is told so, as the players were when it
+   * failed: the turn failed for good, or the server restarted while writing
+   * it. Their "Try again" then queues it (retryTurn).
+   */
+  async tellIfTurnStuck(socket: Socket, gameId: string): Promise<void> {
+    try {
+      const story = await this.storyRepository.getStory(gameId);
+      if (story && waitsForItsTurn(story) && !gameQueueProcessor.isTurnOnItsWay(gameId)) {
+        socket.emit("error", {
+          error: TURN_FAILED_LINE,
+          operationType: "moveStoryForward",
+        });
+      }
+    } catch (error) {
+      // The player has joined already; a story that can't be read here is only logged
+      Logger.Websocket.error(`[GameHandler] Could not check the turn of game ${gameId}:`, error);
     }
   }
 

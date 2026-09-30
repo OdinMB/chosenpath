@@ -48,13 +48,19 @@ export interface ExitStoryMessage extends BaseClientMessage {
   type: "exit_story";
 }
 
+/** A player's "Try again" after a turn failed: the server writes the turn again if the story still waits for it */
+export interface RetryTurnMessage extends BaseClientMessage {
+  type: "retry_turn";
+}
+
 export type WSClientMessage =
   | CreateSessionMessage
   | JoinSessionMessage
   | MakeChoiceMessage
   | SelectCharacterMessage
   | VerifyCodeMessage
-  | ExitStoryMessage;
+  | ExitStoryMessage
+  | RetryTurnMessage;
 
 // ===============================================
 // Server -> Client message types
@@ -122,12 +128,23 @@ export interface ExitStoryResponse
   type: "exit_story_response";
 }
 
+/**
+ * Retry turn response: queued is true when the turn is written again, false
+ * when nothing was missing or it was already on its way (the player is sent
+ * the story as stored)
+ */
+export interface RetryTurnResponse
+  extends WSSuccessResponse<{ queued: boolean }> {
+  type: "retry_turn_response";
+}
+
 export type WSServerResponse =
   | CreateSessionResponse
   | VerifyCodeResponse
   | SelectCharacterResponse
   | MakeChoiceResponse
   | ExitStoryResponse
+  | RetryTurnResponse
   | WSRateLimitedResponse
   | WSErrorResponse;
 

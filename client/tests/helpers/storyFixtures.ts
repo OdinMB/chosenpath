@@ -99,5 +99,7 @@ export function gameSession(
     isConnecting: false,
     isRequestPending: () => false,
     isOperationRunning: () => false,
+    turnFailure: null,
+    tryAgain: noop,
   };
 }

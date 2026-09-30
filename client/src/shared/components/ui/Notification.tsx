@@ -11,6 +11,8 @@ interface NotificationProps {
   autoClose?: boolean;
   autoCloseTime?: number;
   className?: string;
+  /** False hides the close button, for a notice that stays until its own action resolves it */
+  dismissible?: boolean;
 }
 
 export function Notification({
@@ -21,6 +23,7 @@ export function Notification({
   autoClose = false,
   autoCloseTime = 5000,
   className = "",
+  dismissible = true,
 }: NotificationProps) {
   const [isVisible, setIsVisible] = useState(true);
 
@@ -83,19 +86,21 @@ export function Notification({
           <h3 className="text-base font-medium text-primary-800">{title}</h3>
           <div className="mt-1 text-sm text-primary-700">{message}</div>
         </div>
-        <div className="ml-auto pl-3">
-          <button
-            onClick={() => {
-              setIsVisible(false);
-              setTimeout(() => onClose && onClose(), 300);
-            }}
-            className="inline-flex rounded-md text-primary-500 hover:text-primary-700 focus:outline-none"
-            aria-label="Close"
-          >
-            <span className="sr-only">Close</span>
-            <Icons.Close />
-          </button>
-        </div>
+        {dismissible && (
+          <div className="ml-auto pl-3">
+            <button
+              onClick={() => {
+                setIsVisible(false);
+                setTimeout(() => onClose && onClose(), 300);
+              }}
+              className="inline-flex rounded-md text-primary-500 hover:text-primary-700 focus:outline-none"
+              aria-label="Close"
+            >
+              <span className="sr-only">Close</span>
+              <Icons.Close />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

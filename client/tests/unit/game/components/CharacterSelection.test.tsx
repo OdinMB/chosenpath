@@ -1,7 +1,14 @@
 import type { ClientStoryState } from "core/types";
 import { CharacterSelection } from "../../../../src/game/components/CharacterSelection";
-import { GameSessionContext } from "../../../../src/game/GameSessionContext";
-import { notesIn, renderMarkup } from "../../../helpers/staticMarkup";
+import {
+  GameSessionContext,
+  type GameSessionContextType,
+} from "../../../../src/game/GameSessionContext";
+import {
+  accessibleText,
+  notesIn,
+  renderMarkup,
+} from "../../../helpers/staticMarkup";
 import {
   clientStoryState,
   gameSession,
@@ -50,9 +57,14 @@ function selectionState(
   });
 }
 
-function renderSelection(storyState: ClientStoryState): string {
+function renderSelection(
+  storyState: ClientStoryState,
+  session: Partial<GameSessionContextType> = {}
+): string {
   return renderMarkup(
-    <GameSessionContext.Provider value={gameSession(storyState)}>
+    <GameSessionContext.Provider
+      value={{ ...gameSession(storyState), ...session }}
+    >
       <CharacterSelection onCharacterSelected={jest.fn()} />
     </GameSessionContext.Provider>
   );
@@ -74,5 +86,24 @@ describe("CharacterSelection", () => {
     );
 
     expect(html).toContain("[image alt: AI-generated image: Mara]");
+  });
+
+  it("shows a failed selection above the confirm button, which is free to press again", () => {
+    const line = "Unable to save your character choice. Please try again.";
+    // The selection the server failed on is still marked as running when the failure arrives
+    const html = renderSelection(selectionState(), {
+      turnFailure: { message: line, at: "[]" },
+      isOperationRunning: (type) => type === "select_character",
+    });
+
+    const alert = html.indexOf('<div role="alert"');
+    expect(alert).toBeGreaterThan(html.indexOf("Background"));
+    expect(html.indexOf("Confirm Selection")).toBeGreaterThan(alert);
+    expect(accessibleText(html)).toContain(`${line} Try again`);
+    expect(html).not.toContain("Processing Character Selection...");
+  });
+
+  it("shows no alert while nothing failed", () => {
+    expect(renderSelection(selectionState())).not.toContain('role="alert"');
   });
 });

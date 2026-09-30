@@ -69,6 +69,23 @@ export abstract class BaseQueueProcessor<
     return this.operations.get(operationId) || null;
   }
 
+  /**
+   * Whether the queue holds an operation (of the kind asked about) that is
+   * waiting or running: a failed one's resend counts, since it is queued
+   * before the failed one leaves, and a failed one that is being reported
+   * does not.
+   */
+  hasUnfinished(queueId: string, matches: (operation: TOperation) => boolean = () => true): boolean {
+    return (this.queues.get(queueId) ?? []).some((operationId) => {
+      const operation = this.operations.get(operationId);
+      return (
+        operation !== undefined &&
+        (operation.status === "pending" || operation.status === "processing") &&
+        matches(operation)
+      );
+    });
+  }
+
   async start(): Promise<void> {
     if (this.processing) return;
 

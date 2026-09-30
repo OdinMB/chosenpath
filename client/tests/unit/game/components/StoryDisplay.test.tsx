@@ -1,8 +1,15 @@
 import type { Beat, ClientStoryState } from "core/types";
 import { StoryDisplay } from "../../../../src/game/components/StoryDisplay";
-import { GameSessionContext } from "../../../../src/game/GameSessionContext";
+import {
+  GameSessionContext,
+  type GameSessionContextType,
+} from "../../../../src/game/GameSessionContext";
 import { useStoryBeatState } from "../../../../src/game/hooks/useStoryBeatState";
-import { notesIn, renderMarkup } from "../../../helpers/staticMarkup";
+import {
+  accessibleText,
+  notesIn,
+  renderMarkup,
+} from "../../../helpers/staticMarkup";
 import {
   beat,
   clientStoryState,
@@ -21,7 +28,10 @@ jest.mock("../../../../src/game/components/BeatContent", () => ({
     `[beat: ${currentBeat?.title ?? "none"}]`,
 }));
 jest.mock("../../../../src/game/components/NextBeatPlaceholder", () => ({
-  NextBeatPlaceholder: () => "[next beat is being written]",
+  NextBeatPlaceholder: ({ isWriting }: { isWriting?: boolean }) =>
+    isWriting === false
+      ? "[next beat, no spinner]"
+      : "[next beat is being written]",
 }));
 
 const SESSION =
@@ -38,7 +48,8 @@ const REMINDER =
 function renderStory(
   beats: Beat[],
   displayedBeatIndex: number | null,
-  overrides: Partial<ClientStoryState> = {}
+  overrides: Partial<ClientStoryState> = {},
+  session: Partial<GameSessionContextType> = {}
 ): string {
   jest.mocked(useStoryBeatState).mockReturnValue({
     displayedBeatIndex,
@@ -56,7 +67,9 @@ function renderStory(
     ...overrides,
   });
   return renderMarkup(
-    <GameSessionContext.Provider value={gameSession(storyState)}>
+    <GameSessionContext.Provider
+      value={{ ...gameSession(storyState), ...session }}
+    >
       <StoryDisplay onChoiceSelected={jest.fn()} />
     </GameSessionContext.Provider>
   );
@@ -139,5 +152,47 @@ describe("StoryDisplay AI notice", () => {
     for (const category of ["enjoy-fiction", "read-with-kids"] as const) {
       expect(notesIn(renderStory(threads, 1, { category }))).toEqual([]);
     }
+  });
+});
+
+describe("StoryDisplay when a turn fails", () => {
+  const TURN_FAILED = "Unable to continue the story. Please try again.";
+  const failed = { turnFailure: { message: TURN_FAILED, at: "[]" } };
+  const ALERT = '<div role="alert"';
+
+  it("shows the failure where the next beat's spinner was, and stops the spinner", () => {
+    const beats = [beat("Arrival"), beat("Crossroads")];
+    const html = renderStory(beats, 2, {}, failed);
+
+    expect(html).toContain("[next beat, no spinner]");
+    expect(accessibleText(html)).toContain(`${TURN_FAILED} Try again`);
+    expect(html.indexOf(ALERT)).toBeGreaterThan(html.indexOf("[next beat"));
+  });
+
+  it("shows the failure below the latest beat when the player's choice failed and its options are open again", () => {
+    const beats = [beat("Arrival"), beat("Crossroads", -1)];
+    const html = renderStory(beats, 1, {}, failed);
+
+    expect(html.indexOf(ALERT)).toBeGreaterThan(html.indexOf("[beat: Crossroads]"));
+  });
+
+  it("shows nothing below an earlier beat the player looks back at", () => {
+    const beats = [beat("Arrival"), beat("Crossroads")];
+
+    expect(renderStory(beats, 0, {}, failed)).not.toContain(ALERT);
+  });
+
+  it("shows the failure instead of 'Setting up the story...' when the first turn failed", () => {
+    const html = renderStory([], null, {}, failed);
+
+    expect(accessibleText(html)).toContain(`${TURN_FAILED} Try again`);
+    expect(html).not.toContain("Setting up the story...");
+  });
+
+  it("shows no alert while nothing failed", () => {
+    expect(renderStory([], null)).not.toContain(ALERT);
+    expect(renderStory([beat("Arrival"), beat("Crossroads")], 2)).not.toContain(
+      ALERT
+    );
   });
 });

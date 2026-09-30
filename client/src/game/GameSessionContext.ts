@@ -1,5 +1,6 @@
 import { createContext } from "react";
 import type { ClientStoryState, RateLimitInfo } from "core/types";
+import type { TurnFailure } from "./turnFailure";
 
 // Define the GameSessionContext type
 export interface GameSessionContextType {
@@ -20,6 +21,10 @@ export interface GameSessionContextType {
   isConnecting: boolean;
   isRequestPending: (type: string) => boolean;
   isOperationRunning: (type: string) => boolean;
+  /** A turn, choice or character selection that failed, shown where the game waited (TurnFailedNotice) */
+  turnFailure: TurnFailure | null;
+  /** "Try again": clears the failure and sends what the story is missing */
+  tryAgain: () => void;
 }
 
 // Create the context

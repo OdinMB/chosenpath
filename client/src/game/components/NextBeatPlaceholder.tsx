@@ -11,11 +11,14 @@ import { enhanceResolutionDetails } from "game/utils/resolutionUtils";
 interface NextBeatPlaceholderProps {
   storyState: ClientStoryState;
   previousBeat: Beat; // The beat that just had a choice made
+  /** False once the turn failed: no spinner (the failure notice stands below instead) */
+  isWriting?: boolean;
 }
 
 export const NextBeatPlaceholder: React.FC<NextBeatPlaceholderProps> = ({
   storyState,
   previousBeat,
+  isWriting = true,
 }) => {
   // Check if we have valid data to work with
   const isValidData = storyState && previousBeat && previousBeat.choice !== -1;
@@ -120,7 +123,7 @@ export const NextBeatPlaceholder: React.FC<NextBeatPlaceholderProps> = ({
           </h1>
         )}
 
-        <LoadingSpinner size="large" message="" />
+        {isWriting && <LoadingSpinner size="large" message="" />}
 
         {/* Only show pending players list when there are actually pending players */}
         {hasPendingPlayers && (
