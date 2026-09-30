@@ -4,6 +4,8 @@ import {
   type SectionConfig,
 } from "./StoryStatePromptService.js";
 import { GameModes } from "core/types/story.js";
+import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
+import { outcomeNeeds } from "../pacing.js";
 
 /*
  * The switch planner (planner v2, adopted on 2026-09-28; turn doc A2, A4,
@@ -16,7 +18,9 @@ import { GameModes } from "core/types/story.js";
  * library, and shows the thread that just ended as such, with each beat's
  * chosen option only. Today's form before the adoption is kept for the eval
  * in storyTextRound0/; adoptedPlanners.test.ts holds this equal to the
- * measured planner v2.
+ * measured planner v2, with, since 2026-10-01, the measured line that offers a
+ * contested outcome's last stage only as a grouped thread
+ * (CONTEST_LAST_STAGE_LINE, the parallel-threads stage).
  */
 
 /** Closes the example output of every switch analysis after the opening multiplayer one. */
@@ -27,6 +31,34 @@ The relevant questions are:
 - How much agency can we give the player over which outcome/question will be explored next?
 Don't make ANY assessment as to what the player should do to achieve their goals. It doesn't matter what would be sensible or rational for the player to do. That's for the player to decide.
 `;
+
+/**
+ * A contested outcome's last stage is decided with both sides there (the
+ * parallel-threads stage of 2026-10-01, fix 4 of the second playthroughs'
+ * review, measured as the eval's parallelThreads switch planner and adopted as
+ * measured). In the stored stories the switch offered the space pirates'
+ * treasure claim (1 of 2) and the estate agents' sale (2 of 3) as one topic
+ * direction among others; one side took it alone ("Join Rory at a
+ * neighborhood open house"), the chapter planner had to follow the picks, and
+ * the contest was settled in a thread the other side wasn't in. Replayed on
+ * the three switches before such a stage, production offered it as a
+ * direction one side could take alone in 5 of 6 plans, the line in 1 of 6
+ * (moved, p 0.040), its switch planner no slower. Printed after the
+ * coordination examples where a contested shared outcome has one milestone
+ * still needed (the chapter that just ended counted as pending), in a contest
+ * game after the opening switch.
+ */
+export const CONTEST_LAST_STAGE_LINE =
+  "A contested shared outcome (Side A / Side B resolutions) that PACING shows with 1 milestone still needed is settled by its next thread, a contest that needs both sides in it. Offer it only as a grouped thread, a flavor switch on it for every player, never as one direction among others: one side could take that direction alone while the other side is elsewhere, and the contest would be settled without them.\n";
+
+/** Whether the switch planner takes CONTEST_LAST_STAGE_LINE: a contest game after the opening, a contested shared outcome's next thread settling its last stage. */
+export function contestAtLastStage(story: Story): boolean {
+  const mode = story.getGameMode();
+  if (!story.isMultiplayer() || (mode !== GameModes.Competitive && mode !== GameModes.CooperativeCompetitive) || story.getCurrentTurn() === 0) return false;
+  const contested = new Set(story.getSharedOutcomes().filter(isContestedOutcome).map((o) => o.id));
+  const [slot] = story.getPlayerSlots();
+  return outcomeNeeds(story, slot, true).some((need) => contested.has(need.id) && need.stillNeeded === 1);
+}
 
 /** A4 step a: continuity in its narrow form. */
 const STEP_A = `a) Continuity. Is the next thread's outcome forced? Only these things force it:
@@ -234,6 +266,7 @@ Examples
 - Grouped thread to compete over a shared outcome: player1 and player2 are in a grouped thread trying to woo the same NPC. They get flavor switches to decide their approach.
 - In-grouping via an overlap of options: player1 and player2 can both choose how to proceed with a topic switch. Their switches should have one option in common ("Join the expedition"). If they both choose this option, they will be in the same thread.
 `;
+      if (contestAtLastStage(story)) instructions += CONTEST_LAST_STAGE_LINE;
     }
 
     return instructions;

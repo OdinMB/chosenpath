@@ -43,8 +43,8 @@ export type ChoiceCaseSpec = {
   /** The playthrough's story id (playthroughs.ts) */
   story: string;
   turn: number;
-  /** A turn (beat) or the chapter plan before it (thread) */
-  role: "beat" | "thread";
+  /** A turn (beat), the chapter plan before it (thread) or the switch plan before it (switch; the parallel-threads stage) */
+  role: "beat" | "thread" | "switch";
   /** What the case tests, first in its note */
   purpose: string;
 };
@@ -100,7 +100,8 @@ export const playthroughsSent: SentRequestText = (input) => {
  * The stage's cases from the stored runs, each only where its request is the
  * one the run sent; and what could not be built. Another stage builds its own
  * cases from the playthroughs the same way, under its own category
- * (outcomeSettledCases.ts).
+ * (outcomeSettledCases.ts), a switch plan's input among them
+ * (parallelThreadsCases.ts).
  */
 export function choiceResultCases(
   runs: PlayRun[],
@@ -123,9 +124,10 @@ export function choiceResultCases(
     let state: StoryState;
     let fixedAnalysis: FixedAnalysis | undefined;
     let sentFile: string | undefined;
-    if (spec.role === "thread") {
-      if (played.plan?.kind !== "chapter plan") {
-        problems.push(`${spec.id}: turn ${spec.turn} of ${spec.story} planned no chapter`);
+    if (spec.role === "thread" || spec.role === "switch") {
+      const kind = spec.role === "thread" ? "chapter plan" : "switch plan";
+      if (played.plan?.kind !== kind) {
+        problems.push(`${spec.id}: turn ${spec.turn} of ${spec.story} planned no ${spec.role === "thread" ? "chapter" : "switch"}`);
         continue;
       }
       state = clone(beforePlan.getState());

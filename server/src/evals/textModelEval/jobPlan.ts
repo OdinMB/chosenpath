@@ -556,7 +556,8 @@ function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: Pla
       for (const beatArm of plan.beats) chains(evalCase, plan.analysis, beatArm, options.samples ?? plan.samples);
     }
   }
-  return jobs;
+  // A stage that interleaves its arms interleaves its chains the same way: sample by sample, every chain on a case before the next case
+  return stageInterleavesArms(options.stage) ? interleaved(jobs, cases, role) : jobs;
 }
 
 /** Estimated dollars for a job: its call, plus the beat call of a chain. */

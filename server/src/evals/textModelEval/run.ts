@@ -50,6 +50,7 @@ import { buildSettledCasesMode, judgeSettledMode } from "./outcomeSettledPrep.js
 import { buildRecordedCasesMode, judgeRecordedMode } from "./recordedResultPrep.js";
 import { buildLeverCasesMode } from "./leverDirectionCases.js";
 import { judgeLeversMode } from "./leverDirectionPrep.js";
+import { buildParallelCasesMode, judgeParallelMode } from "./parallelThreadsPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
@@ -86,7 +87,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     adopted8: production's turn and outcomeSettled on the second playthroughs' completing switch turns and endings;
  *     recorded-result --role beat under adopted9: production's turn and recordedResult on the second playthroughs'
  *     turns after an exploration step that changed direction; lever-direction --role setup under adopted10: production's
- *     setup and leverDirection on six premises, interleaved)
+ *     setup and leverDirection on six premises, interleaved; parallel-threads under adopted11: --role switch, production's
+ *     group switch planner and parallelThreads', and --role thread --mode pipeline, each side's chapter planner into its
+ *     own group turn, interleaved)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -169,6 +172,15 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-levers [--max-spend 0.05]  leversRunRightWay (leverDirectionJudge.ts) on its calibration (two samples) and
  *     every setup of the stage's arms, one call per setup, one sample each, then judged-levers.md and .json; --cases
  *     <item or case ids> sends only those (a smoke)
+ *   Parallel threads in one world, contests with both sides (parallelThreadsPrep.ts, 2026-10-01), in the parallel-threads
+ *   stage:
+ *   --build-parallel-cases [--rebuild-cases]  the second round's switch plans before a contest's last stage and chapter
+ *     openings with parallel threads (parallelThreadsCases.ts, replayed), each only where its request is the one
+ *     production sent; no calls; they then run with --run --stage parallel-threads --prompt-state adopted11, --role
+ *     switch and --role thread --mode pipeline
+ *   --judge-parallel [--max-spend 0.05]  placesConsistent (parallelThreadsJudge.ts) on its calibration (two samples) and
+ *     every chain's turn of the stage's arms, one call per group turn, one sample each, and the plans read by the game (no
+ *     calls), then judged-parallel.md and .json; --cases <item or case ids> sends only those (a smoke)
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -223,6 +235,8 @@ type Mode =
   | "judge-recorded"
   | "build-lever-cases"
   | "judge-levers"
+  | "build-parallel-cases"
+  | "judge-parallel"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -355,6 +369,8 @@ function parseArgs(argv: string[]): Args {
       case "--judge-recorded":
       case "--build-lever-cases":
       case "--judge-levers":
+      case "--build-parallel-cases":
+      case "--judge-parallel":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1061,6 +1077,11 @@ async function main() {
     case "judge-levers":
       // The stage's judged check books to its own stage
       return judgeLeversMode(prepContext(args, files, "lever-direction"), { caseIds: args.caseIds });
+    case "build-parallel-cases":
+      return buildParallelCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "judge-parallel":
+      // The stage's judged check books to its own stage
+      return judgeParallelMode(prepContext(args, files, "parallel-threads"), { caseIds: args.caseIds });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

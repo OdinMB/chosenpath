@@ -9,7 +9,10 @@
  * (.plans/2026-09-26_build-followup.md, "Adoption into production" and "The
  * owner's feedback of 2026-09-28"). The chapter planner has none: planV2c
  * carries the adopted "without a number" in the chapter title's field. The
- * switch planner has one since 2026-09-30: the threads that fit near the end.
+ * switch planner has one since 2026-09-30: the threads that fit near the end;
+ * since 2026-10-01 it also carries a measured line planner v2b never had (a
+ * contest's last stage offered only as a grouped thread: withContestLastStage,
+ * the parallel-threads stage's variant, not a delta).
  */
 
 import type { Story } from "core/models/Story.js";
@@ -19,6 +22,7 @@ import { chaptersThatFit, turnsLeft } from "../../src/game/services/pacing.js";
 import { StoryStatePromptService } from "../../src/game/services/prompts/StoryStatePromptService.js";
 import { chaptersThatFit as measuredChaptersThatFit } from "../../src/game/services/storyTextRounds/pacing.js";
 import { KIDS_STATS, KIDS_STATS_VARIED } from "../../src/game/services/storyTextRounds/setupRound3Text.js";
+import { PARALLEL_THREADS_TEXT, takesLastStageLine } from "../../src/game/services/storyTextRounds/parallelThreads.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -89,6 +93,22 @@ export function withThreadsThatFit(measured: string, story: Story): string {
     if (!measured.includes(line)) throw new Error(`The measured switch planner no longer says "${line}"`);
   }
   return measured.split(fitLine(was)).join(fitLine(now)).split(neededLine(was)).join(neededLine(now));
+}
+
+/*
+ * The switch planner (2026-10-01, the parallel-threads stage, fix 4 of the
+ * second playthroughs' review): where a contested shared outcome's next thread
+ * settles its last stage, in a contest game after the opening switch, the line
+ * that offers it only as a grouped thread, after the coordination examples.
+ * Not a delta: measured (the variant parallelThreads' switch planner, its
+ * offer reading 1 of 6 → 5 of 6, moved) and adopted as measured; planner v2b,
+ * the measured base the other switch tests read, never carried it.
+ */
+export function withContestLastStage(measured: string, story: Story): string {
+  if (!takesLastStageLine(story)) return measured;
+  const { lastStageAnchor, lastStageLine } = PARALLEL_THREADS_TEXT;
+  if (measured.split(lastStageAnchor).length !== 2) throw new Error("The measured switch planner no longer carries the coordination examples' last line once");
+  return measured.replace(lastStageAnchor, `${lastStageAnchor}${lastStageLine}`);
 }
 
 /** The chapter rules as the measured switch turn printed them: the story's thread types and switch/thread instructions. */

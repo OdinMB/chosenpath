@@ -51,7 +51,11 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * exploration step told as the game recorded it (recorded-result: the variant
  * beside production's turn on the second round's changes of direction), then
  * the setup whose sacrifices cost and rewards help whichever way a stat runs
- * (lever-direction: the variant beside production's setup on six premises).
+ * (lever-direction: the variant beside production's setup on six premises),
+ * then parallel threads in one world and contests with both sides
+ * (parallel-threads: the variant's switch planner beside production's on the
+ * switches before a contest's last stage, and its chapter planner into its
+ * group turn beside production's chains on the chapter openings).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -74,6 +78,7 @@ export const FEEDBACK_STAGES = [
   "outcome-settled",
   "recorded-result",
   "lever-direction",
+  "parallel-threads",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -245,6 +250,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // The lever-direction stage (2026-09-30, fix 3 of the review): the setup whose sacrifices cost and rewards help whichever
   // way a stat runs, against production's setup, which runs beside it
   leverDirection: "adopted",
+  // The parallel-threads stage (2026-10-01, fix 4 of the review): the switch planner, chapter planner and group turn with
+  // their lines, against production's, which run beside them (its chains against production's chains)
+  parallelThreads: "adopted",
 };
 
 /**
@@ -572,9 +580,56 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return recordedResultArms(role);
     case "lever-direction":
       return leverDirectionArms(role);
+    case "parallel-threads":
+      return parallelThreadsArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the parallel-threads stage (2026-10-01, fix 4 of the
+ * second playthroughs' review): production's own code, unchanged since the
+ * lever-direction stage, under a tag of its own so production runs beside the
+ * variant in the same minutes.
+ */
+export const PARALLEL_THREADS_PROMPT_STATE = "adopted11";
+
+/**
+ * The stage's cases, built from the second round's stored runs
+ * (parallelThreadsCases.ts, no calls). The switch plans before a contest's
+ * last stage: the space pirates' switch at turn 9 (the treasure claim, which
+ * the scout then took alone) and the estate agents' at turn 12 (the sale,
+ * Nia alone), where production offered it as one direction among others and
+ * one side took it; the food trucks' at turn 16 (the contract), offered the
+ * same way, where both players happened to take it. The chapter openings
+ * with parallel threads: the space pirates' turn 10 (three threads in three
+ * places, the ship at the docks and in the pylons at once, the converted
+ * contest) and the estate agents' turn 13 (the sale's last stage for Nia
+ * alone, the buyer later in two places), where the defect happened, and the
+ * food trucks' turn 13 (two owners in their own places), an ordinary one.
+ */
+export const PARALLEL_THREADS_CASES = {
+  switches: ["round-parallel-switch-space-pirates-t9", "round-parallel-switch-estate-agents-t12", "round-parallel-switch-food-trucks-t16"],
+  chapters: ["round-parallel-space-pirates-t10", "round-parallel-estate-agents-t13", "round-parallel-food-trucks-t13"],
+} as const;
+
+/**
+ * The parallel-threads stage (the coordinator's fix 4 after the second
+ * playthroughs' review): production's group switch planner (adopted) and the
+ * variant's (parallelThreads) on the group planner model (Luna low), twice on
+ * the stage's switch cases, interleaved, under adopted11. Its chapter
+ * openings run as chains (pipelinePlans): each side's chapter planner into its
+ * own group turn.
+ */
+function parallelThreadsArms(role: EvalRole): ArmPlan[] {
+  if (role !== "switch") return [];
+  return (["adopted", "parallelThreads"] as const).map((variant) => ({
+    arm: adoptedDefault("multiplayerAnalysis", variant),
+    samples: 2,
+    scope: "multiplayer" as const,
+    caseIds: [...PARALLEL_THREADS_CASES.switches],
+  }));
 }
 
 /**
@@ -1052,7 +1107,18 @@ function optionsO2Arms(role: EvalRole): ArmPlan[] {
 }
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
-const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result", "choice-line-sp", "outcome-settled", "recorded-result", "lever-direction"];
+const INTERLEAVED_STAGES: Stage[] = [
+  "options-continuity",
+  "options-o2",
+  "ending-state",
+  "runaway",
+  "choice-result",
+  "choice-line-sp",
+  "outcome-settled",
+  "recorded-result",
+  "lever-direction",
+  "parallel-threads",
+];
 
 export function stageInterleavesArms(stage: Stage): boolean {
   return INTERLEAVED_STAGES.includes(stage);
@@ -1096,6 +1162,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The lever-direction stage's mouse setup (2026-09-30), frozen after every earlier stage had closed; the frozen premises
   // it runs beside were planned by the setup rounds and stay plannable
   [LEVER_MOUSE_CASE, "lever-direction"],
+  // The parallel-threads stage's switch plans and chapter openings from the second playthroughs (2026-10-01), frozen after
+  // every earlier stage had closed
+  ...[...PARALLEL_THREADS_CASES.switches, ...PARALLEL_THREADS_CASES.chapters].map((id): [string, Stage] => [id, "parallel-threads"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */
@@ -1733,6 +1802,17 @@ export function pipelinePlans(stage: Stage): PipelinePlan[] {
         { analysis: luna("low", "planV2"), beats: [luna("low", "chapterFull")], samples: 2, scope: "multiplayer", roles: ["thread"] },
         { analysis: luna("low", "planV2"), beats: [luna("medium", "turnR2b")], samples: 2, scope: "single-player", roles: ["switch"], caseIds: ROUND2_SWITCH_CHAIN_CASES },
       ];
+    case "parallel-threads":
+      // Fix 4 of the second playthroughs' review (2026-10-01): each side's group chapter planner into its own group turn,
+      // twice on the stage's chapter openings, interleaved (planJobs), production's chains beside the variant's
+      return (["adopted", "parallelThreads"] as const).map((variant) => ({
+        analysis: adoptedDefault("multiplayerAnalysis", variant),
+        beats: [adoptedDefault("multiplayerBeat", variant)],
+        samples: 2,
+        scope: "multiplayer" as const,
+        roles: ["thread" as const],
+        caseIds: [...PARALLEL_THREADS_CASES.chapters],
+      }));
     default:
       return [];
   }

@@ -105,6 +105,8 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "outcome-settled": "The turn that completes an outcome, and the ending (outcomeSettled beside production's turn under adopted8, --role beat)",
   "recorded-result": "The turn after an exploration step told as the game recorded it (recordedResult beside production's turn under adopted9, --role beat)",
   "lever-direction": "The setup whose sacrifices cost and rewards help whichever way a stat runs (leverDirection beside production's setup under adopted10, --role setup)",
+  "parallel-threads":
+    "Parallel threads in one world, contests with both sides (parallelThreads beside production under adopted11: --role switch, and --role thread --mode pipeline for the chapter openings' chains)",
 };
 
 /** Jobs by arm key, in plan order. */

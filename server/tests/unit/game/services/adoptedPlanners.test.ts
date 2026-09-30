@@ -16,12 +16,18 @@ import {
   switchAnalysisAfterThread,
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
-import { withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
+import { withContestLastStage, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
+import { CONTEST_LAST_STAGE_LINE } from "../../../../src/game/services/prompts/SwitchPromptService.js";
+import { PARALLEL_THREADS_TEXT } from "../../../../src/game/services/storyTextRounds/parallelThreads.js";
+import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 
 /*
  * Production's planners are planner v2 with two-sided contests as the eval
- * measured it (variant planV2b) for the switch, and, since 2026-09-30,
+ * measured it (variant planV2b) for the switch, with, since the
+ * parallel-threads stage of 2026-10-01, the measured line that offers a
+ * contested outcome's last stage only as a grouped thread (parallelThreads'
+ * switch planner, withContestLastStage), and, since 2026-09-30,
  * planner v2e for the chapter: planner v2c (planV2b with the nearer chapter
  * question and the planner's own kind of milestone, the owner's feedback of
  * 2026-09-28, with a topic switch's chosen direction narrowed to the
@@ -90,6 +96,29 @@ function contestStory(players: number, withFlavor: boolean): Story {
   });
 }
 
+/**
+ * The switch planner after a chapter on a contested outcome: its milestone pending, so with `recorded` of 2 before it the
+ * next thread settles the last stage (1 still needed) or the outcome is complete.
+ */
+function contestSwitchStory(players: number, recorded: number, gameMode: (typeof GameModes)[keyof typeof GameModes] = GameModes.Competitive): Story {
+  const slots = Array.from({ length: players }, (_, i) => `player${i + 1}`);
+  return roundStory({
+    players,
+    turns: 4,
+    maxTurns: 20,
+    gameMode,
+    sharedOutcomes: [
+      outcome("shared_voice", {
+        possibleResolutions: { sideAWins: "The enclave speaks", mixed: "Shared", sideBWins: "The printers speak" },
+        resonance: "Scored by Enclave's Voice|Printers' Voice.",
+        milestones: Array.from({ length: recorded }, (_, k) => `Voice milestone ${k + 1}`),
+      }),
+    ],
+    playerOutcomes: Object.fromEntries(slots.map((slot) => [slot, [outcome(`${slot}_pride`)]])),
+    phases: [topicSwitch([["Speak up", "shared_voice"], ["Stay home", "player1_pride"], ["Hide", "shared_voice"]], 0, slots), endedChapter("shared_voice", 3, 1, "The council hears the enclave", slots)],
+  });
+}
+
 const SWITCH_STORIES: [string, () => Story][] = [
   ...[1, 2, 3].flatMap((players): [string, () => Story][] => [
     [`the opening switch, ${players} players`, () => firstSwitchBeat(players)],
@@ -98,6 +127,10 @@ const SWITCH_STORIES: [string, () => Story][] = [
   ]),
   ["a late 10-turn story", () => singlePlayerAfterChapters(10, 6)],
   ["the middle of a 25-turn story", () => singlePlayerAfterChapters(25, 8)],
+  ...[2, 3].flatMap((players): [string, () => Story][] => [
+    [`a ${players}-player contest whose next thread settles its last stage`, () => contestSwitchStory(players, 0)],
+    [`a ${players}-player contest complete with the chapter that just ended`, () => contestSwitchStory(players, 1)],
+  ]),
 ];
 
 const THREAD_STORIES: [string, () => Story][] = [
@@ -116,7 +149,7 @@ const THREAD_STORIES: [string, () => Story][] = [
 function expectSwitchLikeMeasured(story: Story) {
   const production = switchStep.request(story);
   const measured = plannerV2SwitchRequest(story, false);
-  expect(production.prompt).toBe(withThreadsThatFit(measured.prompt, story));
+  expect(production.prompt).toBe(withContestLastStage(withThreadsThatFit(measured.prompt, story), story));
   expect(json(production.schema)).toBe(json(measured.schema));
 }
 
@@ -151,6 +184,22 @@ describe("the switch planner: planner v2 as measured", () => {
     // Everywhere the two counts agree, production is the measured request byte for byte
     const middle = singlePlayerAfterChapters(25, 8);
     expect(switchStep.request(middle).prompt).toBe(plannerV2SwitchRequest(middle, false).prompt);
+  });
+
+  it("offers a contested outcome's last stage only as a grouped thread, as the parallel-threads stage measured it (2026-10-01)", () => {
+    for (const players of [2, 3]) {
+      const story = contestSwitchStory(players, 0);
+      const production = switchStep.request(story).prompt;
+      expect(production.split(CONTEST_LAST_STAGE_LINE).length - 1).toBe(1);
+      // The measured variant's switch planner, byte for byte, and planner v2b's around the line
+      expect(production).toBe(requestText(requestFor("parallelThreads", { role: "switch", story })));
+      expect(production.replace(CONTEST_LAST_STAGE_LINE, "")).toBe(withThreadsThatFit(plannerV2SwitchRequest(story, false).prompt, story));
+    }
+    // Only where a contested outcome's next thread settles its last stage, in a contest game after the opening
+    for (const story of [contestSwitchStory(2, 1), contestSwitchStory(2, 0, GameModes.Cooperative), firstSwitchBeat(2), switchAnalysisAfterThread(2)]) {
+      expect(switchStep.request(story).prompt).not.toContain(CONTEST_LAST_STAGE_LINE);
+    }
+    expect(CONTEST_LAST_STAGE_LINE).toBe(PARALLEL_THREADS_TEXT.lastStageLine);
   });
 
   (frozen.length ? it : it.skip)("every frozen switch case", () => {

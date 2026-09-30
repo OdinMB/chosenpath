@@ -421,6 +421,8 @@ describe("budget caps", () => {
       "recorded-result": 0.26,
       // Fix 3, its estimate plus 30%
       "lever-direction": 0.26,
+      // Fix 4, its estimate plus 30%
+      "parallel-threads": 0.195,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -442,6 +444,7 @@ describe("budget caps", () => {
       "outcome-settled",
       "recorded-result",
       "lever-direction",
+      "parallel-threads",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -449,10 +452,10 @@ describe("budget caps", () => {
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all nineteen caps still
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all twenty caps still
     // fit (the hard cap $42 since the second round of playthroughs)
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(8.49);
+    expect(caps).toBeCloseTo(8.685);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);

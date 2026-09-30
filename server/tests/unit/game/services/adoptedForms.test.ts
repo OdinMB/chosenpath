@@ -11,7 +11,7 @@ import { SCOREBOARD_ENDING_RULE as PRODUCTION_ENDING_RULE } from "../../../../sr
 import { ROUND3_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { ENDING_STATE_TEXT } from "../../../../src/game/services/storyTextRounds/endingState.js";
-import { adoptedSetupPrompt, adoptedTurn, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
+import { adoptedSetupPrompt, adoptedTurn, withContestLastStage, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
 import { takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 
 /*
@@ -76,7 +76,8 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     case "thread":
       return { prompt, schema: json(measured) };
     case "switch":
-      return { prompt: withThreadsThatFit(prompt, input.story), schema: json(measured) };
+      // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured
+      return { prompt: withContestLastStage(withThreadsThatFit(prompt, input.story), input.story), schema: json(measured) };
     case "beat":
       return { prompt: adoptedTurn(prompt, input.story), schema: json(measured) };
   }

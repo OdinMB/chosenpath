@@ -39,6 +39,7 @@ import type { CallRecord } from "./runner.js";
  *   judged-settled.md|json  the outcome-settled stage's judged checks, the turn that completes an outcome and the ending (--judge-settled)
  *   judged-recorded.md|json  the recorded-result stage's judged check, the turn after an exploration step told as recorded (--judge-recorded)
  *   judged-levers.md|json  the lever-direction stage's judged check, every sacrifice costing and every reward helping (--judge-levers)
+ *   judged-parallel.md|json  the parallel-threads stage's judged check and plan readings, people and places across the players' texts (--judge-parallel)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  *   playthroughs.md|json   the whole-story playthroughs on production's own code (--playthroughs)
  *   stories/<id>.html, stories/index.html  each played story as a page for the owner (--playthroughs)
@@ -167,6 +168,11 @@ export function evalFiles(outDir: string) {
     writeJudgedLevers: (markdown: string, json: unknown) => {
       writeJson(at("judged-levers.json"), json);
       fs.writeFileSync(at("judged-levers.md"), markdown);
+    },
+    /** The parallel-threads stage's judged check and plan readings, people and places across the players' texts (--judge-parallel, parallelThreadsPrep.ts) */
+    writeJudgedParallel: (markdown: string, json: unknown) => {
+      writeJson(at("judged-parallel.json"), json);
+      fs.writeFileSync(at("judged-parallel.md"), markdown);
     },
     /** The choice-line-sp stage's report: each turn read whole, production's retry in the loop (--choice-line-sp, choiceLinePrep.ts) */
     writeChoiceLine: (markdown: string, json: unknown) => {

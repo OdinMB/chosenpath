@@ -28,6 +28,7 @@ import {
   FINAL_CHECK_SETUP_PREMISES,
   FINAL_CHECK_TEMPLATE_PREMISES,
   OPTIONS_O2_CASES,
+  PARALLEL_THREADS_CASES,
   ROUND2_SWITCH_CHAIN_CASES,
   ROUND3_PROBLEM_TURN,
   ROUND3_REPLAY_CASES,
@@ -35,7 +36,9 @@ import {
   RUNAWAY_CASES,
   STAGE_SCOPING_NEW_CASES,
   STAGES,
+  chainSides,
 } from "../../../../src/evals/textModelEval/arms.js";
+import { productionCallLimits } from "../../../../src/shared/llm/chatModel.js";
 import { SWITCH_REMINDER } from "../../../../src/game/services/storyTextRounds/switchReminder.js";
 import { CHOICE_RESULT_TEXT, productionTurnToday } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { beatReplyProblem, missingOptionsProblem, shortTextProblem, withBeatProblem } from "../../../../src/game/services/beatChecks.js";
@@ -689,6 +692,39 @@ describe("planJobs: the round stages and the migration check", () => {
     const earlier = planJobs(cases, { stage: "choice-result", promptState: "adopted5", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
     expect(earlier.length).toBeGreaterThan(0);
     expect(earlier.every((j) => j.retry === undefined)).toBe(true);
+  });
+
+  it("plans the parallel-threads stage (2026-10-01): the group switch planners twice on its switches, and each side's chapter planner into its own group turn twice on its chapter openings, both interleaved", () => {
+    const [switchA, switchB] = PARALLEL_THREADS_CASES.switches;
+    const [chapterA, chapterB] = PARALLEL_THREADS_CASES.chapters;
+    const group = (players: number) => tags({ source: "round", multiplayer: true, players });
+    const cases = [
+      evalCase(switchA, "switch", { state: laterSwitchBeat(3, { id: "story-a" }).getState(), tags: group(3) }),
+      evalCase(switchB, "switch", { state: laterSwitchBeat(2, { id: "story-b" }).getState(), tags: group(2) }),
+      evalCase(chapterA, "thread", { state: threadAnalysisAfterSwitch(3, { id: "story-c" }).getState(), tags: group(3) }),
+      evalCase(chapterB, "thread", { state: threadAnalysisAfterSwitch(2, { id: "story-d" }).getState(), tags: group(2) }),
+      evalCase("mp-other-plan", "thread", { state: threadAnalysisAfterSwitch(2, { id: "story-e" }).getState(), tags: tags({ multiplayer: true, players: 2 }) }),
+    ];
+    const options = { stage: "parallel-threads" as const, promptState: "adopted11", subset15: false, records: [] };
+    // The switch planners, sample by sample, both arms on a case before the next case
+    const switches = planJobs(cases, { ...options, roles: ["switch"], mode: "isolated" });
+    expect(switches.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`)).toEqual(
+      [1, 2].flatMap((s) => [switchA, switchB].flatMap((id) => ["adopted", "parallelThreads"].map((v) => `${id} s${s} gpt-6-luna@low/${v}`)))
+    );
+    for (const job of switches) expect(callLimitsOf(job.first.request())).toEqual(productionCallLimits("switchAnalysis", job.caseId === switchA ? 3 : 2));
+    // The chapter openings as chains, each side's planner into its own turn, interleaved the same way
+    const chains = planJobs(cases, { ...options, roles: ["thread"], mode: "pipeline" });
+    const chain = (variant: string) => `pipeline:gpt-6-luna@low/${variant}>gpt-6-luna@low/${variant}`;
+    expect(chains.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`)).toEqual(
+      [1, 2].flatMap((s) => [chapterA, chapterB].flatMap((id) => ["adopted", "parallelThreads"].map((v) => `${id} s${s} ${chain(v)}`)))
+    );
+    for (const job of chains) {
+      expect(callLimitsOf(job.first.request())).toEqual(productionCallLimits("threadAnalysis", job.caseId === chapterA ? 3 : 2));
+      expect(job.then?.arm.key).toBe(chainSides(job.armKey)?.beat);
+    }
+    // Nothing isolated on the chapter openings, no turn case, and no earlier stage plans the cases
+    expect(planJobs(cases, { ...options, roles: ["beat", "thread"], mode: "isolated" })).toEqual([]);
+    expect(planJobs(cases, { ...options, stage: "lever-direction", roles: ["switch", "thread"], mode: "pipeline" })).toEqual([]);
   });
 
   it("plans the group round (B10): the sharpened note twice on the stored group turns, today's group form's sample 2 beside it", () => {

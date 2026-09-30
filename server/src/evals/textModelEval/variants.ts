@@ -52,6 +52,7 @@ import { choiceResultRequest } from "../../game/services/storyTextRounds/choiceR
 import { outcomeSettledRequest } from "../../game/services/storyTextRounds/outcomeSettled.js";
 import { recordedResultRequest } from "../../game/services/storyTextRounds/recordedResult.js";
 import { leverDirectionRequest } from "../../game/services/storyTextRounds/leverDirection.js";
+import { parallelThreadsRequest } from "../../game/services/storyTextRounds/parallelThreads.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -249,6 +250,19 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * worse, the sacrifice raises it and the reward lowers it) and the two lever
  * fields' first sentences worded the same way; production's request byte for
  * byte elsewhere, with production's setup limits; setup only.
+ * "parallelThreads" is the parallel-threads stage's switch planner, chapter
+ * planner and group turn (2026-10-01, fix 4 of the second playthroughs'
+ * review, storyTextRounds/parallelThreads.ts): production's switch planner
+ * with a line where a contested shared outcome's next thread settles its last
+ * stage (offered only as a grouped thread, a flavor switch for every player),
+ * production's chapter planner with a line where the players' choices set
+ * several outcomes (parallel threads happen at the same time in one world,
+ * each person and vehicle in one place, a player only in their own thread)
+ * and one where only some players chose a contested outcome (that side's
+ * challenge, the other side absent), and production's group turn with a line
+ * on a chapter step with several threads (everyone in one place across the
+ * beats); production's request byte for byte elsewhere, with production's
+ * limits for the role and player count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -311,7 +325,8 @@ export type VariantId =
   | "outcomeSettled"
   | "outcomeSettledB"
   | "recordedResult"
-  | "leverDirection";
+  | "leverDirection"
+  | "parallelThreads";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -371,6 +386,7 @@ export const VARIANTS: VariantId[] = [
   "outcomeSettledB",
   "recordedResult",
   "leverDirection",
+  "parallelThreads",
 ];
 
 /**
@@ -780,6 +796,12 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     if (input.role !== "setup") throw new Error(`Variant leverDirection does not cover role ${input.role}`);
     const { premise, playerCount, gameMode, maxTurns, kids } = input.setup;
     return { ...leverDirectionRequest(premise, playerCount, gameMode, maxTurns, "story", { kids }), limits: productionCallLimits("setup", playerCount) };
+  },
+  // The parallel-threads stage's switch planner, chapter planner and group turn: a contested outcome's last stage as a
+  // grouped thread, parallel threads in one world, a one-sided contest as that side's challenge; production's limits
+  parallelThreads: (input) => {
+    if (input.role !== "beat" && input.role !== "switch" && input.role !== "thread") throw new Error(`Variant parallelThreads does not cover role ${input.role}`);
+    return { ...parallelThreadsRequest(input.story, input.role), limits: productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers()) };
   },
 };
 
