@@ -10,6 +10,7 @@ import {
   chainSides,
   estimateBaseKey,
   pipelinePlans,
+  stageInterleavesArms,
   stagePlansCase,
   stageRunsBaseline,
   type Arm,
@@ -477,7 +478,20 @@ function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measu
       jobs.push(callJob(options, ordered[i % ordered.length], plan.arm, sample, measured));
     }
   }
-  return jobs;
+  return stageInterleavesArms(options.stage) ? interleaved(jobs, cases, role) : jobs;
+}
+
+/**
+ * The jobs sample by sample, and within a sample case by case in turn order,
+ * the arms of one case in plan order: every arm meets the server's pace of the
+ * same minutes (the options and continuity run, 2026-09-30).
+ */
+function interleaved(jobs: Job[], cases: EvalCase[], role: EvalRole): Job[] {
+  const order = new Map(inTurnOrder(cases.filter((c) => c.role === role)).map((c, i) => [c.id, i]));
+  return jobs
+    .map((job, index) => ({ job, index }))
+    .sort((a, b) => a.job.sample - b.job.sample || (order.get(a.job.caseId) ?? 0) - (order.get(b.job.caseId) ?? 0) || a.index - b.index)
+    .map(({ job }) => job);
 }
 
 function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: PlanOptions, measured: Map<string, number[]>): Job[] {

@@ -7,6 +7,7 @@ import {
   FINAL_CHECK_SETUP_PREMISES,
   FINAL_CHECK_TEMPLATE_PREMISES,
   makeArm,
+  OPTIONS_CONTINUITY_PROMPT_STATE,
   pipelinePlans,
   productionArm,
   referenceKey,
@@ -22,6 +23,7 @@ import {
   STAGE_SCOPING_LAST_CHAPTER_CASES,
   STAGE_SCOPING_NEW_CASES,
   STAGES,
+  stageInterleavesArms,
   stagePlansCase,
   stageRunsBaseline,
   standInKey,
@@ -355,18 +357,27 @@ describe("budget caps", () => {
     expect(LEDGER_WHEN_ROUNDS_OPENED + newCaps + DEFAULT_STAGE_CAPS.filter).toBeLessThanOrEqual(HARD_CEILING);
   });
 
-  it("gives each run of the owner's feedback workflow (2026-09-28, and the stage scoping of 2026-09-29) its own stage, cap and reason, inside the $40 hard cap", () => {
-    expect(DEFAULT_STAGE_CAPS).toMatchObject({ "plan-refresh": 0.1, reruns: 0.6, "setup-retests": 0.1, groups: 0.4, "form-gate": 0.4, "final-check": 0.6, "stage-scoping": 0.4 });
-    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping"]);
+  it("gives each run of the owner's feedback workflow (2026-09-28, the stage scoping of 2026-09-29, the options and continuity of 2026-09-30) its own stage, cap and reason, inside the $40 hard cap", () => {
+    expect(DEFAULT_STAGE_CAPS).toMatchObject({
+      "plan-refresh": 0.1,
+      reruns: 0.6,
+      "setup-retests": 0.1,
+      groups: 0.4,
+      "form-gate": 0.4,
+      "final-check": 0.6,
+      "stage-scoping": 0.4,
+      "options-continuity": 1.4,
+    });
+    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping", "options-continuity"]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
       expect(LEDGER_STAGES).toContain(stage);
       expect(stageRunsBaseline(stage)).toBe(false);
-      expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-2[89]/);
+      expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all seven caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all eight caps still fit
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(2.6);
+    expect(caps).toBeCloseTo(4.0);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -405,6 +416,29 @@ describe("budget caps", () => {
     expect(STAGE_CAP_REASONS["stage-scoping"]).toMatch(/planV2d/);
     // The ledger read $33.85 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
     expect(33.85 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["stage-scoping"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("runs the options and continuity arms (2026-09-30) beside production's form: Luna medium, twice on the stored single-player turns, the arms interleaved", () => {
+    const plans = armsFor("options-continuity", "beat");
+    const arms = ["adopted", "turnO", "turnC", "turnOC"].map((variant) => `gpt-6-luna@medium/${variant}`);
+    expect(plans.map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source])).toEqual(arms.map((key) => [key, 1, 2, "single-player", "stored"]));
+    // Production's form on production's own settings group (TEXT_MODEL_GROUPS), and the arms on the same model and effort
+    expect(arms[0]).toBe(armKey({ model: TEXT_MODEL_GROUPS.beat.model, reasoningEffort: TEXT_MODEL_GROUPS.beat.reasoningEffort }, "adopted"));
+    for (const role of ["setup", "switch", "thread", "iteration"] as const) expect(armsFor("options-continuity", role)).toEqual([]);
+    expect(pipelinePlans("options-continuity")).toEqual([]);
+    expect(stageInterleavesArms("options-continuity")).toBe(true);
+    expect(stageInterleavesArms("final-check")).toBe(false);
+    expect(OPTIONS_CONTINUITY_PROMPT_STATE).toBe("adopted2");
+    // Each arm against production's form, which ran beside it; both arms against each part alone too
+    for (const key of arms.slice(1)) {
+      expect(referenceKey(key)).toBe(arms[0]);
+      expect(estimateBaseKey(key)).toBe(arms[0]);
+    }
+    expect(secondReferenceKeys("gpt-6-luna@medium/turnOC")).toEqual(["gpt-6-luna@medium/turnO", "gpt-6-luna@medium/turnC"]);
+    expect(secondReferenceKeys("gpt-6-luna@medium/turnO")).toEqual([]);
+    expect(STAGE_CAP_REASONS["options-continuity"]).toMatch(/turnOC/);
+    // The ledger read $34.02 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
+    expect(34.02 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["options-continuity"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {

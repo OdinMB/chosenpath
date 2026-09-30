@@ -8,6 +8,7 @@ import {
   checkThreadDesign,
   genericMilestoneKind,
   nearDuplicateOfOutcome,
+  reusedFromPrevious,
   statReadouts,
 } from "../../../../src/evals/textModelEval/turnDesignChecks.js";
 import {
@@ -577,6 +578,134 @@ describe("checkBeatDesign", () => {
       expect(checkBeatDesign(story, plain, plain).checks.leverFollowsRateLine).toBe(true);
       // No lever in the last two challenge turns: one fits, so either way passes and nothing is reported
       expect(checkBeatDesign(threadBeat(1), lever, lever).checks).not.toHaveProperty("leverFollowsRateLine");
+    });
+  });
+
+  describe("the owner's feedback of 2026-09-30: option designs, levers per chapter, and continuity", () => {
+    const GUILD = "player1_guild_reform";
+    const bonus = (statId: string, effect: number) => ({ statId, reason: "fits", effect });
+    type Challenge = ReturnType<typeof challengeOptions>[number];
+    const withChallenge = (edits: Partial<Challenge>[]) => {
+      const beats = beatSet(1);
+      beats.player1 = beatGeneration({ options: challengeOptions().map((o, i) => ({ ...o, ...edits[i] })) });
+      return beats;
+    };
+
+    it("reads each option's main bonus as the game counts it: distinct main stats, at most one option without", () => {
+      const story = threadBeat(1);
+      const distinct = withChallenge([
+        { modifiersToSuccessRate: [bonus("player1_nerve", 10), bonus("player1_wits", 5)] },
+        { modifiersToSuccessRate: [bonus("player1_wits", 10)] },
+        { resourceType: "sacrifice", basePoints: 30 },
+      ]);
+      expect(checkBeatDesign(story, distinct, distinct)).toMatchObject({ checks: { primaryStatsDistinct: true }, counts: { distinctPrimaryStats: 2 } });
+      // The owner's example: the same two stats on all three, only the risk differs
+      const same = withChallenge(["safe", "normal", "risky"].map((riskType) => ({ riskType: riskType as Challenge["riskType"], modifiersToSuccessRate: [bonus("shared_sentiment", 15), bonus("player1_agency", 5)] })));
+      expect(checkBeatDesign(story, same, same)).toMatchObject({ checks: { primaryStatsDistinct: false }, counts: { distinctPrimaryStats: 1, sameStatsOnlyRiskSets: 1 } });
+      // Two options without a bonus
+      const bare = withChallenge([{ modifiersToSuccessRate: [bonus("player1_nerve", 10)] }, {}, {}]);
+      expect(checkBeatDesign(story, bare, bare).checks.primaryStatsDistinct).toBe(false);
+      // The main bonus is the largest counted one: a third bonus is not counted, a penalty is no main bonus, +20 counts as 15
+      const counted = withChallenge([
+        { modifiersToSuccessRate: [bonus("player1_wits", 5), bonus("player1_nerve", 20), bonus("player1_luck", 15)] },
+        { modifiersToSuccessRate: [bonus("player1_luck", -10), bonus("player1_wits", 10)] },
+        { modifiersToSuccessRate: [bonus("player1_nerve", -5)] },
+      ]);
+      expect(checkBeatDesign(story, counted, counted)).toMatchObject({ checks: { primaryStatsDistinct: true }, counts: { distinctPrimaryStats: 2 } });
+      // Not a challenge set: not reported
+      expect(checkBeatDesign(firstSwitchBeat(1), beatSet(1), beatSet(1)).checks).not.toHaveProperty("primaryStatsDistinct");
+      expect(checkBeatDesign(firstSwitchBeat(1), beatSet(1), beatSet(1)).counts).toMatchObject({ sameStatsOnlyRiskSets: 0 });
+      expect(checkBeatDesign(firstSwitchBeat(1), beatSet(1), beatSet(1)).counts).not.toHaveProperty("distinctPrimaryStats");
+    });
+
+    it("counts a set with two normal options on the same stats and the same base, whatever their risk; a lever or another base tells them apart", () => {
+      const story = threadBeat(1);
+      const stats = [bonus("player1_nerve", 10)];
+      const otherBase = withChallenge([{ modifiersToSuccessRate: stats }, { modifiersToSuccessRate: stats, basePoints: -10 }, { modifiersToSuccessRate: [bonus("player1_wits", 5)] }]);
+      expect(checkBeatDesign(story, otherBase, otherBase).counts.sameStatsOnlyRiskSets).toBe(0);
+      const lever = withChallenge([{ modifiersToSuccessRate: stats }, { modifiersToSuccessRate: stats, resourceType: "sacrifice" }, {}]);
+      expect(checkBeatDesign(story, lever, lever).counts.sameStatsOnlyRiskSets).toBe(0);
+      const onlyRisk = withChallenge([{ modifiersToSuccessRate: stats, riskType: "safe" }, { modifiersToSuccessRate: stats, riskType: "risky" }, { modifiersToSuccessRate: [bonus("player1_wits", 5)] }]);
+      expect(checkBeatDesign(story, onlyRisk, onlyRisk).counts.sameStatsOnlyRiskSets).toBe(1);
+    });
+
+    /** A four-step challenge chapter from history index 1, with this history before the turn. */
+    function chapterWith(history: Beat[]): Story {
+      const done = history.length - 1;
+      const analysis = threadAnalysis("challenge", 4, 1);
+      const chapter: ThreadAnalysis = {
+        ...analysis,
+        threads: analysis.threads.map((t) => ({ ...t, outcomeId: GUILD, progression: t.progression.map((step, i) => ({ ...step, resolution: i < done ? ("favorable" as const) : null })) })),
+      };
+      const story = roundStory({ turns: history.length, maxTurns: 20, playerOutcomes: { player1: [outcome(GUILD)] }, phases: [roundTopicSwitch([["Petition", GUILD]], 0), chapter] });
+      return edited(story, (state) => {
+        state.players.player1.beatHistory = history;
+      });
+    }
+    const past = (levers: ("normal" | "sacrifice" | "reward")[] = [], choice = 0): Beat => ({
+      ...beatGeneration({ options: challengeOptions().map((o, i) => ({ ...o, resourceType: levers[i] ?? "normal" })) }),
+      choice,
+      resolution: "favorable",
+    });
+    const opening = (): Beat => ({ ...beatGeneration(), choice: 0, resolution: null });
+
+    it("counts the chapter's rewards and sacrifices with this turn's, and wants at most one reward a chapter", () => {
+      const story = chapterWith([opening(), past(["reward"]), past()]);
+      const reward = withChallenge([{}, {}, { resourceType: "reward", basePoints: -30 }]);
+      expect(checkBeatDesign(story, reward, reward)).toMatchObject({ checks: { atMostOneRewardPerChapter: false }, counts: { chapterRewards: 2, chapterSacrifices: 0 } });
+      const plain = withChallenge([{}, {}, {}]);
+      expect(checkBeatDesign(story, plain, plain)).toMatchObject({ checks: { atMostOneRewardPerChapter: true }, counts: { chapterRewards: 1, chapterSacrifices: 0 } });
+      // Not a chapter step: not reported
+      expect(checkBeatDesign(firstSwitchBeat(1), reward, reward).checks).not.toHaveProperty("atMostOneRewardPerChapter");
+      expect(checkBeatDesign(firstSwitchBeat(1), reward, reward).counts).not.toHaveProperty("chapterRewards");
+    });
+
+    it("counts a second-or-later sacrifice in a chapter, and one whose text states no reason", () => {
+      const story = chapterWith([opening(), past(["sacrifice"])]);
+      const reasoned = withChallenge([{ resourceType: "sacrifice", basePoints: 30, text: "Burn your last favor with Gruk (-10% Trust) before the patrol reaches the door" }, {}, {}]);
+      expect(checkBeatDesign(story, reasoned, reasoned).counts).toMatchObject({ chapterSacrifices: 2, secondSacrificeSets: 1, unreasonedSecondSacrifices: 0 });
+      const bare = withChallenge([{ resourceType: "sacrifice", basePoints: 30, text: "Spend 10% Energy to force the door" }, {}, {}]);
+      expect(checkBeatDesign(story, bare, bare).counts).toMatchObject({ secondSacrificeSets: 1, unreasonedSecondSacrifices: 1 });
+      // The chapter's first sacrifice is no second one
+      const first = chapterWith([opening(), past()]);
+      expect(checkBeatDesign(first, bare, bare).counts).toMatchObject({ chapterSacrifices: 1, secondSacrificeSets: 0, unreasonedSecondSacrifices: 0 });
+      // Reported on every reply, zero where it doesn't apply, so the share pools
+      expect(checkBeatDesign(firstSwitchBeat(1), beatSet(1), beatSet(1)).counts).toMatchObject({ secondSacrificeSets: 0, unreasonedSecondSacrifices: 0 });
+    });
+
+    describe("sentences and openings reused from the previous beat", () => {
+      const previous = "You step onto the café terrace, collar up against the rain. Rain drums on the striped awning above the tables.\n\nMaya slides the demand sheet across the table toward you and waits. 'Read it,' she says.";
+      const after = (text: string) => edited(threadBeat(1), (state) => {
+        const history = state.players.player1.beatHistory;
+        history[history.length - 1] = { ...history[history.length - 1], text };
+      });
+      const turn = (text: string) => beatSet(1, { player1: beatGeneration({ text }) });
+
+      it("finds the owner's repeated opening, and sentences told again word for word, along an eight-word run, or with most of their words", () => {
+        const story = after(previous);
+        const repeated = turn(
+          "You step onto the café terrace again. Rain drums on the striped awning above the tables.\n\nMaya slides the demand sheet across the table toward the drone. Across the table, the sheet waits toward you; Maya slides it."
+        );
+        expect(checkBeatDesign(story, repeated, repeated)).toMatchObject({ checks: { openingNotReused: false, noReusedSentences: false }, counts: { reusedSentences: 3, turnSentences: 4 } });
+        // The pairs, for the hand read: each sentence told again with the one it tells again
+        expect(reusedFromPrevious(previous, "Rain drums on the striped awning above the tables. You nod.")).toEqual({
+          pairs: [["Rain drums on the striped awning above the tables.", "Rain drums on the striped awning above the tables."]],
+          sentences: 2,
+          openingReused: true,
+        });
+        const forward = turn("The first drop of rain hits the sheet before you finish reading. 'Clause four,' you say, 'is a trap.'\n\nMaya's pen stops. The drone above the square turns toward the café.");
+        expect(checkBeatDesign(story, forward, forward)).toMatchObject({ checks: { openingNotReused: true, noReusedSentences: true }, counts: { reusedSentences: 0, turnSentences: 4 } });
+      });
+
+      it("leaves short lines and image tags out, and reads nothing on the first turn", () => {
+        const story = after("'Go,' she says. [image id=maya source=story desc=\"Maya\"]The rain keeps falling on the empty tables tonight.");
+        const short = turn("'Go,' she says. You go.");
+        expect(checkBeatDesign(story, short, short)).toMatchObject({ checks: { noReusedSentences: true, openingNotReused: true }, counts: { reusedSentences: 0 } });
+        const first = checkBeatDesign(firstSwitchBeat(1), turn(previous), turn(previous));
+        expect(first.checks).not.toHaveProperty("noReusedSentences");
+        expect(first.checks).not.toHaveProperty("openingNotReused");
+        expect(first.counts).toMatchObject({ reusedSentences: 0, turnSentences: 0 });
+      });
     });
   });
 

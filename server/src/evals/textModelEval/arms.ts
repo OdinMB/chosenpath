@@ -32,10 +32,11 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * retests, the group turn round (B10), the request form's gate (B9) and the
  * paid final check on production's own code, each with the arms its phase
  * set (armsFor, pipelinePlans). The owner's feedback of 2026-09-29 adds the
- * stage scoping (planner v2d and its judged stage check). Their caps and
- * reasons are in budget.ts.
+ * stage scoping (planner v2d and its judged stage check), and that of
+ * 2026-09-30 the options and continuity arms on production's turn form. Their
+ * caps and reasons are in budget.ts.
  */
-export const FEEDBACK_STAGES = ["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping"] as const;
+export const FEEDBACK_STAGES = ["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping", "options-continuity"] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
 export const STAGES: Stage[] = ["0", "1-2", "3", "4", "setup-rounds", "turn-rounds", "migration", ...FEEDBACK_STAGES];
@@ -167,6 +168,11 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   planV2d: "planV2c",
   // The climax clause (the owner's open question, 2026-09-30) against planner v2d, whose last-chapter clause it replaces
   planV2dClimax: "planV2d",
+  // The options and continuity arms (the owner's feedback, 2026-09-30) against production's single-player turn form,
+  // which they edit and which runs beside them
+  turnO: "adopted",
+  turnC: "adopted",
+  turnOC: "adopted",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -253,6 +259,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "planV2d")]: [armKey(LUNA_LOW, "prod")],
   // The climax clause against production's planner v2c too, on the same last chapters
   [armKey(LUNA_LOW, "planV2dClimax")]: [armKey(LUNA_LOW, "planV2c")],
+  // Both arms together against each part alone: what each adds on top of the other
+  [armKey(LUNA_MEDIUM, "turnOC")]: [armKey(LUNA_MEDIUM, "turnO"), armKey(LUNA_MEDIUM, "turnC")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
   // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
   // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
@@ -443,9 +451,44 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return finalCheckArms(role);
     case "stage-scoping":
       return stageScopingArms(role);
+    case "options-continuity":
+      return optionsContinuityArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the options and continuity run (2026-09-30):
+ * production's own code, which builds the requests adopted1 recorded byte for
+ * byte (only the beat repair changed since, 2f24e1e), under a tag of its own so
+ * production's form runs at samples 1 and 2 beside the three arms in the same
+ * hour, and the form gate's and the final check's readings stay as they ran.
+ */
+export const OPTIONS_CONTINUITY_PROMPT_STATE = "adopted2";
+
+/**
+ * The options and continuity arms (the owner's feedback of 2026-09-30,
+ * coordinator's brief): production's single-player turn form (adopted) and
+ * arms O, C and OC on it, on Luna medium, production's single-player turn
+ * model, twice on the 44 stored single-player turns, interleaved
+ * (stageInterleavesArms), so every arm meets the same server pace.
+ */
+function optionsContinuityArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return (["adopted", "turnO", "turnC", "turnOC"] as const).map((variant) => ({
+    arm: adoptedDefault("beat", variant),
+    samples: 2,
+    scope: "single-player" as const,
+    source: "stored" as const,
+  }));
+}
+
+/** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
+const INTERLEAVED_STAGES: Stage[] = ["options-continuity"];
+
+export function stageInterleavesArms(stage: Stage): boolean {
+  return INTERLEAVED_STAGES.includes(stage);
 }
 
 /**

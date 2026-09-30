@@ -1,3 +1,4 @@
+import { MAX_STAT_MODIFIER_POINTS, MAX_STAT_MODIFIERS_PER_OPTION } from "core/config.js";
 import type { Story } from "core/models/Story.js";
 import type { BeatOption, Change, Outcome, SetOfBeatGenerationSchema, Stat, Switch, SwitchAnalysis, Thread, ThreadAnalysis } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
@@ -6,6 +7,7 @@ import { expectedOptionType } from "../../game/services/beatRepairs.js";
 import { outcomeIdsNamed, resultKind } from "../../game/services/planChecks.js";
 import { allowedLengths, chaptersThatFit, outcomeNeeds, stageOf, turnsLeft } from "../../game/services/storyTextRounds/pacing.js";
 import { sacrificeRewardLine } from "../../game/services/storyTextRounds/turnRound2.js";
+import { chapterLevers } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
 import { canAddMilestones } from "../../game/services/storyTextSteps.js";
 import { playerParagraphs } from "./playerText.js";
 import type { CheckResult } from "./textChecks.js";
@@ -585,6 +587,137 @@ function roundTwoChecks(story: Story, reply: SetOfBeatGenerationSchema): Record<
   return checks;
 }
 
+// --- The owner's feedback of 2026-09-30 (turnOptionsContinuity.ts): option designs, levers per chapter, continuity ---
+
+type Counted = { statId: string; effect: number };
+
+/** An option's stat bonuses as the game counts them (BeatResolutionService): the first two, each within ±15; zero effects left out. */
+function countedBonuses(option: BeatOption): Counted[] {
+  if (option.optionType !== "challenge") return [];
+  return asArray<{ statId?: unknown; effect?: unknown }>(option.modifiersToSuccessRate)
+    .slice(0, MAX_STAT_MODIFIERS_PER_OPTION)
+    .map((m) => ({ statId: asString(m?.statId), effect: typeof m?.effect === "number" ? Math.max(-MAX_STAT_MODIFIER_POINTS, Math.min(MAX_STAT_MODIFIER_POINTS, m.effect)) : 0 }))
+    .filter((m) => m.statId !== "" && m.effect !== 0);
+}
+
+/** The stat an option leans on: its largest counted bonus (the first on a tie); none without a positive one. */
+function mainStat(option: BeatOption): string | undefined {
+  let best: Counted | undefined;
+  for (const bonus of countedBonuses(option)) if (bonus.effect > 0 && (!best || bonus.effect > best.effect)) best = bonus;
+  return best?.statId;
+}
+
+/** Two normal options that only their risk tells apart: the same counted stats (none alike included) and the same base points. */
+function onlyRiskApart(a: BeatOption, b: BeatOption): boolean {
+  if (a.optionType !== "challenge" || b.optionType !== "challenge" || a.resourceType !== "normal" || b.resourceType !== "normal") return false;
+  const stats = (o: BeatOption) => [...new Set(countedBonuses(o).map((m) => m.statId))].sort().join("|");
+  return a.basePoints === b.basePoints && stats(a) === stats(b);
+}
+
+/** Words that give a sacrifice's text a reason in the scene (a heuristic for the hand read): urgency, a condition, no other way. */
+const STATED_REASON = /\b(because|since|now that|before|or else|otherwise|so that|only way|last chance|no other|in time|while|until|unless|if)\b/i;
+
+const MIN_SENTENCE_WORDS = 5;
+const SHARED_RUN_WORDS = 8;
+const SHARED_WORDS_SHARE = 0.75;
+
+const sentencesOf = (text: string) =>
+  playerParagraphs(prose(text))
+    .flatMap((paragraph) => paragraph.split(/(?<=[.!?…]["'”’)]*)\s+/))
+    .map((s) => s.trim())
+    .filter((s) => /\p{L}/u.test(s));
+const wordsOf = (sentence: string) => sentence.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+function sharesRun(a: string[], b: string[], length: number): boolean {
+  const runs = new Set(b.slice(0, Math.max(0, b.length - length + 1)).map((_, i) => b.slice(i, i + length).join(" ")));
+  return a.slice(0, Math.max(0, a.length - length + 1)).some((_, i) => runs.has(a.slice(i, i + length).join(" ")));
+}
+
+/** A sentence told again: the same words, a run of eight words in common, or three quarters of their words shared; short lines never. */
+function nearDuplicate(a: string[], b: string[]): boolean {
+  if (a.length < MIN_SENTENCE_WORDS || b.length < MIN_SENTENCE_WORDS) return false;
+  if (a.join(" ") === b.join(" ") || sharesRun(a, b, SHARED_RUN_WORDS)) return true;
+  const [x, y] = [new Set(a), new Set(b)];
+  const shared = [...x].filter((w) => y.has(w)).length;
+  return shared / (x.size + y.size - shared) >= SHARED_WORDS_SHARE;
+}
+
+/**
+ * What a turn's text tells again from the previous beat's: each of its
+ * sentences that is a near duplicate of one there, with that one (for the
+ * hand read), its sentence count, and whether its opening is reused: the
+ * same first five words as the previous beat's first sentence, or a first
+ * sentence told again.
+ */
+export function reusedFromPrevious(previousText: string, text: string): { pairs: [string, string][]; sentences: number; openingReused: boolean } {
+  const previous = sentencesOf(previousText).map((sentence) => ({ sentence, words: wordsOf(sentence) }));
+  const own = sentencesOf(text).map((sentence) => ({ sentence, words: wordsOf(sentence) }));
+  const pairs = own.flatMap(({ sentence, words }): [string, string][] => {
+    const match = previous.find((p) => nearDuplicate(words, p.words));
+    return match ? [[sentence, match.sentence]] : [];
+  });
+  const [first, before] = [own[0]?.words ?? [], previous[0]?.words ?? []];
+  const start = (words: string[]) => words.slice(0, MIN_SENTENCE_WORDS).join(" ");
+  const sameStart = first.length >= MIN_SENTENCE_WORDS && before.length >= MIN_SENTENCE_WORDS && start(first) === start(before);
+  return { pairs, sentences: own.length, openingReused: sameStart || previous.some((p) => nearDuplicate(first, p.words)) };
+}
+
+/**
+ * The owner's feedback of 2026-09-30, per player: on a challenge set, each
+ * option's main stat (its largest counted bonus) distinct, at most one
+ * without, and the sets where two normal options only their risk tells apart;
+ * on a rolled chapter step, the chapter's rewards and sacrifices with this
+ * turn's (read from the history, turnOptionsContinuity.ts), no second reward,
+ * and a second-or-later sacrifice and one whose text states no reason (a
+ * heuristic, for the hand read); the rate part of arm O's lever line reads as
+ * leverFollowsRateLine. On every turn after the first, the sentences and the
+ * opening told again from the player's previous beat. Counts that pool into
+ * shares are reported on every reply.
+ */
+function feedbackChecks(story: Story, reply: SetOfBeatGenerationSchema): CheckResult {
+  const checks: Record<string, boolean> = {};
+  const counts: Record<string, number> = { sameStatsOnlyRiskSets: 0, secondSacrificeSets: 0, unreasonedSecondSacrifices: 0, reusedSentences: 0, turnSentences: 0 };
+  const rolled = story.getCurrentBeatType() === "thread";
+  const and = (name: string, ok: boolean) => {
+    checks[name] = (checks[name] ?? true) && ok;
+  };
+  const add = (name: string, n: number) => {
+    counts[name] = (counts[name] ?? 0) + n;
+  };
+  for (const slot of story.getPlayerSlots()) {
+    const beat = asObject((reply as unknown as Loose)[slot]);
+    if (Object.keys(beat).length === 0) continue;
+    const options = asArray<BeatOption>(beat.options).filter((o) => o && typeof o === "object");
+    if (options.length === 3 && options.every((o) => o.optionType === "challenge")) {
+      const mains = options.map(mainStat);
+      const named = mains.filter((m): m is string => m !== undefined);
+      add("distinctPrimaryStats", new Set(named).size);
+      and("primaryStatsDistinct", new Set(named).size === named.length && mains.length - named.length <= 1);
+      if (options.some((a, i) => options.some((b, j) => i < j && onlyRiskApart(a, b)))) add("sameStatsOnlyRiskSets", 1);
+    }
+    if (rolled && expectedOptionType(story, slot) === "challenge") {
+      const levers = chapterLevers(story, slot);
+      const rewards = options.filter((o) => o.resourceType === "reward").length;
+      const sacrifices = options.filter((o) => o.resourceType === "sacrifice");
+      add("chapterRewards", levers.rewards + rewards);
+      add("chapterSacrifices", levers.sacrifices + sacrifices.length);
+      and("atMostOneRewardPerChapter", rewards <= 1 && !(rewards > 0 && levers.rewards > 0));
+      if (levers.sacrifices > 0 && sacrifices.length > 0) {
+        add("secondSacrificeSets", 1);
+        add("unreasonedSecondSacrifices", sacrifices.filter((o) => !STATED_REASON.test(asString(o.text))).length);
+      }
+    }
+    if ((story.getPlayer(slot)?.beatHistory ?? []).length > 0) {
+      const reused = reusedFromPrevious(asString(story.getCurrentBeat(slot)?.text), asString(beat.text));
+      add("reusedSentences", reused.pairs.length);
+      add("turnSentences", reused.sentences);
+      and("noReusedSentences", reused.pairs.length === 0);
+      and("openingNotReused", !reused.openingReused);
+    }
+  }
+  return { checks, counts, unknownIds: [] };
+}
+
 /**
  * The beat checks of turn doc A.C on one reply. `reply` is what the game
  * keeps (beatRepairs), `written` the reply as the model wrote it.
@@ -674,5 +807,6 @@ export function checkBeatDesign(story: Story, reply: SetOfBeatGenerationSchema, 
   counts.bonusOptions = bonus.length;
   counts.bonusOptionsNegativeBase = bonus.filter((o) => o.optionType === "challenge" && o.basePoints < 0).length;
 
-  return { checks, counts, unknownIds: [] };
+  const feedback = feedbackChecks(story, reply);
+  return { checks: { ...checks, ...feedback.checks }, counts: { ...counts, ...feedback.counts }, unknownIds: [] };
 }

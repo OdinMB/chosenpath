@@ -117,6 +117,10 @@ export const RATIOS: { name: string; numerator: string; denominator: string }[] 
   { name: "leverShare", numerator: "leverSets", denominator: "challengeSets" },
   { name: "rewardShareOfLevers", numerator: "rewardSets", denominator: "leverSets" },
   { name: "negativeBaseOnBonusShare", numerator: "bonusOptionsNegativeBase", denominator: "bonusOptions" },
+  // The owner's feedback of 2026-09-30: sets that only risk tells apart, second sacrifices in a chapter, sentences told again
+  { name: "sameStatsOnlyRiskShare", numerator: "sameStatsOnlyRiskSets", denominator: "challengeSets" },
+  { name: "secondSacrificeShare", numerator: "secondSacrificeSets", denominator: "challengeSets" },
+  { name: "reusedSentenceShare", numerator: "reusedSentences", denominator: "turnSentences" },
 ];
 
 const ROLES: EvalRole[] = ["setup", "beat", "switch", "thread"];

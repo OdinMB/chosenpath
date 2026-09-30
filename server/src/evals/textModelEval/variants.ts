@@ -45,6 +45,7 @@ import { todaysFormWithB6Request, turnRound2Request, type TurnRound2Form } from 
 import { turnRound3FormRequest, type TurnRound3Request } from "../../game/services/storyTextRounds/turnRound3.js";
 import { groupTurnB10Request } from "../../game/services/storyTextRounds/turnRound3Groups.js";
 import { productionFormRequest } from "../../game/services/storyTextRounds/requestFormB9.js";
+import { optionsContinuityRequest, type OptionsContinuityArm } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -161,6 +162,15 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * of 2026-09-29, measured on the built last chapters only): in the story's
  * last thread an outcome still needing several milestones is settled outright,
  * its stages left together; elsewhere planV2d byte for byte.
+ * "turnO", "turnC" and "turnOC" are the owner's feedback of 2026-09-30
+ * (storyTextRounds/turnOptionsContinuity.ts) on production's single-player
+ * turn form, built from the frozen copy (turnB6 without the switch turn's
+ * chapter rules, production's request byte for byte), with production's
+ * single-player turn limits like "adopted": arm O's options (each draws on a
+ * different stat, risk alone tells none apart, the lever line counted per
+ * chapter on top of today's rate), arm C's continuity (the switch's full text on a chapter's first
+ * step, one instruction to pick up where the previous beat ended and move the
+ * story forward), and both; single player only.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -206,7 +216,10 @@ export type VariantId =
   | "setupR3c"
   | "setupR3d"
   | "planV2d"
-  | "planV2dClimax";
+  | "planV2dClimax"
+  | "turnO"
+  | "turnC"
+  | "turnOC";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -249,6 +262,9 @@ export const VARIANTS: VariantId[] = [
   "setupR3d",
   "planV2d",
   "planV2dClimax",
+  "turnO",
+  "turnC",
+  "turnOC",
 ];
 
 /**
@@ -508,6 +524,18 @@ function chapterTurn(variant: VariantId, form: ChapterTurnForm, reruns = false) 
   };
 }
 
+/**
+ * The owner's feedback of 2026-09-30: arm O, arm C or both on production's
+ * single-player turn form, with production's single-player turn limits (as
+ * "adopted" sends them), so the arms and production's form run alike.
+ */
+function optionsContinuity(variant: VariantId, arm: OptionsContinuityArm) {
+  return (input: RequestInput): EvalRequest => {
+    if (input.role !== "beat") throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+    return { ...optionsContinuityRequest(input.story, arm), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  };
+}
+
 /** Turn round 2's form, or its paragraph arm: every single-player turn. */
 function roundTwoTurn(variant: VariantId, form: TurnRound2Form) {
   return (input: RequestInput): Round2Request => {
@@ -579,6 +607,9 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     const { premise, playerCount, gameMode, maxTurns } = input.setup;
     return { ...setupStep.request(premise, playerCount, gameMode, maxTurns, "template"), limits: productionCallLimits("templateGeneration", playerCount) };
   },
+  turnO: optionsContinuity("turnO", { options: true, continuity: false }),
+  turnC: optionsContinuity("turnC", { options: false, continuity: true }),
+  turnOC: optionsContinuity("turnOC", { options: true, continuity: true }),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

@@ -489,6 +489,24 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(plan("form-gate", { mode: "pipeline", roles: ["switch", "thread"] })).toEqual([]);
   });
 
+  it("plans the options and continuity arms (2026-09-30) beside production's form, interleaved: every arm on a case before the next case, sample 1 before sample 2", () => {
+    const arms = ["adopted", "turnO", "turnC", "turnOC"].map((variant) => `gpt-6-luna@medium/${variant}`);
+    expect(perArm(plan("options-continuity", { roles: ["setup", "beat", "switch", "thread"] }))).toEqual(Object.fromEntries(arms.map((key) => [key, ["sp s1", "sp s2"]])));
+    expect(plan("options-continuity", { mode: "pipeline", roles: ["switch", "thread"] })).toEqual([]);
+    // Two stored single-player turns: the four arms on one case, then on the next, so the server's pace is shared
+    const second = evalCase("sp-later", "beat", { state: threadBeat(1, { id: "story-z" }).getState() });
+    const cases = [evalCase("sp", "beat", { state: threadBeat(1, { id: "story-a" }).getState() }), second];
+    const jobs = planJobs(cases, { stage: "options-continuity", promptState: "adopted2", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
+    expect(jobs.map((j) => `${j.caseId} s${j.sample} ${j.armKey.split("/")[1]}`)).toEqual(
+      [1, 2].flatMap((s) => ["sp", "sp-later"].flatMap((id) => ["adopted", "turnO", "turnC", "turnOC"].map((v) => `${id} s${s} ${v}`)))
+    );
+    // Every arm with production's single-player turn limits
+    for (const job of jobs) expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    // Other stages keep their plan order: one arm's cases and samples, then the next arm's
+    const gate = planJobs(cases, { stage: "form-gate", promptState: "adopted1", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
+    expect(gate.map((j) => `${j.caseId} ${j.armKey.split("/")[1]}`)).toEqual(["sp adopted", "sp-later adopted", "sp adoptedSplit", "sp-later adoptedSplit"]);
+  });
+
   it("plans the group round (B10): the sharpened note twice on the stored group turns, today's group form's sample 2 beside it", () => {
     // Today's form ran once on the stored group turns (the migration check), so its sample 2 gives the noise and the
     // same-hour waits; no chain, no planner, no single-player turn
