@@ -21,6 +21,9 @@ import {
   ROUND3_PROBLEM_TURN,
   ROUND3_REPLAY_CASES,
   ROUND3_REPLAY_SAMPLES,
+  RUNAWAY_CASES,
+  RUNAWAY_PROMPT_STATE,
+  RUNAWAY_SAMPLES,
   secondReferenceKeys,
   SETUP_R3C_PREMISES,
   SETUP_R3D_PREMISES,
@@ -376,6 +379,7 @@ describe("budget caps", () => {
       "options-o2": 0.7,
       "planner-v2e": 0.15,
       "ending-state": 0.1,
+      runaway: 0.08,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -389,6 +393,7 @@ describe("budget caps", () => {
       "options-o2",
       "planner-v2e",
       "ending-state",
+      "runaway",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -396,9 +401,9 @@ describe("budget caps", () => {
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all eleven caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all twelve caps still fit
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(4.95);
+    expect(caps).toBeCloseTo(5.03);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -569,6 +574,36 @@ describe("budget caps", () => {
     expect(stageRunsBaseline("ending-state")).toBe(false);
     // The ledger read $36.08 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
     expect(36.08 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["ending-state"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("replays the runaway turn (runaway, 2026-09-30): production's request and the switch reminder's fix three times each on the case that ran away, interleaved, under a tag of their own", () => {
+    const plans = armsFor("runaway", "beat");
+    const [production, fix] = ["adopted", "noSwitchReminder"].map((variant) =>
+      armKey({ model: TEXT_MODEL_GROUPS.beat.model, reasoningEffort: TEXT_MODEL_GROUPS.beat.reasoningEffort }, variant as "adopted")
+    );
+    expect([production, fix]).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/noSwitchReminder"]);
+    expect(plans.map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source, p.caseIds])).toEqual([
+      [production, 1, 3, "single-player", "stored", RUNAWAY_CASES],
+      [fix, 1, 3, "single-player", "stored", RUNAWAY_CASES],
+    ]);
+    // The switch turn after story 8988006e's first chapter whose production request ran away 3 times in 4 first tries on 30 September
+    expect(RUNAWAY_CASES).toEqual(["cont-8988006e-t4-o1"]);
+    expect(RUNAWAY_SAMPLES).toBe(3);
+    for (const role of ["setup", "switch", "thread", "iteration"] as const) expect(armsFor("runaway", role)).toEqual([]);
+    expect(pipelinePlans("runaway")).toEqual([]);
+    expect(stageInterleavesArms("runaway")).toBe(true);
+    // Production's code since the ending's adoption: a tag of its own, so production's three samples run beside the fix
+    expect(RUNAWAY_PROMPT_STATE).toBe("adopted4");
+    expect([OPTIONS_CONTINUITY_PROMPT_STATE, OPTIONS_O2_PROMPT_STATE, ENDING_STATE_PROMPT_STATE]).not.toContain(RUNAWAY_PROMPT_STATE);
+    // Against production's request, which runs beside it, and priced from it
+    expect(referenceKey(fix)).toBe(production);
+    expect(estimateBaseKey(fix)).toBe(production);
+    expect(secondReferenceKeys(fix)).toEqual([]);
+    expect(STAGE_CAP_REASONS.runaway).toMatch(/noSwitchReminder/);
+    expect(STAGE_CAP_REASONS.runaway).toMatch(/2026-09-30/);
+    expect(stageRunsBaseline("runaway")).toBe(false);
+    // The ledger read $36.17 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
+    expect(36.17 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS.runaway).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {

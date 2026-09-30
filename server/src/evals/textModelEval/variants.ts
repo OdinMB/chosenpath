@@ -47,6 +47,7 @@ import { groupTurnB10Request } from "../../game/services/storyTextRounds/turnRou
 import { productionFormRequest } from "../../game/services/storyTextRounds/requestFormB9.js";
 import { optionsContinuityRequest, type OptionsContinuityArm } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
 import { endingStateRequest, type EndingStateForm } from "../../game/services/storyTextRounds/endingState.js";
+import { noSwitchReminderRequest } from "../../game/services/storyTextRounds/switchReminder.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -195,6 +196,12 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * player count. That is the smoke's draft (two records); "endingStateB" is the
  * run's form, the draft with the smoke's one fix: the rule's words kept out of
  * the prose (both smoke endings wrote "milestone" or "favorable outcome").
+ * "noSwitchReminder" is the runaway turn's suspected cause fixed (2026-09-30,
+ * storyTextRounds/switchReminder.ts): production's single-player turn with the
+ * switch configuration's closing reminder ("players decided what is supposed
+ * to happen next. These things have not yet happened"), the chapter planner's,
+ * left out on a switch turn (the turn document's B3.13 alone), production's
+ * request byte for byte elsewhere, with production's single-player turn limits.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -249,7 +256,8 @@ export type VariantId =
   | "turnO2"
   | "turnO2b"
   | "endingState"
-  | "endingStateB";
+  | "endingStateB"
+  | "noSwitchReminder";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -301,6 +309,7 @@ export const VARIANTS: VariantId[] = [
   "turnO2b",
   "endingState",
   "endingStateB",
+  "noSwitchReminder",
 ];
 
 /**
@@ -664,6 +673,11 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   // The smoke's draft (its two records rebuild), then the run's form with the smoke's one fix, the story's own words
   endingState: endingStateVariant("endingState", { ownWords: false }),
   endingStateB: endingStateVariant("endingStateB", { ownWords: true }),
+  // The runaway turn's fix: no switch reminder on a switch turn, production's single-player turn limits
+  noSwitchReminder: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant noSwitchReminder does not cover role ${input.role}`);
+    return { ...noSwitchReminderRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  },
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

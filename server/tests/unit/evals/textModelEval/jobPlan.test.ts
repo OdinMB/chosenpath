@@ -29,9 +29,11 @@ import {
   ROUND3_PROBLEM_TURN,
   ROUND3_REPLAY_CASES,
   ROUND3_REPLAY_SAMPLES,
+  RUNAWAY_CASES,
   STAGE_SCOPING_NEW_CASES,
   STAGES,
 } from "../../../../src/evals/textModelEval/arms.js";
+import { SWITCH_REMINDER } from "../../../../src/game/services/storyTextRounds/switchReminder.js";
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import { setupStep } from "../../../../src/game/services/storyTextSteps.js";
 import { planJobs, rebuiltToday, requestInputFor, sameRequestAs, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
@@ -555,6 +557,28 @@ describe("planJobs: the round stages and the migration check", () => {
     const onSingle = jobs.filter((j) => j.caseId === single && j.sample === 1).map((j) => jobs.indexOf(j));
     expect(Math.abs(onSingle[0] - onSingle[1])).toBe(1);
     expect(planJobs(cases, { stage: "ending-state", promptState: "adopted2", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
+  });
+
+  it("plans the runaway replay (2026-09-30): production's request and the switch reminder's fix three times each on the runaway case only, interleaved, with production's single-player turn limits", () => {
+    const [runaway] = RUNAWAY_CASES;
+    const cases = [
+      evalCase(runaway, "beat", { state: laterSwitchBeat(1, { id: "story-a" }).getState() }),
+      evalCase("sp-other-switch", "beat", { state: laterSwitchBeat(1, { id: "story-b" }).getState() }),
+    ];
+    const jobs = planJobs(cases, { stage: "runaway", promptState: "adopted4", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
+    // Sample by sample, both arms together: six jobs, as the dry run counts them
+    expect(jobs.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`)).toEqual(
+      [1, 2, 3].flatMap((s) => ["adopted", "noSwitchReminder"].map((v) => `${runaway} s${s} gpt-6-luna@medium/${v}`))
+    );
+    for (const job of jobs) expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    // The smoke: sample 1 of each
+    const smoke = planJobs(cases, { stage: "runaway", promptState: "adopted4", roles: ["beat"], mode: "isolated", subset15: false, records: [], samples: 1 });
+    expect(smoke.map((j) => `${j.sample} ${j.armKey}`)).toEqual(["1 gpt-6-luna@medium/adopted", "1 gpt-6-luna@medium/noSwitchReminder"]);
+    // The two requests differ by the switch reminder alone
+    const [production, fix] = jobs.slice(0, 2).map((j) => requestText(j.first.request()));
+    expect(production.replace(SWITCH_REMINDER, "")).toBe(fix);
+    expect(production).not.toBe(fix);
+    expect(planJobs(cases, { stage: "runaway", promptState: "adopted4", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
   });
 
   it("plans the group round (B10): the sharpened note twice on the stored group turns, today's group form's sample 2 beside it", () => {

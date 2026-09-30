@@ -36,7 +36,8 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * 2026-09-30 the options and continuity arms on production's turn form, then
  * version O2 beside production's form, then planner v2e (planner v2d with its
  * last step listed once), then the ending told as its milestones leave it
- * beside production's ending. Their caps and reasons are in budget.ts.
+ * beside production's ending, then the replay of the turn that reasons to its
+ * output cap (runaway). Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -50,6 +51,7 @@ export const FEEDBACK_STAGES = [
   "options-o2",
   "planner-v2e",
   "ending-state",
+  "runaway",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -200,6 +202,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // edits and which runs beside it on the same turn model: the smoke's draft, and the run's form with the smoke's one fix
   endingState: "adopted",
   endingStateB: "adopted",
+  // The runaway turn's fix (2026-09-30: no switch reminder on a switch turn, the turn document's B3.13 alone) against
+  // production's request, which runs beside it on the case that ran away
+  noSwitchReminder: "adopted",
 };
 
 /**
@@ -507,9 +512,50 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return role === "thread" ? [{ arm: luna("low", "planV2e"), samples: 2, scope: "all" }] : [];
     case "ending-state":
       return endingStateArms(role);
+    case "runaway":
+      return runawayArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the runaway replay (2026-09-30): production's own code
+ * since the ending's adoption (6b4908a), under a tag of its own so production's
+ * three samples run beside the fix in the same minutes. Production's request on
+ * the runaway case is adopted2's byte for byte (a test holds its hash), whose
+ * records are the run that saw it run away.
+ */
+export const RUNAWAY_PROMPT_STATE = "adopted4";
+
+/**
+ * The runaway case: story 8988006e's switch turn after its first chapter, the
+ * player's last choice a sacrifice that released the exposé, the switch a
+ * flavor switch on "the immediate fallout of exposing" the Waste Ring.
+ * Production's exact request ran away 3 times in 4 first tries there on 30
+ * September and in none of 2 on 28 September; over every form with the
+ * reminder, 4 of 17 first tries ever, all four within 20 minutes on 30
+ * September.
+ */
+export const RUNAWAY_CASES = ["cont-8988006e-t4-o1"];
+export const RUNAWAY_SAMPLES = 3;
+
+/**
+ * The runaway replay (the coordinator's brief of 2026-09-30): production's
+ * request and the suspected cause fixed (noSwitchReminder: the switch
+ * configuration's reminder left out on a switch turn) on Luna medium,
+ * production's single-player turn model, three times each on the runaway case,
+ * interleaved.
+ */
+function runawayArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return (["adopted", "noSwitchReminder"] as const).map((variant) => ({
+    arm: adoptedDefault("beat", variant),
+    samples: RUNAWAY_SAMPLES,
+    scope: "single-player" as const,
+    source: "stored" as const,
+    caseIds: RUNAWAY_CASES,
+  }));
 }
 
 /**
@@ -667,7 +713,7 @@ function optionsO2Arms(role: EvalRole): ArmPlan[] {
 }
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
-const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state"];
+const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway"];
 
 export function stageInterleavesArms(stage: Stage): boolean {
   return INTERLEAVED_STAGES.includes(stage);
