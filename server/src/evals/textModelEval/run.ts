@@ -72,7 +72,8 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     --pairwise: exactly two arms, the reference then the candidate, Which is better? per item;
  *     --chain-arms <ref chain>,<candidate chain> [--chain-items 4]: on a pairwise turn page, chapter openings
  *     too, each option the chain's first turn with its own plan;
- *     --no-repeat: leaves the repeated item out; --criteria turn-round2: a pairwise turn page with turn round 2's questions;
+ *     --no-repeat: leaves the repeated item out; --criteria turn-round2|groups|options: a pairwise turn page with that
+ *     round's questions (turn round 2's, the group round's, the options and continuity page's);
  *     --chain-cases a,b: the chapter openings from those cases only; --frames nearer: the contexts show the nearer
  *     chapter frames, recorded in the key)
  *   --rerender-page <pageId>      renders an existing key's page afresh (same items, labels, page id)
@@ -261,10 +262,10 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--criteria": {
         const value = next();
-        if (value !== "turn-round2" && value !== "groups") {
-          throw new UsageError("--criteria is turn-round2 (a pairwise turn page with turn round 2's questions) or groups (the group round's)");
+        if (value !== "turn-round2" && value !== "groups" && value !== "options") {
+          throw new UsageError("--criteria is turn-round2 (a pairwise turn page with turn round 2's questions), groups (the group round's) or options (the options and continuity page's)");
         }
-        args.criteria = value === "groups" ? "groups" : "turnRound2";
+        args.criteria = value === "turn-round2" ? "turnRound2" : value;
         break;
       }
       case "--ratings":

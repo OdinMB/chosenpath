@@ -1579,6 +1579,42 @@ describe("a pairwise turn page for turn round 2: the owner's round-2 questions, 
   });
 });
 
+describe("a pairwise turn page for the options and continuity arms (the owner's feedback of 2026-09-30): the owner's option questions", () => {
+  const REF = { promptState: "adopted2", armKey: "gpt-6-luna@medium/adopted" };
+  const CAND = { promptState: "adopted2", armKey: "gpt-6-luna@medium/turnO" };
+  const cases = Array.from({ length: 5 }, (_, i) => evalCase(`step-${i}`, "beat", { state: threadBeat(1, { id: `story-o${i}` }).getState() }));
+  const records: CallRecord[] = [];
+  const outputs = new Map<string, unknown>();
+  for (const c of cases) {
+    for (const [arm, samples] of [[REF, [1, 2]], [CAND, [1]]] as const) {
+      for (const sample of samples) {
+        const outputFile = `${c.id}-${arm.armKey}-${sample}`;
+        outputs.set(outputFile, beatSet(1, { player1: beatGeneration({ text: `A scene in ${c.id}.` }) }));
+        records.push(record({ caseId: c.id, group: "beat", role: "beat", promptState: arm.promptState, armKey: arm.armKey, callArmKey: arm.armKey, baseline: false, sample, outputFile }));
+      }
+    }
+  }
+  const load = (r: CallRecord) => outputs.get(r.outputFile ?? "");
+  const { set, key } = planRatingSet({ kind: "turn", arms: [REF, CAND], items: 4, preview: false, pairwise: true, criteria: "options" }, records, cases, {
+    loadOutput: load,
+    salt: "options",
+    now: new Date(0),
+  });
+
+  it("asks about option variety, sacrifices and rewards, and moving the story on, keeps the questions in the key, and leaks nothing", () => {
+    const text = set.instructions.join(" ");
+    for (const question of PAIRWISE_CRITERIA_SETS.options) expect(text).toContain(question);
+    expect(text).toContain("not only in how risky they are");
+    expect(text).toContain("a second sacrifice");
+    expect(text).toContain("move the story forward");
+    expect(key.criteria).toBe("options");
+    expect(ratingSetFromKey(key, records, cases, load)).toEqual(set);
+    expect(metadataLeaks(set)).toEqual([]);
+    expect(htmlLeaks(renderRatingPage(set), key)).toEqual([]);
+    for (const question of PAIRWISE_CRITERIA_SETS.options) expect(LEAK_PATTERN.test(question)).toBe(false);
+  });
+});
+
 describe("each version's choice mechanics and the changes its turn writes (the owner's feedback of 2026-09-29)", () => {
   const REF = { promptState: "round0", armKey: "gpt-6-luna@medium/prod" };
   const CAND = { promptState: "round0", armKey: "gpt-6-luna@medium/turnR2b" };

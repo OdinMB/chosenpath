@@ -188,6 +188,18 @@ export const PAIRWISE_CRITERIA_SETS = {
     "Is there a real choice among each player's options, and does each option work whatever the other players choose?",
     "Does the prose sound like this story?",
   ],
+  /**
+   * The options and continuity page (the owner's feedback of 2026-09-30 on
+   * option variety, sacrifices and rewards per chapter, and turns that repeat
+   * the one before): single-player turns, production's form against the best arm.
+   */
+  options: [
+    "Do the three options differ in what you do and which stat or approach you lean on, not only in how risky they are?",
+    "Are sacrifices and rewards offered where they fit the chapter, with a clear reason in the scene for a second sacrifice?",
+    "Does the turn pick up where the last one ended and move the story forward?",
+    "Does this turn move the chapter's question and follow its plan?",
+    "Does the prose sound like this story?",
+  ],
 } as const;
 export type PairwiseCriteriaSet = keyof typeof PAIRWISE_CRITERIA_SETS;
 
