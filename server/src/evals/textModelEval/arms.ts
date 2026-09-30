@@ -37,7 +37,9 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * version O2 beside production's form, then planner v2e (planner v2d with its
  * last step listed once), then the ending told as its milestones leave it
  * beside production's ending, then the replay of the turn that reasons to its
- * output cap (runaway). Their caps and reasons are in budget.ts.
+ * output cap (runaway), then whole-story playthroughs on production's own
+ * code (playthroughs: no --run arms; its calls are the --playthroughs mode's
+ * prep calls, playthroughMode.ts). Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -52,6 +54,7 @@ export const FEEDBACK_STAGES = [
   "planner-v2e",
   "ending-state",
   "runaway",
+  "playthroughs",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;

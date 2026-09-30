@@ -14,7 +14,7 @@ export { FEEDBACK_STAGES };
  * (going on although the stalled Stage 4 calls may have been billed). The
  * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
  * the setup rounds, the turn rounds and the migration check, and $0.10 /
- * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 for the feedback
+ * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 for the feedback
  * workflow's runs (STAGE_CAP_REASONS says why); a stage cap above its default needs a
  * recorded reason, and the global cap can only be lowered. The probe and case
  * building count as Stage 0. The content-filter check (--filter-check,
@@ -47,6 +47,7 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   "planner-v2e": 0.15,
   "ending-state": 0.1,
   runaway: 0.08,
+  playthroughs: 0.7,
 };
 /** The owner's hard cap: $30, raised to $33 on 2026-09-27 and to $40 on 2026-09-28. */
 export const HARD_CEILING = 40;
@@ -103,6 +104,8 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-09-30 (the owner's decision that each outcome is told at the ending as its milestones leave it, complete ones resolved, unfinished ones in their current state; the ledger at $36.08 of the $40 hard cap): the ending told as its milestones leave it (endingState, the smoke's draft, then endingStateB with the smoke's one fix, the rule's words kept out of the prose) and production's ending beside it (adopted, under adopted2, whose two samples on the three stored endings are already recorded) twice on the stored endings and four built ones (one player, a two-player contest complete and unfinished, three players in two camps): 22 turns, about $0.08 at $0.003 a single-player and $0.004-0.005 a group ending, the judged check on every ending and its calibration (about 60 Luna low calls, about $0.02-0.03), and a smoke",
   runaway:
     "coordinator, 2026-09-30 (production's single-player switch turn on story 8988006e after its first chapter reasons to the 12,000-token output cap and writes nothing, 3 of 4 first tries of its exact request that day, retried at about 70 s more for the player; the ledger at $36.17 of the $40 hard cap): production's request (adopted, under adopted4) and the suspected cause fixed (noSwitchReminder: the switch configuration's reminder, the chapter planner's, left out on a switch turn, the turn document's B3.13 alone) three times each on the case that ran away, interleaved, with a smoke among them: 6 turns, about $0.02 at $0.0034 a turn, plus the runaways production's retries pay (about $0.0074 each, at most two a job)",
+  playthroughs:
+    "coordinator, 2026-09-30 (the owner's \"do whatever additional tests you think are useful\"; the coordinator chose whole-story playthroughs; the ledger at $36.20 of the $40 hard cap): four stories set up and played to their ending on production's own code and models (adopted, under adopted4: setup, character selection, both planners with pacing and their retry, turns with repairs, stat changes, chapter resolution, the ending), an automated player, no pregeneration: a 10-turn and a 25-turn single-player story, a 25-turn two-player contest and a 25-turn three-player cooperative-competitive story, about 150 calls, about $0.49 at the final check's measured costs ($0.0034 a single-player turn, $0.0043-0.0055 a group turn, $0.0011-0.0014 a plan, $0.006-0.009 a setup), the judged stage and ending checks on them (about 30 Luna low calls, about $0.01), a two-turn smoke, and the retries and runaways production's own re-sends pay",
 };
 
 export type Caps = {

@@ -8,7 +8,7 @@ import type { EvalRequest } from "./variants.js";
 /*
  * The rounds' own calls (the chapter backfill, chapterFrames.ts; the judged
  * checks, judgedChecks.ts; setup round 3's setup-to-play chain,
- * setupChain.ts): runner jobs in the group "prep", recorded in
+ * setupChain.ts; the whole-story playthroughs, playthroughs.ts): runner jobs in the group "prep", recorded in
  * prep-calls.jsonl beside calls.jsonl, so every report that reads calls.jsonl
  * keeps reading only the isolated and chained cases' calls. Their spend joins
  * the ledger under their stage (turn-rounds; setup-rounds for the chain)
@@ -16,7 +16,7 @@ import type { EvalRequest } from "./variants.js";
  * (backfill>gpt-6-luna@low/prod), so it never reads as an eval arm.
  */
 
-export type PrepKind = "backfill" | "judge" | "chain";
+export type PrepKind = "backfill" | "judge" | "chain" | "play";
 
 export const prepArmKey = (kind: PrepKind, arm: Arm) => `${kind}>${arm.key}`;
 

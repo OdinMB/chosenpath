@@ -380,6 +380,7 @@ describe("budget caps", () => {
       "planner-v2e": 0.15,
       "ending-state": 0.1,
       runaway: 0.08,
+      playthroughs: 0.7,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -394,6 +395,7 @@ describe("budget caps", () => {
       "planner-v2e",
       "ending-state",
       "runaway",
+      "playthroughs",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -401,9 +403,9 @@ describe("budget caps", () => {
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all twelve caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all thirteen caps still fit
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(5.03);
+    expect(caps).toBeCloseTo(5.73);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -604,6 +606,16 @@ describe("budget caps", () => {
     expect(stageRunsBaseline("runaway")).toBe(false);
     // The ledger read $36.17 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
     expect(36.17 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS.runaway).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("gives the whole-story playthroughs (playthroughs, 2026-09-30) a stage of their own: no --run arms, their calls prep calls in its ledger", () => {
+    for (const role of ["setup", "beat", "switch", "thread", "iteration"] as const) expect(armsFor("playthroughs", role)).toEqual([]);
+    expect(pipelinePlans("playthroughs")).toEqual([]);
+    expect(stageRunsBaseline("playthroughs")).toBe(false);
+    expect(STAGE_CAP_REASONS.playthroughs).toMatch(/2026-09-30/);
+    expect(STAGE_CAP_REASONS.playthroughs).toMatch(/production's own code/);
+    // The ledger read $36.20 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
+    expect(36.2 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS.playthroughs).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {

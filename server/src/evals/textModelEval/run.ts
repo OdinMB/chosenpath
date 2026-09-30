@@ -41,6 +41,7 @@ import { planRatingSet, ratingSetFromKey, type ArmRef, type PairwiseCriteriaSet,
 import { renderPairwiseScores, renderScores, scorePairwise, scoreRatings, type ExportedRatings } from "./ratingScore.js";
 import { renderResults } from "./resultsReport.js";
 import { DEFAULT_CHAIN_MAX_SPEND, setupChainMode } from "./setupChainMode.js";
+import { DEFAULT_PLAYTHROUGH_MAX_SPEND, PLAYTHROUGH_STAGE, playthroughsMode, printPlaythroughPlan } from "./playthroughMode.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
 import { buildStageCasesMode, judgeStagesMode } from "./stagePrep.js";
 import { buildEndingCasesMode, judgeEndingsMode } from "./endingPrep.js";
@@ -126,6 +127,11 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     prep-calls.jsonl, in the setup-rounds stage; writes setup-chain.md and .json with the runs the file already
  *     holds (--samples picks the chain's sample, default 1; --report-only renders afresh without calls; --merge adds
  *     another chain file's runs)
+ *   --playthroughs [--cases <story ids>] [--samples N] [--turns N] [--max-spend 0.70] [--report-only]  whole-story
+ *     playthroughs on production's own code (playthroughs.ts, playthroughMode.ts): four new setups played to their
+ *     ending by an automated player, then the judged stage and ending checks; prep-calls.jsonl, in the playthroughs
+ *     stage under adopted4; writes playthroughs.md and .json and a page per story in stories/ (--turns stops each
+ *     story after that many turns, the smoke; --report-only renders afresh without calls)
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
@@ -157,7 +163,8 @@ type Mode =
   | "build-ending-cases"
   | "judge-endings"
   | "balance-sim"
-  | "setup-chain";
+  | "setup-chain"
+  | "playthroughs";
 
 type Args = {
   mode: Mode;
@@ -205,6 +212,8 @@ type Args = {
   reportOnly: boolean;
   /** --setup-chain --merge <file>: add another chain file's runs */
   mergeFile?: string;
+  /** --playthroughs --turns N: each story only to that many turns (the smoke) */
+  turns?: number;
   /** --frames nearer: the nearer chapter frames (the owner's feedback of 2026-09-28) for the backfill, the judge and a turn page */
   frames?: FrameSet;
   /** --chain-cases: the chapter-opening items' cases on a pairwise turn page (turns-r1b: the old page's four) */
@@ -276,7 +285,11 @@ function parseArgs(argv: string[]): Args {
       case "--judge-endings":
       case "--balance-sim":
       case "--setup-chain":
+      case "--playthroughs":
         args.mode = arg.slice(2) as Mode;
+        break;
+      case "--turns":
+        args.turns = numberArg(arg, next());
         break;
       case "--criteria": {
         const value = next();
@@ -518,6 +531,7 @@ async function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guar
     log: (line) => console.log(line),
   });
   printPrepPlan(files, (line) => console.log(line));
+  printPlaythroughPlan(files, (line) => console.log(line));
 }
 
 const DEFAULT_PREP_MAX_SPEND = 0.1;
@@ -535,6 +549,21 @@ function prepContext(args: Args, files: EvalFiles, stage: LedgerStage = "turn-ro
     deps: (ledger) => runnerDeps(files, ledger),
     refuse: (stage, estimate) => refuseIfOverCaps(caps, files, stage, estimate),
     tpm: args.tpm,
+    maxInFlight: MAX_IN_FLIGHT,
+    log: (line) => console.log(line),
+  };
+}
+
+/** A mode's context that sends nothing (--report-only): the default caps, and runner deps that refuse any call. */
+function reportContext(files: EvalFiles): PrepContext {
+  return {
+    files,
+    caps: resolveCaps({}).caps,
+    deps: () => {
+      throw new UsageError("--report-only sends no call");
+    },
+    refuse: () => undefined,
+    tpm: DEFAULT_TOKENS_PER_MINUTE,
     maxInFlight: MAX_IN_FLIGHT,
     log: (line) => console.log(line),
   };
@@ -939,6 +968,13 @@ async function main() {
         caseIds: args.caseIds,
         reportOnly: args.reportOnly,
         mergeFile: args.mergeFile,
+      });
+    case "playthroughs":
+      return playthroughsMode(args.reportOnly ? reportContext(files) : prepContext(args, files, PLAYTHROUGH_STAGE, DEFAULT_PLAYTHROUGH_MAX_SPEND), {
+        sample: args.samples ?? 1,
+        caseIds: args.caseIds,
+        turns: args.turns,
+        reportOnly: args.reportOnly,
       });
     default:
       return dryRun(args, files, dirs);
