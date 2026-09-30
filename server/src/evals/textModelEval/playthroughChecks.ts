@@ -123,9 +123,13 @@ export type StoryReadings = {
     shortTextRetries: number[];
     resends: { turn: number; caseId: string; outcomes: string[] }[];
     failedCalls: string[];
+    /** Turns production could not get past (a plan unusable twice fails the turn; nothing sends it again), where the harness asked the planner again */
+    stuckTurns: { turn: number; kind: string; failure: string; rounds: number; repicks?: { slot: string; from: number; to: number; outcomeId: string }[] }[];
   };
   /** Turn design checks that failed, with the turns */
   checkFailures: Record<string, number[]>;
+  /** Switch and chapter plan design checks that failed (turnDesignChecks.ts), with the turn each plan opened */
+  planCheckFailures: Record<string, number[]>;
   ending?: { turn: number; states: OutcomeState[]; judged: JudgedItem[] };
   waits: WaitReading[];
   cost: { storyUsd: number; judgeUsd: number; calls: number };
@@ -320,11 +324,13 @@ function repairReadings(run: PlayRun): StoryReadings["repairs"] {
   for (const turn of run.turns) {
     const plan = turn.plan;
     if (plan) {
-      plan.calls.forEach((call, i) => {
-        const previous = plan.calls[i - 1];
-        if (call.retry && previous) planRetries.push({ turn: turn.turn, kind: plan.kind, ...(previous.problem ? { problem: previous.problem } : {}), ...(previous.lengthProblem ? { lengthProblem: previous.lengthProblem } : {}) });
-      });
-      read(turn.turn, plan.calls);
+      for (const calls of [...(plan.failedRounds ?? []).map((r) => r.calls), plan.calls]) {
+        calls.forEach((call, i) => {
+          const previous = calls[i - 1];
+          if (call.retry && previous) planRetries.push({ turn: turn.turn, kind: plan.kind, ...(previous.problem ? { problem: previous.problem } : {}), ...(previous.lengthProblem ? { lengthProblem: previous.lengthProblem } : {}) });
+        });
+        read(turn.turn, calls);
+      }
     }
     read(turn.turn, turn.calls);
   }
@@ -337,13 +343,19 @@ function repairReadings(run: PlayRun): StoryReadings["repairs"] {
     shortTextRetries: run.turns.filter((t) => t.calls[0]?.problem !== undefined && t.calls.length > 1).map((t) => t.turn),
     resends,
     failedCalls,
+    stuckTurns: run.turns.flatMap((t) => {
+      const rounds = t.plan?.failedRounds ?? [];
+      const repicks = t.repicks?.map(({ slot, from, to, outcomeId }) => ({ slot, from, to, outcomeId }));
+      return rounds.length && t.plan ? [{ turn: t.turn, kind: t.plan.kind, failure: rounds[0].failure, rounds: rounds.length, ...(repicks?.length ? { repicks } : {}) }] : [];
+    }),
   };
 }
 
 function waitReadings(run: PlayRun): WaitReading[] {
   const beatArm = playthroughArm("beat", run.input.playerCount).key;
   return KINDS.flatMap((kind): WaitReading[] => {
-    const turns = run.turns.filter((t) => t.kind === kind && t.calls.length > 0);
+    // A turn production could not get past is no wait a player would have seen (the repairs list it)
+    const turns = run.turns.filter((t) => t.kind === kind && t.calls.length > 0 && !t.plan?.failedRounds?.length);
     if (turns.length === 0) return [];
     const waits = turns.map((t) => t.waitMs);
     const allowanceS = allowanceFor(beatArm, kind);
@@ -381,8 +393,10 @@ export function readStory(run: PlayRun): StoryReadings {
     }
   }
   const checkFailures: Record<string, number[]> = {};
+  const planCheckFailures: Record<string, number[]> = {};
   for (const turn of run.turns) {
     for (const [name, ok] of Object.entries(turn.checks?.checks ?? {})) if (!ok) (checkFailures[name] ??= []).push(turn.turn);
+    for (const [name, ok] of Object.entries(turn.plan?.checks?.checks ?? {})) if (!ok) (planCheckFailures[name] ??= []).push(turn.turn);
   }
   const setupCalls = run.setup?.calls ?? [];
   return {
@@ -406,12 +420,13 @@ export function readStory(run: PlayRun): StoryReadings {
     unfit: run.turns.flatMap((t) => t.unfit.map((u) => ({ turn: t.turn, ...u }))),
     repairs: repairReadings(run),
     checkFailures,
+    planCheckFailures,
     ...(ending ? { ending: { turn: ending.turn, states: ending.endingStates ?? [], judged: (run.judged ?? []).filter((j) => j.kind === "ending") } } : {}),
     waits: waitReadings(run),
     cost: {
       storyUsd: sum(setupCalls.map((c) => c.costUsd)) + sum(run.turns.map((t) => t.costUsd)),
       judgeUsd: sum((run.judged ?? []).map((j) => j.costUsd)),
-      calls: setupCalls.length + sum(run.turns.map((t) => (t.plan?.calls.length ?? 0) + t.calls.length)),
+      calls: setupCalls.length + sum(run.turns.map((t) => sum((t.plan?.failedRounds ?? []).map((r) => r.calls.length)) + (t.plan?.calls.length ?? 0) + t.calls.length)),
     },
   };
 }
@@ -486,10 +501,20 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     `- one-paragraph turns retried: ${list(r.repairs.shortTextRetries)}`,
     `- calls re-sent by the runner: ${r.repairs.resends.length ? r.repairs.resends.map((s) => `turn ${s.turn} ${s.caseId} (${s.outcomes.join(", ")})`).join("; ") : "none"}`,
     `- calls with no usable reply: ${list(r.repairs.failedCalls)}`,
+    `- production would have stopped at: ${r.repairs.stuckTurns.length ? r.repairs.stuckTurns
+            .map(
+              (s) =>
+                `turn ${s.turn} (the ${s.kind} could not be used twice: ${cell(s.failure)}; ${s.rounds} round(s) failed${s.repicks ? `; the harness re-picked the switch: ${s.repicks.map((p) => `${p.slot} direction ${p.from + 1} → ${p.to + 1} (${p.outcomeId})`).join(", ")}` : ""})`
+            )
+            .join("; ") : "no turn"}`,
     "",
     "### Turn design checks that failed",
     "",
     ...(Object.keys(r.checkFailures).length ? Object.entries(r.checkFailures).map(([name, turns]) => `- ${name}: turns ${turns.join(", ")}`) : ["none"]),
+    "",
+    "### Plan design checks that failed",
+    "",
+    ...(Object.keys(r.planCheckFailures).length ? Object.entries(r.planCheckFailures).map(([name, turns]) => `- ${name}: turns ${turns.join(", ")}`) : ["none"]),
     "",
     "### Waits",
     "",

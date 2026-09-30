@@ -5,6 +5,7 @@ import type { EvalFiles } from "../../../../src/evals/textModelEval/evalFiles.js
 import { sha256, type ExecutedCall } from "../../../../src/evals/textModelEval/executor.js";
 import { JUDGE_ARMS } from "../../../../src/evals/textModelEval/judgedChecks.js";
 import {
+  HARNESS_TURN_RETRIES,
   PLAYTHROUGH_PROMPT_STATE,
   judgeTargets,
   measuredCallCosts,
@@ -19,7 +20,8 @@ import { PLAYTHROUGHS, playthroughArm, type JudgeTarget, type PlayRun } from "..
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import type { PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
 import { executed, record } from "./fixtures.js";
-import { fakeCall } from "./playFixtures.js";
+import { threadAnalysis } from "../../../helpers/textFixtures.js";
+import { DEFAULT, fakeCall } from "./playFixtures.js";
 
 /*
  * The --playthroughs mode: each story's calls as prep jobs in the playthroughs
@@ -140,6 +142,18 @@ describe("the judged checks after each story", () => {
     ]);
     expect(kinds.slice(-2)).toEqual(["judge", "judge"]);
     expect(kinds.filter((k) => k === "play").length).toBe(16);
+  });
+});
+
+describe("a turn production could not get past", () => {
+  it("is asked again, up to twice, so the story can be read to its end", async () => {
+    const unusable = { ...threadAnalysis("challenge", 4, 0, ["player1"]), threads: [{ ...threadAnalysis("challenge", 4, 0, ["player1"]).threads[0], outcomeId: "no_such_outcome" }] };
+    const { call: play } = fakeCall(1, { reply: (role, nth) => (role === "thread" && nth < 4 ? unusable : DEFAULT) });
+    const call: ModeCall = async (s) => (s.kind === "judge" ? { latencyMs: 0, costUsd: 0, sends: [] } : ((await play(s)) ?? { latencyMs: 0, costUsd: 0, sends: [] }));
+    expect(HARNESS_TURN_RETRIES).toBe(2);
+    const run = await playAndJudge(PLAYTHROUGHS[0], call, { sample: 1 });
+    expect(run.complete).toBe(true);
+    expect(run.turns[1].plan?.failedRounds).toHaveLength(2);
   });
 });
 

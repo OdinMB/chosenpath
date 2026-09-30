@@ -16,7 +16,7 @@ import {
   withSeededDice,
 } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
-import { beatSet, explorationOptions, PARAGRAPH, threadAnalysis } from "../../../helpers/textFixtures.js";
+import { beatSet, explorationOptions, PARAGRAPH, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input, leverSet, setupReply } from "./playFixtures.js";
 
 /*
@@ -294,6 +294,70 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(run.complete).toBe(false);
     expect(run.stopped).toMatch(/turn 2.*chapter plan.*could not be used/);
     expect(run.turns.at(-1)?.plan?.failure).toBeTruthy();
+  });
+
+  it("where production would fail the turn on a plan unusable twice, asks production's checked planner again when told to, and marks the turn", async () => {
+    const unusable = () => {
+      const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
+      return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
+    };
+    const { call, calls } = fakeCall(1, { reply: (role, nth) => (role === "thread" && nth < 2 ? unusable() : DEFAULT) });
+    const { run } = await playStory(spec, input(1), call, { sample: 1, retryFailedTurns: 2 });
+    expect(run.complete).toBe(true);
+    const planned = run.turns[1].plan;
+    // The failed round keeps both of production's calls; the next round is production's checked planner again
+    expect(planned?.failedRounds).toEqual([{ calls: [expect.objectContaining({ retry: false }), expect.objectContaining({ retry: true })], failure: expect.stringMatching(/usable thread plan/) }]);
+    expect(planned?.calls).toHaveLength(1);
+    expect(planned?.calls[0].caseId).toMatch(/chapter-plan-again-1$/);
+    expect(calls.filter((c) => c.role === "thread").map((c) => c.caseId.replace(/^play-lemonade-s1-\d+-/, ""))).toEqual(["chapter-plan", "chapter-plan-retry", "chapter-plan-again-1", "chapter-plan"]);
+    // Where the harness gives up, it says so
+    const { call: never } = fakeCall(1, { reply: (role) => (role === "thread" ? unusable() : DEFAULT) });
+    const stuck = await playStory(spec, input(1), never, { sample: 1, retryFailedTurns: 1 });
+    expect(stuck.run.stopped).toMatch(/turn 2.*chapter plan.*could not be used/);
+    expect(stuck.run.turns[1].plan?.failedRounds).toHaveLength(1);
+  });
+
+  it("where a group chapter can't be planned from the players' switch picks, has the stuck players pick the shared direction another player took, then plans once more, and marks it", async () => {
+    // The second switch: a topic switch per player, each offering the shared outcome, their own, and (player2) the shared one last
+    const direction = (text: string, outcomeId: string) => ({ direction: text, outcomeId });
+    const topic = (slot: string, directions: { direction: string; outcomeId: string }[]) => ({
+      ...switchAnalysis([slot]).switches[0],
+      id: `sw_${slot}`,
+      players: [slot],
+      type: "topic",
+      topicChoices: directions.map((d) => `${d.direction} (${d.outcomeId})`),
+      topicDirections: directions,
+    });
+    const splitSwitch = {
+      ...switchAnalysis(["player1", "player2"]),
+      switches: [
+        topic("player1", [direction("Tavi", "shared_harbour"), direction("Own", "player1_main"), direction("Side", "player1_side")]),
+        topic("player2", [direction("Own", "player2_main"), direction("Side", "player2_side"), direction("Tavi", "shared_harbour")]),
+      ],
+    };
+    const unusable = { ...threadAnalysis("challenge", 4, 0, ["player1", "player2"]), threads: [{ ...threadAnalysis("challenge", 4, 0, ["player1", "player2"]).threads[0], outcomeId: "no_such_outcome" }] };
+    const { call, calls } = fakeCall(2, {
+      reply: (role, nth, s) => {
+        if (role === "switch" && nth === 1) return splitSwitch;
+        // After the split switch, a chapter can be planned only once both players picked the shared direction
+        const prompt = requestText(s.request);
+        if (role === "thread" && nth >= 1 && prompt.includes("player1 chose direction 2 of 3")) return unusable;
+        return DEFAULT;
+      },
+    });
+    const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1, retryFailedTurns: 1, repickStuckSwitches: true });
+    const stuck = run.turns.find((t) => t.repicks?.length);
+    expect(stuck?.turn).toBe(7);
+    // player1 had taken their own outcome (Option 2); they now take the shared direction player2 took (Option 1)
+    expect(stuck?.repicks).toEqual([{ slot: "player1", from: 1, to: 0, text: "Option 1", outcomeId: "shared_harbour" }]);
+    expect(stuck?.plan?.failedRounds).toHaveLength(2);
+    expect(stuck?.plan?.plan).toBeDefined();
+    const last = calls.filter((c) => c.role === "thread").at(-1);
+    expect(last?.caseId).toMatch(/chapter-plan-after-repick$/);
+    expect(requestText(last?.request as never)).toContain('player1 chose direction 1 of 3: "Option 1"');
+    // The switch turn's recorded pick says it was changed
+    expect(run.turns[5].picks[0]).toMatchObject({ slot: "player1", option: 1, repickedTo: 0 });
+    expect(run.complete).toBe(true);
   });
 
   it("gives a one-paragraph turn production's one retry, told so", async () => {

@@ -86,9 +86,20 @@ export async function judgeTargets(targets: JudgeTarget[], call: ModeCall): Prom
   return items;
 }
 
+/**
+ * How often the harness asks production's checked planner again where a plan
+ * unusable twice fails the turn (2026-09-30: both group stories stopped there
+ * on the first run; production leaves such a story waiting), so the rest of
+ * the story can be read; where every round fails on the players' switch
+ * picks, a group's stuck players re-pick the shared direction another player
+ * took (coordinatedRepick) and the planner runs once more. The pages and
+ * readings mark each such turn.
+ */
+export const HARNESS_TURN_RETRIES = 2;
+
 /** One story played on production's code, then its judged checks. */
 export async function playAndJudge(spec: PlaythroughSpec, call: ModeCall, options: { sample: number; turnLimit?: number }, input: SetupInput = playthroughSetupInput(spec)): Promise<PlayRun> {
-  const { run, judgeTargets: targets } = await playStory(spec, input, (s) => call({ kind: "play", ...s }), options);
+  const { run, judgeTargets: targets } = await playStory(spec, input, (s) => call({ kind: "play", ...s }), { ...options, retryFailedTurns: HARNESS_TURN_RETRIES, repickStuckSwitches: true });
   run.judged = await judgeTargets(targets, call);
   return run;
 }

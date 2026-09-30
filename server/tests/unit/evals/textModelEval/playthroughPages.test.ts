@@ -54,8 +54,10 @@ describe("storyPage", () => {
     expect(html).toContain("base points");
     // What a turn changes, and the previous lever's payment
     expect(html).toContain("Previous choice sacrificed");
-    // The ending, and each outcome as its milestones leave it
+    // The ending, shown as the game shows it (no options), and each outcome as its milestones leave it
     expect(html).toContain('id="ending"');
+    const endingTurn = html.slice(html.indexOf('id="turn-11"'), html.indexOf("</article>", html.indexOf('id="turn-11"')));
+    expect(endingTurn).not.toContain('class="options"');
     expect(html).toMatch(/player1_side[\s\S]*unfinished/);
     // The code's readings for the story
     expect(html).toContain("Ends on its turn count");

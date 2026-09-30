@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import type { BeatOption } from "core/types/index.js";
 import { readStory, renderPlaythroughReadings } from "../../../../src/evals/textModelEval/playthroughChecks.js";
 import { PLAYTHROUGHS, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
-import { fakeCall, input, leverSet, type Overrides } from "./playFixtures.js";
+import { threadAnalysis } from "../../../helpers/textFixtures.js";
+import { DEFAULT, fakeCall, input, leverSet, type Overrides } from "./playFixtures.js";
 
 /*
  * What the code checks on a whole played story: it ends on its turn count;
@@ -90,6 +91,36 @@ describe("readStory", () => {
     expect(misfit.unfit[0]).toMatchObject({ name: "Supplies", kinds: [expect.stringMatching(/cantApply/)] });
   });
 
+  it("lists the turns production could not get past, where the harness asked the planner again", async () => {
+    const { run } = await playStory(
+      PLAYTHROUGHS[0],
+      input(1),
+      fakeCall(1, {
+        reply: (role, nth) => {
+          if (role !== "thread" || nth > 1) return DEFAULT;
+          const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
+          return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
+        },
+      }).call,
+      { sample: 1, retryFailedTurns: 2 }
+    );
+    const readings = readStory(run);
+    expect(readings.repairs.stuckTurns).toEqual([{ turn: 2, kind: "chapter plan", failure: expect.stringMatching(/usable thread plan/), rounds: 1 }]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toMatch(/production would have stopped at: turn 2/);
+  });
+
+  it("lists the plan design checks that failed, with the turn of each plan", async () => {
+    const doubled = () => {
+      const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
+      const [first] = plan.threads;
+      const steps = [first.progression[0], first.progression[1], { ...first.progression[2], title: "The Last Push" }, { ...first.progression[3], title: "The Last Push" }];
+      return { ...plan, threads: [{ ...first, outcomeId: "player1_main", progression: steps }] };
+    };
+    const readings = readStory(await played(1, { reply: (role, nth) => (role === "thread" && nth === 0 ? doubled() : DEFAULT) }));
+    expect(readings.planCheckFailures.stepsOnce).toEqual([2]);
+    expect(renderPlaythroughReadings([await played(1, { reply: (role, nth) => (role === "thread" && nth === 0 ? doubled() : DEFAULT) })], new Date(0))).toMatch(/### Plan design checks that failed[\s\S]*stepsOnce: turns 2/);
+  });
+
   it("lists the repairs production made, the retries it sent and the re-sends", async () => {
     const readings = readStory(await played());
     // The fake's exploration options on chapter steps are retyped nowhere; its switch options are exploration already
@@ -97,6 +128,7 @@ describe("readStory", () => {
     expect(readings.repairs.shortTextRetries).toEqual([]);
     expect(readings.repairs.resends).toEqual([]);
     expect(readings.repairs.setupRetries).toBe(0);
+    expect(readings.repairs.stuckTurns).toEqual([]);
   });
 
   it("reads waits per turn kind against their allowances, and the story's cost", async () => {

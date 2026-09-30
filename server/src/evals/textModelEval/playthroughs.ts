@@ -11,10 +11,11 @@ import {
   type SetOfBeatGenerationSchema,
   type StatValueEntry,
   type StoryState,
+  type Switch,
   type SwitchAnalysis,
   type ThreadAnalysis,
 } from "core/types/index.js";
-import { storyStateStartProblem } from "core/utils/outcomeReadiness.js";
+import { isContestedOutcome, storyStateStartProblem } from "core/utils/outcomeReadiness.js";
 import { checkStoryStateBackgrounds, describeBackgroundFixes } from "core/utils/statValueCheck.js";
 import { resolveTextModelConfig, settingsFor } from "shared/llm/textModelSettings.js";
 import { BeatResolutionService } from "../../game/services/BeatResolutionService.js";
@@ -23,7 +24,7 @@ import { ThreadResolutionService } from "../../game/services/ThreadResolutionSer
 import { checkedBeatReply, shortTextProblem } from "../../game/services/beatChecks.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { outcomeStatesAtEnding, type OutcomeState } from "../../game/services/endingStates.js";
-import { allowedLengths, chaptersThatFit, isLastChapter, lastChapterAfterSwitch, outcomeNeeds, stageOf, turnsLeft } from "../../game/services/pacing.js";
+import { allowedLengths, chaptersThatFit, isLastChapter, lastChapterAfterSwitch, outcomeNeeds, pickedOutcome, stageOf, turnsLeft } from "../../game/services/pacing.js";
 import { checkSwitchPlan, checkThreadPlan, checkedSwitchPlan, checkedThreadPlan } from "../../game/services/planChecks.js";
 import { UnusableResultError, withOneRetry } from "../../game/services/retryOnce.js";
 import { analysisBefore, beatStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
@@ -323,6 +324,13 @@ export type PlayPlan = {
   stages?: { outcomeId: string; recorded: number; intended: number; stage?: number; last?: boolean }[];
   /** Why production would fail the turn here */
   failure?: string;
+  /**
+   * Rounds production could not get past: its checked planner failed twice
+   * (a plan unusable twice), which fails the turn and leaves the story waiting
+   * (nothing sends the progression again). The harness then asked the checked
+   * planner again, not production's behaviour (retryFailedTurns).
+   */
+  failedRounds?: { calls: PlayCallLog[]; failure: string }[];
 };
 
 export type PlayPick = {
@@ -340,7 +348,12 @@ export type PlayPick = {
   resolution: string | null;
   /** A challenge's odds, roll and points */
   details?: ResolutionDetails;
+  /** The harness changed this switch pick where the group's chapter could not be planned from it (the next turn's repicks) */
+  repickedTo?: number;
 };
+
+/** A switch pick the harness changed at a stuck group chapter plan: from the option taken to the direction on the outcome another player took. */
+export type Repick = { slot: string; from: number; to: number; text: string; outcomeId: string };
 
 export type PlayTurn = {
   /** 1-based */
@@ -365,6 +378,12 @@ export type PlayTurn = {
   picks: PlayPick[];
   /** The ending: each outcome's standing after its milestones, as production's ending reads it */
   endingStates?: OutcomeState[];
+  /**
+   * A group chapter production could not plan from the players' switch picks
+   * (every round unusable): the picks the harness changed before planning
+   * once more (repickStuckSwitches), not production's behaviour
+   */
+  repicks?: Repick[];
   /** The player's wait: the planner's calls and the turn's, each attempt */
   waitMs: number;
   costUsd: number;
@@ -439,6 +458,42 @@ function planPacing(story: Story, kind: "switch" | "thread"): PlanPacing {
   return { turnsLeft: left, lastChapter: isLastChapter(left), allowedLengths: allowedLengths(left), needs };
 }
 
+/** The option of a topic switch whose direction pushes the outcome: its structured direction, else the direction text naming the id. */
+function directionIndex(sw: Switch, outcomeId: string): number {
+  const structured = (sw as Switch & { topicDirections?: { outcomeId?: unknown }[] }).topicDirections;
+  if (Array.isArray(structured)) return structured.findIndex((d) => d?.outcomeId === outcomeId);
+  return (sw.topicChoices ?? []).findIndex((text) => text.includes(outcomeId));
+}
+
+/**
+ * At a group chapter production could not plan from the players' switch
+ * picks: the shared outcome one of them picked (a contested one first, else
+ * the one most picked), and each other player whose own topic switch offers
+ * it moved to that direction. Undefined when no player picked a shared
+ * outcome or nobody can move.
+ */
+export function coordinatedRepick(story: Story): Repick[] | undefined {
+  const plan = story.getCurrentSwitchAnalysis();
+  if (!plan || !story.isMultiplayer()) return undefined;
+  const shared = story.getSharedOutcomes();
+  const picks = story.getPlayerSlots().map((slot) => ({ slot, outcomeId: pickedOutcome(story, slot)?.outcomeId }));
+  const pickedShared = picks.map((p) => p.outcomeId).filter((id): id is string => id !== undefined && shared.some((o) => o.id === id));
+  if (pickedShared.length === 0) return undefined;
+  const contested = pickedShared.find((id) => shared.some((o) => o.id === id && isContestedOutcome(o)));
+  const most = [...new Set(pickedShared)].sort((a, b) => pickedShared.filter((id) => id === b).length - pickedShared.filter((id) => id === a).length)[0];
+  const target = contested ?? most;
+  const changes = picks.flatMap(({ slot, outcomeId }): Repick[] => {
+    if (outcomeId === target) return [];
+    const sw = plan.switches.find((s) => s.players.includes(slot));
+    const beat = story.getCurrentBeat(slot);
+    if (!sw || sw.type !== "topic" || !beat) return [];
+    const to = directionIndex(sw, target);
+    const option = beat.options[to];
+    return to >= 0 && option ? [{ slot, from: beat.choice, to, text: option.text, outcomeId: target }] : [];
+  });
+  return changes.length ? changes : undefined;
+}
+
 function statValuesOf(story: Story): PlayTurn["statValues"] {
   const state = story.getState();
   return { shared: state.sharedStatValues ?? [], players: Object.fromEntries(story.getPlayerSlots().map((slot) => [slot, state.players[slot]?.statValues ?? []])) };
@@ -467,9 +522,9 @@ const newTurn = (turn: number, kind: TurnKind, story: Story): PlayTurn => ({
   milestones: milestoneCounts(story),
 });
 
-/** A turn's wait and cost: its planner's calls and its own, every attempt. */
+/** A turn's wait and cost: its planner's calls (its failed rounds too) and its own, every attempt. */
 function settle(turn: PlayTurn): void {
-  const calls = [...(turn.plan?.calls ?? []), ...turn.calls];
+  const calls = [...(turn.plan?.failedRounds ?? []).flatMap((r) => r.calls), ...(turn.plan?.calls ?? []), ...turn.calls];
   turn.waitMs = sum(calls.map((c) => c.latencyMs));
   turn.costUsd = sum(calls.map((c) => c.costUsd));
 }
@@ -485,9 +540,18 @@ function promptOf(request: EvalRequest): string {
  * module comment). Stops at the ending, after `turnLimit` turns (a smoke),
  * where production would fail a turn (a plan unusable twice, a call that
  * brings nothing back), at a turn that leaves a player nothing to choose, or
- * where the budget stops a call.
+ * where the budget stops a call. With `retryFailedTurns`, a plan unusable
+ * twice is asked for again that many more times, each time production's
+ * checked planner in full (the harness's own step: production fails the
+ * turn and nothing sends it again), so a whole story can still be read; the
+ * turn keeps its failed rounds.
  */
-export async function playStory(spec: PlaythroughSpec, input: SetupInput, call: PlayCall, options: { sample: number; turnLimit?: number }): Promise<PlayResult> {
+export async function playStory(
+  spec: PlaythroughSpec,
+  input: SetupInput,
+  call: PlayCall,
+  options: { sample: number; turnLimit?: number; retryFailedTurns?: number; repickStuckSwitches?: boolean }
+): Promise<PlayResult> {
   const id = playRunId(spec, options.sample);
   const players = input.playerCount;
   const run: PlayRun = { spec, sample: options.sample, input, turns: [], stopped: "", complete: false };
@@ -549,9 +613,10 @@ export async function playStory(spec: PlaythroughSpec, input: SetupInput, call: 
   const difficulty = story.getState().difficultyLevel || { title: "Balanced", modifier: -10 };
   const policies = new Map(story.getPlayerSlots().map((slot) => [slot, START_POLICY]));
 
-  /** A planner's call, checked and retried as production does; the story with the plan, or why the turn fails. */
-  const plan = async (kind: "switch" | "thread", before: Story, turn: PlayTurn): Promise<Story | string> => {
+  /** A planner's call, checked and retried as production does; the story with the plan, or why the turn fails (`unusable`: a plan unusable twice). */
+  const plan = async (kind: "switch" | "thread", before: Story, turn: PlayTurn, suffix = ""): Promise<Story | { stopped: string; unusable: boolean }> => {
     const label = kind === "switch" ? "switch plan" : "chapter plan";
+    const callLabel = `${label}${suffix}`;
     const request = requestFor("adopted", { role: kind, story: before });
     const record: PlayPlan = { kind: label, calls: [], pacing: planPacing(before, kind) };
     turn.plan = record;
@@ -561,39 +626,72 @@ export async function playStory(spec: PlaythroughSpec, input: SetupInput, call: 
       if (result.lengthProblem) log.lengthProblem = result.lengthProblem;
       log.repairs = result.repairs.map(repairLine);
     };
-    const invoke = invoker(label, kind, request, record.calls, read);
     const note = (line: string) => turn.notes.push(line);
-    try {
-      if (kind === "switch") {
-        const stored = await checkedSwitchPlan(before, promptOf(request), async (prompt) => (await invoke(prompt)) as SwitchAnalysis, note);
-        Object.assign(record, { plan: stored, checks: checkSwitchDesign(before, stored) });
-        return switchStep.apply(before, stored);
+    const retries = options.retryFailedTurns ?? 0;
+    for (let round = 0; ; round++) {
+      // Each round is production's checked planner in full: its first call and its one retry told the problem
+      record.calls = [];
+      const invoke = invoker(round ? `${callLabel} again ${round}` : callLabel, kind, request, record.calls, read);
+      try {
+        if (kind === "switch") {
+          const stored = await checkedSwitchPlan(before, promptOf(request), async (prompt) => (await invoke(prompt)) as SwitchAnalysis, note);
+          Object.assign(record, { plan: stored, checks: checkSwitchDesign(before, stored) });
+          return switchStep.apply(before, stored);
+        }
+        const stored = await checkedThreadPlan(before, promptOf(request), async (prompt) => (await invoke(prompt)) as ThreadAnalysis, note);
+        record.plan = stored;
+        record.checks = checkThreadDesign(before, stored);
+        record.stages = stored.threads.map((thread) => {
+          const outcome = before.getOutcomeById(thread.outcomeId);
+          const recorded = outcome?.milestones?.length ?? 0;
+          const intended = outcome?.intendedNumberOfMilestones ?? 0;
+          const stage = stageOf(recorded, intended);
+          return { outcomeId: thread.outcomeId, recorded, intended, ...(stage ? { stage: stage.stage, last: stage.last } : {}) };
+        });
+        stored.threads.forEach((thread, i) => {
+          const judge = stageJudgeRequest(before, judgedThread(thread));
+          if (judge) judgeTargets.push({ key: `${id}-t${turn.turn}-${i}`, kind: "stage", turn: turn.turn, label: thread.outcomeId, request: judge });
+        });
+        return threadStep.apply(before, stored);
+      } catch (error) {
+        if (error instanceof UnusableResultError && round < retries) {
+          (record.failedRounds ??= []).push({ calls: record.calls, failure: describe(error) });
+          continue;
+        }
+        record.failure = describe(error);
+        const why =
+          error instanceof UnusableResultError
+            ? "could not be used twice (production fails the turn)"
+            : error instanceof PlayCallFailed && error.notSent
+              ? `was not sent (${error.notSent})`
+              : "brought no usable reply";
+        return { stopped: `turn ${turn.turn}: the ${label} ${why}`, unusable: error instanceof UnusableResultError };
       }
-      const stored = await checkedThreadPlan(before, promptOf(request), async (prompt) => (await invoke(prompt)) as ThreadAnalysis, note);
-      record.plan = stored;
-      record.checks = checkThreadDesign(before, stored);
-      record.stages = stored.threads.map((thread) => {
-        const outcome = before.getOutcomeById(thread.outcomeId);
-        const recorded = outcome?.milestones?.length ?? 0;
-        const intended = outcome?.intendedNumberOfMilestones ?? 0;
-        const stage = stageOf(recorded, intended);
-        return { outcomeId: thread.outcomeId, recorded, intended, ...(stage ? { stage: stage.stage, last: stage.last } : {}) };
-      });
-      stored.threads.forEach((thread, i) => {
-        const judge = stageJudgeRequest(before, judgedThread(thread));
-        if (judge) judgeTargets.push({ key: `${id}-t${turn.turn}-${i}`, kind: "stage", turn: turn.turn, label: thread.outcomeId, request: judge });
-      });
-      return threadStep.apply(before, stored);
-    } catch (error) {
-      record.failure = describe(error);
-      const why =
-        error instanceof UnusableResultError
-          ? "could not be used twice (production fails the turn)"
-          : error instanceof PlayCallFailed && error.notSent
-            ? `was not sent (${error.notSent})`
-            : "brought no usable reply";
-      return `turn ${turn.turn}: the ${label} ${why}`;
     }
+  };
+
+  /**
+   * A group chapter production could not plan from the players' switch picks:
+   * the stuck players re-pick the shared direction another player took
+   * (coordinatedRepick), then production's checked planner once more, the
+   * failed rounds kept on the turn; the switch turn's picks say what changed.
+   */
+  const repickAndPlan = async (before: Story, turn: PlayTurn, failed: { stopped: string; unusable: boolean }): Promise<Story | { stopped: string; unusable: boolean }> => {
+    const changes = failed.unusable && options.repickStuckSwitches ? coordinatedRepick(before) : undefined;
+    const earlier = turn.plan;
+    if (!changes || !earlier) return failed;
+    let repicked = before;
+    for (const change of changes) {
+      const chosen = repicked.updateChoice(change.slot as PlayerSlot, change.to);
+      repicked = withSeededDice(`${id}|t${turn.turn}|repick|${change.slot}`, () => BeatResolutionService.resolveChoice(chosen, change.slot as PlayerSlot, change.to, difficulty));
+      const pick = run.turns.at(-1)?.picks.find((p) => p.slot === change.slot);
+      if (pick) pick.repickedTo = change.to;
+    }
+    turn.repicks = changes;
+    const planned = await plan("thread", repicked, turn, " after repick");
+    const now = turn.plan as PlayPlan;
+    now.failedRounds = [...(earlier.failedRounds ?? []), { calls: earlier.calls, failure: earlier.failure ?? failed.stopped }, ...(now.failedRounds ?? [])];
+    return planned;
   };
 
   for (;;) {
@@ -613,11 +711,12 @@ export async function playStory(spec: PlaythroughSpec, input: SetupInput, call: 
     const analysis = analysisBefore(story, next);
     const turn = newTurn(written + 1, turnKind(story, next, analysis), story);
     if (analysis) {
-      const planned = await plan(analysis, story, turn);
-      if (typeof planned === "string") {
+      let planned = await plan(analysis, story, turn);
+      if (!(planned instanceof Story) && analysis === "thread") planned = await repickAndPlan(story, turn, planned);
+      if (!(planned instanceof Story)) {
         settle(turn);
         run.turns.push(turn);
-        run.stopped = planned;
+        run.stopped = planned.stopped;
         break;
       }
       story = planned;

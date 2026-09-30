@@ -42,6 +42,7 @@ Model ids are the code defaults: `server/src/shared/llm/textModelSettings.ts` fo
 
 Not features:
 - The image-model eval harness (`server/src/evals/imageModelEval/`), whose outputs only the developer sees.
+- The text-model eval harness (`server/src/evals/textModelEval/`): its rating pages and, since 2026-09-30, its whole-story playthrough pages (`DOCS/…/stories/`, gitignored) hold generated text that only the developer and the owner read offline; nothing it writes reaches players.
 - Video generation, which returns 501 and never shipped.
 - Academy videos, which have human narration and machine-transcribed captions.
 

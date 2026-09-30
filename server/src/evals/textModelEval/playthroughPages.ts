@@ -207,7 +207,29 @@ function switchBlock(run: PlayRun, turn: PlayTurn, readings: StoryReadings): str
   const binding = pacing ? ` · ${pacing.threadsFit} more chapter${pacing.threadsFit === 1 ? "" : "s"} fit, ${pacing.stillNeeded} milestone${pacing.stillNeeded === 1 ? "" : "s"} still needed${pacing.binding ? ": the late pacing binds" : ""}` : "";
   const retried = plan.calls.length > 1 ? `<p class="flag">The plan was asked for again: ${e(plan.calls[0].problem ?? plan.calls[0].lengthProblem ?? "")}</p>` : "";
   const failed = plan.failure ? `<p class="flag">The switch plan failed: ${e(plan.failure)}</p>` : "";
-  return `<div class="switch"><p class="kicker">The switch${e(binding)}</p>${body}${retried}${failed}</div>`;
+  const stuck = stuckLines(plan)
+    .map((line) => `<p class="flag">${e(line)}</p>`)
+    .join("");
+  return `<div class="switch"><p class="kicker">The switch${e(binding)}</p>${body}${stuck}${retried}${failed}</div>`;
+}
+
+/** A plan production could not get past: each failed round's problems, and what the harness did. */
+function stuckLines(plan: NonNullable<PlayTurn["plan"]>, repicks: PlayTurn["repicks"] = [], names: (slot: string) => string = (slot) => slot): string[] {
+  const rounds = plan.failedRounds ?? [];
+  if (rounds.length === 0) return [];
+  const problems = [...new Set(rounds.flatMap((r) => r.calls.map((c) => c.problem).filter((p): p is string => Boolean(p))))];
+  const repicked = repicks.length
+    ? [
+        `Asking again didn't help: the players' switch picks can't make one chapter. So the harness, not production, changed the pick${repicks.length === 1 ? "" : "s"}: ${repicks
+          .map((r) => `${names(r.slot)} now takes direction ${r.to + 1} ("${r.text}") instead of direction ${r.from + 1}, the shared outcome another player picked`)
+          .join("; ")}. Then production's planner ran once more.`,
+      ]
+    : [];
+  return [
+    `Production could not get past this turn: its ${plan.kind} could not be used twice, which fails the turn ("Unable to continue the story"), and nothing sends it again, so the players would be left waiting here. To read on, the harness asked production's planner again (${rounds.length} failed round${rounds.length === 1 ? "" : "s"} of its call and retry in all).`,
+    ...problems.map((p) => `The plan check: ${p}`),
+    ...repicked,
+  ];
 }
 
 function chapterBlock(run: PlayRun, turn: PlayTurn, chapter: ChapterReading | undefined): string {
@@ -244,6 +266,7 @@ function chapterBlock(run: PlayRun, turn: PlayTurn, chapter: ChapterReading | un
     })
     .join("");
   const flags = [
+    ...stuckLines(plan, turn.repicks, (slot) => nameOf(run.start, slot)),
     ...(chapter && !chapter.lengthAllowed ? [`Its length is not one PACING allows (${chapter.duration} turns; allowed ${lengths.join(", ")}).`] : []),
     ...(plan.calls.length > 1 ? [`The plan was asked for again: ${plan.calls[0].problem ?? plan.calls[0].lengthProblem ?? ""}`] : []),
     ...(plan.failure ? [`The chapter plan failed: ${plan.failure}`] : []),
@@ -265,12 +288,18 @@ function pickLine(pick: PlayPick): string {
   const odds = pick.details
     ? `; odds favorable ${Math.round(pick.details.distribution.favorable)}%, mixed ${Math.round(pick.details.distribution.mixed)}%, unfavorable ${Math.round(pick.details.distribution.unfavorable)}%${pick.details.roll !== undefined ? `, rolled ${pick.details.roll.toFixed(1)}` : ""} on ${signed(pick.details.points)} points`
     : "";
-  return `<p class="pick"><strong>Chosen</strong> (the player's policy: ${e(pick.rule)}, ${e(pick.why)}). Result: <strong>${e(pick.resolution ?? "–")}</strong>${e(odds)}.</p>`;
+  const repicked =
+    pick.repickedTo !== undefined
+      ? ` <span class="flag">The harness later changed this pick to choice ${pick.repickedTo + 1}, where the next chapter could not be planned from it (see the chapter below).</span>`
+      : "";
+  return `<p class="pick"><strong>Chosen</strong> (the player's policy: ${e(pick.rule)}, ${e(pick.why)}). Result: <strong>${e(pick.resolution ?? "–")}</strong>${e(odds)}.${repicked}</p>`;
 }
 
 function beatBlock(run: PlayRun, turn: PlayTurn, slot: string): string {
   const beat = asObject(asObject(turn.reply)[slot]);
-  const options = asArray<Loose>(beat.options);
+  // The game shows an ending without options or interludes (turn doc M21), whatever the reply wrote
+  const ending = turn.kind === "ending";
+  const options = ending ? [] : asArray<Loose>(beat.options);
   const mechanics = turn.mechanics?.choices[slot] ?? [];
   const pick = turn.picks.find((p) => p.slot === slot);
   const optionItems = options
@@ -280,12 +309,12 @@ function beatBlock(run: PlayRun, turn: PlayTurn, slot: string): string {
       return `<li class="option${chosen ? " chosen" : ""}"><p>${e(asString(option.text))}</p>${lines}${chosen && pick ? pickLine(pick) : ""}</li>`;
     })
     .join("");
-  const interludes = asArray<Loose>(beat.interludes);
+  const interludes = ending ? [] : asArray<Loose>(beat.interludes);
   const multi = Object.keys(asObject(run.start?.players)).length > 1;
   return `<div class="beat">
 <h4>${multi ? `${e(nameOf(run.start, slot))}: ` : ""}${e(asString(beat.title))}</h4>
 ${prose(asString(beat.text))}
-${options.length ? `<ol class="options">${optionItems}</ol>` : turn.kind === "ending" ? "" : `<p class="flag">No options: the player could not go on.</p>`}
+${options.length ? `<ol class="options">${optionItems}</ol>` : ending ? "" : `<p class="flag">No options: the player could not go on.</p>`}
 ${interludes.length ? `<details><summary>Shown while the next turn was written</summary><ul>${interludes.map((i) => `<li>${e(asString(i.text))}</li>`).join("")}</ul></details>` : ""}
 </div>`;
 }
@@ -369,6 +398,7 @@ function readingsSection(readings: StoryReadings): string {
     `Sacrifices and rewards against the owner's rule: ${r.leverFlags.length ? r.leverFlags.map((f) => `chapter ${f.chapter} (${f.slot}): ${f.rule} at turn ${f.turns.join(", ")}`).join("; ") : "no chapter offered a second reward or sacrifice"}.`,
     `Levers the player took, paid on the next turn: ${r.leversPaid.counts.applied} of ${Object.values(r.leversPaid.counts).reduce((a, b) => a + b, 0)}.`,
     `Stat changes that don't fit their stat: ${r.unfit.length}.`,
+    `Turns production could not get past (the harness asked the planner again): ${r.repairs.stuckTurns.map((s) => `turn ${s.turn} (${s.kind})`).join(", ") || "none"}.`,
     `Repairs: plans retried ${r.repairs.planRetries.length}, one-paragraph turns retried ${r.repairs.shortTextRetries.length}, calls re-sent ${r.repairs.resends.length}, beat repairs ${Object.values(r.repairs.beatRepairs).reduce((a, b) => a + b, 0)}.`,
     `Waits over their allowance: ${r.waits.flatMap((w) => w.over.map((t) => `turn ${t} (${w.kind})`)).join(", ") || "none"}.`,
     `Cost: ${usd(r.cost.storyUsd)} over ${r.cost.calls} calls (judged checks ${usd(r.cost.judgeUsd)}).`,
