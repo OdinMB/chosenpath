@@ -12,6 +12,7 @@ import { getThreadType } from "core/types/thread.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { checkStatValue, statValueFit } from "core/utils/statValueCheck.js";
 import { canAddMilestones, isPlayerBeat } from "./storyTextSteps.js";
+import { scoreboardWinners } from "./scoreboards.js";
 import type { Repair } from "./textRepairs.js";
 
 /*
@@ -63,7 +64,7 @@ export function repairBeatReply(
 
   const repaired: SetOfBeatGenerationSchema = { ...reply };
   if (Array.isArray(reply.statChanges)) {
-    repaired.statChanges = repairStatChanges(reply.statChanges, known, repairs);
+    repaired.statChanges = repairScoreboardMoves(story, repairStatChanges(reply.statChanges, known, repairs), repairs);
   }
   if (Array.isArray(reply.newMilestones)) {
     repaired.newMilestones = repairMilestones(story, reply.newMilestones, repairs);
@@ -217,6 +218,61 @@ function repairStatChanges(changes: Change[], known: Known, repairs: Repair[]): 
     kept.push(repaired);
   }
   return kept;
+}
+
+// --- The scoreboard's direction ---
+
+const clampScore = (value: number) => Math.max(0, Math.min(100, value));
+
+/** The score a numeric change leaves, before the game clamps it; undefined for a change that sets no number. */
+function scoreAfter(change: StatChange, before: number): number | undefined {
+  if (typeof change.value !== "number") return undefined;
+  if (change.change === "addNumber") return before + change.value;
+  if (change.change === "subtractNumber") return before - change.value;
+  if (change.change === "setNumber") return change.value;
+  return undefined;
+}
+
+/** The same move the other way, by the same size: an addition as a subtraction and back, a value set reflected around the score before. */
+function turnedAround(change: StatChange, before: number): StatChange {
+  if (change.change === "addNumber") return { ...change, change: "subtractNumber" };
+  if (change.change === "subtractNumber") return { ...change, change: "addNumber" };
+  return { ...change, value: clampScore(2 * before - (change.value as number)) };
+}
+
+/**
+ * A contest's scoreboard moves only toward the side that won the contest step
+ * or chapter this turn follows (scoreboardWinners). A move the other way is
+ * turned around by the same size: the model sized the move, the recorded
+ * result says which way it goes. The playthroughs' food trucks turn 22, after
+ * side B's win: "Luz's Side B victory shifts the race 15 points toward" her,
+ * written as addNumber 15, which moved 35|65 to 50|50. Moves are read in
+ * order, each from the score the ones before it leave; after a mixed result,
+ * and on turns that follow no contest result, every move stays as written.
+ */
+function repairScoreboardMoves(story: Story, changes: Change[], repairs: Repair[]): Change[] {
+  const winners = scoreboardWinners(story);
+  if (winners.size === 0) return changes;
+  const scores = new Map(story.getState().sharedStatValues.map((entry) => [entry.statId, entry.value]));
+  return changes.map((change) => {
+    if (change.type !== "statChange" || change.group !== "shared") return change;
+    const winner = winners.get(change.stat);
+    const before = scores.get(change.stat);
+    if (!winner || typeof before !== "number") return change;
+    const after = scoreAfter(change, before);
+    if (after === undefined) return change;
+    const wrongWay = winner === "sideA" ? after < before : after > before;
+    const kept = wrongWay ? turnedAround(change, before) : change;
+    const settled = clampScore(scoreAfter(kept, before) ?? before);
+    if (wrongWay) {
+      repairs.push({
+        kind: "scoreboardDirection",
+        detail: `${change.stat}: ${before} -> ${clampScore(after)} after side ${winner === "sideA" ? "A" : "B"} won; ${before} -> ${settled}`,
+      });
+    }
+    scores.set(change.stat, settled);
+    return kept;
+  });
 }
 
 // --- Milestones ---

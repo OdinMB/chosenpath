@@ -8,6 +8,7 @@ import type {
   Outcome,
   SetOfBeatGenerationSchema,
   StoryState,
+  ThreadAnalysis,
 } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
@@ -676,6 +677,116 @@ describe("repairBeatReply: option types (TR-7)", () => {
     const ending = repairBeatReply(endingBeat(1), beatSet(1, { player1: beatWith({}, challengeOptions()) }));
     expect(expectedOptionType(endingBeat(1), "player1")).toBeUndefined();
     expect(beatOf(ending.reply).options).toEqual(challengeOptions());
+  });
+});
+
+describe("repairBeatReply: the scoreboard moves toward the side that won (TR-8)", () => {
+  const CONTESTED = outcome("shared_license", {
+    possibleResolutions: { sideAWins: "Jo wins the license.", mixed: "The license is split.", sideBWins: "Luz wins the license." },
+    resonance: "Both owners need the license. Scored by License Race.",
+  });
+  const RACE = stat("shared_license_race", { type: "opposites", name: "License Race" });
+  type ContestResult = "sideAWins" | "mixed" | "sideBWins";
+
+  /** A contest chapter on the license (player1 against player2), its first `resolvedSteps` steps resolved as `result`. */
+  function licenseChapter(result: ContestResult, firstBeatIndex: number, duration = 2, resolvedSteps = duration): ThreadAnalysis {
+    const analysis = threadAnalysis("contest", duration, firstBeatIndex, ["player1"], ["player2"]);
+    const [written] = analysis.threads;
+    const progression = written.progression.map((step, i) => ({ ...step, resolution: i < resolvedSteps ? result : null }));
+    const resolved = resolvedSteps === duration ? result : null;
+    return { ...analysis, threads: [{ ...written, outcomeId: CONTESTED.id, progression, resolution: resolved, milestone: "The judges decide." }] };
+  }
+
+  function withContest(story: Story, score: number, extra: Partial<StoryState> = {}): Story {
+    return story.clone({
+      gameMode: GameModes.Competitive,
+      sharedOutcomes: [CONTESTED],
+      sharedStats: [RACE],
+      sharedStatValues: [{ statId: RACE.id, value: score }],
+      ...extra,
+    });
+  }
+
+  /** The switch turn after the license chapter ended with `result`. */
+  const switchAfter = (result: ContestResult, score = 35, extra: Partial<StoryState> = {}) =>
+    withContest(laterSwitchBeat(2, { storyPhases: [switchAnalysis(slotsOf(2), 0), licenseChapter(result, 1), switchAnalysis(slotsOf(2), 3)] }), score, extra);
+
+  const race = (change: StatChange["change"], value: number) => statChange("shared", RACE.id, change, value);
+
+  function repairScore(story: Story, changes: Change[]) {
+    const { reply, repairs } = repairBeatReply(story, beatSet(2, { statChanges: changes }));
+    return { changes: reply.statChanges, kinds: kinds(repairs, "scoreboard"), repairs };
+  }
+
+  it("turns a move toward the side that lost around, by the same size (the food trucks' turn 22: side B won, 35|65 went to 50|50)", () => {
+    const result = repairScore(switchAfter("sideBWins"), [race("addNumber", 15)]);
+    expect(result.changes).toEqual([race("subtractNumber", 15)]);
+    expect(result.kinds).toEqual(["scoreboardDirection"]);
+    expect(result.repairs[0].detail).toBe("shared_license_race: 35 -> 50 after side B won; 35 -> 20");
+    // Applied as the game applies it: 20|80
+    const [withBeat, changes] = beatStep.apply(switchAfter("sideBWins"), beatSet(2, { statChanges: result.changes }), true);
+    const after = new ChangeService().applyChanges(withBeat, changes);
+    expect(after.getState().sharedStatValues).toEqual([{ statId: RACE.id, value: 20 }]);
+  });
+
+  it("keeps a move toward the side that won", () => {
+    expect(repairScore(switchAfter("sideBWins"), [race("subtractNumber", 15)])).toMatchObject({ changes: [race("subtractNumber", 15)], kinds: [] });
+    expect(repairScore(switchAfter("sideAWins"), [race("addNumber", 15)])).toMatchObject({ changes: [race("addNumber", 15)], kinds: [] });
+    expect(repairScore(switchAfter("sideAWins", 50), [race("setNumber", 65)])).toMatchObject({ changes: [race("setNumber", 65)], kinds: [] });
+  });
+
+  it("reflects a value set on the wrong side of the score, and a negative addition, around the score before", () => {
+    expect(repairScore(switchAfter("sideAWins", 50), [race("setNumber", 40)]).changes).toEqual([race("setNumber", 60)]);
+    expect(repairScore(switchAfter("sideAWins", 90), [race("setNumber", 70)]).changes).toEqual([race("setNumber", 100)]);
+    expect(repairScore(switchAfter("sideAWins", 50), [race("addNumber", -10)]).changes).toEqual([race("subtractNumber", -10)]);
+  });
+
+  it("reads the scoreboard's move after the scores the reply wrote before it", () => {
+    const result = repairScore(switchAfter("sideBWins", 35), [race("subtractNumber", 10), race("addNumber", 5)]);
+    expect(result.changes).toEqual([race("subtractNumber", 10), race("subtractNumber", 5)]);
+    expect(result.repairs.map((r) => r.detail)).toEqual(["shared_license_race: 25 -> 30 after side B won; 25 -> 20"]);
+  });
+
+  it("leaves every move after a mixed result as written: no side won", () => {
+    expect(repairScore(switchAfter("mixed"), [race("addNumber", 10)])).toMatchObject({ changes: [race("addNumber", 10)], kinds: [] });
+  });
+
+  it("follows the contest step a chapter's turn comes after", () => {
+    const story = withContest(threadBeat(2, { storyPhases: [switchAnalysis(slotsOf(2), 1), licenseChapter("sideAWins", 2, 3, 1)] }), 50);
+    expect(repairScore(story, [race("subtractNumber", 10)]).changes).toEqual([race("addNumber", 10)]);
+  });
+
+  it("follows the story's last contest chapter at the ending", () => {
+    const phases = [switchAnalysis(slotsOf(2), 0), resolvedThread(2, 1, 2, "Older Thread"), switchAnalysis(slotsOf(2), 3), licenseChapter("sideBWins", 4)];
+    const story = withContest(endingBeat(2, { storyPhases: phases }), 50);
+    expect(story.getCurrentBeatType()).toBe("ending");
+    expect(repairScore(story, [race("addNumber", 10)]).changes).toEqual([race("subtractNumber", 10)]);
+  });
+
+  it("leaves moves alone where the turn follows no contest result: a chapter's opening, or a switch after a challenge chapter", () => {
+    const opening = withContest(threadBeat(2, { storyPhases: [switchAnalysis(slotsOf(2), 1), licenseChapter("sideAWins", 3, 2, 0)] }), 50);
+    expect(repairScore(opening, [race("subtractNumber", 10)])).toMatchObject({ changes: [race("subtractNumber", 10)], kinds: [] });
+    const afterChallenge = withContest(laterSwitchBeat(2), 50);
+    expect(repairScore(afterChallenge, [race("subtractNumber", 10)])).toMatchObject({ changes: [race("subtractNumber", 10)], kinds: [] });
+  });
+
+  it("moves only the contest's own scoreboard: the stat its resonance names, else the story's one shared opposites stat", () => {
+    const calm = stat("shared_calm", { type: "opposites", name: "Calm|Storm" });
+    const twoStats = { sharedStats: [RACE, calm], sharedStatValues: [{ statId: RACE.id, value: 35 }, { statId: calm.id, value: 50 }] };
+    const named = repairScore(switchAfter("sideBWins", 35, twoStats), [statChange("shared", calm.id, "addNumber", 10), race("addNumber", 10)]);
+    expect(named.changes).toEqual([statChange("shared", calm.id, "addNumber", 10), race("subtractNumber", 10)]);
+
+    const unnamed = { sharedOutcomes: [{ ...CONTESTED, resonance: "Both owners need the license." }] };
+    expect(repairScore(switchAfter("sideBWins", 35, unnamed), [race("addNumber", 10)]).changes).toEqual([race("subtractNumber", 10)]);
+    // Two opposites stats and no "Scored by": no stat is known to be the scoreboard
+    expect(repairScore(switchAfter("sideBWins", 35, { ...twoStats, ...unnamed }), [race("addNumber", 10)]).kinds).toEqual([]);
+  });
+
+  it("leaves a scoreboard alone when two contests this turn follows disagree on who won", () => {
+    const chapter = licenseChapter("sideAWins", 1);
+    const other = { ...licenseChapter("sideBWins", 1).threads[0], id: "rematch" };
+    const story = switchAfter("sideAWins", 50, { storyPhases: [switchAnalysis(slotsOf(2), 0), { ...chapter, threads: [...chapter.threads, other] }, switchAnalysis(slotsOf(2), 3)] });
+    expect(repairScore(story, [race("subtractNumber", 10)]).kinds).toEqual([]);
   });
 });
 
