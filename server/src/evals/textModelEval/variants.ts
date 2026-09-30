@@ -170,7 +170,9 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * different stat, risk alone tells none apart, the lever line counted per
  * chapter on top of today's rate), arm C's continuity (the switch's full text on a chapter's first
  * step, one instruction to pick up where the previous beat ended and move the
- * story forward), and both; single player only.
+ * story forward), and both; single player only. "turnOb" is arm O's one
+ * fix-and-retest after the run of 2026-09-30: arm O with one sentence closing
+ * its stats line (an option's words never name the stat its bonus comes from).
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -219,7 +221,8 @@ export type VariantId =
   | "planV2dClimax"
   | "turnO"
   | "turnC"
-  | "turnOC";
+  | "turnOC"
+  | "turnOb";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -265,6 +268,7 @@ export const VARIANTS: VariantId[] = [
   "turnO",
   "turnC",
   "turnOC",
+  "turnOb",
 ];
 
 /**
@@ -610,6 +614,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   turnO: optionsContinuity("turnO", { options: true, continuity: false }),
   turnC: optionsContinuity("turnC", { options: false, continuity: true }),
   turnOC: optionsContinuity("turnOC", { options: true, continuity: true }),
+  turnOb: optionsContinuity("turnOb", { options: true, continuity: false, statsUnnamed: true }),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

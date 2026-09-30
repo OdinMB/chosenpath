@@ -395,13 +395,69 @@ describe("arm OC: both", () => {
   });
 });
 
+describe("arm O's fix-and-retest (turnOb): the option's words never name the stat its bonus comes from", () => {
+  // The run of 2026-09-30: arm O's options named their stat ("Use your Technical skill to…" / "Use your Creative skill to…"),
+  // so more sets opened with the same word; the fix is one sentence closing arm O's stats line, nothing else
+  const OB = { options: true, continuity: false, statsUnnamed: true };
+  const withFix = (prompt: string) =>
+    prompt.replace(OPTIONS_CONTINUITY_TEXT.drawsOnStats, `${OPTIONS_CONTINUITY_TEXT.drawsOnStats} ${OPTIONS_CONTINUITY_TEXT.statsUnnamed}`);
+
+  it("is one sentence: what the character does, never the bonus stat's name", () => {
+    expect(OPTIONS_CONTINUITY_TEXT.statsUnnamed).toBe("An option's words say what the character does; they never name the stat its bonus comes from.");
+  });
+
+  it.each([
+    ["a chapter's first step", () => chapterStep("challenge", 0)],
+    ["a chapter's middle step", () => chapterStep("challenge", 1)],
+    ["a chapter's last step", () => chapterStep("challenge", 2)],
+  ] as const)("%s: arm O's request with the sentence closing its stats line, once", (_, build) => {
+    const story = build();
+    const [fixed, o] = [optionsContinuityRequest(story, OB), optionsContinuityRequest(story, O)];
+    expect(fixed.prompt).toBe(withFix(o.prompt));
+    expect(fixed.prompt).not.toBe(o.prompt);
+    expect(occurrences(fixed.prompt, OPTIONS_CONTINUITY_TEXT.statsUnnamed)).toBe(1);
+    expect(json(fixed.schema)).toBe(json(o.schema));
+  });
+
+  it.each([
+    ["the first turn", () => firstSwitchBeat(1)],
+    ["a switch after a chapter", switchAfterChapter],
+    ["an exploration step", () => chapterStep("exploration", 1)],
+    ["the ending", () => endingBeat(1)],
+  ] as const)("%s: no rolled options, so the base exactly", (_, build) => {
+    const story = build();
+    expect(optionsContinuityRequest(story, OB).prompt).toBe(productionTurnForm(story).prompt);
+  });
+
+  (frozen.length ? it : it.skip)("every frozen single-player turn: arm O's request with the sentence where arm O applies, the base elsewhere", () => {
+    const cases = frozen.filter((c) => c.role === "beat" && !c.tags.multiplayer);
+    let fixedCount = 0;
+    for (const c of cases) {
+      const story = caseStory(c);
+      const [fixed, o] = [optionsContinuityRequest(story, OB), optionsContinuityRequest(story, O)];
+      expect({ id: c.id, same: fixed.prompt === withFix(o.prompt) }).toEqual({ id: c.id, same: true });
+      // The sentence goes exactly where arm O changes production's request
+      const armOApplies = o.prompt !== productionTurnForm(story).prompt;
+      expect({ id: c.id, fixed: fixed.prompt !== o.prompt }).toEqual({ id: c.id, fixed: armOApplies });
+      if (fixed.prompt !== o.prompt) fixedCount++;
+    }
+    // The 32 rolled steps among the 44 stored turns, and the built rolled step among the round cases
+    expect(fixedCount).toBe(33);
+  });
+
+  it("needs arm O: the sentence has nothing to close without its stats line", () => {
+    expect(() => optionsContinuityRequest(chapterStep("challenge", 1), { options: false, continuity: false, statsUnnamed: true })).toThrow(/arm O/);
+  });
+});
+
 describe("the eval's variants", () => {
-  it("turnO, turnC and turnOC build the arms with production's single-player turn limits", () => {
+  it("turnO, turnC, turnOC and turnOb build the arms with production's single-player turn limits", () => {
     const story = chapterStep("challenge", 0);
     for (const [variant, arm] of [
       ["turnO", O],
       ["turnC", C],
       ["turnOC", OC],
+      ["turnOb", { options: true, continuity: false, statsUnnamed: true }],
     ] as const) {
       const request = requestFor(variant, { role: "beat", story });
       expect(requestText(request)).toBe(optionsContinuityRequest(story, arm).prompt);

@@ -173,13 +173,20 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   turnO: "adopted",
   turnC: "adopted",
   turnOC: "adopted",
+  // Arm O's one fix-and-retest (after the run of 2026-09-30) against production's form too, arm O second
+  turnOb: "adopted",
 };
 
-/** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
+/**
+ * The earlier form each variant re-runs with one change, whose measured
+ * outputs price it until it has its own: the Stage 4 forms of the count fix,
+ * and arm O for its fix-and-retest.
+ */
 const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   rewrite2: "rewrite",
   rewrite2Slim: "rewriteSlim",
   rewrite2ZeroShot: "rewriteZeroShot",
+  turnOb: "turnO",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -261,6 +268,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "planV2dClimax")]: [armKey(LUNA_LOW, "planV2c")],
   // Both arms together against each part alone: what each adds on top of the other
   [armKey(LUNA_MEDIUM, "turnOC")]: [armKey(LUNA_MEDIUM, "turnO"), armKey(LUNA_MEDIUM, "turnC")],
+  // Arm O's fix-and-retest against arm O, the text it fixes
+  [armKey(LUNA_MEDIUM, "turnOb")]: [armKey(LUNA_MEDIUM, "turnO")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
   // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
   // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
@@ -472,17 +481,50 @@ export const OPTIONS_CONTINUITY_PROMPT_STATE = "adopted2";
  * coordinator's brief): production's single-player turn form (adopted) and
  * arms O, C and OC on it, on Luna medium, production's single-player turn
  * model, twice on the 44 stored single-player turns, interleaved
- * (stageInterleavesArms), so every arm meets the same server pace.
+ * (stageInterleavesArms), so every arm meets the same server pace. Then arm
+ * O's one fix-and-retest (turnOb), once on OPTIONS_CONTINUITY_RETEST_CASES.
  */
 function optionsContinuityArms(role: EvalRole): ArmPlan[] {
   if (role !== "beat") return [];
-  return (["adopted", "turnO", "turnC", "turnOC"] as const).map((variant) => ({
+  const arms: ArmPlan[] = (["adopted", "turnO", "turnC", "turnOC"] as const).map((variant) => ({
     arm: adoptedDefault("beat", variant),
     samples: 2,
     scope: "single-player" as const,
     source: "stored" as const,
   }));
+  return [...arms, { arm: adoptedDefault("beat", "turnOb"), samples: 1, scope: "single-player", source: "stored", caseIds: OPTIONS_CONTINUITY_RETEST_CASES }];
 }
+
+/**
+ * Where arm O's fix-and-retest runs (after the run of 2026-09-30): the rolled
+ * chapter steps of the two Novi Reg stories (8988006e and 7492b211), whose
+ * stats are Technical and Creative skills, where arm O's options named their
+ * stat ("Use your Technical skill to…" / "Use your Creative skill to…") and more
+ * sets opened with the same word; 21 cases, once, what the stage has left.
+ */
+export const OPTIONS_CONTINUITY_RETEST_CASES = [
+  "cont-7492b211-t2-o0",
+  "cont-7492b211-t2-o1",
+  "cont-7492b211-t2-o2",
+  "synth-7492b211-t2-pregeneration_1_player1_1-noimg",
+  "cont-8988006e-t2-o0",
+  "cont-8988006e-t2-o1",
+  "cont-8988006e-t2-o2",
+  "cont-8988006e-t3-o0",
+  "cont-8988006e-t3-o1",
+  "cont-8988006e-t3-o2",
+  "synth-8988006e-t3-pregeneration_2_player1_1-noimg",
+  "cont-8988006e-t5-o0",
+  "cont-8988006e-t5-o1",
+  "cont-8988006e-t5-o2",
+  "cont-8988006e-t6-o0",
+  "cont-8988006e-t6-o1",
+  "cont-8988006e-t6-o2",
+  "cont-8988006e-t7-o0",
+  "cont-8988006e-t7-o1",
+  "cont-8988006e-t7-o2",
+  "synth-8988006e-t7-pregeneration_6_player1_2",
+];
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
 const INTERLEAVED_STAGES: Stage[] = ["options-continuity"];

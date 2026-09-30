@@ -8,6 +8,7 @@ import {
   FINAL_CHECK_TEMPLATE_PREMISES,
   makeArm,
   OPTIONS_CONTINUITY_PROMPT_STATE,
+  OPTIONS_CONTINUITY_RETEST_CASES,
   pipelinePlans,
   productionArm,
   referenceKey,
@@ -421,7 +422,17 @@ describe("budget caps", () => {
   it("runs the options and continuity arms (2026-09-30) beside production's form: Luna medium, twice on the stored single-player turns, the arms interleaved", () => {
     const plans = armsFor("options-continuity", "beat");
     const arms = ["adopted", "turnO", "turnC", "turnOC"].map((variant) => `gpt-6-luna@medium/${variant}`);
-    expect(plans.map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source])).toEqual(arms.map((key) => [key, 1, 2, "single-player", "stored"]));
+    expect(plans.slice(0, 4).map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source, p.caseIds])).toEqual(
+      arms.map((key) => [key, 1, 2, "single-player", "stored", undefined])
+    );
+    // Arm O's one fix-and-retest after the run: once, on the rolled steps of the two Novi Reg stories, where its options named their stat
+    expect(plans.slice(4).map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source, p.caseIds])).toEqual([
+      ["gpt-6-luna@medium/turnOb", 1, 1, "single-player", "stored", OPTIONS_CONTINUITY_RETEST_CASES],
+    ]);
+    expect(OPTIONS_CONTINUITY_RETEST_CASES.length).toBe(21);
+    expect(OPTIONS_CONTINUITY_RETEST_CASES.every((id) => /8988006e|7492b211/.test(id))).toBe(true);
+    expect(referenceKey("gpt-6-luna@medium/turnOb")).toBe(arms[0]);
+    expect(secondReferenceKeys("gpt-6-luna@medium/turnOb")).toEqual(["gpt-6-luna@medium/turnO"]);
     // Production's form on production's own settings group (TEXT_MODEL_GROUPS), and the arms on the same model and effort
     expect(arms[0]).toBe(armKey({ model: TEXT_MODEL_GROUPS.beat.model, reasoningEffort: TEXT_MODEL_GROUPS.beat.reasoningEffort }, "adopted"));
     for (const role of ["setup", "switch", "thread", "iteration"] as const) expect(armsFor("options-continuity", role)).toEqual([]);
@@ -429,7 +440,8 @@ describe("budget caps", () => {
     expect(stageInterleavesArms("options-continuity")).toBe(true);
     expect(stageInterleavesArms("final-check")).toBe(false);
     expect(OPTIONS_CONTINUITY_PROMPT_STATE).toBe("adopted2");
-    // Each arm against production's form, which ran beside it; both arms against each part alone too
+    // Each arm against production's form, which ran beside it; both arms against each part alone too; the retest priced from arm O
+    expect(estimateBaseKey("gpt-6-luna@medium/turnOb")).toBe("gpt-6-luna@medium/turnO");
     for (const key of arms.slice(1)) {
       expect(referenceKey(key)).toBe(arms[0]);
       expect(estimateBaseKey(key)).toBe(arms[0]);

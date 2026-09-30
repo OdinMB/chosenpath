@@ -36,7 +36,12 @@ import { sacrificeRewardLine, todaysFormWithB6Request } from "./turnRound2.js";
 
 const LABEL = "Options and continuity turn";
 
-export type OptionsContinuityArm = { options: boolean; continuity: boolean };
+/**
+ * Which arm: O's options, C's continuity, both; `statsUnnamed` is arm O's one
+ * fix-and-retest after the run of 2026-09-30 (turnOb), one sentence closing its
+ * stats line.
+ */
+export type OptionsContinuityArm = { options: boolean; continuity: boolean; statsUnnamed?: boolean };
 
 // ---------------------------------------------------------------- the base: production's form
 
@@ -70,6 +75,9 @@ const WEAK_ONE_APPROACH = '--- Weak: "Use your speech skill to…" / "Use your c
 const DRAWS_ON_STATS =
   "--- Each option also draws on a different stat: no two take their main stat bonus from the same stat, and at most one has no stat bonus (as far as the stats' current values give bonuses). Risk alone never tells two options apart.";
 const RISK_ONLY_WEAK = "--- Weak: three options that each earn +10 from Nerve and differ only in how risky they are.";
+// Arm O's fix-and-retest (turnOb): in the run of 2026-09-30 its options named their stat ("Use your Technical skill to…" /
+// "Use your Creative skill to…"), B6's one approach three times; "its bonus", since a sacrifice's text names the stat it pays
+const STATS_UNNAMED = "An option's words say what the character does; they never name the stat its bonus comes from.";
 
 function threadOf(story: Story, slot: string): Thread | undefined {
   return story.getCurrentThreadAnalysis()?.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
@@ -151,8 +159,8 @@ export function chapterLeverLine(story: Story, slot: string): string {
   return `Sacrifice or reward: ${sacrifice} ${reward}`;
 }
 
-function optionEdits(instructions: string, story: Story): string {
-  let edited = replaceOnce(LABEL, instructions, THIRD_WAY, `${THIRD_WAY}${DRAWS_ON_STATS}\n`);
+function optionEdits(instructions: string, story: Story, statsUnnamed: boolean): string {
+  let edited = replaceOnce(LABEL, instructions, THIRD_WAY, `${THIRD_WAY}${DRAWS_ON_STATS}${statsUnnamed ? ` ${STATS_UNNAMED}` : ""}\n`);
   edited = replaceOnce(LABEL, edited, WEAK_ONE_APPROACH, `${WEAK_ONE_APPROACH}${RISK_ONLY_WEAK}\n`);
   return replaceOnce(LABEL, edited, `--- ${sacrificeRewardLine(story, "player1")}\n`, `--- ${chapterLeverLine(story, "player1")}\n`);
 }
@@ -207,12 +215,13 @@ function continuitySchema(schema: unknown): z.AnyZodObject {
 /** An arm's request for a single-player turn of any kind: production's form with arm O's and arm C's edits where they apply. */
 export function optionsContinuityRequest(story: Story, arm: OptionsContinuityArm): TextRequest {
   if (story.isMultiplayer()) throw new Error(`${LABEL}: the arms are single-player (group turns stay on production's group form)`);
+  if (arm.statsUnnamed && !arm.options) throw new Error(`${LABEL}: statsUnnamed closes arm O's stats line, so it needs arm O`);
   const base = productionTurnForm(story);
   const options = arm.options && rollsOptions(story);
   const continuity = arm.continuity && !story.isFirstBeat();
   if (!options && !continuity) return base;
   const { instructions, state } = splitAtState(LABEL, base.prompt);
-  let edited = options ? optionEdits(instructions, story) : instructions;
+  let edited = options ? optionEdits(instructions, story, arm.statsUnnamed === true) : instructions;
   if (continuity) edited = replaceOnce(LABEL, edited, OLD_TEXT_START, `Text\n${PICK_UP}\n- The first paragraph must\n`);
   return {
     prompt: edited + (continuity ? continuityState(state, story) : state),
@@ -224,6 +233,7 @@ export function optionsContinuityRequest(story: Story, arm: OptionsContinuityArm
 export const OPTIONS_CONTINUITY_TEXT = {
   drawsOnStats: DRAWS_ON_STATS,
   riskOnlyWeak: RISK_ONLY_WEAK,
+  statsUnnamed: STATS_UNNAMED,
   pickUp: PICK_UP,
   previousBeatHeading: PREVIOUS_BEAT_HEADING,
   oldContinue: OLD_CONTINUE,
