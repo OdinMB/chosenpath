@@ -4,7 +4,15 @@ import {
   type SectionConfig,
 } from "./StoryStatePromptService.js";
 import { POINTS_FOR_SACRIFICE, POINTS_FOR_REWARD } from "core/config.js";
-import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, THREE_WAYS, sacrificeRewardLine, takesOptionRules } from "../optionRules.js";
+import {
+  EXPLORATION_ORDER,
+  NO_DOUBLE_SACRIFICE,
+  REWARD_EXCEPTION,
+  THREE_WAYS,
+  sacrificeRewardLine,
+  takesExplorationOrder,
+  takesOptionRules,
+} from "../optionRules.js";
 import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { outcomeStateLines } from "../endingStates.js";
 
@@ -513,7 +521,9 @@ ${
   story.getCurrentBeatType() === "switch"
     ? "--- Use 'exploration' for all options in switches.\n"
     : "--- Use 'exploration' for options in Exploration threads (that don't follow a success/failure or win/lose pattern).\n" +
-      "--- Use 'challenge' for options in Challenge threads and Contest threads.\n"
+      "--- Use 'challenge' for options in Challenge threads and Contest threads.\n" +
+      // A group's exploration step: its options are the step's results, in order (the choice-result stage)
+      (takesExplorationOrder(story) ? EXPLORATION_ORDER : "")
 }
 - Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).
 --- You can only define sacrifice and reward options for stats that allow to be sacrificed or gained as a reward in their stat definitions.

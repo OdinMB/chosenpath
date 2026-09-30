@@ -3,12 +3,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { CHOICE_RESULT_BUILT_CASES } from "../../../../src/evals/textModelEval/arms.js";
 import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
+import type { ThreadAnalysis } from "core/types/index.js";
 import {
   CHOICE_RESULT_CASE_SPECS,
   choiceResultCases,
   choiceResultCasesToFreeze,
+  playthroughsSent,
+  productionSends,
   type ChoiceCaseSpec,
 } from "../../../../src/evals/textModelEval/choiceResultCases.js";
+import { CHOICE_RESULT_TEXT } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
+import { threadBeat } from "../../../helpers/promptStories.js";
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import { requestInputFor } from "../../../../src/evals/textModelEval/jobPlan.js";
 import { outputIdOf } from "../../../../src/evals/textModelEval/judgedChecks.js";
@@ -36,7 +41,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-const hashOfRequest = (evalCase: Parameters<typeof requestInputFor>[0]) => sha256(requestText(requestFor("adopted", requestInputFor(evalCase))));
+const hashOfRequest = (evalCase: Parameters<typeof requestInputFor>[0]) => sha256(productionSends(requestInputFor(evalCase)));
 
 /** A played fake story and the prompt hash each of its calls sent, by output file. */
 async function playedFake() {
@@ -54,10 +59,45 @@ const SPECS: ChoiceCaseSpec[] = [
   { id: "round-choice-plan-fake-t2", story: "play-lemonade", turn: 2, role: "thread", purpose: "A chapter plan." },
 ];
 
+/** A group's step 2 of a 3-beat exploration thread for everyone. */
+function groupExplorationStep() {
+  const story = threadBeat(2);
+  const state = structuredClone(story.getState());
+  const analysis = state.storyPhases[1] as ThreadAnalysis;
+  const results = { resolution1: "one", resolution2: "two", resolution3: "three" };
+  analysis.threads = analysis.threads.map((t) => ({
+    ...t,
+    possibleMilestones: results,
+    progression: t.progression.map((s, i) => ({ ...s, possibleResolutions: results, resolution: i === 0 ? ("resolution1" as const) : null })),
+  }));
+  return story.clone({ storyPhases: state.storyPhases });
+}
+
+describe("playthroughsSent: what production sent in the stored playthroughs, before the stage's adoption", () => {
+  it("is planner v2e's request on a chapter plan, where production now sends planner v2f's", async () => {
+    const { run, hashOf } = await playedFake();
+    const [, , plan] = choiceResultCases([run], hashOf, SPECS, productionSends).cases;
+    const input = requestInputFor(plan);
+    expect(playthroughsSent(input)).toBe(requestText(requestFor("planV2e", input)));
+    expect(playthroughsSent(input)).not.toBe(productionSends(input));
+  });
+
+  it("is a group's exploration step without the adopted exploration-order line, and production's request on every other turn", async () => {
+    const group = { role: "beat" as const, story: groupExplorationStep() };
+    expect(productionSends(group)).toContain(CHOICE_RESULT_TEXT.explorationOrder);
+    expect(playthroughsSent(group)).toBe(productionSends(group).replace(CHOICE_RESULT_TEXT.explorationOrder, ""));
+    for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) expect(playthroughsSent({ role: "beat", story })).toBe(productionSends({ role: "beat", story }));
+    const { run, hashOf } = await playedFake();
+    const [opening, step] = choiceResultCases([run], hashOf, SPECS, productionSends).cases;
+    for (const c of [opening, step]) expect(playthroughsSent(requestInputFor(c))).toBe(productionSends(requestInputFor(c)));
+  });
+});
+
 describe("choiceResultCases: turns and plans of a stored playthrough, frozen as round cases", () => {
   it("freezes a chapter opening as the story before its plan with the plan as its fixed analysis, a step as its input, a plan case as the planner's input; each request as the run sent it", async () => {
+    // The fake run plays through today's production, so its requests are today's
     const { run, hashOf } = await playedFake();
-    const { cases, problems } = choiceResultCases([run], hashOf, SPECS);
+    const { cases, problems } = choiceResultCases([run], hashOf, SPECS, productionSends);
     expect(problems).toEqual([]);
     expect(cases.map((c) => [c.id, c.role, c.fixedAnalysis?.kind, c.tags.source, c.tags.category, c.tags.analysisTurn])).toEqual([
       ["round-choice-fake-t2", "beat", "thread", "round", "choice-result", true],
@@ -96,12 +136,14 @@ describe("choiceResultCases: turns and plans of a stored playthrough, frozen as 
 
   it("freezes only the cases not frozen yet, unless rebuilding", async () => {
     const { run, hashOf } = await playedFake();
-    const first = choiceResultCasesToFreeze([], [run], hashOf, false, SPECS);
+    const first = choiceResultCasesToFreeze([], [run], hashOf, false, SPECS, productionSends);
     expect(first.cases).toHaveLength(3);
-    const again = choiceResultCasesToFreeze(first.cases, [run], hashOf, false, SPECS);
+    const again = choiceResultCasesToFreeze(first.cases, [run], hashOf, false, SPECS, productionSends);
     expect(again.cases).toEqual([]);
     expect(again.skipped).toEqual(SPECS.map((s) => s.id));
-    expect(choiceResultCasesToFreeze(first.cases, [run], hashOf, true, SPECS).cases).toHaveLength(3);
+    expect(choiceResultCasesToFreeze(first.cases, [run], hashOf, true, SPECS, productionSends).cases).toHaveLength(3);
+    // By default a case is built only where it is what the stored playthroughs sent: the fake run's plan is today's
+    expect(choiceResultCasesToFreeze([], [run], hashOf, false, SPECS).problems).toEqual([expect.stringMatching(/^round-choice-plan-fake-t2: its request is not the one the run sent/)]);
   });
 
   it("names the stage's own cases, each once, as the stage plans them", () => {

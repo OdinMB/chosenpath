@@ -5,7 +5,8 @@ import { requestInputFor } from "./jobPlan.js";
 import type { PlayRun } from "./playthroughs.js";
 import { replayedTurn } from "./playthroughReplay.js";
 import { roundCase } from "./roundCases.js";
-import { requestFor, requestText } from "./variants.js";
+import { requestFor, requestText, type RequestInput } from "./variants.js";
+import { productionTurnToday } from "../../game/services/storyTextRounds/choiceResult.js";
 
 /*
  * The choice-result stage's cases (2026-09-30, no calls): turns and chapter
@@ -14,7 +15,8 @@ import { requestFor, requestText } from "./variants.js";
  * --build-choice-cases. Each is rebuilt by replaying its stored run from its
  * start (playthroughReplay.ts: its own plans, turns and seeded dice), and is
  * built only where its request is the one production sent there, byte for
- * byte (the stored call's prompt hash): a turn case is the turn's input (a
+ * byte (the stored call's prompt hash; production as it stood that day,
+ * before the stage's adoption: playthroughsSent): a turn case is the turn's input (a
  * chapter opening's the story before its plan, with the plan as its fixed
  * analysis, as the frozen chapter openings read), a plan case the chapter
  * planner's input.
@@ -75,8 +77,32 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 /** The prompt hash a stored call sent, by its output file; undefined where the call is not held. */
 export type PromptHashOf = (outputFile: string) => string | undefined;
 
+/** The request text a run's production sent for an input. */
+export type SentRequestText = (input: RequestInput) => string;
+
+/** What production sends today: a run played through today's code (the tests' fake runs). */
+export const productionSends: SentRequestText = (input) => requestText(requestFor("adopted", input));
+
+/**
+ * What production sent in the stored playthroughs of 30 September, before the
+ * stage's adoption: planner v2e's chapter plans (production now sends planner
+ * v2f's), and its turn without the exploration-order line a group's
+ * exploration step now carries (productionTurnToday); today's request
+ * everywhere else.
+ */
+export const playthroughsSent: SentRequestText = (input) => {
+  if (input.role === "thread") return requestText(requestFor("planV2e", input));
+  if (input.role === "beat") return productionTurnToday(input.story).prompt;
+  return productionSends(input);
+};
+
 /** The stage's cases from the stored runs, each only where its request is the one the run sent; and what could not be built. */
-export function choiceResultCases(runs: PlayRun[], promptHashOf: PromptHashOf, specs: ChoiceCaseSpec[] = CHOICE_RESULT_CASE_SPECS): { cases: EvalCase[]; problems: string[] } {
+export function choiceResultCases(
+  runs: PlayRun[],
+  promptHashOf: PromptHashOf,
+  specs: ChoiceCaseSpec[] = CHOICE_RESULT_CASE_SPECS,
+  sent: SentRequestText = playthroughsSent
+): { cases: EvalCase[]; problems: string[] } {
   const cases: EvalCase[] = [];
   const problems: string[] = [];
   for (const spec of specs) {
@@ -90,21 +116,21 @@ export function choiceResultCases(runs: PlayRun[], promptHashOf: PromptHashOf, s
     const { played, beforePlan, before } = replayed;
     let state: StoryState;
     let fixedAnalysis: FixedAnalysis | undefined;
-    let sent: string | undefined;
+    let sentFile: string | undefined;
     if (spec.role === "thread") {
       if (played.plan?.kind !== "chapter plan") {
         problems.push(`${spec.id}: turn ${spec.turn} of ${spec.story} planned no chapter`);
         continue;
       }
       state = clone(beforePlan.getState());
-      sent = played.plan.calls[0]?.outputFile;
+      sentFile = played.plan.calls[0]?.outputFile;
     } else {
       state = clone((played.plan ? beforePlan : before).getState());
       if (played.plan) {
         const phase = clone(before.getState().storyPhases.at(-1));
         fixedAnalysis = played.plan.kind === "switch plan" ? { kind: "switch", phase: phase as SwitchAnalysis } : { kind: "thread", phase: phase as ThreadAnalysis };
       }
-      sent = played.calls[0]?.outputFile;
+      sentFile = played.calls[0]?.outputFile;
     }
     const evalCase = roundCase({
       id: spec.id,
@@ -114,8 +140,8 @@ export function choiceResultCases(runs: PlayRun[], promptHashOf: PromptHashOf, s
       category: "choice-result",
       note: `${spec.purpose} Built from the stored playthrough ${spec.story} (sample 1) at turn ${spec.turn}, replayed from its start with its own plans, turns and dice (playthroughReplay.ts); its request is the one production sent there, byte for byte.`,
     });
-    const rebuilt = sha256(requestText(requestFor("adopted", requestInputFor(evalCase))));
-    if (!sent || rebuilt !== promptHashOf(sent)) {
+    const rebuilt = sha256(sent(requestInputFor(evalCase)));
+    if (!sentFile || rebuilt !== promptHashOf(sentFile)) {
       problems.push(`${spec.id}: its request is not the one the run sent at turn ${spec.turn} of ${spec.story}`);
       continue;
     }
@@ -130,9 +156,10 @@ export function choiceResultCasesToFreeze(
   runs: PlayRun[],
   promptHashOf: PromptHashOf,
   replace: boolean,
-  specs: ChoiceCaseSpec[] = CHOICE_RESULT_CASE_SPECS
+  specs: ChoiceCaseSpec[] = CHOICE_RESULT_CASE_SPECS,
+  sent: SentRequestText = playthroughsSent
 ): { cases: EvalCase[]; problems: string[]; skipped: string[] } {
-  const { cases, problems } = choiceResultCases(runs, promptHashOf, specs);
+  const { cases, problems } = choiceResultCases(runs, promptHashOf, specs, sent);
   const known = new Set(frozen.map((c) => c.id));
   const skipped = replace ? [] : cases.filter((c) => known.has(c.id)).map((c) => c.id);
   return { cases: cases.filter((c) => !skipped.includes(c.id)), problems, skipped };

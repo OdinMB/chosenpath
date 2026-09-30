@@ -54,6 +54,27 @@ export function takesOptionRules(story: Story): boolean {
   return thread !== undefined && getThreadType(thread) !== "exploration";
 }
 
+/*
+ * The exploration-order line (the choice-result stage of 2026-09-30, measured
+ * as the eval's choiceResult): on an exploration step the game records the
+ * chosen option by its position as the step's result (BeatResolutionService:
+ * option n is resolution n), and the playthroughs' turns wrote options that
+ * carry out another result, or none, so the next turn told the recorded
+ * result instead of the choice. Adopted for group turns only: a group's
+ * options followed their results 0 of 6 -> 6 of 6 with nothing else moved,
+ * while 3 of a single player's 20 replies came back as one short paragraph,
+ * in both the line's forms. BeatPromptService prints it after the option
+ * types; adoptedTurns.test.ts holds it to the measured form.
+ */
+export const EXPLORATION_ORDER =
+  "--- In an Exploration thread, a player's three options are the current step's three possible outcomes, in their order: option 1 is Resolution 1, option 2 is Resolution 2 and option 3 is Resolution 3, each the same action in the same direction, without its consequences, in the scene's own words. The game records the chosen option's resolution as what the player did, so an option that says something else sends the story where the player didn't choose. The beat text leads up to the three and carries out none of them.\n";
+
+/** Whether this turn takes the exploration-order line: a group's chapter step where some player's thread is an exploration thread. */
+export function takesExplorationOrder(story: Story): boolean {
+  if (!story.isMultiplayer() || story.getCurrentBeatType() !== "thread") return false;
+  return (story.getCurrentThreadAnalysis()?.threads ?? []).some((thread) => getThreadType(thread) === "exploration");
+}
+
 const isChallengeTurn = (beat: Beat) => (beat.options ?? []).length > 0 && beat.options.every((o) => o.optionType === "challenge");
 const leverOf = (beat: Beat) => (beat.options ?? []).find((o) => o.resourceType !== "normal")?.resourceType;
 

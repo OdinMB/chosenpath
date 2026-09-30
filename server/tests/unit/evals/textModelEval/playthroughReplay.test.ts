@@ -7,6 +7,7 @@ import { replayRun, replayedTurn } from "../../../../src/evals/textModelEval/pla
 import { outputIdOf } from "../../../../src/evals/textModelEval/judgedChecks.js";
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
+import { playthroughsSent } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
@@ -135,7 +136,7 @@ describe("replayRun on the stored playthroughs (skipped where the output folder 
     for (const run of stored.filter((r) => r.input.playerCount === 1)) {
       for (const r of replayRun(run)) {
         const sentHash = promptHashes.get(outputIdOf(r.played.calls[0]?.outputFile ?? ""));
-        expect([run.spec.id, r.turn, sha256(requestText(requestFor("adopted", { role: "beat", story: r.before })))]).toEqual([run.spec.id, r.turn, sentHash]);
+        expect([run.spec.id, r.turn, sha256(playthroughsSent({ role: "beat", story: r.before }))]).toEqual([run.spec.id, r.turn, sentHash]);
         turns++;
       }
     }
@@ -152,7 +153,8 @@ describe("replayRun on the stored playthroughs (skipped where the output folder 
       expect(replayed.length).toBe(firstChanged[run.spec.id] - 1);
       for (const r of replayed) {
         const sentHash = promptHashes.get(outputIdOf(r.played.calls[0]?.outputFile ?? ""));
-        expect([run.spec.id, r.turn, sha256(requestText(requestFor("adopted", { role: "beat", story: r.before })))]).toEqual([run.spec.id, r.turn, sentHash]);
+        // Production's request as it was on 30 September, before the stage's exploration-order line for groups
+        expect([run.spec.id, r.turn, sha256(playthroughsSent({ role: "beat", story: r.before }))]).toEqual([run.spec.id, r.turn, sentHash]);
       }
     }
   });

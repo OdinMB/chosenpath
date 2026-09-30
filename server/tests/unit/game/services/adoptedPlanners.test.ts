@@ -6,7 +6,7 @@ import type { Story } from "core/models/Story.js";
 import { GameModes } from "core/types/index.js";
 import { checkThreadPlan } from "../../../../src/game/services/planChecks.js";
 import { switchStep, threadStep } from "../../../../src/game/services/storyTextSteps.js";
-import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
+import { PLANNER_V2_TEXT, plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
 import { evalFiles } from "../../../../src/evals/textModelEval/evalFiles.js";
 import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
 import {
@@ -29,10 +29,13 @@ import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "..
  * "without a number" in the chapter title's field) with the outcome's stages
  * (planner v2d, the owner's feedback of 2026-09-29; the story's last chapter
  * settles only its outcome's next stage, the owner's decision of 2026-09-30)
- * and the last step listed once (the doubled-step fix). The same prompt and
- * JSON schema, byte for byte, on every story the tests build and on every
- * frozen planning case; and a reply is assembled into today's stored plan
- * the way the eval assembles it.
+ * and the last step listed once (the doubled-step fix); and, since the
+ * choice-result stage of 2026-09-30, planner v2f: the step results' two
+ * rules (a challenge or contest result says how the attempt turns out, never
+ * the player's approach or decision; an exploration result is the player's
+ * own choice). The same prompt and JSON schema, byte for byte, on every story
+ * the tests build and on every frozen planning case; and a reply is assembled
+ * into today's stored plan the way the eval assembles it.
  */
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -122,10 +125,12 @@ function expectSwitchLikeMeasured(story: Story) {
  * ("without a number") (planV2c), the outcome's stages (planV2d) and the last step listed once.
  */
 const planV2e = (story: Story) => plannerV2ThreadRequest(story, false, { twoSided: true, nearerQuestion: true, stages: true, stepsOnce: true });
+/** planV2f: planV2e with the step results' two rules (the choice-result stage), production's chapter planner since. */
+const planV2f = (story: Story) => plannerV2ThreadRequest(story, false, { twoSided: true, nearerQuestion: true, stages: true, stepsOnce: true, outcomeResults: true });
 
 function expectThreadLikeMeasured(story: Story) {
   const production = threadStep.request(story);
-  const measured = planV2e(story);
+  const measured = planV2f(story);
   expect(production.prompt).toBe(measured.prompt);
   expect(json(production.schema)).toBe(json(measured.schema));
 }
@@ -155,8 +160,20 @@ describe("the switch planner: planner v2 as measured", () => {
   });
 });
 
-describe("the chapter planner: planner v2e (two-sided contests, the nearer chapter question, the outcome's stages, each step once)", () => {
+describe("the chapter planner: planner v2f (two-sided contests, the nearer chapter question, the outcome's stages, each step once, the step results' rules)", () => {
   it.each(THREAD_STORIES)("%s", (_, build) => expectThreadLikeMeasured(build()));
+
+  it("is no longer planner v2e: the step results' two rules are what changed (the choice-result stage, 2026-09-30)", () => {
+    for (const [, build] of THREAD_STORIES) {
+      const story = build();
+      const multiplayer = story.isMultiplayer();
+      const { before, after } = PLANNER_V2_TEXT.stepResults(multiplayer);
+      const production = threadStep.request(story).prompt;
+      expect(production).toContain(after);
+      expect(production).not.toContain(before);
+      expect(production.replace(after, before)).toBe(planV2e(story).prompt);
+    }
+  });
 
   it("is no longer planner v2c: the stage item, PACING's stage and the steps line are what changed (2026-09-30)", () => {
     const story = singlePlayerAfterChapters(25, 8);

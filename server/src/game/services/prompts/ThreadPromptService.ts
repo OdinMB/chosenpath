@@ -20,9 +20,12 @@ import { pickedOutcome, threadPacingBlock } from "../pacing.js";
  * milestone it adds (planner v2c). Since 2026-09-30 (planner v2e) it names
  * its outcome's stages and stays within the one PACING says it settles (in
  * the story's last chapter too, the next stage only: the owner's decision),
- * and lists each step once. Today's form before the adoption is kept for the
- * eval in storyTextRound0/; adoptedPlanners.test.ts holds this equal to the
- * eval's planner v2e.
+ * and lists each step once. Since the choice-result stage of 2026-09-30
+ * (planner v2f) each step result follows the rule for its kind: a challenge
+ * or contest result says how the attempt turns out, an exploration result is
+ * something the player chooses to do. Today's form before the adoption is
+ * kept for the eval in storyTextRound0/; adoptedPlanners.test.ts holds this
+ * equal to the eval's planner v2f.
  */
 
 /** A4's length rule. */
@@ -45,11 +48,26 @@ function kindRule(story: Story): string {
   return `As a rule, match the thread's kind to the outcome it pushes: favorable/mixed/unfavorable resolutions → Challenge thread; Side A/Side B resolutions → Contest thread (${sides}, so the result matches the outcome's sides and its scoreboard); three paths → Exploration thread. A contest always has exactly two sides.`;
 }
 
+/**
+ * The two rules on a step's results (planner v2f, adopted at the
+ * choice-result stage of 2026-09-30: the playthroughs' next turns told the
+ * result instead of the choice). A challenge or contest result is rolled
+ * against the option the player chose, so it says how the attempt turns out,
+ * never which approach the player takes or what they say or decide; an
+ * exploration result is the option at its position, so it is something the
+ * player chooses to do, never how others respond. Each follows the sentence
+ * planner v2e printed for its kind.
+ */
+const stepResultRules = (multiplayer: boolean) =>
+  multiplayer
+    ? `In challenge and contest threads, each result gives an advantage or a disadvantage for the next step without closing it off. Each challenge or contest result, the milestones included, says how the players' attempts turn out, whatever they chose to do: what each side achieves or fails to achieve, and how others respond; never which approach a player takes or what they say or decide, since the options they choose decide that (weak: "The group bribes the guard instead"; good: "The guard pockets the coin and calls his sergeant anyway"). In exploration threads, each step's three results are three paths the players can take, and the last step's results lead toward the outcome's three resolutions, in the same order. Each exploration result is something a player chooses to do, and the step's three options offer them one each, in order: never how others respond.`
+    : `In challenge threads, each result gives an advantage or a disadvantage for the next step without closing it off. Each challenge result, the milestones included, says how the player's attempt turns out, whatever they chose to do: what they achieve or fail to achieve, and how others respond; never which approach the player takes or what they say or decide, since the option they choose decides that (weak: "Rikkit bribes the guard instead"; good: "The guard pockets the coin and calls his sergeant anyway"). In exploration threads, each step's three results are three paths the player can take, and the last step's results lead toward the outcome's three resolutions, in the same order. Each exploration result is something the player chooses to do, and the step's three options offer them one each, in order: never how others respond.`;
+
 function progressionItem(number: number, multiplayer: boolean): string {
   const who = multiplayer ? "players" : "player";
   return `${number}. A progression of steps, as many as the length, that tells one situation rising to a climax:
    - The thread stays with one situation: the same people, place, rival or problem from step to step. Each step raises the stakes of that situation instead of starting a new activity, and every step stays on the thread's outcome.
-   - From the second step on, something pushes back: a rival moves, an ally hesitates, a cost comes due. In challenge${multiplayer ? " and contest" : ""} threads, each result gives an advantage or a disadvantage for the next step without closing it off. In exploration threads, each step's three results are three paths the ${who} can take, and the last step's results lead toward the outcome's three resolutions, in the same order.
+   - From the second step on, something pushes back: a rival moves, an ally hesitates, a cost comes due. ${stepResultRules(multiplayer)}
    - The last step is the decisive moment: its question brings the thread's question to a head.
    - Each step comes once: a thread of n beats has n different steps, and the last one never repeats the step before it.
    - Each step asks how the ${who} act${multiplayer ? "" : "s"} ("Stealth: How does Rikkit get past the Guild's night watch?").${multiplayer ? " In a contest, every step is the same moment for both sides, and its question names them all." : ""}

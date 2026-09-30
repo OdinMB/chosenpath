@@ -72,28 +72,46 @@ const OTHER_TURNS: [string, () => Story][] = [
   ["a group's ending", () => endingBeat(2)],
 ];
 
-const EXPLORATION_STEPS: [string, () => Story][] = [
+const SINGLE_EXPLORATION_STEPS: [string, () => Story][] = [
   ["a single player's exploration chapter's first step", () => chapterStep(1, ["exploration"], 0)],
   ["a single player's exploration step after the first", () => chapterStep(1, ["exploration"], 1)],
+];
+
+const GROUP_EXPLORATION_STEPS: [string, () => Story][] = [
   ["a group's shared exploration step", () => chapterStep(2, ["exploration"], 1)],
   ["a group where one player explores and one takes a challenge", () => chapterStep(2, ["exploration", "challenge"], 0)],
 ];
 
-describe("productionTurnToday: production's turn as the eval measured it, built from the frozen copy", () => {
-  it.each([...OTHER_TURNS, ...EXPLORATION_STEPS])("is production's request byte for byte on %s, prompt and schema", (_, make) => {
+const EXPLORATION_STEPS = [...SINGLE_EXPLORATION_STEPS, ...GROUP_EXPLORATION_STEPS];
+
+/** Whether production sends the exploration line on this turn: a group's exploration step, since the stage's adoption. */
+const productionTakesLine = (story: Story) => story.isMultiplayer() && takesExplorationOrder(story);
+
+describe("productionTurnToday: production's turn as the eval measured it before the stage, built from the frozen copy", () => {
+  it.each([...OTHER_TURNS, ...SINGLE_EXPLORATION_STEPS])("is production's request byte for byte on %s, prompt and schema", (_, make) => {
     const story = make();
     const [ours, production] = [productionTurnToday(story), beatStep.request(story)];
     expect(ours.prompt).toBe(production.prompt);
     expect(json(ours.schema)).toBe(json(production.schema));
   });
 
-  (frozen.length ? it : it.skip)("is production's request byte for byte on every frozen turn case", () => {
+  // Adopted for group turns only (the run of 2026-09-30): production's group exploration step is the variant as measured
+  it.each(GROUP_EXPLORATION_STEPS)("is production's request without the adopted exploration line on %s, and production is the variant", (_, make) => {
+    const story = make();
+    const [ours, variant, production] = [productionTurnToday(story), choiceResultRequest(story), beatStep.request(story)];
+    expect(production.prompt).toBe(variant.prompt);
+    expect(production.prompt.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(ours.prompt);
+    expect(json(ours.schema)).toBe(json(production.schema));
+  });
+
+  (frozen.length ? it : it.skip)("is production's request byte for byte on every frozen turn case, the variant's on a group's exploration step", () => {
     const turns = frozen.filter((c) => c.role === "beat" && c.state);
     expect(turns.length).toBeGreaterThan(50);
     for (const c of turns) {
       const story = caseStory(c);
-      const [ours, production] = [productionTurnToday(story), beatStep.request(story)];
-      expect([c.id, ours.prompt === production.prompt, json(ours.schema) === json(production.schema)]).toEqual([c.id, true, true]);
+      const measured = productionTakesLine(story) ? choiceResultRequest(story) : productionTurnToday(story);
+      const production = beatStep.request(story);
+      expect([c.id, measured.prompt === production.prompt, json(measured.schema) === json(production.schema)]).toEqual([c.id, true, true]);
     }
   });
 });
@@ -102,13 +120,13 @@ describe("choiceResultRequest: an exploration step's options are its results, in
   it("adds the one line after the option types on an exploration step, and nothing else", () => {
     for (const [, make] of EXPLORATION_STEPS) {
       const story = make();
-      const [ours, production] = [choiceResultRequest(story), beatStep.request(story)];
+      const [ours, base] = [choiceResultRequest(story), productionTurnToday(story)];
       expect(takesExplorationOrder(story)).toBe(true);
       expect(occurrences(ours.prompt, CHOICE_RESULT_TEXT.explorationOrder)).toBe(1);
-      expect(ours.prompt.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(production.prompt);
+      expect(ours.prompt.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(base.prompt);
       // Right after the option-type lines, before the resource types
       expect(ours.prompt).toContain(`${CHOICE_RESULT_TEXT.optionTypes}${CHOICE_RESULT_TEXT.explorationOrder}\n- Define if the option is a sacrifice`);
-      expect(json(ours.schema)).toBe(json(production.schema));
+      expect(json(ours.schema)).toBe(json(base.schema));
     }
   });
 
@@ -161,8 +179,8 @@ describe("choiceResultRequest: an exploration step's options are its results, in
   (frozen.length ? it : it.skip)("changes only the exploration steps among the frozen turn cases", () => {
     for (const c of frozen.filter((f) => f.role === "beat" && f.state)) {
       const story = caseStory(c);
-      const [ours, production] = [choiceResultRequest(story), beatStep.request(story)];
-      const changed = ours.prompt !== production.prompt;
+      const [ours, base] = [choiceResultRequest(story), productionTurnToday(story)];
+      const changed = ours.prompt !== base.prompt;
       expect([c.id, changed]).toEqual([c.id, takesExplorationOrder(story)]);
     }
   });

@@ -12,18 +12,20 @@ import { ROUND3_PARTS } from "../../../../src/game/services/storyTextRounds/setu
 import { setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { ENDING_STATE_TEXT } from "../../../../src/game/services/storyTextRounds/endingState.js";
 import { adoptedSetupPrompt, adoptedTurn, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
+import { takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 
 /*
  * The adoption's free final test (rounds status note, section 9, step 3):
  * production's own code, the eval's "adopted" variant, builds byte for byte
  * the requests of the variants that passed on every frozen case the eval
  * holds: the final setup form (setupR3, a case's kids tag included), planner
- * v2 with two-sided contests (planV2b) for the switch and planner v2e (the
+ * v2 with two-sided contests (planV2b) for the switch and planner v2f (the
  * nearer chapter question of 2026-09-28, the outcome's stages and each step
- * once, 2026-09-30) for the chapter, today's turn form with B6 alone
- * (turnB6) for a single player and today's form (prod) for groups, every
- * ending as the ending told as its milestones leave it (endingStateB,
- * 2026-09-30), and AI
+ * once, and the step results' two rules, 2026-09-30) for the chapter, today's
+ * turn form with B6 alone (turnB6) for a single player and today's form
+ * (prod) for groups, a group's exploration step with the exploration-order
+ * line (choiceResult, 2026-09-30), every ending as the ending told as its
+ * milestones leave it (endingStateB, 2026-09-30), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -48,11 +50,14 @@ function measuredVariant(input: RequestInput): VariantId {
     case "switch":
       return "planV2b";
     case "thread":
-      // Planner v2e since 2026-09-30 (planner v2c with the outcome's stages and each step once); planner v2c until then
-      return "planV2e";
+      // Planner v2f since the choice-result stage of 2026-09-30 (planner v2e with the step results' two rules); planner v2e
+      // (planner v2c with the outcome's stages and each step once) before, earlier that day, and planner v2c until then
+      return "planV2f";
     case "beat":
       // Every ending since 2026-09-30: the ending told as its milestones leave it
       if (input.story.getCurrentBeatType() === "ending") return "endingStateB";
+      // A group's exploration step since the choice-result stage: the exploration-order line (choiceResult as measured)
+      if (input.story.isMultiplayer() && takesExplorationOrder(input.story)) return "choiceResult";
       return input.story.isMultiplayer() ? "prod" : "turnB6";
   }
 }

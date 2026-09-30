@@ -15,6 +15,7 @@ import { stat, threadAnalysis, type ThreadKind } from "../../../helpers/textFixt
 import { CHAPTER_RULES_HEADING, adoptedTurn } from "../../../helpers/adoptedDeltas.js";
 import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../../../src/game/services/storyTextRounds/endingState.js";
 import { SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
+import { CHOICE_RESULT_TEXT, choiceResultRequest, takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -28,12 +29,22 @@ import { SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/Be
  * since the owner's decision of 2026-09-30, is the measured variant
  * endingStateB byte for byte (each outcome told as its milestones leave it,
  * the scoreboard rule with its unfinished half); until then an ending was
- * today's form with the scoreboard rule on a scored contest's ending.
+ * today's form with the scoreboard rule on a scored contest's ending. Since
+ * the choice-result stage of 2026-09-30, a group turn where a player's thread
+ * explores is the measured variant choiceResult byte for byte (the
+ * exploration-order line after the option types); a single player's
+ * exploration step stays today's form, since the line failed there (one-
+ * paragraph replies).
  */
 
-/** The measured request production must send: the ending as endingStateB, else a single player's turnB6 or a group's today's form. */
+/**
+ * The measured request production must send: the ending as endingStateB, a
+ * group's exploration step as choiceResult, else a single player's turnB6 or a
+ * group's today's form.
+ */
 function measuredTurn(story: Story): { prompt: string; schema: Parameters<typeof toJsonSchema>[0] } {
   if (story.getCurrentBeatType() === "ending") return endingStateRequest(story);
+  if (story.isMultiplayer() && takesExplorationOrder(story)) return choiceResultRequest(story);
   return story.isMultiplayer() ? round0BeatStep.request(story) : todaysFormWithB6Request(story);
 }
 
@@ -81,10 +92,32 @@ const SINGLE_PLAYER: [string, () => Story][] = [
   ],
 ];
 
+/** A group's step 2 of a 3-beat thread from history index 2: one exploration thread for everyone, or player1 exploring beside the others' challenge. */
+function groupStep(players: number, kind: "exploration" | "mixed"): Story {
+  const story = threadBeat(players);
+  const state = structuredClone(story.getState());
+  const analysis = state.storyPhases[1] as ThreadAnalysis;
+  const explore = <T extends ThreadAnalysis["threads"][number]>(t: T): T => ({
+    ...t,
+    possibleMilestones: { resolution1: "one", resolution2: "two", resolution3: "three" },
+    progression: t.progression.map((s, i) => ({ ...s, possibleResolutions: { resolution1: "one", resolution2: "two", resolution3: "three" }, resolution: i === 0 ? ("resolution1" as const) : null })),
+  });
+  analysis.threads =
+    kind === "exploration"
+      ? analysis.threads.map(explore)
+      : [
+          { ...explore(analysis.threads[0]), id: "explore", playersSideA: ["player1"] },
+          { ...analysis.threads[0], id: "fight", playersSideA: analysis.threads[0].playersSideA.filter((s) => s !== "player1") },
+        ];
+  return story.clone({ storyPhases: state.storyPhases });
+}
+
 const GROUPS: [string, () => Story][] = [2, 3].flatMap((players): [string, () => Story][] => [
   [`the first switch, ${players} players`, () => firstSwitchBeat(players)],
   [`a later switch, ${players} players`, () => laterSwitchBeat(players)],
   [`a chapter step, ${players} players`, () => threadBeat(players)],
+  [`an exploration step, ${players} players`, () => groupStep(players, "exploration")],
+  [`one player exploring beside a challenge, ${players} players`, () => groupStep(players, "mixed")],
   [`the ending, ${players} players`, () => endingBeat(players)],
 ]);
 
@@ -200,10 +233,22 @@ function contestEnding(players: number, mode: GameMode = GameModes.Competitive, 
   return scoreboard ? story.clone({ sharedStats: [SCOREBOARD], sharedStatValues: [{ statId: SCOREBOARD.id, value: 40 }] }) : story;
 }
 
-describe("group turns: today's form, the ending as endingStateB", () => {
+describe("group turns: today's form, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(GROUPS)("%s", (_, build) => {
     const story = build();
     expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
+  });
+
+  it("gives a group's exploration step the exploration-order line, once, after the option types, and a single player's none (the choice-result stage)", () => {
+    for (const players of [2, 3]) {
+      for (const kind of ["exploration", "mixed"] as const) {
+        const prompt = beatStep.request(groupStep(players, kind)).prompt;
+        expect(prompt.split(CHOICE_RESULT_TEXT.explorationOrder).length - 1).toBe(1);
+        expect(prompt).toContain(`${CHOICE_RESULT_TEXT.optionTypes}${CHOICE_RESULT_TEXT.explorationOrder}\n- Define if the option is a sacrifice`);
+      }
+      expect(beatStep.request(threadBeat(players)).prompt).not.toContain(CHOICE_RESULT_TEXT.explorationOrder);
+    }
+    expect(beatStep.request(chapterStep("exploration", 1)).prompt).not.toContain(CHOICE_RESULT_TEXT.explorationOrder);
   });
 
   it.each([
