@@ -1936,3 +1936,60 @@ The coordinator's fix 2 of the review's paid list: the turn after an exploration
   - `.context/story.md` is unchanged: production is.
   - `outcomeSettledJudge.ts` now exports `paragraphsOf` and `factLines`, which the new judge reads; nothing else in it changed.
   - `npm run check:all` clean (server 3,585, client 256).
+
+## 2026-09-30 (night): fix 3, a sacrifice runs the right way on a stat where more is worse (stage `lever-direction`, $0.176 of $0.26; not adopted)
+
+The coordinator's fix 3 of the review's paid list: a setup's sacrifice costs the player and its reward helps, also on a stat where higher is worse. Its own stage, capped at $0.26 (the $0.20 estimate plus 30%), the reason recorded in `budget.ts`.
+
+- **The cause, in the stored setups and production's request:**
+  - The mouse story's setup (round 2) made Cat's Nearness a stat where more is worse (at 70% the next switch must offer hiding) and wrote "Give up 10% Cat's Nearness by making a noisy distraction that draws Marmalade away" as its sacrifice. Bran took it at turn 2: +30 points, and the cat moved away (50% → 40%). New Avalon's Heartwell Feedback was written the same way.
+  - It isn't rare in production's stored setups (setup round 3's form and the final check's, 77 setups, read by stat name and then by hand). On 19 stats named for a pressure both levers run backwards, against 7 the right way (the round-2 pirates' Patrol Heat among them). Backwards: Family Pressure and Family Questions (Casablanca, most samples), Storm, Dust and Danger, Pursuit Pressure, Outlaw's Alertness, Eclipse Strain, Corporate Scrutiny, Application Paperwork Load. Right way: Department Strain, Civic Tension, Administrative Scrutiny, Imperial Patrol Heat ("Add 10% Patrol Heat by making a conspicuous move").
+  - The request pulls this way in three places:
+    - the lever fields say "What the player gives up from this stat" and "What the player gains of this stat";
+    - every example is a stat where more is better ('Spend 10% fuel', 'Regain 10% health', the worked example's Public Support and Fervor);
+    - the stat rules ask for the premise's "pressures" ("burnout for an activist").
+  - Nothing says which way a lever runs on a stat where more is worse, so "give up" lowers it, which is a benefit.
+- **The variant** (`leverDirection`, `storyTextRounds/leverDirection.ts`, eval only, test-first). It is production's setup request with two changes and is byte for byte production's elsewhere; a test holds that over every player count, mode, length and the kids budget.
+  - One line after "Most player stats can be spent or earned in a scene…": a sacrifice always costs the player and a reward always helps. On a stat where more is worse, the sacrifice raises it and the reward lowers it ('Let the guards' Suspicion rise 10% …'; 'Lower Suspicion 10% by lying low …').
+  - The two lever fields' first sentences are reworded the same way: the sacrifice "always leaves the player worse off", the reward "better off", with an example for each kind of stat. The rest of each field stays as production has it.
+- **Cases:** six premises. Every built request was read end to end; the variant differs only in the line and the two field sentences.
+  - The mouse story's setup is a new round case, `round-setup-kids-mouse` (`leverDirectionCases.ts`, `--build-lever-cases`, no calls). It uses the round's merged premise, age 5, 10 turns, with production's kids setup. A test holds its request to the prompt hash the round sent.
+  - New Avalon's frozen premise, whose request is the round's Avalon setup byte for byte (a test holds that too).
+  - The bounty hunters, Casablanca and the secret society, where production's stored setups wrote pressures backwards.
+  - The ER doctor, where they wrote them the right way.
+- **The check:** a new judge, `leversRunRightWay` (`leverDirectionJudge.ts`, `--judge-levers`). It makes one Luna low call per setup and reads every stat with a lever: whose it is, type, values, tooltip, effects, thresholds, changes after chapters, sacrifice and reward.
+  - Calibrated on 19 stored setups read by hand before any judge call: 9 no (the round's mouse and New Avalon setups among them), 9 yes (three that raise a pressure as the sacrifice among them), 1 partial.
+  - **v1** asked what each lever does to the player, then yes or no. It agreed on 16 of 18 (yes 7 of 9, no 9 of 9), samples 15 of 19: not reliable. It read "Spend 10% Market Buzz by making a bold offer" (a stat where more is better) as helping the player, taking the story action over the stat's move.
+  - **v2, its one fix,** asks only which way is better and which way each lever moves its stat, read from the lever's words. The game then works out what the lever does. v2 agreed on 17 of 18 (yes 8 of 9, no 9 of 9), samples 18 of 19: **reliable**. Its miss is a named-step ladder read the wrong way round (Hospital Oversight "toward Formal Review").
+  - v1's file is kept as `judged-levers-v1.md|json`.
+- **The run:** the dry run planned 24 jobs, est $0.12. The smoke ran the dry run's 2 jobs, then the other 22. Every setup was valid on its first attempt.
+- **Readings:**
+  - **By hand (all 24 read before the judge ran):**
+    - The variant wrote every lever the right way (12 of 12 setups), and it wrote more pressures, each raised as the sacrifice. Examples: "Let Cat Nearness rise 10% by making a quick, noisy move" (both mouse samples), Civic Strain, Team Strain, System Overload, Trail Fatigue, Frontier Heat, Family Questions, Prophecy Panic, Meridian Instability.
+    - Production got 11 of 12. Its one backwards setup is the defect premise again, the mouse story's sample 2: "Spend 10% Cat's Curiosity by making a tempting distraction", on a stat that is -10 above 70% and rises after an unfavorable thread.
+    - This time production wrote few pressures, and none on the bounty hunters, Casablanca or the secret society.
+  - **The judge (v2):** production 9 of 12, the variant 11 of 12, within the noise (17 points).
+    - Beside the hand's fail, it failed production's secret-society Public Alarm (read as worse high; that setup's own effects make it better high, so a reader could go either way) and Casablanca's Family Ease ladder. It also failed the variant's New Avalon Crisis Composure ladder (Steady → Overwhelmed).
+    - Both ladder fails are v2's known misread.
+    - Its labels read levers on stats where more is worse, run the right way, at 6 of 14 → 18 of 18 (moved higher, p < 0.001). That figure is inflated by the ladder misreads. By hand it is 6 of 8 → 18 of 18, inside production's own two-sample noise (50 points).
+  - **Automatic checks:** nothing moved either way.
+    - `noProgressMeter` fell 91.7% → 75.0%, within the noise. Its "how close" pattern flags a pressure's tooltip ("how close the tabby is to the mice"), and the variant writes more pressures.
+    - `distinctIdentities` and `noSlotNames` fell 100% → 91.7%: beyond the noise, not moved (p 0.5).
+  - **Waits and cost:** level. p50 53.6 s → 51.2 s, p95 67.0 s → 67.5 s, $0.0056 a setup on both.
+- **Verdict: not adopted, and no fix-and-retest.**
+  - The variant has nothing on its target to fix.
+  - Production erred in 1 of 12 setups by hand this time, against about three in four pressures in its stored setups. The setup-level check can't move at that rate.
+  - More samples of the same two arms within the $0.08 left in the cap (about 12 setups) couldn't move it either: 3 of 18 against 0 of 18 would read p 0.11.
+  - Production is unchanged, so the byte-for-byte setup test and its deltas are untouched.
+- **What the owner could weigh:**
+  - The variant costs nothing in waits or money, moved nothing the wrong way, and wrote every lever right, including every pressure it added. Adopting it anyway is your call.
+  - If adopted, two production pieces assume a sacrifice lowers its stat and would need a test-first change:
+    - `leverPayments.ts` records a sacrifice's payment only as a fall, so a raised pressure's double charge would go unseen;
+    - the turn's option types define a sacrifice as giving up some of a stat.
+  - Whether turns then apply a rising sacrifice correctly is unmeasured.
+  - A decisive measurement would need about six samples a side on the premises where production erred most (the mouse story, Casablanca), about $0.13.
+- **Spend:** $0.176 of $0.26: 24 setups $0.134, 100 judge records $0.042 (v1's calibration 38, v2's 38, the stage's 24). The ledger is $38.69 of $42; fixes 4-8 have about $1.69 of the workflow's $2.40.
+- **Docs and checks:**
+  - `.context/text-model-eval.md` gains the stage (commands, variant, arms, budget, the run).
+  - `.context/story.md` is unchanged: production is.
+  - Test-first: the variant's, cases', judge's and prep's suites could not load until their modules existed, and v2's five reading tests failed before v2 was written; `armsBudget.test.ts` carries the new cap. `npm run check:all` clean (server 3,624, client 256).

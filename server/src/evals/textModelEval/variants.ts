@@ -51,6 +51,7 @@ import { noSwitchReminderRequest } from "../../game/services/storyTextRounds/swi
 import { choiceResultRequest } from "../../game/services/storyTextRounds/choiceResult.js";
 import { outcomeSettledRequest } from "../../game/services/storyTextRounds/outcomeSettled.js";
 import { recordedResultRequest } from "../../game/services/storyTextRounds/recordedResult.js";
+import { leverDirectionRequest } from "../../game/services/storyTextRounds/leverDirection.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -241,6 +242,13 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * and, where it writes that chapter's milestone, a line that the milestone is
  * the chosen resolution; production's request byte for byte elsewhere, with
  * production's turn limits for the player count.
+ * "leverDirection" is the lever-direction stage's setup (2026-09-30, fix 3 of
+ * the second playthroughs' review, storyTextRounds/leverDirection.ts):
+ * production's custom-story setup with one line in the stat rules (a sacrifice
+ * always costs the player and a reward always helps; on a stat where more is
+ * worse, the sacrifice raises it and the reward lowers it) and the two lever
+ * fields' first sentences worded the same way; production's request byte for
+ * byte elsewhere, with production's setup limits; setup only.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -302,7 +310,8 @@ export type VariantId =
   | "planV2f"
   | "outcomeSettled"
   | "outcomeSettledB"
-  | "recordedResult";
+  | "recordedResult"
+  | "leverDirection";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -361,6 +370,7 @@ export const VARIANTS: VariantId[] = [
   "outcomeSettled",
   "outcomeSettledB",
   "recordedResult",
+  "leverDirection",
 ];
 
 /**
@@ -763,6 +773,13 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   recordedResult: (input) => {
     if (input.role !== "beat") throw new Error(`Variant recordedResult does not cover role ${input.role}`);
     return { ...recordedResultRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  },
+  // The lever-direction stage's setup: a sacrifice costs and a reward helps, whichever way the stat runs; production's
+  // setup limits
+  leverDirection: (input) => {
+    if (input.role !== "setup") throw new Error(`Variant leverDirection does not cover role ${input.role}`);
+    const { premise, playerCount, gameMode, maxTurns, kids } = input.setup;
+    return { ...leverDirectionRequest(premise, playerCount, gameMode, maxTurns, "story", { kids }), limits: productionCallLimits("setup", playerCount) };
   },
 };
 

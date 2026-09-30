@@ -18,7 +18,7 @@ export { FEEDBACK_STAGES };
  * $40 left $2.76, about $1.46 with the stalled Stage 4 calls on top). The
  * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
  * the setup rounds, the turn rounds and the migration check, and $0.10 /
- * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 / $1.20 / $0.39 / $0.26 for the feedback
+ * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 / $1.20 / $0.39 / $0.26 / $0.26 for the feedback
  * workflow's runs (STAGE_CAP_REASONS says why); a stage cap above its default needs a
  * recorded reason, and the global cap can only be lowered. The probe and case
  * building count as Stage 0. The content-filter check (--filter-check,
@@ -57,6 +57,7 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   "playthroughs-2": 1.2,
   "outcome-settled": 0.39,
   "recorded-result": 0.26,
+  "lever-direction": 0.26,
 };
 /** The owner's hard cap: $30, raised to $33 on 2026-09-27, to $40 on 2026-09-28 and to $42 on 2026-09-30 (more playthroughs). */
 export const HARD_CEILING = 42;
@@ -125,6 +126,8 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-09-30 (fix 1 of the second playthroughs' review, estimated at about $0.30 and capped 30% above it; the ledger at $37.99 of the $42 hard cap, and the whole review's workflow held to about $2.40): the turn that completes an outcome told and recorded as settled, no stat change against the milestone beside it, and the ending's milestones over earlier facts that call a complete outcome open (outcomeSettled), with production's turn beside it (adopted, under adopted8), twice on 12 turns of the second round's stored runs (7 switch turns completing an outcome, 5 endings; 48 turns, about $0.20 at the run's $0.003 a single-player and $0.004-0.006 a group turn), the new judged check on the switch turns with its calibration and the calibrated ending check on the endings (about 110 Luna low calls, about $0.04), a smoke, and room for one fix-and-retest; the fix-and-retest (2026-09-30, after the run: the variant's milestones copied the plan's words, milestoneNotCopied moved lower, and the judge's calibration read not reliable): the completing milestone kept specific (outcomeSettledB) twice on the 7 switch turns and once on the 5 endings (19 turns, about $0.075), and the judge's one fix (prompt v2) on its calibration and the switch turns of production and the retest (about 75 Luna low calls, about $0.035), from what is left",
   "recorded-result":
     "coordinator, 2026-09-30 (fix 2 of the second playthroughs' review, estimated at about $0.20 and capped 30% above it; the ledger at $38.35 of the $42 hard cap after fix 1, and the whole review's workflow held to about $2.40): the turn after an exploration step told as the game recorded it, where the player's choice changes direction from the step before (recordedResult), with production's turn beside it (adopted, under adopted9), twice on 8 turns of the second round's stored runs (food trucks turn 23, where the chosen result was told as the earlier one, and seven ordinary changes of direction; 32 turns, about $0.16 at $0.0037 a single-player and $0.005-0.0075 a group turn), a new judged check (the recorded result told) with its calibration on hand-read stored turns and constructed failing versions (about 80 Luna low calls, about $0.03), a smoke, and what is left for one fix-and-retest",
+  "lever-direction":
+    "coordinator, 2026-09-30 (fix 3 of the second playthroughs' review, estimated at about $0.20 and capped 30% above it; the ledger at $38.52 of the $42 hard cap after fixes 1 and 2, and the whole review's workflow held to about $2.40): the setup whose sacrifices cost and rewards help whichever way a stat runs (leverDirection: one line in the stat rules and the two lever fields reworded), with production's setup beside it (adopted, under adopted10), twice on six premises (the second round's mouse story and New Avalon, three where production's stored setups wrote a pressure backwards, and one where they wrote it right; 24 setups, about $0.13 at the playthroughs' $0.004-0.0065 a Luna low setup), a new judged check (every lever runs the right way) with its calibration on hand-read stored setups (about 60 Luna low calls, about $0.03), a smoke, and what is left for one fix-and-retest",
 };
 
 export type Caps = {

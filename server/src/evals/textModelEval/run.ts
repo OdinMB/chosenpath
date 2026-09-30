@@ -48,6 +48,8 @@ import { buildEndingCasesMode, judgeEndingsMode } from "./endingPrep.js";
 import { buildChoiceCasesMode, judgeChoiceResultsMode } from "./choiceResultPrep.js";
 import { buildSettledCasesMode, judgeSettledMode } from "./outcomeSettledPrep.js";
 import { buildRecordedCasesMode, judgeRecordedMode } from "./recordedResultPrep.js";
+import { buildLeverCasesMode } from "./leverDirectionCases.js";
+import { judgeLeversMode } from "./leverDirectionPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
@@ -83,7 +85,8 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     same on the single-player steps, each turn with production's one checked retry; outcome-settled --role beat under
  *     adopted8: production's turn and outcomeSettled on the second playthroughs' completing switch turns and endings;
  *     recorded-result --role beat under adopted9: production's turn and recordedResult on the second playthroughs'
- *     turns after an exploration step that changed direction)
+ *     turns after an exploration step that changed direction; lever-direction --role setup under adopted10: production's
+ *     setup and leverDirection on six premises, interleaved)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -158,6 +161,14 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-recorded [--max-spend 0.05]  recordedResultTold (recordedResultJudge.ts) on its calibration (two samples)
  *     and every reply of the stage's arms, one call per player of an exploration thread, one sample each, then
  *     judged-recorded.md and .json; --cases <item or case ids> sends only those (a smoke)
+ *   Setups whose sacrifices cost and rewards help, whichever way a stat runs (leverDirectionPrep.ts, 2026-09-30), in the
+ *   lever-direction stage:
+ *   --build-lever-cases [--rebuild-cases]  the second round's mouse story setup as a round case (leverDirectionCases.ts),
+ *     its request the one production sent; no calls; the setups then run with --run --stage lever-direction --role setup
+ *     --prompt-state adopted10 (production's setup and leverDirection, interleaved)
+ *   --judge-levers [--max-spend 0.05]  leversRunRightWay (leverDirectionJudge.ts) on its calibration (two samples) and
+ *     every setup of the stage's arms, one call per setup, one sample each, then judged-levers.md and .json; --cases
+ *     <item or case ids> sends only those (a smoke)
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -210,6 +221,8 @@ type Mode =
   | "judge-settled"
   | "build-recorded-cases"
   | "judge-recorded"
+  | "build-lever-cases"
+  | "judge-levers"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -340,6 +353,8 @@ function parseArgs(argv: string[]): Args {
       case "--judge-settled":
       case "--build-recorded-cases":
       case "--judge-recorded":
+      case "--build-lever-cases":
+      case "--judge-levers":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1041,6 +1056,11 @@ async function main() {
     case "judge-recorded":
       // The stage's judged check books to its own stage
       return judgeRecordedMode(prepContext(args, files, "recorded-result"), { caseIds: args.caseIds });
+    case "build-lever-cases":
+      return buildLeverCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "judge-levers":
+      // The stage's judged check books to its own stage
+      return judgeLeversMode(prepContext(args, files, "lever-direction"), { caseIds: args.caseIds });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

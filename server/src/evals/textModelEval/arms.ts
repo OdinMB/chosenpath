@@ -49,8 +49,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * (outcome-settled: the variant beside production's turn on switch turns and
  * endings of the second round's stored runs), then the turn after an
  * exploration step told as the game recorded it (recorded-result: the variant
- * beside production's turn on the second round's changes of direction). Their
- * caps and reasons are in budget.ts.
+ * beside production's turn on the second round's changes of direction), then
+ * the setup whose sacrifices cost and rewards help whichever way a stat runs
+ * (lever-direction: the variant beside production's setup on six premises).
+ * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -71,6 +73,7 @@ export const FEEDBACK_STAGES = [
   "playthroughs-2",
   "outcome-settled",
   "recorded-result",
+  "lever-direction",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -239,6 +242,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // The recorded-result stage (2026-09-30, fix 2 of the second playthroughs' review): the turn after an exploration step
   // told as the game recorded it, against production's turn, which runs beside it
   recordedResult: "adopted",
+  // The lever-direction stage (2026-09-30, fix 3 of the review): the setup whose sacrifices cost and rewards help whichever
+  // way a stat runs, against production's setup, which runs beside it
+  leverDirection: "adopted",
 };
 
 /**
@@ -564,9 +570,53 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return outcomeSettledArms(role);
     case "recorded-result":
       return recordedResultArms(role);
+    case "lever-direction":
+      return leverDirectionArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the lever-direction stage (2026-09-30, fix 3 of the
+ * second playthroughs' review): production's own code, unchanged since the
+ * recorded-result stage, under a tag of its own so production's setup runs
+ * beside the variant in the same minutes.
+ */
+export const LEVER_DIRECTION_PROMPT_STATE = "adopted10";
+
+/** The mouse story's setup, read with a five-year-old at ten turns (leverDirectionCases.ts): the second round's premise and length. */
+export const LEVER_MOUSE_CASE = "round-setup-kids-mouse";
+
+/**
+ * The stage's setup premises. Where the defect happened: the mouse story (the
+ * second round's Cat's Nearness, a sacrifice that moved the cat away) and New
+ * Avalon (the round's Heartwell Feedback; its frozen premise sends the round's
+ * request); the bounty hunters, Casablanca and the secret society, where
+ * production's stored setups wrote a pressure's levers backwards (Dust and
+ * Danger, Pursuit Pressure, Family Pressure, Eclipse Strain); beside them the
+ * emergency-room doctor, whose stored setups wrote Department Strain and
+ * Hospital Oversight the right way. Every player count; a story read with a
+ * child.
+ */
+export const LEVER_DIRECTION_CASES = [
+  LEVER_MOUSE_CASE,
+  "setup-custom-avalon",
+  "setup-pretend-er-doctor",
+  "setup-fiction-bounty-hunters",
+  "setup-future-casablanca",
+  "setup-flexible-secret-society",
+];
+
+/**
+ * The lever-direction stage (the coordinator's fix 3 after the second
+ * playthroughs' review): production's custom-story setup (adopted) and the
+ * variant (leverDirection) on the setup group's model (Luna low), twice on the
+ * stage's premises, interleaved, under adopted10.
+ */
+function leverDirectionArms(role: EvalRole): ArmPlan[] {
+  if (role !== "setup") return [];
+  return (["adopted", "leverDirection"] as const).map((variant) => ({ arm: adoptedDefault("setup", variant), samples: 2, scope: "all" as const, caseIds: [...LEVER_DIRECTION_CASES] }));
 }
 
 /**
@@ -1002,7 +1052,7 @@ function optionsO2Arms(role: EvalRole): ArmPlan[] {
 }
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
-const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result", "choice-line-sp", "outcome-settled", "recorded-result"];
+const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result", "choice-line-sp", "outcome-settled", "recorded-result", "lever-direction"];
 
 export function stageInterleavesArms(stage: Stage): boolean {
   return INTERLEAVED_STAGES.includes(stage);
@@ -1043,6 +1093,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   ...[...OUTCOME_SETTLED_CASES.single, ...OUTCOME_SETTLED_CASES.groups].map((id): [string, Stage] => [id, "outcome-settled"]),
   // The recorded-result stage's cases from the second playthroughs (2026-09-30), frozen after every earlier stage had closed
   ...[...RECORDED_RESULT_CASES.single, ...RECORDED_RESULT_CASES.groups].map((id): [string, Stage] => [id, "recorded-result"]),
+  // The lever-direction stage's mouse setup (2026-09-30), frozen after every earlier stage had closed; the frozen premises
+  // it runs beside were planned by the setup rounds and stay plannable
+  [LEVER_MOUSE_CASE, "lever-direction"],
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */
