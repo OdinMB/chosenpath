@@ -108,7 +108,7 @@ export function narrativeImplications(statId: string, lines: string[]): StateEdi
 
 // --- Frozen round cases ---
 
-type RoundCaseInput = {
+export type RoundCaseInput = {
   id: string;
   role: "beat" | "switch" | "thread";
   state: StoryState;
@@ -119,7 +119,7 @@ type RoundCaseInput = {
 };
 
 /** A round case with its tags read from its state, as a turn call would see it. */
-function roundCase(input: RoundCaseInput): EvalCase {
+export function roundCase(input: RoundCaseInput): EvalCase {
   const players = Object.keys(input.state.players).length;
   const draft: EvalCase = {
     id: input.id,

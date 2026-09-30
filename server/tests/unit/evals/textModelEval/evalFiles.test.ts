@@ -92,6 +92,13 @@ describe("evalFiles", () => {
     expect(JSON.parse(fs.readFileSync(path.join(outDir, "judged-stages.json"), "utf-8"))).toEqual({ set: "stages" });
   });
 
+  it("writes the ending check's readings to judged-endings.md and .json", () => {
+    const files = evalFiles(outDir);
+    files.writeJudgedEndings("# endings\n", { set: "endings" });
+    expect(fs.readFileSync(path.join(outDir, "judged-endings.md"), "utf-8")).toBe("# endings\n");
+    expect(JSON.parse(fs.readFileSync(path.join(outDir, "judged-endings.json"), "utf-8"))).toEqual({ set: "endings" });
+  });
+
   it("writes the nearer frames' judged turns beside the rounds' file, not over it", () => {
     const files = evalFiles(outDir);
     files.writeJudgedTurns("# rounds\n", { set: "rounds" });

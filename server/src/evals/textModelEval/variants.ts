@@ -46,6 +46,7 @@ import { turnRound3FormRequest, type TurnRound3Request } from "../../game/servic
 import { groupTurnB10Request } from "../../game/services/storyTextRounds/turnRound3Groups.js";
 import { productionFormRequest } from "../../game/services/storyTextRounds/requestFormB9.js";
 import { optionsContinuityRequest, type OptionsContinuityArm } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
+import { endingStateRequest } from "../../game/services/storyTextRounds/endingState.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -184,6 +185,14 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * lever line that invites a reward until the chapter has offered one.
  * "turnO2b" is O2's one fix-and-retest after its run: O2 with sacrifices on
  * today's rate (no strong-reason clause), the reward invitation kept.
+ * "endingState" is the ending told as its milestones leave it (the owner's
+ * decision of 2026-09-30, storyTextRounds/endingState.ts): production's ending
+ * (today's form with the scoreboard rule on a scored contest's ending, built
+ * from the frozen copy) with its outcome lines replaced (each outcome told as
+ * its milestones leave it, the game stating which are complete and which
+ * unfinished after this beat, a contest's rule with its unfinished half),
+ * with production's turn limits for the player count; endings only, every
+ * player count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -236,7 +245,8 @@ export type VariantId =
   | "turnOC"
   | "turnOb"
   | "turnO2"
-  | "turnO2b";
+  | "turnO2b"
+  | "endingState";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -286,6 +296,7 @@ export const VARIANTS: VariantId[] = [
   "turnOb",
   "turnO2",
   "turnO2b",
+  "endingState",
 ];
 
 /**
@@ -638,6 +649,10 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   turnOb: optionsContinuity("turnOb", { options: true, continuity: false, statsUnnamed: true }),
   turnO2: optionsContinuity("turnO2", { options: true, continuity: false, o2: true }),
   turnO2b: optionsContinuity("turnO2b", { options: true, continuity: false, o2: true, o2RateSacrifices: true }),
+  endingState: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant endingState does not cover role ${input.role}`);
+    return { ...endingStateRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  },
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

@@ -35,7 +35,8 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * stage scoping (planner v2d and its judged stage check), and that of
  * 2026-09-30 the options and continuity arms on production's turn form, then
  * version O2 beside production's form, then planner v2e (planner v2d with its
- * last step listed once). Their caps and reasons are in budget.ts.
+ * last step listed once), then the ending told as its milestones leave it
+ * beside production's ending. Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -48,6 +49,7 @@ export const FEEDBACK_STAGES = [
   "options-continuity",
   "options-o2",
   "planner-v2e",
+  "ending-state",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -194,6 +196,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   turnO2: "adopted",
   // O2's one fix-and-retest (after its run of 2026-09-30) against production's form too, O2 second
   turnO2b: "adopted",
+  // The ending told as its milestones leave it (the owner's decision of 2026-09-30) against production's ending, which it
+  // edits and which runs beside it on the same turn model
+  endingState: "adopted",
 };
 
 /**
@@ -498,9 +503,52 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       // Planner v2e (coordinator, 2026-09-30) on Luna low, twice on every chapter-planning case, stored and built; planner
       // v2c, v2d and today's form read their stored records, and its switch planner is planner v2b's, so no switch case runs
       return role === "thread" ? [{ arm: luna("low", "planV2e"), samples: 2, scope: "all" }] : [];
+    case "ending-state":
+      return endingStateArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the ending's run (2026-09-30): adopted2, whose records
+ * hold production's own ending twice on the three stored endings (the options
+ * and continuity run). Production's beat code is unchanged since then (only
+ * its chapter planner moved, planner v2e), so its ending requests are
+ * adopted2's byte for byte, and those two samples serve as production's
+ * without being sent again; production runs beside the variant on the built
+ * endings in the same hour.
+ */
+export const ENDING_STATE_PROMPT_STATE = "adopted2";
+
+/** The stored endings: Novi Reg after its first chapter, every outcome unfinished (the Waste Ring 1 of 3 with the ending's milestone). */
+export const ENDING_STATE_STORED_CASES = ["end-8988006e-t4-o0", "end-8988006e-t4-o1", "end-8988006e-t4-o2"];
+
+/**
+ * The endings built for the run (endingCases.ts, no calls): a single player
+ * with one outcome complete and two unfinished; a two-player contest complete
+ * and the same contest unfinished; three players in two camps, a cooperative
+ * outcome complete and the camps' contest unfinished.
+ */
+export const ENDING_STATE_BUILT_CASES = {
+  single: ["round-end-complete-8988006e-t8"],
+  groups: ["round-end-contest-complete-bounty-t4", "round-end-contest-unfinished-bounty-t4", "round-end-camps-cofounders-t4"],
+} as const;
+
+/**
+ * The ending's run (the coordinator's brief of 2026-09-30, the owner's decision
+ * that each outcome is told as its milestones leave it): production's ending
+ * (adopted) and the variant (endingState) on each player count's own turn
+ * group, twice on the stored and built endings, interleaved.
+ */
+function endingStateArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  const single = [...ENDING_STATE_STORED_CASES, ...ENDING_STATE_BUILT_CASES.single];
+  const groups = [...ENDING_STATE_BUILT_CASES.groups];
+  return [
+    ...(["adopted", "endingState"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: single })),
+    ...(["adopted", "endingState"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: groups })),
+  ];
 }
 
 /**
@@ -615,7 +663,7 @@ function optionsO2Arms(role: EvalRole): ArmPlan[] {
 }
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
-const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2"];
+const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state"];
 
 export function stageInterleavesArms(stage: Stage): boolean {
   return INTERLEAVED_STAGES.includes(stage);
@@ -646,9 +694,11 @@ export const STAGE_SCOPING_LAST_CHAPTER_CASES = ["round-thread-last4-8988006e-t5
  * the rounds, the migration check and the feedback stages before it had
  * closed; the round cases before them were frozen before those stages ran.
  */
-const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map(
-  [...STAGE_SCOPING_NEW_CASES, ...STAGE_SCOPING_LAST_CHAPTER_CASES].map((id): [string, Stage] => [id, "stage-scoping"])
-);
+const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
+  ...[...STAGE_SCOPING_NEW_CASES, ...STAGE_SCOPING_LAST_CHAPTER_CASES].map((id): [string, Stage] => [id, "stage-scoping"]),
+  // The built endings (2026-09-30), frozen after every stage before the ending's run had closed
+  ...[...ENDING_STATE_BUILT_CASES.single, ...ENDING_STATE_BUILT_CASES.groups].map((id): [string, Stage] => [id, "ending-state"]),
+]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */
 export function stagePlansCase(stage: Stage, caseId: string): boolean {

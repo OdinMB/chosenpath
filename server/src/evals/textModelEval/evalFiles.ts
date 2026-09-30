@@ -33,6 +33,7 @@ import type { CallRecord } from "./runner.js";
  *   judged-turns.md|json   the judged checks on a round's turns, reference against candidate (--judge-records)
  *   judged-groups.md|json  the group round's judged consistency check and its calibration (--judge-groups)
  *   judged-stages.md|json  the stage scoping's judged check, "the chapter stays within its stage", and its calibration (--judge-stages)
+ *   judged-endings.md|json the ending's judged check, "each outcome told as its milestones leave it", and its calibration (--judge-endings)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  */
 
@@ -133,6 +134,11 @@ export function evalFiles(outDir: string) {
     writeJudgedStages: (markdown: string, json: unknown) => {
       writeJson(at("judged-stages.json"), json);
       fs.writeFileSync(at("judged-stages.md"), markdown);
+    },
+    /** The ending's judged check, "each outcome told as its milestones leave it" (--judge-endings, endingJudge.ts) */
+    writeJudgedEndings: (markdown: string, json: unknown) => {
+      writeJson(at("judged-endings.json"), json);
+      fs.writeFileSync(at("judged-endings.md"), markdown);
     },
     /** Setup round 3's setup-to-play chain (--setup-chain) */
     writeSetupChain: (markdown: string, json: unknown) => {

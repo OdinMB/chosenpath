@@ -43,6 +43,7 @@ import { renderResults } from "./resultsReport.js";
 import { DEFAULT_CHAIN_MAX_SPEND, setupChainMode } from "./setupChainMode.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
 import { buildStageCasesMode, judgeStagesMode } from "./stagePrep.js";
+import { buildEndingCasesMode, judgeEndingsMode } from "./endingPrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
 import {
@@ -64,11 +65,12 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --dry-run (default) [--prompt-state <tag>, default round0]  cases, open jobs, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e --prompt-state <tag> [filters]
+ *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e|ending-state --prompt-state <tag> [filters]
  *     (options-continuity runs under adopted2: production's form beside the three arms, interleaved;
  *     options-o2 under adopted3: production's form beside version O2 on the stored rolled chapter steps, interleaved,
  *     then O2's retest turnO2b once on the same steps; planner-v2e under round0, beside planner v2c's and v2d's
- *     stored plans)
+ *     stored plans; ending-state under adopted2: the ending told as its milestones leave it beside production's
+ *     ending, interleaved, on the stored and built endings, production's stored-ending samples already recorded)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -108,6 +110,13 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-stages [--arms <chapter planner keys>] --prompt-state <tag> [--max-spend 0.10]  the judged stage check
  *     (stageJudge.ts): its calibration (two samples), the stored chapters and every isolated chapter plan of the
  *     arms (one sample), then judged-stages.md and .json; --cases <item or case ids> sends only those (a smoke)
+ *   The ending (endingPrep.ts, the owner's decision of 2026-09-30), in the ending-state stage:
+ *   --build-ending-cases [--rebuild-cases]  four endings no frozen case holds (endingCases.ts: a single player
+ *     with an outcome complete, a two-player contest complete and unfinished, three players in two camps), from a
+ *     frozen case and the stored setup chain, frozen beside the others; no calls
+ *   --judge-endings --arms <beat keys> --prompt-state <tag> [--max-spend 0.05]  the judged check "each outcome told
+ *     as its milestones leave it" (endingJudge.ts): its calibration (two samples) and every ending of the arms (one
+ *     sample, one call per player), then judged-endings.md and .json; --cases <item or case ids> sends only those
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -143,6 +152,8 @@ type Mode =
   | "judge-groups"
   | "build-stage-cases"
   | "judge-stages"
+  | "build-ending-cases"
+  | "judge-endings"
   | "balance-sim"
   | "setup-chain";
 
@@ -259,6 +270,8 @@ function parseArgs(argv: string[]): Args {
       case "--judge-groups":
       case "--build-stage-cases":
       case "--judge-stages":
+      case "--build-ending-cases":
+      case "--judge-endings":
       case "--balance-sim":
       case "--setup-chain":
         args.mode = arg.slice(2) as Mode;
@@ -906,6 +919,14 @@ async function main() {
       // The stage scoping's judged check books to its own stage unless another is given
       return judgeStagesMode(prepContext(args, files, args.stage ?? "stage-scoping"), args.armKeys, args.promptState ?? CURRENT_PROMPT_STATE, {
         stage: args.stage ?? "stage-scoping",
+        caseIds: args.caseIds,
+      });
+    case "build-ending-cases":
+      return buildEndingCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "judge-endings":
+      // The ending's judged check books to its own stage unless another is given
+      return judgeEndingsMode(prepContext(args, files, args.stage ?? "ending-state"), args.armKeys, args.promptState ?? CURRENT_PROMPT_STATE, {
+        stage: args.stage ?? "ending-state",
         caseIds: args.caseIds,
       });
     case "balance-sim":

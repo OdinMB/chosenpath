@@ -20,6 +20,8 @@ import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/
 import { todaysFormWithB6Request } from "../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
 import {
+  ENDING_STATE_BUILT_CASES,
+  ENDING_STATE_STORED_CASES,
   FINAL_CHECK_SETUP_PREMISES,
   FINAL_CHECK_TEMPLATE_PREMISES,
   OPTIONS_O2_CASES,
@@ -523,6 +525,36 @@ describe("planJobs: the round stages and the migration check", () => {
     ]);
     for (const job of jobs) expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
     expect(planJobs(cases, { stage: "options-o2", promptState: "adopted3", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
+  });
+
+  it("plans the ending told as its milestones leave it (2026-09-30) beside production's ending on its endings only, interleaved, each on its player count's model and limits", () => {
+    const [stored] = ENDING_STATE_STORED_CASES;
+    const [group] = ENDING_STATE_BUILT_CASES.groups;
+    const [single] = ENDING_STATE_BUILT_CASES.single;
+    const cases = [
+      evalCase(stored, "beat", { state: endingBeat(1, { id: "story-a" }).getState(), tags: tags({ ending: true }) }),
+      evalCase(single, "beat", { state: endingBeat(1, { id: "story-b" }).getState(), tags: tags({ ending: true, source: "round" }) }),
+      evalCase(group, "beat", { state: endingBeat(2, { id: "story-c" }).getState(), tags: tags({ ending: true, source: "round", multiplayer: true, players: 2 }) }),
+      evalCase("sp-other-ending", "beat", { state: endingBeat(1, { id: "story-d" }).getState(), tags: tags({ ending: true }) }),
+    ];
+    // Production's two samples on a stored ending are adopted2's records already (the runner skips finished jobs), so there
+    // only the variant goes out
+    const jobs = planJobs(cases, { stage: "ending-state", promptState: "adopted2", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
+    expect(jobs.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`).sort()).toEqual(
+      [
+        ...[1, 2].flatMap((s) => ["adopted", "endingState"].map((v) => `${stored} s${s} gpt-6-luna@medium/${v}`)),
+        ...[1, 2].flatMap((s) => ["adopted", "endingState"].map((v) => `${single} s${s} gpt-6-luna@medium/${v}`)),
+        ...[1, 2].flatMap((s) => ["adopted", "endingState"].map((v) => `${group} s${s} gpt-6-luna@low/${v}`)),
+      ].sort()
+    );
+    for (const job of jobs) {
+      const players = job.caseId === group ? 2 : 1;
+      expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: players === 1 ? 12_000 : 14_000 });
+    }
+    // Interleaved: both arms on a case before the next case
+    const onSingle = jobs.filter((j) => j.caseId === single && j.sample === 1).map((j) => jobs.indexOf(j));
+    expect(Math.abs(onSingle[0] - onSingle[1])).toBe(1);
+    expect(planJobs(cases, { stage: "ending-state", promptState: "adopted2", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
   });
 
   it("plans the group round (B10): the sharpened note twice on the stored group turns, today's group form's sample 2 beside it", () => {

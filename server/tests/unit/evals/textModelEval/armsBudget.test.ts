@@ -3,6 +3,9 @@ import {
   armsFor,
   armSettings,
   baselineArm,
+  ENDING_STATE_BUILT_CASES,
+  ENDING_STATE_PROMPT_STATE,
+  ENDING_STATE_STORED_CASES,
   estimateBaseKey,
   FINAL_CHECK_SETUP_PREMISES,
   FINAL_CHECK_TEMPLATE_PREMISES,
@@ -372,17 +375,30 @@ describe("budget caps", () => {
       "options-continuity": 1.4,
       "options-o2": 0.7,
       "planner-v2e": 0.15,
+      "ending-state": 0.1,
     });
-    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping", "options-continuity", "options-o2", "planner-v2e"]);
+    expect(FEEDBACK_STAGES).toEqual([
+      "plan-refresh",
+      "reruns",
+      "setup-retests",
+      "groups",
+      "form-gate",
+      "final-check",
+      "stage-scoping",
+      "options-continuity",
+      "options-o2",
+      "planner-v2e",
+      "ending-state",
+    ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
       expect(LEDGER_STAGES).toContain(stage);
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all ten caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all eleven caps still fit
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(4.85);
+    expect(caps).toBeCloseTo(4.95);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -508,6 +524,47 @@ describe("budget caps", () => {
     expect(stageRunsBaseline("planner-v2e")).toBe(false);
     // The ledger read $36.01 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
     expect(36.01 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["planner-v2e"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("runs the ending told as its milestones leave it (ending-state, 2026-09-30) beside production's ending: each player count on its own turn model, twice on the stored and built endings, interleaved", () => {
+    const plans = armsFor("ending-state", "beat");
+    const one = ["adopted", "endingState"].map((variant) => armKey({ model: TEXT_MODEL_GROUPS.beat.model, reasoningEffort: TEXT_MODEL_GROUPS.beat.reasoningEffort }, variant as "adopted"));
+    const group = ["adopted", "endingState"].map((variant) =>
+      armKey({ model: TEXT_MODEL_GROUPS.multiplayerBeat.model, reasoningEffort: TEXT_MODEL_GROUPS.multiplayerBeat.reasoningEffort }, variant as "adopted")
+    );
+    const single = [...ENDING_STATE_STORED_CASES, ...ENDING_STATE_BUILT_CASES.single];
+    expect(plans.map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source, p.caseIds])).toEqual([
+      [one[0], 1, 2, "single-player", undefined, single],
+      [one[1], 1, 2, "single-player", undefined, single],
+      [group[0], 1, 2, "multiplayer", undefined, ENDING_STATE_BUILT_CASES.groups],
+      [group[1], 1, 2, "multiplayer", undefined, ENDING_STATE_BUILT_CASES.groups],
+    ]);
+    expect(one).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/endingState"]);
+    expect(group).toEqual(["gpt-6-luna@low/adopted", "gpt-6-luna@low/endingState"]);
+    expect(ENDING_STATE_STORED_CASES).toEqual(["end-8988006e-t4-o0", "end-8988006e-t4-o1", "end-8988006e-t4-o2"]);
+    expect(ENDING_STATE_BUILT_CASES.single).toHaveLength(1);
+    expect(ENDING_STATE_BUILT_CASES.groups).toHaveLength(3);
+    for (const role of ["setup", "switch", "thread", "iteration"] as const) expect(armsFor("ending-state", role)).toEqual([]);
+    expect(pipelinePlans("ending-state")).toEqual([]);
+    expect(stageInterleavesArms("ending-state")).toBe(true);
+    // Production's beat code is adopted2's (only its chapter planner changed since), whose records hold production's two samples on the stored endings
+    expect(ENDING_STATE_PROMPT_STATE).toBe("adopted2");
+    // The built endings are frozen after every earlier stage closed, so only this stage plans them
+    for (const id of [...ENDING_STATE_BUILT_CASES.single, ...ENDING_STATE_BUILT_CASES.groups]) {
+      expect(stagePlansCase("ending-state", id)).toBe(true);
+      expect(stagePlansCase("planner-v2e", id)).toBe(false);
+      expect(stagePlansCase("options-continuity", id)).toBe(false);
+    }
+    // Against production's ending on the same turn model; priced from it
+    expect(referenceKey(one[1])).toBe(one[0]);
+    expect(referenceKey(group[1])).toBe(group[0]);
+    expect(estimateBaseKey(one[1])).toBe(one[0]);
+    expect(secondReferenceKeys(one[1])).toEqual([]);
+    expect(STAGE_CAP_REASONS["ending-state"]).toMatch(/endingState/);
+    expect(STAGE_CAP_REASONS["ending-state"]).toMatch(/2026-09-30/);
+    expect(stageRunsBaseline("ending-state")).toBe(false);
+    // The ledger read $36.08 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
+    expect(36.08 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["ending-state"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {
