@@ -3,7 +3,7 @@ import type { Callbacks } from "@langchain/core/callbacks/manager";
 import type { ClientOptions } from "openai";
 import { Logger } from "shared/logger.js";
 import {
-  REASONING_EFFORTS,
+  reasoningEffortsFor,
   VERBOSITIES,
   type TextModelSettings,
   type TextRole,
@@ -14,11 +14,12 @@ import { errorFinishReason, errorName } from "./usageRecorder.js";
 /*
  * The one place a text-model ChatOpenAI is built: the exact request shape per
  * model family, the retry policy, retry logging, and production's timeout and
- * output cap per role. The factory accepts gpt-4.x and gpt-6; anything else
- * throws, because an unknown family would fail at runtime (and a fail-closed
- * content filter would then block creation). Production text roles take
- * gpt-6 only (textModelSettings.ts); gpt-4.x stays here for the eval's
- * comparison arms.
+ * output cap per role. The factory accepts gpt-4.x and gpt-6 (gpt-6-* and
+ * gpt-6.1-*, each at the efforts it takes: reasoningEffortsFor); anything
+ * else throws, because an unknown family would fail at runtime (and a
+ * fail-closed content filter would then block creation). Production text
+ * roles take gpt-6 only (textModelSettings.ts); gpt-4.x stays here for the
+ * eval's comparison arms.
  *
  * LangChain 0.6.7 does not know gpt-6 is a reasoning model, so effort goes
  * through modelKwargs and temperature must never be set. For the same reason
@@ -44,11 +45,12 @@ export function modelFamily(model: string): ModelFamily {
   if (model.startsWith("gpt-4.1") || model.startsWith("gpt-4o")) {
     return "gpt-4.x";
   }
-  if (/^gpt-6-/.test(model)) {
+  // GPT-6.1 Sol (2026-09-29) takes the gpt-6 request; a later point release waits until its page is read
+  if (/^gpt-6(\.1)?-/.test(model)) {
     return "gpt-6";
   }
   throw new Error(
-    `Unsupported text model "${model}": only gpt-4.1*, gpt-4o* and gpt-6-* are configured`
+    `Unsupported text model "${model}": only gpt-4.1*, gpt-4o*, gpt-6-* and gpt-6.1-* are configured`
   );
 }
 
@@ -76,9 +78,10 @@ export function assertSupportedSettings(
   if (temperature !== undefined) {
     throw new Error(`${model} takes no temperature`);
   }
-  if (reasoningEffort === undefined || !isOneOf(REASONING_EFFORTS, reasoningEffort)) {
+  const efforts = reasoningEffortsFor(model);
+  if (reasoningEffort === undefined || !isOneOf(efforts, reasoningEffort)) {
     throw new Error(
-      `${model} needs a reasoning effort of ${REASONING_EFFORTS.join(", ")} (got ${reasoningEffort ?? "none set"})`
+      `${model} needs a reasoning effort of ${efforts.join(", ")} (got ${reasoningEffort ?? "none set"})`
     );
   }
   if (verbosity !== undefined && !isOneOf(VERBOSITIES, verbosity)) {

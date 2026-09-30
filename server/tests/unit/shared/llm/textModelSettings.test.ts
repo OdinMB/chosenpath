@@ -95,6 +95,55 @@ describe("resolveTextModelConfig: env overrides", () => {
   });
 });
 
+describe("resolveTextModelConfig: GPT-6.1 Sol (accepted since 2026-09-30, no group's default)", () => {
+  it("accepts gpt-6.1-sol in a group at an effort it takes, and moves no default", () => {
+    const config = resolveTextModelConfig(
+      { GENERATION_MODEL_NAME: "gpt-6.1-sol", GENERATION_MODEL_REASONING_EFFORT: "low" },
+      quiet
+    );
+    expect(settingsFor(config, "templateGeneration")).toEqual({ model: "gpt-6.1-sol", reasoningEffort: "low" });
+    expect(settingsFor(config, "templateIteration")).toEqual({ model: "gpt-6.1-sol", reasoningEffort: "low" });
+    expect(describeTextModels(config).templateEditor).toBe("gpt-6.1-sol@low");
+    // Custom-story setup, which a player waits for, stays on its own default
+    expect(settingsFor(config, "setup")).toEqual({ model: "gpt-6-luna", reasoningEffort: "low" });
+    const beat = resolveTextModelConfig({ TEXT_MODEL_NAME: "gpt-6.1-sol", TEXT_MODEL_REASONING_EFFORT: "high" }, quiet);
+    expect(settingsFor(beat, "beat")).toEqual({ model: "gpt-6.1-sol", reasoningEffort: "high" });
+    expect(describeTextModels(resolveTextModelConfig({}, quiet)).templateEditor).toBe("gpt-6-sol@low");
+  });
+
+  it("stops the server on effort none with gpt-6.1-sol, naming the variable, what the model takes and what to set", () => {
+    const none = () =>
+      resolveTextModelConfig({ GENERATION_MODEL_NAME: "gpt-6.1-sol", GENERATION_MODEL_REASONING_EFFORT: "none" }, quiet);
+    expect(none).toThrow("GENERATION_MODEL_REASONING_EFFORT=none is not supported by gpt-6.1-sol, which takes low, medium or high");
+    expect(none).toThrow(/OpenAI refuses it and a refused call is never retried/);
+    expect(none).toThrow(/Set GENERATION_MODEL_REASONING_EFFORT=low/);
+    // The suggestion is the group's own default effort
+    expect(() =>
+      resolveTextModelConfig({ TEXT_MODEL_NAME: "gpt-6.1-sol", TEXT_MODEL_REASONING_EFFORT: "none" }, quiet)
+    ).toThrow(/Set TEXT_MODEL_REASONING_EFFORT=medium/);
+  });
+
+  it("names gpt-6.1-sol's own efforts when its effort is minimal, unknown or missing", () => {
+    const minimal = () =>
+      resolveTextModelConfig({ GENERATION_MODEL_NAME: "gpt-6.1-sol", GENERATION_MODEL_REASONING_EFFORT: "minimal" }, quiet);
+    expect(minimal).toThrow(/GENERATION_MODEL_REASONING_EFFORT=minimal is not a GPT-6 reasoning effort/);
+    expect(minimal).toThrow(/gpt-6.1-sol takes low, medium or high/);
+    expect(minimal).toThrow(/set low or remove it/);
+    expect(() => resolveTextModelConfig({ GENERATION_MODEL_NAME: "gpt-6.1-sol" }, quiet)).toThrow(
+      "GENERATION_MODEL_REASONING_EFFORT must be set for gpt-6.1-sol (low, medium or high)"
+    );
+    // Today's models still list none
+    expect(() => resolveTextModelConfig({ TEXT_MODEL_NAME: "gpt-6-luna" }, quiet)).toThrow(
+      "TEXT_MODEL_REASONING_EFFORT must be set for gpt-6-luna (none, low, medium or high)"
+    );
+  });
+
+  it("keeps none for today's Sol and Luna: the guard reads the model, not the group", () => {
+    const config = resolveTextModelConfig({ GENERATION_MODEL_REASONING_EFFORT: "none" }, quiet);
+    expect(settingsFor(config, "templateGeneration")).toEqual({ model: "gpt-6-sol", reasoningEffort: "none" });
+  });
+});
+
 describe("resolveTextModelConfig: what stops the server at startup", () => {
   it.each([
     ["SETUP_MODEL_NAME", "gpt-4.1", "SETUP_MODEL_NAME=gpt-6-luna and SETUP_MODEL_REASONING_EFFORT=low"],
@@ -136,6 +185,12 @@ describe("resolveTextModelConfig: what stops the server at startup", () => {
     expect(() => resolveTextModelConfig({ CONTENT_FILTER_MODEL_NAME: "o3" }, quiet)).toThrow(
       /CONTENT_FILTER_MODEL_NAME=o3 is not a supported text model/
     );
+  });
+
+  it("refuses a later GPT-6 point release, whose page nobody has read", () => {
+    expect(() =>
+      resolveTextModelConfig({ GENERATION_MODEL_NAME: "gpt-6.2-sol", GENERATION_MODEL_REASONING_EFFORT: "low" }, quiet)
+    ).toThrow("GENERATION_MODEL_NAME=gpt-6.2-sol is not a supported text model: production text calls take gpt-6-* and gpt-6.1-* models.");
   });
 
   it("drops a temperature with one warning per variable", () => {

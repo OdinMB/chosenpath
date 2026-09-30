@@ -17,13 +17,23 @@ export type Usage = {
 
 type Price = { input: number; cached: number; cacheWrite: number; output: number };
 
-/** US$ per 1M tokens (test plan §2.1). Longest matching prefix wins. */
+/**
+ * US$ per 1M tokens (test plan §2.1). Longest matching prefix wins.
+ * gpt-6.1-sol from OpenAI's model and pricing pages of 2026-09-30
+ * (DOCS/2026-09-30_sol-6-1-assessment.md): today's Sol's but for cached input.
+ */
 const PRICES: [string, Price][] = [
   ["gpt-4.1-mini", { input: 0.4, cached: 0.1, cacheWrite: 0, output: 1.6 }],
   ["gpt-4.1", { input: 2.0, cached: 0.5, cacheWrite: 0, output: 8.0 }],
   ["gpt-6-sol", { input: 2.0, cached: 0.2, cacheWrite: 2.5, output: 10.0 }],
+  ["gpt-6.1-sol", { input: 2.0, cached: 0.1, cacheWrite: 2.5, output: 10.0 }],
   ["gpt-6-luna", { input: 0.1, cached: 0.01, cacheWrite: 0.125, output: 0.5 }],
 ];
+
+/** Today's Sol or GPT-6.1 Sol, which estimates read alike until measured (Artificial Analysis: the same pace at low). */
+function isSol(model: string): boolean {
+  return model.startsWith("gpt-6-sol") || model.startsWith("gpt-6.1-sol");
+}
 
 function priceFor(model: string): Price {
   const match = PRICES.filter(([prefix]) => model.startsWith(prefix)).sort(
@@ -70,9 +80,9 @@ function reasoningTokens(arm: Arm): number {
   if (!effort || effort === "none") {
     return 0;
   }
-  const isSol = arm.model.startsWith("gpt-6-sol");
-  if (effort === "low") return isSol ? 700 : 500;
-  if (effort === "medium") return isSol ? 2_400 : 6_200;
+  const sol = isSol(arm.model);
+  if (effort === "low") return sol ? 700 : 500;
+  if (effort === "medium") return sol ? 2_400 : 6_200;
   return 12_000;
 }
 
@@ -117,7 +127,7 @@ export function estimateCall(input: {
 /** Rough output speed (tokens/s) for duration estimates (test plan §2.6). */
 export function outputTokensPerSecond(model: string): number {
   if (model.startsWith("gpt-6-luna")) return 130;
-  if (model.startsWith("gpt-6-sol")) return 90;
+  if (isSol(model)) return 90;
   if (model.startsWith("gpt-4.1-mini")) return 130;
   return 140;
 }

@@ -71,7 +71,7 @@ describe("printDryRun: the prompt state it plans under", () => {
     expect(lines.some((line) => /Stage migration: \$0\.00 of \$1\.2 \(.+\)/.test(line))).toBe(true);
   });
 
-  it("plans a row for each run of the owner's feedback workflow against its own cap, and names the $40 hard cap", async () => {
+  it("plans a row for each run of the owner's feedback workflow against its own cap, and names the $42 hard cap and why it was raised", async () => {
     const lines = await dryRun([]);
     for (const [label, cap] of [
       ["Plan refresh", "0.1"],
@@ -85,7 +85,11 @@ describe("printDryRun: the prompt state it plans under", () => {
       expect([label, lines.some((line) => new RegExp(`^${label} pipeline chains: \\d+ jobs .*\\(stage cap \\$${cap}\\)`).test(line))]).toEqual([label, true]);
     }
     expect(lines.some((line) => /Stage final-check: \$0\.00 of \$0\.6 \(.*2026-09-28.*\)/.test(line))).toBe(true);
-    expect(lines).toContainEqual(expect.stringMatching(/^ {2}Total: \$\d+\.\d\d of \$40 \(hard cap, raised from \$33 by the owner on 2026-09-28/));
+    expect(lines).toContainEqual(
+      expect.stringMatching(
+        /^ {2}Total: \$\d+\.\d\d of \$42 \(hard cap, raised from \$40 by the owner on 2026-09-30 for more whole-story playthroughs, from \$33 on 2026-09-28 and from \$30 on 2026-09-27;/
+      )
+    );
   });
 
   it("lists the round stages' open jobs per arm, each with its estimate", async () => {

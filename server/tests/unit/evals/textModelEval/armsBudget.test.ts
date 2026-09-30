@@ -50,6 +50,7 @@ import {
   costFromUsage,
   estimateCall,
   MIN_MEASURED_RECORDS,
+  outputTokensPerSecond,
 } from "../../../../src/evals/textModelEval/pricing.js";
 import {
   budgetCheck,
@@ -81,6 +82,17 @@ describe("costFromUsage", () => {
 
   it("refuses a model without a price", () => {
     expect(() => costFromUsage("o3", { inputTokens: 1, cachedTokens: 0, cacheWriteTokens: 0, outputTokens: 1 })).toThrow();
+  });
+
+  it("prices GPT-6.1 Sol at OpenAI's rates (2026-09-29): today's Sol's, but cached input at $0.10", () => {
+    const usage = { inputTokens: 1_000_000, cachedTokens: 200_000, cacheWriteTokens: 300_000, outputTokens: 1_000_000 };
+    // 0.5M × 2.00 + 0.2M × 0.10 + 0.3M × 2.50 + 1M × 10.00
+    expect(costFromUsage("gpt-6.1-sol", usage)).toBeCloseTo(1 + 0.02 + 0.75 + 10);
+    expect(costFromUsage("gpt-6.1-sol-2026-09-29", usage)).toBeCloseTo(11.77);
+    // Uncached, a call costs what it costs on today's Sol: a setup at the assessment's medians, $0.105
+    const setup = { inputTokens: 23_059, cachedTokens: 0, cacheWriteTokens: 0, outputTokens: 5_841 };
+    expect(costFromUsage("gpt-6.1-sol", setup)).toBeCloseTo(costFromUsage("gpt-6-sol", setup));
+    expect(costFromUsage("gpt-6.1-sol", setup)).toBeCloseTo(0.105, 3);
   });
 });
 
@@ -174,6 +186,17 @@ describe("arm keys and estimates", () => {
     const enough = estimateCall({ ...base, measuredOutputTokens: [900, 1_000, 5_000] });
     expect(enough.outputTokens).toBe(1_000);
     expect(enough.inputTokens).toBe(1_000);
+  });
+
+  it("estimates GPT-6.1 Sol's reasoning and speed as Sol's, not Luna's, until it has measurements", () => {
+    const beat = (model: string, reasoningEffort: "low" | "medium") =>
+      estimateCall({ role: "beat", arm: makeArm({ model, reasoningEffort }), promptChars: 4_000, players: 1 });
+    expect(beat("gpt-6.1-sol", "low").outputTokens).toBe(2_100 + 700);
+    expect(beat("gpt-6.1-sol", "medium").outputTokens).toBe(2_100 + 2_400);
+    expect(beat("gpt-6.1-sol", "low").outputTokens).toBe(beat("gpt-6-sol", "low").outputTokens);
+    // Artificial Analysis measured it at today's Sol's pace (66.1 against 65.9 tokens a second at low)
+    expect(outputTokensPerSecond("gpt-6.1-sol")).toBe(outputTokensPerSecond("gpt-6-sol"));
+    expect(outputTokensPerSecond("gpt-6.1-sol")).toBe(90);
   });
 
   it("counts the schema as input, since OpenAI bills it", () => {
@@ -320,11 +343,11 @@ describe("budget caps", () => {
     expect(budgetCheck(caps, spend(7.5), 0, "0", 0.2)).toEqual({ ok: true });
     expect(budgetCheck(caps, spend(8, 12.9), 0, "1-2", 0.05)).toEqual({ ok: true });
     expect(budgetCheck(caps, spend(8, 12.9), 0, "1-2", 0.2)).toMatchObject({ ok: false });
-    // Stage caps sum to $28, so the $40 global cap only binds after a raised stage cap
-    const nearGlobal = spentByStage([{ stage: "0", costUsd: 8 }, { stage: "1-2", costUsd: 24.9 }, { stage: "3", costUsd: 3 }, { stage: "4", costUsd: 4 }]);
+    // Stage caps sum to $28, so the $42 global cap only binds after a raised stage cap
+    const nearGlobal = spentByStage([{ stage: "0", costUsd: 8 }, { stage: "1-2", costUsd: 26.9 }, { stage: "3", costUsd: 3 }, { stage: "4", costUsd: 4 }]);
     const { caps: raised } = resolveCaps({ stage: "4", stageCap: 10, overTargetReason: "rerun the rewrite" });
     expect(budgetCheck(raised, nearGlobal, 0, "4", 0.05)).toEqual({ ok: true });
-    expect(budgetCheck(raised, nearGlobal, 0, "4", 0.2)).toMatchObject({ ok: false, reason: expect.stringMatching(/Global cap \$40/) });
+    expect(budgetCheck(raised, nearGlobal, 0, "4", 0.2)).toMatchObject({ ok: false, reason: expect.stringMatching(/Global cap \$42/) });
     expect(budgetCheck(caps, spend(0), 0.95, "0", 0.1)).toMatchObject({ ok: false });
   });
 
@@ -335,7 +358,7 @@ describe("budget caps", () => {
       () => new Date("2026-09-27T00:00:00Z")
     );
     expect(caps.stageCaps["1-2"]).toBe(14);
-    expect(caps.globalCap).toBe(40);
+    expect(caps.globalCap).toBe(42);
     expect(override).toEqual({ at: "2026-09-27T00:00:00.000Z", stage: "1-2", stageCap: 14, globalCap: undefined, reason: "more Sol setup samples" });
     // Lowering a cap needs no reason
     expect(resolveCaps({ stage: "0", stageCap: 2 }).override).toBeUndefined();
@@ -798,13 +821,14 @@ describe("budget caps", () => {
     expect(STAGES.filter(stageRunsBaseline)).toEqual(["0", "1-2", "3", "4"]);
   });
 
-  it("never lets the global cap pass $40 (the owner's raise of 2026-09-28), whatever the reason", () => {
-    expect(HARD_CEILING).toBe(40);
-    expect(() => resolveCaps({ globalCap: 40.01, overTargetReason: "anything" })).toThrow(/\$40/);
-    expect(() => resolveCaps({ globalCap: 50, overTargetReason: "the owner's old ceiling" })).toThrow(/\$40/);
-    expect(resolveCaps({ globalCap: 40 }).caps.globalCap).toBe(40);
-    expect(resolveCaps({}).caps.globalCap).toBe(40);
-    // Lowering it back to the old hard cap needs no reason
+  it("never lets the global cap pass $42 (the owner's raise of 2026-09-30, for more playthroughs), whatever the reason", () => {
+    expect(HARD_CEILING).toBe(42);
+    expect(() => resolveCaps({ globalCap: 42.01, overTargetReason: "anything" })).toThrow(/\$42/);
+    expect(() => resolveCaps({ globalCap: 50, overTargetReason: "the owner's old ceiling" })).toThrow(/\$42/);
+    expect(resolveCaps({ globalCap: 42 }).caps.globalCap).toBe(42);
+    expect(resolveCaps({}).caps.globalCap).toBe(42);
+    // Lowering it back to an old hard cap needs no reason
+    expect(resolveCaps({ globalCap: 40 })).toEqual({ caps: expect.objectContaining({ globalCap: 40 }) });
     expect(resolveCaps({ globalCap: 33 }).caps.globalCap).toBe(33);
   });
 });

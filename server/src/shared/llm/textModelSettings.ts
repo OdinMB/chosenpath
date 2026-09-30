@@ -17,6 +17,8 @@ import { assertSupportedSettings, modelFamily } from "./chatModel.js";
  * a warning. Production text calls run only on gpt-6 models: a gpt-4.x name
  * stops the server at startup with the variable and its replacement. The
  * eval's comparison arms still run gpt-4.x through the factory directly.
+ * gpt-6.1-sol is accepted since 2026-09-30 (no group's default); an effort a
+ * model does not take (none on gpt-6.1-sol) stops the server too.
  */
 
 export type TextRole =
@@ -30,6 +32,21 @@ export type TextRole =
 
 export const REASONING_EFFORTS = ["none", "low", "medium", "high"] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+/**
+ * Models that take fewer of REASONING_EFFORTS than the rest, by name prefix.
+ * GPT-6.1 Sol (released 2026-09-29) takes low to max but no none or minimal
+ * (OpenAI's model page; DOCS/2026-09-30_sol-6-1-assessment.md), and a refused
+ * request (400) is never retried, so a none there would fail every call.
+ */
+const EFFORTS_BY_MODEL: [prefix: string, efforts: readonly ReasoningEffort[]][] = [
+  ["gpt-6.1-sol", ["low", "medium", "high"]],
+];
+
+/** The reasoning efforts this model takes. */
+export function reasoningEffortsFor(model: string): readonly ReasoningEffort[] {
+  return EFFORTS_BY_MODEL.find(([prefix]) => model.startsWith(prefix))?.[1] ?? REASONING_EFFORTS;
+}
 
 export const VERBOSITIES = ["low", "medium", "high"] as const;
 export type Verbosity = (typeof VERBOSITIES)[number];
@@ -101,6 +118,11 @@ function isEffort(value: string): value is ReasoningEffort {
   return (REASONING_EFFORTS as readonly string[]).includes(value);
 }
 
+/** "low, medium or high" */
+function listOf(efforts: readonly string[]): string {
+  return efforts.length < 2 ? efforts.join("") : `${efforts.slice(0, -1).join(", ")} or ${efforts[efforts.length - 1]}`;
+}
+
 function replacement(group: GroupDefault): string {
   return `Set ${group.prefix}_NAME=${group.model} and ${group.prefix}_REASONING_EFFORT=${group.reasoningEffort}, or remove ${group.prefix}_NAME to use that default.`;
 }
@@ -115,7 +137,7 @@ function readGroup(env: Env, group: GroupDefault, warn: (message: string) => voi
     family = modelFamily(model);
   } catch {
     throw new Error(
-      `${prefix}_NAME=${model} is not a supported text model: production text calls take gpt-6-* models. ${replacement(group)}`
+      `${prefix}_NAME=${model} is not a supported text model: production text calls take gpt-6-* and gpt-6.1-* models. ${replacement(group)}`
     );
   }
   if (family === "gpt-4.x") {
@@ -130,13 +152,20 @@ function readGroup(env: Env, group: GroupDefault, warn: (message: string) => voi
 
   // The default model brings its default effort; an explicit name needs its own
   const effort = read(env, `${prefix}_REASONING_EFFORT`) ?? (name ? undefined : group.reasoningEffort);
+  const efforts = reasoningEffortsFor(model);
   if (effort === undefined) {
-    throw new Error(`${prefix}_REASONING_EFFORT must be set for ${model} (none, low, medium or high)`);
+    throw new Error(`${prefix}_REASONING_EFFORT must be set for ${model} (${listOf(efforts)})`);
   }
   if (!isEffort(effort)) {
     const legacy = effort === "minimal" ? `; minimal was a gpt-4-era value: set ${group.reasoningEffort} or remove it` : "";
     throw new Error(
-      `${prefix}_REASONING_EFFORT=${effort} is not a GPT-6 reasoning effort (none, low, medium or high)${legacy}`
+      `${prefix}_REASONING_EFFORT=${effort} is not a GPT-6 reasoning effort: ${model} takes ${listOf(efforts)}${legacy}`
+    );
+  }
+  if (!efforts.includes(effort)) {
+    const suggestion = efforts.includes(group.reasoningEffort) ? group.reasoningEffort : efforts[0];
+    throw new Error(
+      `${prefix}_REASONING_EFFORT=${effort} is not supported by ${model}, which takes ${listOf(efforts)}: OpenAI refuses it and a refused call is never retried, so every call would fail. Set ${prefix}_REASONING_EFFORT=${suggestion}.`
     );
   }
 

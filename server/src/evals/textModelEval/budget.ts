@@ -9,9 +9,13 @@ export { FEEDBACK_STAGES };
  * $25 is justified because the owner explicitly prioritised Sol for story
  * setups, and setup inputs are 21-23K tokens with the schema, not the 15K
  * the plan assumed. The owner raised the hard cap to $33 on 2026-09-27, for
- * the setup and turn rounds after the Round 0 play fixes, and to $40 on
+ * the setup and turn rounds after the Round 0 play fixes, to $40 on
  * 2026-09-28, for the missing steps after the owner's feedback of that day
- * (going on although the stalled Stage 4 calls may have been billed). The
+ * (going on although the stalled Stage 4 calls may have been billed), and to
+ * $42 on 2026-09-30, for a second round of whole-story playthroughs on
+ * production's current code (the owner OK'd "a few more dollars to do useful
+ * playthroughs" and the coordinator set $42: the ledger read $37.24, so the
+ * $40 left $2.76, about $1.46 with the stalled Stage 4 calls on top). The
  * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
  * the setup rounds, the turn rounds and the migration check, and $0.10 /
  * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 for the feedback
@@ -51,8 +55,8 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   "choice-result": 0.4,
   "choice-line-sp": 0.25,
 };
-/** The owner's hard cap: $30, raised to $33 on 2026-09-27 and to $40 on 2026-09-28. */
-export const HARD_CEILING = 40;
+/** The owner's hard cap: $30, raised to $33 on 2026-09-27, to $40 on 2026-09-28 and to $42 on 2026-09-30 (more playthroughs). */
+export const HARD_CEILING = 42;
 export const DEFAULT_GLOBAL_CAP = HARD_CEILING;
 
 /** The ledger total when the round stages opened (2026-09-27): $26.39 of the then $33 hard cap, $6.61 left. */

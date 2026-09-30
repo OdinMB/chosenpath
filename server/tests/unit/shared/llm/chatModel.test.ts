@@ -1,11 +1,16 @@
 import { jest } from "@jest/globals";
 import { z } from "zod";
 import {
+  assertSupportedSettings,
   createChatModel,
   modelFamily,
   productionCallLimits,
 } from "../../../../src/shared/llm/chatModel.js";
-import type { TextModelSettings, TextRole } from "../../../../src/shared/llm/textModelSettings.js";
+import {
+  reasoningEffortsFor,
+  type TextModelSettings,
+  type TextRole,
+} from "../../../../src/shared/llm/textModelSettings.js";
 
 type FetchFn = (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -78,6 +83,8 @@ describe("createChatModel wire shape", () => {
   it.each([
     [{ model: "gpt-6-luna", reasoningEffort: "none" }],
     [{ model: "gpt-6-sol", reasoningEffort: "medium" }],
+    // GPT-6.1 Sol (2026-09-29) takes the same request: no temperature, effort, no tools
+    [{ model: "gpt-6.1-sol", reasoningEffort: "low" }],
   ] as [TextModelSettings][])("pins the gpt-6 shape for %j", async (settings) => {
     const body = await sendOnce(settings);
     expect(body).not.toHaveProperty("temperature");
@@ -120,6 +127,43 @@ describe("createChatModel wire shape", () => {
         timeoutMs: 1_000,
       })
     ).toThrow(/takes no temperature/);
+  });
+});
+
+describe("GPT-6.1 Sol (released 2026-09-29): accepted, with the efforts it takes", () => {
+  it("takes gpt-6-* and gpt-6.1-* as the gpt-6 family, and no later point release", () => {
+    expect(modelFamily("gpt-6-luna")).toBe("gpt-6");
+    expect(modelFamily("gpt-6.1-sol")).toBe("gpt-6");
+    // A served snapshot name
+    expect(modelFamily("gpt-6.1-sol-2026-09-29")).toBe("gpt-6");
+    // A later point release may change the request or its efforts: accepted only once someone has read its page
+    expect(() => modelFamily("gpt-6.2-sol")).toThrow('Unsupported text model "gpt-6.2-sol": only gpt-4.1*, gpt-4o*, gpt-6-* and gpt-6.1-* are configured');
+    expect(() => modelFamily("gpt-6.1")).toThrow(/Unsupported text model/);
+    expect(() => modelFamily("gpt-61-sol")).toThrow(/Unsupported text model/);
+  });
+
+  it("gives gpt-6.1-sol no effort none (OpenAI's model page), while today's Sol and Luna keep it", () => {
+    expect(reasoningEffortsFor("gpt-6.1-sol")).toEqual(["low", "medium", "high"]);
+    expect(reasoningEffortsFor("gpt-6.1-sol-2026-09-29")).toEqual(["low", "medium", "high"]);
+    expect(reasoningEffortsFor("gpt-6-sol")).toEqual(["none", "low", "medium", "high"]);
+    expect(reasoningEffortsFor("gpt-6-luna")).toEqual(["none", "low", "medium", "high"]);
+  });
+
+  it("refuses to build a request at an effort the model does not take", () => {
+    // A 400 is never retried, so it would fail every call; the factory refuses it before any is sent
+    expect(() =>
+      createChatModel({
+        role: "templateGeneration",
+        settings: { model: "gpt-6.1-sol", reasoningEffort: "none" },
+        maxRetries: 0,
+        timeoutMs: 1_000,
+      })
+    ).toThrow("gpt-6.1-sol needs a reasoning effort of low, medium, high (got none)");
+    expect(() => assertSupportedSettings({ model: "gpt-6.1-sol", reasoningEffort: "minimal" })).toThrow(
+      "gpt-6.1-sol needs a reasoning effort of low, medium, high (got minimal)"
+    );
+    expect(() => assertSupportedSettings({ model: "gpt-6.1-sol", reasoningEffort: "low" })).not.toThrow();
+    expect(() => assertSupportedSettings({ model: "gpt-6-sol", reasoningEffort: "none" })).not.toThrow();
   });
 });
 
