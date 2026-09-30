@@ -45,7 +45,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * player with production's one checked retry in the loop (choice-line-sp),
  * then a second round of whole-story playthroughs on production's current
  * code (playthroughs-2: no --run arms either, the --playthroughs --round 2
- * mode's prep calls). Their caps and reasons are in budget.ts.
+ * mode's prep calls), then the turn that completes an outcome and the ending
+ * (outcome-settled: the variant beside production's turn on switch turns and
+ * endings of the second round's stored runs). Their caps and reasons are in
+ * budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -64,6 +67,7 @@ export const FEEDBACK_STAGES = [
   "choice-result",
   "choice-line-sp",
   "playthroughs-2",
+  "outcome-settled",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -223,6 +227,12 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // Its one fix-and-retest against production's turn too, the run's line second
   choiceResultB: "adopted",
   planV2f: "planV2e",
+  // The outcome-settled stage (2026-09-30, the second playthroughs' review): the turn that completes an outcome told and
+  // recorded as settled, no stat change against a milestone, the ending's milestones over earlier facts, against
+  // production's turn, which runs beside it
+  outcomeSettled: "adopted",
+  // Its one fix-and-retest against production's turn too, the run's lines second
+  outcomeSettledB: "adopted",
 };
 
 /**
@@ -243,6 +253,7 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   endingStateB: "endingState",
   planV2f: "planV2e",
   choiceResultB: "choiceResult",
+  outcomeSettledB: "outcomeSettled",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -334,6 +345,9 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_MEDIUM, "turnO2b")]: [armKey(LUNA_MEDIUM, "turnO2")],
   // The choice-result turn's fix-and-retest against the run's line, the sentence it changes
   [armKey(LUNA_MEDIUM, "choiceResultB")]: [armKey(LUNA_MEDIUM, "choiceResult")],
+  // The outcome-settled retest against the run's lines, the sentences it changes, on both turn models
+  [armKey(LUNA_MEDIUM, "outcomeSettledB")]: [armKey(LUNA_MEDIUM, "outcomeSettled")],
+  [armKey(LUNA_LOW, "outcomeSettledB")]: [armKey(LUNA_LOW, "outcomeSettled")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
   // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
   // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
@@ -540,9 +554,70 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return choiceResultArms(role);
     case "choice-line-sp":
       return choiceLineSpArms(role);
+    case "outcome-settled":
+      return outcomeSettledArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the outcome-settled stage (2026-09-30, the second
+ * playthroughs' review): production's own code since that review's fix
+ * (leverChargedAgain, a beat repair; every turn request is adopted7's byte for
+ * byte), under a tag of its own so production runs beside the variant in the
+ * same minutes.
+ */
+export const OUTCOME_SETTLED_PROMPT_STATE = "adopted8";
+
+/**
+ * The stage's cases, built from the second round's stored runs
+ * (outcomeSettledCases.ts, no calls), by the turn model that plays them:
+ * switch turns whose milestones complete an outcome and endings. Where the
+ * defect happened: New Avalon's turn 16 (a stat set against the completing
+ * milestone) and its ending, the space pirates' turn 14 (the completed claim
+ * told and recorded as open) and its ending, the estate agents' ending; beside
+ * them ordinary ones.
+ */
+export const OUTCOME_SETTLED_CASES = {
+  single: ["round-settled-avalon-t16", "round-settled-lemonade-t4", "round-settled-kids-mouse-t5", "round-settled-avalon-t23", "round-settled-avalon-t26", "round-settled-lemonade-t11"],
+  groups: [
+    "round-settled-space-pirates-t14",
+    "round-settled-estate-agents-t15",
+    "round-settled-food-trucks-t20",
+    "round-settled-space-pirates-t26",
+    "round-settled-estate-agents-t26",
+    "round-settled-food-trucks-t26",
+  ],
+} as const;
+
+/** The stage's switch turns, by turn model: where the retest's settled line differs from the run's. */
+export const OUTCOME_SETTLED_SWITCH_CASES = {
+  single: OUTCOME_SETTLED_CASES.single.filter((id) => !id.endsWith("-t26") && !id.endsWith("-t11")),
+  groups: OUTCOME_SETTLED_CASES.groups.filter((id) => !id.endsWith("-t26")),
+};
+
+/**
+ * The outcome-settled stage (the coordinator's fix 1 after the second
+ * playthroughs' review): production's turn (adopted) and the variant
+ * (outcomeSettled) on each player count's own turn group (Luna medium for one
+ * player, Luna low for groups), twice on the stage's cases, interleaved, under
+ * adopted8. Then the one fix-and-retest (outcomeSettledB: the completing
+ * milestone kept specific, after the run's milestones copied the plan's
+ * words), twice on the switch turns, where its settled line differs, and once
+ * on the endings, where only its ending line does; what the stage has left.
+ */
+function outcomeSettledArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  const endings = { single: OUTCOME_SETTLED_CASES.single.filter((id) => !OUTCOME_SETTLED_SWITCH_CASES.single.includes(id)), groups: OUTCOME_SETTLED_CASES.groups.filter((id) => !OUTCOME_SETTLED_SWITCH_CASES.groups.includes(id)) };
+  return [
+    ...(["adopted", "outcomeSettled"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: [...OUTCOME_SETTLED_CASES.single] })),
+    ...(["adopted", "outcomeSettled"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: [...OUTCOME_SETTLED_CASES.groups] })),
+    { arm: adoptedDefault("beat", "outcomeSettledB"), samples: 2, scope: "single-player" as const, caseIds: [...OUTCOME_SETTLED_SWITCH_CASES.single] },
+    { arm: adoptedDefault("multiplayerBeat", "outcomeSettledB"), samples: 2, scope: "multiplayer" as const, caseIds: [...OUTCOME_SETTLED_SWITCH_CASES.groups] },
+    { arm: adoptedDefault("beat", "outcomeSettledB"), samples: 1, scope: "single-player" as const, caseIds: endings.single },
+    { arm: adoptedDefault("multiplayerBeat", "outcomeSettledB"), samples: 1, scope: "multiplayer" as const, caseIds: endings.groups },
+  ];
 }
 
 /**
@@ -882,7 +957,7 @@ function optionsO2Arms(role: EvalRole): ArmPlan[] {
 }
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
-const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result", "choice-line-sp"];
+const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result", "choice-line-sp", "outcome-settled"];
 
 export function stageInterleavesArms(stage: Stage): boolean {
   return INTERLEAVED_STAGES.includes(stage);
@@ -919,6 +994,8 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   ...[...ENDING_STATE_BUILT_CASES.single, ...ENDING_STATE_BUILT_CASES.groups].map((id): [string, Stage] => [id, "ending-state"]),
   // The choice-result stage's cases from the playthroughs (2026-09-30), frozen after every earlier stage had closed
   ...[...CHOICE_RESULT_BUILT_CASES.single, ...CHOICE_RESULT_BUILT_CASES.groups, ...CHOICE_RESULT_BUILT_CASES.plans].map((id): [string, Stage] => [id, "choice-result"]),
+  // The outcome-settled stage's cases from the second playthroughs (2026-09-30), frozen after every earlier stage had closed
+  ...[...OUTCOME_SETTLED_CASES.single, ...OUTCOME_SETTLED_CASES.groups].map((id): [string, Stage] => [id, "outcome-settled"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

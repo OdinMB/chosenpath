@@ -46,6 +46,7 @@ import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, run
 import { buildStageCasesMode, judgeStagesMode } from "./stagePrep.js";
 import { buildEndingCasesMode, judgeEndingsMode } from "./endingPrep.js";
 import { buildChoiceCasesMode, judgeChoiceResultsMode } from "./choiceResultPrep.js";
+import { buildSettledCasesMode, judgeSettledMode } from "./outcomeSettledPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
@@ -78,7 +79,8 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     reasoned to its output cap, interleaved; choice-result in two parts: --role beat under adopted5, production's
  *     turn and choiceResult on the exploration steps, interleaved, then --role thread under round0, planner v2e and
  *     v2f on the chapter plans beside planner v2e's stored plans; choice-line-sp --role beat under adopted6: the
- *     same on the single-player steps, each turn with production's one checked retry)
+ *     same on the single-player steps, each turn with production's one checked retry; outcome-settled --role beat under
+ *     adopted8: production's turn and outcomeSettled on the second playthroughs' completing switch turns and endings)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -137,6 +139,14 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --choice-line-sp [--max-spend 0.10] [--report-only]  the options judge on every reply (first and retry, one sample),
  *     then choice-line-sp.md and .json: each turn read whole (checkedTurns.ts), the reply the game keeps, the wait
  *     including the retry, cost; --cases <case ids> judges only those (a smoke)
+ *   The turn that completes an outcome, and the ending (outcomeSettledPrep.ts, 2026-09-30), in the outcome-settled stage:
+ *   --build-settled-cases [--rebuild-cases]  switch turns completing an outcome and endings of the second round's stored
+ *     runs (outcomeSettledCases.ts, replayed), each only where its request is the one production sent; no calls; the
+ *     turns then run with --run --stage outcome-settled --role beat --prompt-state adopted8 (production's turn and
+ *     outcomeSettled, interleaved)
+ *   --judge-settled [--max-spend 0.10]  completedToldSettled (outcomeSettledJudge.ts) on its calibration (two samples)
+ *     and every switch turn of the stage's arms, and the ending's outcomesToldAsLeft on every ending, one sample each,
+ *     then judged-settled.md and .json; --cases <item or case ids> sends only those (a smoke)
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -185,6 +195,8 @@ type Mode =
   | "build-choice-cases"
   | "judge-choice-results"
   | "choice-line-sp"
+  | "build-settled-cases"
+  | "judge-settled"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -311,6 +323,8 @@ function parseArgs(argv: string[]): Args {
       case "--build-choice-cases":
       case "--judge-choice-results":
       case "--choice-line-sp":
+      case "--build-settled-cases":
+      case "--judge-settled":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1002,6 +1016,11 @@ async function main() {
     case "choice-line-sp":
       // The stage's options judge books to its own stage; --report-only renders the report afresh without a call
       return choiceLineMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "choice-line-sp"), { reportOnly: args.reportOnly, caseIds: args.caseIds });
+    case "build-settled-cases":
+      return buildSettledCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "judge-settled":
+      // The stage's judged checks book to its own stage
+      return judgeSettledMode(prepContext(args, files, "outcome-settled"), { caseIds: args.caseIds });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

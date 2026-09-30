@@ -102,6 +102,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "choice-result": "Choices and results (choiceResult beside production's turn under adopted5, --role beat; planV2f beside planV2e under round0, --role thread)",
   "choice-line-sp": "The exploration line for one player (choiceResult beside production's turn under adopted6, each with production's one checked retry)",
   "playthroughs-2": "Whole-story playthroughs, round 2, on production's current code (no --run jobs: --playthroughs --round 2 plays them, listed below)",
+  "outcome-settled": "The turn that completes an outcome, and the ending (outcomeSettled beside production's turn under adopted8, --role beat)",
 };
 
 /** Jobs by arm key, in plan order. */

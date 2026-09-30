@@ -49,6 +49,7 @@ import { optionsContinuityRequest, type OptionsContinuityArm } from "../../game/
 import { endingStateRequest, type EndingStateForm } from "../../game/services/storyTextRounds/endingState.js";
 import { noSwitchReminderRequest } from "../../game/services/storyTextRounds/switchReminder.js";
 import { choiceResultRequest } from "../../game/services/storyTextRounds/choiceResult.js";
+import { outcomeSettledRequest } from "../../game/services/storyTextRounds/outcomeSettled.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -218,6 +219,18 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * is something the player chooses to do, which one option offers, never how
  * others respond. Otherwise planner v2e byte for byte, its switch planner
  * planner v2b's.
+ * "outcomeSettled" is the outcome-settled stage's turn (2026-09-30, the second
+ * playthroughs' review, storyTextRounds/outcomeSettled.ts): production's turn,
+ * every player count, with a stat line on a switch turn after a chapter and at
+ * the ending (no stat change contradicts a milestone the beat adds), the
+ * outcomes a switch turn's milestones complete and that they are told and
+ * recorded as settled, and at an ending with a complete outcome that its
+ * milestones hold over earlier facts, summaries and stat levels that call it
+ * open; production's request byte for byte elsewhere, with production's turn
+ * limits for the player count. "outcomeSettledB" is its one fix-and-retest
+ * after the run: the completing milestone made specific from the thread's text
+ * (the run's milestones copied the plan's words) and the ending line's "follow
+ * the milestones" as "tell the outcome as its milestones leave it".
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -276,7 +289,9 @@ export type VariantId =
   | "noSwitchReminder"
   | "choiceResult"
   | "choiceResultB"
-  | "planV2f";
+  | "planV2f"
+  | "outcomeSettled"
+  | "outcomeSettledB";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -332,6 +347,8 @@ export const VARIANTS: VariantId[] = [
   "choiceResult",
   "choiceResultB",
   "planV2f",
+  "outcomeSettled",
+  "outcomeSettledB",
 ];
 
 /**
@@ -717,6 +734,17 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   choiceResultB: (input) => {
     if (input.role !== "beat") throw new Error(`Variant choiceResultB does not cover role ${input.role}`);
     return { ...choiceResultRequest(input.story, { fullText: true }), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  },
+  // The outcome-settled stage's turn: no stat change against a milestone, a completed outcome told and recorded as settled,
+  // the ending's milestones over what calls it open; production's turn limits
+  outcomeSettled: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant outcomeSettled does not cover role ${input.role}`);
+    return { ...outcomeSettledRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  },
+  // Its one fix-and-retest: the completing milestone kept specific (the run's milestones copied the plan's words)
+  outcomeSettledB: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant outcomeSettledB does not cover role ${input.role}`);
+    return { ...outcomeSettledRequest(input.story, { specificMilestone: true }), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
   },
 };
 

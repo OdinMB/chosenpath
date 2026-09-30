@@ -1871,3 +1871,38 @@ The review verified nine findings on the round-2 report. All nine hold; three ar
   - `.context/text-model-eval.md` gains the readings and corrected results.
   - `.context/ai-transparency.md` and `Privacy.tsx` were checked: nothing to change.
   - `npm run check:all` clean (server 3,504, client 256).
+
+## 2026-09-30 (night): fix 1, the turn that completes an outcome and the ending (stage `outcome-settled`, $0.362 of $0.39; not adopted)
+
+The coordinator's fix 1 of the review's paid list: a complete outcome is never told as still open, stored facts give way to milestones, and a stat is not set against the milestone written in the same reply. Its own stage, capped at $0.39 (the $0.30 estimate plus 30%), the reason recorded in `budget.ts`.
+
+- **The cause, in the stored stories and production's request:**
+  - The space pirates' switch turn 14 wrote the treasure claim's completing milestone (2 of 2), but its texts told the claim "open and unsettled" and it stored the fact that the crew's "provisional galley record … does not settle Pip's repair-reserve proposal", beside older facts calling it provisional. The ending's request said the claim was complete, yet all three endings followed the facts.
+  - New Avalon's switch turn 16 wrote the parting milestone (the outcome's third resolution, 2 of 2) and, in the same reply, set Orin's relationship to "Deeply Trusted" (the first resolution's level), reasoning from the stat's own rule ("one step up after a favorable thread that offers honest care").
+  - The request: a switch turn is told to add each ended chapter's milestone, and the state shows the outcome at "1 / 2"; nothing says this milestone completes it, while the chapter's last turn, the earlier milestone and the stored facts all call it open. Nothing ties a stat change to the milestone beside it. The ending reads every fact and summary written before.
+- **The variant** (`outcomeSettled`, `storyTextRounds/outcomeSettled.ts`, eval only, test-first; production's turn today byte for byte elsewhere):
+  - on a switch turn after a chapter and at the ending, a stat line after the thread-resolution lines: no stat change contradicts a milestone the beat adds, even where the stat's adjustments after threads point elsewhere (a bond does not rise to its closest level beside a parting);
+  - on a switch turn whose milestones complete an outcome, the outcomes it completes with the game's count (`outcomesCompletedThisBeat`, no aftermath) and that such an outcome is settled: its milestone written without softening the resolution, every player's text and every fact told settled; earlier milestones, facts and summaries that call it open were written before;
+  - at an ending with a complete outcome: its milestones hold over an earlier milestone, fact, summary or stat level that calls it open.
+- **Cases** (`outcomeSettledCases.ts`, `--build-settled-cases`, no calls): 12 turns of the second round's stored runs, replayed, each only where its request is the one production sent there, byte for byte (`choiceResultCases` gained a category parameter). Seven switch turns completing an outcome (the defect's space pirates 14 and New Avalon 16; estate agents 15, food trucks 20, lemonade 4, the mouse story 5, New Avalon 23) and five endings (space pirates, estate agents, New Avalon, lemonade, food trucks). Every built request was read end to end.
+- **Checks:**
+  - A new judge, `completedToldSettled` (`outcomeSettledJudge.ts`), one Luna low call per completing switch turn: the completed outcomes, other milestones, stat changes with levels and values before, facts and every player's text. Calibrated on 22 hand-read items (11 yes, 6 no, 5 partial: stored turns, the run's own replies by output id, read before the judge ran, and two constructed failing versions of stored turns). **Not reliable:** v1 15 of 17 with the hand (it passed a pending rival proposal as "a separate issue" and a credibility stat cut by 30 as "no bearing"), samples 19 of 22; its one fix, v2's decision rule, 16 of 17 (it now fails a ship outcome whose own milestone leaves it needing refuge), samples still 19 of 22 (86%, floor 90%).
+  - The endings: the ending's calibrated `outcomesToldAsLeft`, reused (prompt v1).
+  - The automatic checks in `results.md`.
+- **The run** (19:49-20:08 UTC): dry run 48 jobs, est $0.19; the smoke's 2 jobs as counted, then 46; every reply valid, production's once after a reply cut at its output cap. Then the retest's 19 jobs, as the dry run counted.
+- **Readings:**
+  - **By hand, switch turns:** production told a completed outcome as open on 2 of 14 (the space pirates 14 sample 1, "the repair-reserve proposal remains unresolved" in its milestone and a fact; New Avalon 23 sample 1, facts "leaves the bypass's oversight arrangements unsettled"); New Avalon 16's stat was never set against the milestone (no stat change in either sample). The variant 0 of 14, but its stat line moved Orin to "Wary" beside "they part on good terms" in 1 of 2 replies (the retest in 2 of 2), a move production never made there.
+  - **The judge, indicative only:** v1 production 12 of 14, the variant 14 of 14 (within the noise); v2 8 of 14 against 14 of 14 (moved higher, p 0.008) and the retest 11 of 14.
+  - **Endings (reliable judge):** 4 of 10 → 6 of 10, beyond the noise, not moved (groups 0 of 6 → 2 of 6, one player 4 of 4 both). On these replays both arms resolve the treasure claim. The rest fail in both arms for other causes: the space pirates' ship (complete at 4 of 2 after two aftermath chapters, told as stranded; fix 8), Rory's principle retold as a lesson after later chapters moved him, Suri's result (fix 2).
+  - **Wrong way:** `milestoneNotCopied` one player 91.7% → 25.0% (moved lower, p 0.001): "Write its milestone as the thread's resolution settles it" wrote the plan's words instead of the specific milestone B1 asks for. `youParagraphShare` moved higher (p 0.095 and 0.072).
+  - **Waits and cost:** within allowances, level with production.
+- **The one fix-and-retest** (`outcomeSettledB`, test-first): the settled line asks for the milestone "made specific from the thread's text as the line above asks, keeps everything the thread's resolution settles and softens none of it", and the ending line's "follow the milestones" became "tell the outcome as its milestones leave it". Twice on the 7 switch turns, once on the 5 endings. `milestoneNotCopied` still moved lower on one player (90.0% → 40.0%, p 0.029); `youParagraphShare` no longer moved; the target within the noise.
+- **Verdict: not adopted.** The target never moved under the stop rule: production showed the defect on 2 of 14 replayed switch turns (not the 1 in 1 the stored stories suggested), too few to move on this sample. The switch-turn judge could not be made reliable in its one fix. And both forms moved `milestoneNotCopied` the wrong way. The stat line also brought a new questionable move ("Wary"). Production is unchanged, so the byte-for-byte test and its deltas are untouched.
+- **What the owner could weigh instead:**
+  - The ending line alone (4 of 10 → 6 of 10, not moved) touched no milestone check on groups but its single-player endings copied too (3 of 4 against 1 of 4, a small sample).
+  - The ship-and-aftermath failures belong to fix 8, which will re-measure endings on whole stories.
+- **Spend:** $0.362 of $0.39: 68 turn attempts $0.274, 185 judge records $0.088. The ledger $38.35 of $42; fixes 2-8 have about $2.04 of the workflow's $2.40.
+- **Docs and checks:**
+  - `.context/text-model-eval.md` gains the stage (commands, variant, arms, budget, the run).
+  - `.context/story.md` is unchanged: production is.
+  - `npm run check:all` clean (server 3,549, client 256).

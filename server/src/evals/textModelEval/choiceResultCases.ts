@@ -96,12 +96,18 @@ export const playthroughsSent: SentRequestText = (input) => {
   return productionSends(input);
 };
 
-/** The stage's cases from the stored runs, each only where its request is the one the run sent; and what could not be built. */
+/**
+ * The stage's cases from the stored runs, each only where its request is the
+ * one the run sent; and what could not be built. Another stage builds its own
+ * cases from the playthroughs the same way, under its own category
+ * (outcomeSettledCases.ts).
+ */
 export function choiceResultCases(
   runs: PlayRun[],
   promptHashOf: PromptHashOf,
   specs: ChoiceCaseSpec[] = CHOICE_RESULT_CASE_SPECS,
-  sent: SentRequestText = playthroughsSent
+  sent: SentRequestText = playthroughsSent,
+  category = "choice-result"
 ): { cases: EvalCase[]; problems: string[] } {
   const cases: EvalCase[] = [];
   const problems: string[] = [];
@@ -137,7 +143,7 @@ export function choiceResultCases(
       role: spec.role,
       state,
       ...(fixedAnalysis ? { fixedAnalysis } : {}),
-      category: "choice-result",
+      category,
       note: `${spec.purpose} Built from the stored playthrough ${spec.story} (sample 1) at turn ${spec.turn}, replayed from its start with its own plans, turns and dice (playthroughReplay.ts); its request is the one production sent there, byte for byte.`,
     });
     const rebuilt = sha256(sent(requestInputFor(evalCase)));
