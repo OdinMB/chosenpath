@@ -5,6 +5,7 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { Story } from "core/models/Story.js";
 import { getThreadType, type Beat, type BeatOption, type ThreadAnalysis } from "core/types/index.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
+import { EXPLORATION_ORDER, takesExplorationOrder } from "../../../../../src/game/services/optionRules.js";
 import { sacrificeRewardLine } from "../../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { endingStateRequest, productionEndingForm } from "../../../../../src/game/services/storyTextRounds/endingState.js";
 import {
@@ -122,10 +123,16 @@ const SINGLE_PLAYER: [string, () => Story][] = [
 /**
  * Production's request as it stood when the arms ran (2026-09-30): the same
  * as today on every turn but the ending, which production has told as its
- * milestones leave it since the ending's adoption later that day (endingStateB);
- * the arms' base keeps the ending they ran beside (today's form).
+ * milestones leave it since the ending's adoption later that day (endingStateB),
+ * and an exploration step, which carries the exploration-order line since the
+ * choice-line-sp adoption of the same day; the arms' base keeps the turns they
+ * ran beside.
  */
-const productionThen = (story: Story) => (story.getCurrentBeatType() === "ending" ? productionEndingForm(story) : beatStep.request(story));
+function productionThen(story: Story) {
+  if (story.getCurrentBeatType() === "ending") return productionEndingForm(story);
+  const today = beatStep.request(story);
+  return takesExplorationOrder(story) ? { ...today, prompt: today.prompt.replace(EXPLORATION_ORDER, "") } : today;
+}
 
 describe("the base: production's single-player turn form, built from the frozen copy", () => {
   it.each(SINGLE_PLAYER)("%s: production's request byte for byte (the ending as it stood when the arms ran)", (_, build) => {
@@ -136,10 +143,13 @@ describe("the base: production's single-player turn form, built from the frozen 
     expect(optionsContinuityRequest(story, BASE).prompt).toBe(production.prompt);
   });
 
-  it("differs from today's production only at the ending, which production now tells as its milestones leave it", () => {
+  it("differs from today's production only at the ending, which production now tells as its milestones leave it, and on an exploration step, which now carries the exploration-order line", () => {
     const ending = endingBeat(1);
     expect(beatStep.request(ending).prompt).toBe(endingStateRequest(ending).prompt);
     expect(productionTurnForm(ending).prompt).not.toBe(beatStep.request(ending).prompt);
+    const exploring = chapterStep("exploration", 1);
+    expect(beatStep.request(exploring).prompt.split(EXPLORATION_ORDER)).toHaveLength(2);
+    expect(productionTurnForm(exploring).prompt).toBe(beatStep.request(exploring).prompt.replace(EXPLORATION_ORDER, ""));
   });
 
   (frozen.length ? it : it.skip)("every frozen single-player turn: production's request byte for byte (the ending as it stood when the arms ran)", () => {

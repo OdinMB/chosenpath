@@ -522,7 +522,7 @@ ${
     ? "--- Use 'exploration' for all options in switches.\n"
     : "--- Use 'exploration' for options in Exploration threads (that don't follow a success/failure or win/lose pattern).\n" +
       "--- Use 'challenge' for options in Challenge threads and Contest threads.\n" +
-      // A group's exploration step: its options are the step's results, in order (the choice-result stage)
+      // An exploration step, every player count: its options are the step's results, in order (the choice-result and choice-line-sp stages)
       (takesExplorationOrder(story) ? EXPLORATION_ORDER : "")
 }
 - Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).

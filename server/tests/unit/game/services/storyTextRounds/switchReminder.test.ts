@@ -5,6 +5,7 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
 import { beatStep, threadStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { SWITCH_REMINDER, noSwitchReminderRequest } from "../../../../../src/game/services/storyTextRounds/switchReminder.js";
+import { EXPLORATION_ORDER, takesExplorationOrder } from "../../../../../src/game/services/optionRules.js";
 import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
 import { RUNAWAY_CASES } from "../../../../../src/evals/textModelEval/arms.js";
 import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
@@ -118,14 +119,17 @@ describe("noSwitchReminderRequest: production's single-player turn without the r
     expect(() => requestFor("noSwitchReminder", { role: "switch", story: flavorAfterChapter() })).toThrow(/does not cover role switch/);
   });
 
-  (frozen.length ? it : it.skip)("every frozen single-player turn: switch turns differ from production by the reminder alone, every other turn byte for byte", () => {
+  (frozen.length ? it : it.skip)("every frozen single-player turn: switch turns differ from production by the reminder alone, every other turn byte for byte (an exploration step as production sent it when the fix ran)", () => {
     const cases = frozen.filter((c) => c.role === "beat" && !c.tags.multiplayer);
     expect(cases.length).toBeGreaterThan(40);
     let switchTurns = 0;
     for (const c of cases) {
       const story = caseStory(c);
       const [ours, production] = [noSwitchReminderRequest(story), beatStep.request(story)];
-      const expected = story.getCurrentBeatType() === "switch" ? production.prompt.replace(SWITCH_REMINDER, "") : production.prompt;
+      // Since the choice-line-sp adoption (2026-09-30) a single player's exploration step carries the exploration-order
+      // line, which the fix, measured before it, doesn't
+      const sent = takesExplorationOrder(story) ? production.prompt.replace(EXPLORATION_ORDER, "") : production.prompt;
+      const expected = story.getCurrentBeatType() === "switch" ? sent.replace(SWITCH_REMINDER, "") : sent;
       if (story.getCurrentBeatType() === "switch") switchTurns++;
       expect({ id: c.id, same: ours.prompt === expected }).toEqual({ id: c.id, same: true });
       expect(json(ours.schema)).toBe(json(production.schema));

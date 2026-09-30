@@ -37,7 +37,7 @@ import {
   STAGES,
 } from "../../../../src/evals/textModelEval/arms.js";
 import { SWITCH_REMINDER } from "../../../../src/game/services/storyTextRounds/switchReminder.js";
-import { CHOICE_RESULT_TEXT } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
+import { CHOICE_RESULT_TEXT, productionTurnToday } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { beatReplyProblem, missingOptionsProblem, shortTextProblem, withBeatProblem } from "../../../../src/game/services/beatChecks.js";
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import { setupStep } from "../../../../src/game/services/storyTextSteps.js";
@@ -620,9 +620,11 @@ describe("planJobs: the round stages and the migration check", () => {
     // Interleaved: both arms on a case before the next case
     const onSingle = turns.filter((j) => j.caseId === single && j.sample === 1).map((j) => turns.indexOf(j));
     expect(Math.abs(onSingle[0] - onSingle[1])).toBe(1);
-    // The two requests differ by the exploration line alone
+    // The two requests differed by the exploration line alone; since the choice-line-sp adoption (2026-09-30) production's
+    // own request (adopted) is the variant's, and what it sent then is productionTurnToday
     const [production, variant] = onSingle.map((i) => requestText(turns[i].first.request()));
-    expect(variant.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(production);
+    expect(production).toBe(variant);
+    expect(variant.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(productionTurnToday(caseStory(cases[1])).prompt);
     // The planners, beside planner v2e's stored plans: v2e and v2f twice on a built plan, v2f once on a stored one
     const plans = planJobs(cases, { stage: "choice-result", promptState: "round0", roles: ["thread"], mode: "isolated", subset15: false, records: [] });
     expect(plans.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`).sort()).toEqual(
@@ -654,11 +656,13 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(turns.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`).sort()).toEqual(
       [...[1, 2].flatMap((s) => [stored, single].flatMap((c) => ["adopted", "choiceResult"].map((v) => `${c} s${s} gpt-6-luna@medium/${v}`)))].sort()
     );
-    // Interleaved: both arms on a case before the next case; the requests differ by the exploration line alone
+    // Interleaved: both arms on a case before the next case; the requests differed by the exploration line alone (since
+    // the stage's adoption, production's own request is the variant's, and what it sent at the run is productionTurnToday)
     const onSingle = turns.filter((j) => j.caseId === single && j.sample === 1);
     expect(Math.abs(turns.indexOf(onSingle[0]) - turns.indexOf(onSingle[1]))).toBe(1);
     const [production, variant] = onSingle.map((j) => requestText(j.first.request()));
-    expect(variant.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(production);
+    expect(production).toBe(variant);
+    expect(variant.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(productionTurnToday(caseStory(cases[1])).prompt);
     // Production's one checked retry on every job: its check is production's, and so is the retry's request
     const reply = (paragraphs: number, options: number) => ({
       player1: { text: Array.from({ length: paragraphs }, (_, i) => `Paragraph ${i + 1}. It goes on. And on.`).join("\n\n"), options: Array.from({ length: options }, (_, i) => ({ text: `Option ${i + 1}` })) },

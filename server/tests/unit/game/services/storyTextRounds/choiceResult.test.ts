@@ -84,19 +84,23 @@ const GROUP_EXPLORATION_STEPS: [string, () => Story][] = [
 
 const EXPLORATION_STEPS = [...SINGLE_EXPLORATION_STEPS, ...GROUP_EXPLORATION_STEPS];
 
-/** Whether production sends the exploration line on this turn: a group's exploration step, since the stage's adoption. */
-const productionTakesLine = (story: Story) => story.isMultiplayer() && takesExplorationOrder(story);
+/**
+ * Whether production sends the exploration line on this turn: every exploration step, a group's since the stage's
+ * adoption, a single player's since the choice-line-sp stage (2026-09-30).
+ */
+const productionTakesLine = (story: Story) => takesExplorationOrder(story);
 
 describe("productionTurnToday: production's turn as the eval measured it before the stage, built from the frozen copy", () => {
-  it.each([...OTHER_TURNS, ...SINGLE_EXPLORATION_STEPS])("is production's request byte for byte on %s, prompt and schema", (_, make) => {
+  it.each(OTHER_TURNS)("is production's request byte for byte on %s, prompt and schema", (_, make) => {
     const story = make();
     const [ours, production] = [productionTurnToday(story), beatStep.request(story)];
     expect(ours.prompt).toBe(production.prompt);
     expect(json(ours.schema)).toBe(json(production.schema));
   });
 
-  // Adopted for group turns only (the run of 2026-09-30): production's group exploration step is the variant as measured
-  it.each(GROUP_EXPLORATION_STEPS)("is production's request without the adopted exploration line on %s, and production is the variant", (_, make) => {
+  // Adopted for group turns (the choice-result run of 2026-09-30), then for a single player (the choice-line-sp run of
+  // the same day): production's exploration step is the variant as measured
+  it.each(EXPLORATION_STEPS)("is production's request without the adopted exploration line on %s, and production is the variant", (_, make) => {
     const story = make();
     const [ours, variant, production] = [productionTurnToday(story), choiceResultRequest(story), beatStep.request(story)];
     expect(production.prompt).toBe(variant.prompt);
@@ -104,7 +108,7 @@ describe("productionTurnToday: production's turn as the eval measured it before 
     expect(json(ours.schema)).toBe(json(production.schema));
   });
 
-  (frozen.length ? it : it.skip)("is production's request byte for byte on every frozen turn case, the variant's on a group's exploration step", () => {
+  (frozen.length ? it : it.skip)("is production's request byte for byte on every frozen turn case, the variant's on an exploration step", () => {
     const turns = frozen.filter((c) => c.role === "beat" && c.state);
     expect(turns.length).toBeGreaterThan(50);
     for (const c of turns) {

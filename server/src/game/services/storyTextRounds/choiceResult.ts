@@ -30,10 +30,12 @@ import { productionTurnForm } from "./turnOptionsContinuity.js";
  * result, the same action in the same direction, why, and the text carries out
  * none of them. Everywhere else production's request byte for byte. Every
  * player count: the line reads per player. Model-facing text says "thread"
- * and "beat". Adopted after the run for group turns only (production's own
- * copy is EXPLORATION_ORDER in optionRules.ts): productionTurnToday stays the
- * turn as production sent it before, so production's group exploration step
- * is this variant, and a single player's is productionTurnToday.
+ * and "beat". Adopted after the run for group turns, and after the
+ * choice-line-sp run (the same day, production's one retry of a short reply in
+ * the loop) for a single player too (production's own copy is
+ * EXPLORATION_ORDER in optionRules.ts): productionTurnToday stays the turn as
+ * production sent it before, so production's exploration step, every player
+ * count, is this variant.
  */
 
 const LABEL = "Choice-result turn";

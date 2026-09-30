@@ -32,19 +32,19 @@ import { CHOICE_RESULT_TEXT, choiceResultRequest, takesExplorationOrder } from "
  * today's form with the scoreboard rule on a scored contest's ending. Since
  * the choice-result stage of 2026-09-30, a group turn where a player's thread
  * explores is the measured variant choiceResult byte for byte (the
- * exploration-order line after the option types); a single player's
- * exploration step stays today's form, since the line failed there (one-
- * paragraph replies).
+ * exploration-order line after the option types); since the choice-line-sp
+ * stage of the same day, a single player's exploration step is too (measured
+ * with production's one retry of a short reply in the loop).
  */
 
 /**
- * The measured request production must send: the ending as endingStateB, a
- * group's exploration step as choiceResult, else a single player's turnB6 or a
- * group's today's form.
+ * The measured request production must send: the ending as endingStateB, an
+ * exploration step as choiceResult (every player count), else a single
+ * player's turnB6 or a group's today's form.
  */
 function measuredTurn(story: Story): { prompt: string; schema: Parameters<typeof toJsonSchema>[0] } {
   if (story.getCurrentBeatType() === "ending") return endingStateRequest(story);
-  if (story.isMultiplayer() && takesExplorationOrder(story)) return choiceResultRequest(story);
+  if (takesExplorationOrder(story)) return choiceResultRequest(story);
   return story.isMultiplayer() ? round0BeatStep.request(story) : todaysFormWithB6Request(story);
 }
 
@@ -129,7 +129,7 @@ function expectSame(production: { prompt: string; schema: Parameters<typeof toJs
 /** The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. */
 const asAdopted = <T extends { prompt: string }>(measured: T, story: Story): T => ({ ...measured, prompt: adoptedTurn(measured.prompt, story) });
 
-describe("single-player turns: today's form with B6 as measured, the ending as endingStateB", () => {
+describe("single-player turns: today's form with B6 as measured, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(SINGLE_PLAYER)("%s", (_, build) => {
     const story = build();
     expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
@@ -239,16 +239,19 @@ describe("group turns: today's form, an exploration step as choiceResult, the en
     expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
   });
 
-  it("gives a group's exploration step the exploration-order line, once, after the option types, and a single player's none (the choice-result stage)", () => {
+  it("gives every exploration step the exploration-order line, once, after the option types: a group's (the choice-result stage) and a single player's (the choice-line-sp stage); no challenge step", () => {
+    const once = (prompt: string) => {
+      expect(prompt.split(CHOICE_RESULT_TEXT.explorationOrder).length - 1).toBe(1);
+      expect(prompt).toContain(`${CHOICE_RESULT_TEXT.optionTypes}${CHOICE_RESULT_TEXT.explorationOrder}\n- Define if the option is a sacrifice`);
+    };
     for (const players of [2, 3]) {
-      for (const kind of ["exploration", "mixed"] as const) {
-        const prompt = beatStep.request(groupStep(players, kind)).prompt;
-        expect(prompt.split(CHOICE_RESULT_TEXT.explorationOrder).length - 1).toBe(1);
-        expect(prompt).toContain(`${CHOICE_RESULT_TEXT.optionTypes}${CHOICE_RESULT_TEXT.explorationOrder}\n- Define if the option is a sacrifice`);
-      }
+      for (const kind of ["exploration", "mixed"] as const) once(beatStep.request(groupStep(players, kind)).prompt);
       expect(beatStep.request(threadBeat(players)).prompt).not.toContain(CHOICE_RESULT_TEXT.explorationOrder);
     }
-    expect(beatStep.request(chapterStep("exploration", 1)).prompt).not.toContain(CHOICE_RESULT_TEXT.explorationOrder);
+    for (const done of [0, 1, 2]) once(beatStep.request(chapterStep("exploration", done)).prompt);
+    for (const build of [() => threadBeat(1), () => chapterStep("challenge", 1), () => firstSwitchBeat(1), () => laterSwitchBeat(1), () => endingBeat(1)]) {
+      expect(beatStep.request(build()).prompt).not.toContain(CHOICE_RESULT_TEXT.explorationOrder);
+    }
   });
 
   it.each([

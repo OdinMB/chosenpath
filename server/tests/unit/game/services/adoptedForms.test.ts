@@ -23,8 +23,9 @@ import { takesExplorationOrder } from "../../../../src/game/services/storyTextRo
  * nearer chapter question of 2026-09-28, the outcome's stages and each step
  * once, and the step results' two rules, 2026-09-30) for the chapter, today's
  * turn form with B6 alone (turnB6) for a single player and today's form
- * (prod) for groups, a group's exploration step with the exploration-order
- * line (choiceResult, 2026-09-30), every ending as the ending told as its
+ * (prod) for groups, an exploration step with the exploration-order line
+ * (choiceResult; a group's and, since the choice-line-sp stage, a single
+ * player's, 2026-09-30), every ending as the ending told as its
  * milestones leave it (endingStateB, 2026-09-30), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
@@ -56,8 +57,9 @@ function measuredVariant(input: RequestInput): VariantId {
     case "beat":
       // Every ending since 2026-09-30: the ending told as its milestones leave it
       if (input.story.getCurrentBeatType() === "ending") return "endingStateB";
-      // A group's exploration step since the choice-result stage: the exploration-order line (choiceResult as measured)
-      if (input.story.isMultiplayer() && takesExplorationOrder(input.story)) return "choiceResult";
+      // An exploration step: the exploration-order line (choiceResult as measured), a group's since the choice-result stage,
+      // a single player's since the choice-line-sp stage (measured with production's one retry of a short reply in the loop)
+      if (takesExplorationOrder(input.story)) return "choiceResult";
       return input.story.isMultiplayer() ? "prod" : "turnB6";
   }
 }
