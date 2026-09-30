@@ -108,8 +108,8 @@ export function settledJudgeSchema() {
 
 const resultLines = (resolutions: unknown) => Object.entries(asObject(resolutions)).map(([key, text]) => `    ${key}: ${asString(text)}`);
 
-/** A player's text as they read it: paragraphs without image tags. */
-function paragraphsOf(reply: unknown, slot: string): string[] {
+/** A player's text as they read it: paragraphs without image tags (recordedResultJudge.ts reads it too). */
+export function paragraphsOf(reply: unknown, slot: string): string[] {
   const beat = asObject(asObject(reply)[slot]);
   return playerParagraphs(asString(beat.text))
     .map((p) => p.replace(IMAGE_TAG, " ").replace(/\s+/g, " ").trim())
@@ -148,8 +148,8 @@ function statBlock(story: Story, change: Loose): string {
   ].join("\n");
 }
 
-/** The facts the turn records (each player's, once each) and the new story elements' own. */
-function factLines(story: Story, reply: SetOfBeatGenerationSchema): string[] {
+/** The facts the turn records (each player's, once each) and the new story elements' own (recordedResultJudge.ts reads them too). */
+export function factLines(story: Story, reply: SetOfBeatGenerationSchema): string[] {
   const names = new Map(story.getStoryElements().map((e) => [e.id, e.name]));
   const seen = new Set<string>();
   const lines: string[] = [];

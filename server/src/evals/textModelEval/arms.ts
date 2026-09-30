@@ -47,8 +47,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * code (playthroughs-2: no --run arms either, the --playthroughs --round 2
  * mode's prep calls), then the turn that completes an outcome and the ending
  * (outcome-settled: the variant beside production's turn on switch turns and
- * endings of the second round's stored runs). Their caps and reasons are in
- * budget.ts.
+ * endings of the second round's stored runs), then the turn after an
+ * exploration step told as the game recorded it (recorded-result: the variant
+ * beside production's turn on the second round's changes of direction). Their
+ * caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -68,6 +70,7 @@ export const FEEDBACK_STAGES = [
   "choice-line-sp",
   "playthroughs-2",
   "outcome-settled",
+  "recorded-result",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -233,6 +236,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   outcomeSettled: "adopted",
   // Its one fix-and-retest against production's turn too, the run's lines second
   outcomeSettledB: "adopted",
+  // The recorded-result stage (2026-09-30, fix 2 of the second playthroughs' review): the turn after an exploration step
+  // told as the game recorded it, against production's turn, which runs beside it
+  recordedResult: "adopted",
 };
 
 /**
@@ -556,9 +562,48 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return choiceLineSpArms(role);
     case "outcome-settled":
       return outcomeSettledArms(role);
+    case "recorded-result":
+      return recordedResultArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the recorded-result stage (2026-09-30, fix 2 of the
+ * second playthroughs' review): production's own code, unchanged since the
+ * outcome-settled stage (every turn request is adopted7's byte for byte),
+ * under a tag of its own so production runs beside the variant in the same
+ * minutes.
+ */
+export const RECORDED_RESULT_PROMPT_STATE = "adopted9";
+
+/**
+ * The stage's cases, built from the second round's stored runs
+ * (recordedResultCases.ts, no calls), by the turn model that plays them: turns
+ * that narrate an exploration step's recorded result where the player changed
+ * direction from the step before. Where the defect happened: food trucks turn
+ * 23 (the chosen result told as the earlier one, the milestone a blend);
+ * beside it ordinary ones, switch turns and chapter steps.
+ */
+export const RECORDED_RESULT_CASES = {
+  single: ["round-recorded-lemonade-t7", "round-recorded-avalon-t11", "round-recorded-avalon-t16", "round-recorded-kids-mouse-t8"],
+  groups: ["round-recorded-food-trucks-t23", "round-recorded-space-pirates-t14", "round-recorded-space-pirates-t25", "round-recorded-estate-agents-t15"],
+} as const;
+
+/**
+ * The recorded-result stage (the coordinator's fix 2 after the second
+ * playthroughs' review): production's turn (adopted) and the variant
+ * (recordedResult) on each player count's own turn group (Luna medium for one
+ * player, Luna low for groups), twice on the stage's cases, interleaved, under
+ * adopted9.
+ */
+function recordedResultArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return [
+    ...(["adopted", "recordedResult"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: [...RECORDED_RESULT_CASES.single] })),
+    ...(["adopted", "recordedResult"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: [...RECORDED_RESULT_CASES.groups] })),
+  ];
 }
 
 /**
@@ -957,7 +1002,7 @@ function optionsO2Arms(role: EvalRole): ArmPlan[] {
 }
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
-const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result", "choice-line-sp", "outcome-settled"];
+const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result", "choice-line-sp", "outcome-settled", "recorded-result"];
 
 export function stageInterleavesArms(stage: Stage): boolean {
   return INTERLEAVED_STAGES.includes(stage);
@@ -996,6 +1041,8 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   ...[...CHOICE_RESULT_BUILT_CASES.single, ...CHOICE_RESULT_BUILT_CASES.groups, ...CHOICE_RESULT_BUILT_CASES.plans].map((id): [string, Stage] => [id, "choice-result"]),
   // The outcome-settled stage's cases from the second playthroughs (2026-09-30), frozen after every earlier stage had closed
   ...[...OUTCOME_SETTLED_CASES.single, ...OUTCOME_SETTLED_CASES.groups].map((id): [string, Stage] => [id, "outcome-settled"]),
+  // The recorded-result stage's cases from the second playthroughs (2026-09-30), frozen after every earlier stage had closed
+  ...[...RECORDED_RESULT_CASES.single, ...RECORDED_RESULT_CASES.groups].map((id): [string, Stage] => [id, "recorded-result"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

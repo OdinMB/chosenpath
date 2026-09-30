@@ -50,6 +50,7 @@ import { endingStateRequest, type EndingStateForm } from "../../game/services/st
 import { noSwitchReminderRequest } from "../../game/services/storyTextRounds/switchReminder.js";
 import { choiceResultRequest } from "../../game/services/storyTextRounds/choiceResult.js";
 import { outcomeSettledRequest } from "../../game/services/storyTextRounds/outcomeSettled.js";
+import { recordedResultRequest } from "../../game/services/storyTextRounds/recordedResult.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -231,6 +232,15 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * after the run: the completing milestone made specific from the thread's text
  * (the run's milestones copied the plan's words) and the ending line's "follow
  * the milestones" as "tell the outcome as its milestones leave it".
+ * "recordedResult" is the recorded-result stage's turn (2026-09-30, fix 2 of
+ * the second playthroughs' review, storyTextRounds/recordedResult.ts):
+ * production's turn today, every player count, with a line where the turn
+ * narrates an exploration step's recorded result (the chosen resolution is
+ * what the player did, holding over earlier texts, results and facts that
+ * point another way: a change of course shown, never folded back or blended)
+ * and, where it writes that chapter's milestone, a line that the milestone is
+ * the chosen resolution; production's request byte for byte elsewhere, with
+ * production's turn limits for the player count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -291,7 +301,8 @@ export type VariantId =
   | "choiceResultB"
   | "planV2f"
   | "outcomeSettled"
-  | "outcomeSettledB";
+  | "outcomeSettledB"
+  | "recordedResult";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -349,6 +360,7 @@ export const VARIANTS: VariantId[] = [
   "planV2f",
   "outcomeSettled",
   "outcomeSettledB",
+  "recordedResult",
 ];
 
 /**
@@ -745,6 +757,12 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   outcomeSettledB: (input) => {
     if (input.role !== "beat") throw new Error(`Variant outcomeSettledB does not cover role ${input.role}`);
     return { ...outcomeSettledRequest(input.story, { specificMilestone: true }), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  },
+  // The recorded-result stage's turn: the chosen exploration result holds over earlier texts and facts, in the text, the
+  // facts and the chapter's milestone; production's turn limits
+  recordedResult: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant recordedResult does not cover role ${input.role}`);
+    return { ...recordedResultRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
   },
 };
 
