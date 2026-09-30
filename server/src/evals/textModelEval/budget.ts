@@ -14,7 +14,7 @@ export { FEEDBACK_STAGES };
  * (going on although the stalled Stage 4 calls may have been billed). The
  * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
  * the setup rounds, the turn rounds and the migration check, and $0.10 /
- * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 for the feedback
+ * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 for the feedback
  * workflow's runs (STAGE_CAP_REASONS says why); a stage cap above its default needs a
  * recorded reason, and the global cap can only be lowered. The probe and case
  * building count as Stage 0. The content-filter check (--filter-check,
@@ -44,6 +44,7 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   "stage-scoping": 0.4,
   "options-continuity": 1.4,
   "options-o2": 0.7,
+  "planner-v2e": 0.15,
 };
 /** The owner's hard cap: $30, raised to $33 on 2026-09-27 and to $40 on 2026-09-28. */
 export const HARD_CEILING = 40;
@@ -94,6 +95,8 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-09-30 (the owner's feedback on options that differ only in risk, sacrifices too common and rewards rare, and a turn that repeated the one before it; the ledger at $34.02 of the $40 hard cap): production's single-player turn form (adopted, under adopted2) and the three arms on it (turnO, turnC, turnOC) twice on the 44 stored single-player turns, interleaved (352 turns, about $1.15 at the form gate's $0.0033 a turn), the judged checks on their turns (about 350 Luna low calls, about $0.10), a smoke, and room for one fix and retest; the fix and retest (2026-09-30): arm O with one sentence (turnOb, its options named their stat) once on the 21 rolled chapter steps of the two Novi Reg stories (about $0.08), from what is left",
   "options-o2":
     "coordinator, 2026-09-30 (after the options and continuity run: arm O's variety gain without its wrong-way moves; the ledger at $35.40 of the $40 hard cap): version O2 (turnO2: arm O's stat variety with the lever option left out of the bonus count, its retest sentence, B6's negative base kept, a reward invited until the chapter offered one) and production's single-player turn form beside it (adopted, under adopted3), twice on the 32 stored rolled chapter steps, interleaved (128 turns, about $0.44 at the run's $0.0034 a turn), their judged checks (about $0.03), a smoke, and room for one fix and retest (O2 once on the 32, about $0.11); the fix and retest (2026-09-30): O2 with sacrifices on today's rate (turnO2b, its strong-reason clause gave unreasoned second sacrifices) once on the 32 (about $0.12) and its judged turns, from what is left",
+  "planner-v2e":
+    "coordinator, 2026-09-30 (the owner's decision that the story's last chapter settles only its outcome's next stage, planner v2d's clause, and planner v2d's last step written twice in 4 of 46 plans; the ledger at $36.01 of the $40 hard cap): planner v2e (planV2e: planner v2d with its last step listed once) twice on the 23 chapter-planning cases, stored and built, the built first chapter and three last chapters among them (46 plans, about $0.065 at planner v2d's $0.0014 a plan), the judged stage check on its plans (about 50 Luna low calls, about $0.02), a smoke, and room for one fix and retest",
 };
 
 export type Caps = {

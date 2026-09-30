@@ -300,12 +300,30 @@ function kindRules(story: Story, twoSided: boolean): string {
   return `${KIND_RULE_MP}${story.getNumberOfPlayers() === 3 ? `\n${RACE_RULE}` : ""}`;
 }
 
-function progressionItem(number: number, multiplayer: boolean): string {
+/**
+ * Planner v2e's fix for the doubled last step (after the stage scoping of
+ * 2026-09-30: planner v2d wrote its last step twice, in `steps` and again as
+ * `finalStep`, in 4 of 46 plans, planner v2c in 1 of 46; a last chapter's
+ * four-beat plan held three steps and the third again): one line in the
+ * progression item, right after the decisive last step, and the reply's
+ * steps, last step and (in multiplayer) duration saying it of their own
+ * field. Each description's form before the fix stays, so every earlier
+ * planner builds as it ran.
+ */
+const STEPS_ONCE = "Each step comes once: a thread of n beats has n different steps, and the last one never repeats the step before it.";
+const STEPS_FIELD = `The steps before the last one: one for a two-beat thread, two for three beats, three for a four-beat thread. ${NO_BLANK_ITEMS}`;
+const STEPS_FIELD_ONCE = `The steps before the last one: one for a two-beat thread, two for three beats, three for a four-beat thread. The last step is not among them: it is finalStep, and it comes only there. ${NO_BLANK_ITEMS}`;
+const FINAL_STEP_FIELD = "The last step. Its three results are the milestones above.";
+const FINAL_STEP_FIELD_ONCE = "The last step, written only here and never one of the steps above again. Its three results are the milestones above.";
+const DURATION_FIELD = "Two, three or four beats, the same for every thread in this batch.";
+const DURATION_FIELD_ONCE = "Two, three or four beats, the same for every thread in this batch: each thread's steps plus its final step make exactly this many.";
+
+function progressionItem(number: number, multiplayer: boolean, stepsOnce = false): string {
   const who = multiplayer ? "players" : "player";
   return `${number}. A progression of steps, as many as the length, that tells one situation rising to a climax:
    - The thread stays with one situation: the same people, place, rival or problem from step to step. Each step raises the stakes of that situation instead of starting a new activity, and every step stays on the thread's outcome.
    - From the second step on, something pushes back: a rival moves, an ally hesitates, a cost comes due. In challenge${multiplayer ? " and contest" : ""} threads, each result gives an advantage or a disadvantage for the next step without closing it off. In exploration threads, each step's three results are three paths the ${who} can take, and the last step's results lead toward the outcome's three resolutions, in the same order.
-   - The last step is the decisive moment: its question brings the thread's question to a head.
+   - The last step is the decisive moment: its question brings the thread's question to a head.${stepsOnce ? `\n   - ${STEPS_ONCE}` : ""}
    - Each step asks how the ${who} act${multiplayer ? "" : "s"} ("Stealth: How does Rikkit get past the Guild's night watch?").${multiplayer ? " In a contest, every step is the same moment for both sides, and its question names them all." : ""}
    - No step settles the thread early, and the ${who} can't leave or derail it.
    Weak: "Rally supporters" → "Print posters" → "Negotiate with the Guild" (three activities, and the last one belongs to a different question).
@@ -374,7 +392,7 @@ function stageItem(number: number, multiplayer: boolean, climax = false): string
    Outcome: "${outcome}" with 3 milestones has the stages 1. prove the noble's hand; 2. turn the Guild against him; 3. stop the conspiracy. At stage 1 the thread is about the proof. Weak: a last step "${step}", or the milestone "${who}'s proof brings the noble down" (stages 2 and 3). Good: the milestones "${who} gets the noble's letters out of the manor: proof of his hand", "${who} gets one letter, which hints at his hand but proves nothing", "${who} flees the manor with nothing".`;
 }
 
-function threadList(multiplayer: boolean, nearer: boolean, staged = false, climax = false): string {
+function threadList(multiplayer: boolean, nearer: boolean, staged = false, climax = false, stepsOnce = false): string {
   const milestones = `Possible milestones, one of which is added to the outcome when the thread ends. ${MILESTONE_SIZE}`;
   // planV2c inserts its question item before the milestones, planV2d its stage item before that; the rest renumbers
   const q = nearer ? 1 : 0;
@@ -384,7 +402,7 @@ function threadList(multiplayer: boolean, nearer: boolean, staged = false, clima
 1. The thread's outcome is already set (PLAYER DECISIONS below). Every step and every milestone stays on that outcome.
 2. The type of thread.
 ${staged ? `${stageItem(3, false, climax)}\n` : ""}${nearer ? `${questionItem(3 + s, false)}\n` : ""}${3 + s + q}. ${milestones}
-${progressionItem(4 + s + q, false)}
+${progressionItem(4 + s + q, false, stepsOnce)}
 
 `;
   }
@@ -393,7 +411,7 @@ ${progressionItem(4 + s + q, false)}
 2. Players involved (Side A and, if it's a Contest thread, Side B)
 3. The type of thread.
 ${staged ? `${stageItem(4, true, climax)}\n` : ""}${nearer ? `${questionItem(4 + s, true)}\n` : ""}${4 + s + q}. ${milestones}
-${progressionItem(5 + s + q, true)}
+${progressionItem(5 + s + q, true, stepsOnce)}
 
 `;
 }
@@ -415,7 +433,7 @@ const EXAMPLE_1P_EDITS: [string, string][] = [
   ["How do [insert player names] handle the situation?", "How does Rikkit handle the situation?"],
 ];
 
-function threadInstructions(production: string, story: Story, twoSided: boolean, nearer: boolean, staged = false, climax = false): string {
+function threadInstructions(production: string, story: Story, twoSided: boolean, nearer: boolean, staged = false, climax = false, stepsOnce = false): string {
   const multiplayer = story.isMultiplayer();
   let text = production;
   for (const [find, replace] of CONTEXT_EDITS) text = replaceOnce(LABEL, text, find, replace);
@@ -452,7 +470,7 @@ function threadInstructions(production: string, story: Story, twoSided: boolean,
     `\n${kindRules(story, twoSided)}\n`
   );
   // The list, through the first-thread reminder that repeats the MANDATORY FIRST THREAD REQUIREMENT above
-  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer, nearer, staged, climax));
+  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer, nearer, staged, climax, stepsOnce));
   text = replaceOnce(
     LABEL,
     text,
@@ -570,7 +588,7 @@ function stepSchema(multiplayer: boolean) {
   });
 }
 
-function threadFields(multiplayer: boolean, nearer: boolean, staged = false) {
+function threadFields(multiplayer: boolean, nearer: boolean, staged = false, stepsOnce = false) {
   return {
     kind: (multiplayer ? z.enum(["challenge", "contest", "exploration"]) : z.enum(["challenge", "exploration"])).describe(
       "The thread's kind, by the kind rule (the outcome decides it, not the thread type). Decide it first: the milestones and the steps below use its result names."
@@ -590,27 +608,27 @@ function threadFields(multiplayer: boolean, nearer: boolean, staged = false) {
     steps: z
       .array(stepSchema(multiplayer))
       .max(3)
-      .describe(`The steps before the last one: one for a two-beat thread, two for three beats, three for a four-beat thread. ${NO_BLANK_ITEMS}`),
+      .describe(stepsOnce ? STEPS_FIELD_ONCE : STEPS_FIELD),
     finalStep: z
       .object({
         title: PRODUCTION_STEP.shape.title,
         question: z.string().describe(`The decisive moment: how the ${multiplayer ? "players act" : "player acts"} to settle the thread's question.`),
       })
-      .describe("The last step. Its three results are the milestones above."),
+      .describe(stepsOnce ? FINAL_STEP_FIELD_ONCE : FINAL_STEP_FIELD),
     plan: z.string().describe(PLAN(multiplayer)),
   };
 }
 
-function threadReplySchema(story: Story, full: boolean, nearer: boolean, staged = false): z.AnyZodObject {
+function threadReplySchema(story: Story, full: boolean, nearer: boolean, staged = false, stepsOnce = false): z.AnyZodObject {
   const restated: z.ZodRawShape = full ? { relevantSwitchAndThreadInstructions: threadAnalysisSchema.shape.relevantSwitchAndThreadInstructions } : {};
-  if (!story.isMultiplayer()) return z.object({ ...restated, thread: z.object(threadFields(false, nearer, staged)) });
+  if (!story.isMultiplayer()) return z.object({ ...restated, thread: z.object(threadFields(false, nearer, staged, stepsOnce)) });
   const ids = storyOutcomeIds(story);
   const sides = { playersSideA: threadSchema.shape.playersSideA, playersSideB: threadSchema.shape.playersSideB };
-  const { kind, ...rest } = threadFields(true, nearer, staged);
+  const { kind, ...rest } = threadFields(true, nearer, staged, stepsOnce);
   return z.object({
     ...restated,
     grouping: z.string().describe("Which players share which thread, and why, in one or two sentences."),
-    duration: z.number().describe("Two, three or four beats, the same for every thread in this batch."),
+    duration: z.number().describe(stepsOnce ? DURATION_FIELD_ONCE : DURATION_FIELD),
     threads: z
       .array(
         z.object({
@@ -696,21 +714,25 @@ function assembleThread(story: Story, parsed: unknown): unknown {
  * owner's open question of 2026-09-29): in the story's last thread, an outcome
  * still needing several milestones is settled outright (the stage item's
  * climax clause, PACING's folded stages), and elsewhere it is planV2d byte for
- * byte.
+ * byte; `stepsOnce` with the stages is planV2e (after the stage scoping of
+ * 2026-09-30, the owner having chosen planner v2d's next-stage last chapter):
+ * planner v2d with its last step listed once (STEPS_ONCE and the three field
+ * descriptions), its assembly planner v2d's.
  */
 export function plannerV2ThreadRequest(
   story: Story,
   full: boolean,
-  options: { twoSided?: boolean; nearerQuestion?: boolean; stages?: boolean; climax?: boolean } = {}
+  options: { twoSided?: boolean; nearerQuestion?: boolean; stages?: boolean; climax?: boolean; stepsOnce?: boolean } = {}
 ): AssembledRequest {
   const production = threadStep.request(story);
   const { instructions, state } = splitAtState(LABEL, production.prompt);
   const nearer = options.nearerQuestion ?? false;
   const staged = options.stages ?? false;
   const climax = staged && (options.climax ?? false) && foldsStages(story);
+  const stepsOnce = options.stepsOnce ?? false;
   return {
-    prompt: threadInstructions(instructions, story, options.twoSided ?? false, nearer, staged, climax) + threadState(state, story, staged, climax),
-    schema: threadReplySchema(story, full, nearer, staged),
+    prompt: threadInstructions(instructions, story, options.twoSided ?? false, nearer, staged, climax, stepsOnce) + threadState(state, story, staged, climax),
+    schema: threadReplySchema(story, full, nearer, staged, stepsOnce),
     assemble: (parsed) => assembleThread(story, parsed),
   };
 }
@@ -735,4 +757,11 @@ export const PLANNER_V2_TEXT = {
   stageItemStart: STAGE_ITEM_START,
   stagesRule: STAGES_RULE,
   climaxClause,
+  stepsOnce: STEPS_ONCE,
+  /** Planner v2e's three field descriptions, each with its form before the fix */
+  stepsOnceFields: {
+    steps: { once: STEPS_FIELD_ONCE, before: STEPS_FIELD },
+    finalStep: { once: FINAL_STEP_FIELD_ONCE, before: FINAL_STEP_FIELD },
+    duration: { once: DURATION_FIELD_ONCE, before: DURATION_FIELD },
+  },
 };

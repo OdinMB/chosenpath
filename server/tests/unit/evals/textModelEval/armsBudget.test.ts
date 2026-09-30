@@ -371,17 +371,18 @@ describe("budget caps", () => {
       "stage-scoping": 0.4,
       "options-continuity": 1.4,
       "options-o2": 0.7,
+      "planner-v2e": 0.15,
     });
-    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping", "options-continuity", "options-o2"]);
+    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping", "options-continuity", "options-o2", "planner-v2e"]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
       expect(LEDGER_STAGES).toContain(stage);
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all nine caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all ten caps still fit
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(4.7);
+    expect(caps).toBeCloseTo(4.85);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -488,6 +489,25 @@ describe("budget caps", () => {
     expect(STAGE_CAP_REASONS["options-o2"]).toMatch(/2026-09-30/);
     // The ledger read $35.40 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
     expect(35.4 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["options-o2"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("runs planner v2e (planner-v2e, 2026-09-30): Luna low, twice on every chapter-planning case, stored and built, against planner v2c", () => {
+    const plans = armsFor("planner-v2e", "thread");
+    expect(plans.map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source, p.caseIds])).toEqual([["gpt-6-luna@low/planV2e", 1, 2, "all", undefined, undefined]]);
+    for (const role of ["setup", "beat", "switch", "iteration"] as const) expect(armsFor("planner-v2e", role)).toEqual([]);
+    expect(pipelinePlans("planner-v2e")).toEqual([]);
+    expect(stageInterleavesArms("planner-v2e")).toBe(false);
+    // The built first chapter and the three last chapters are planned here too: the stage comes after the stage scoping
+    for (const id of [...STAGE_SCOPING_NEW_CASES, ...STAGE_SCOPING_LAST_CHAPTER_CASES]) expect(stagePlansCase("planner-v2e", id)).toBe(true);
+    // Against production's planner v2c, with planner v2d (the form it fixes) and today's form second; priced from planner v2d
+    expect(referenceKey("gpt-6-luna@low/planV2e")).toBe("gpt-6-luna@low/planV2c");
+    expect(secondReferenceKeys("gpt-6-luna@low/planV2e")).toEqual(["gpt-6-luna@low/planV2d", "gpt-6-luna@low/prod"]);
+    expect(estimateBaseKey("gpt-6-luna@low/planV2e")).toBe("gpt-6-luna@low/planV2d");
+    expect(STAGE_CAP_REASONS["planner-v2e"]).toMatch(/planV2e/);
+    expect(STAGE_CAP_REASONS["planner-v2e"]).toMatch(/2026-09-30/);
+    expect(stageRunsBaseline("planner-v2e")).toBe(false);
+    // The ledger read $36.01 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
+    expect(36.01 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["planner-v2e"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {

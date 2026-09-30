@@ -292,6 +292,42 @@ export function namedStageChecks(story: Story, thread: unknown): Record<string, 
   return checks;
 }
 
+// --- Each step once (planner v2e's fix, 2026-09-30) ---
+
+/** A step's title or question as compared: lower case, curly apostrophes straight, punctuation and spacing folded. */
+const stepText = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[^\p{L}\p{N}']+/gu, " ")
+    .trim();
+/** A step question without its leading label ("Decisive Evidence: The shipment…" reads "The shipment…"). */
+const unlabelled = (question: string) => question.replace(/^[^:?]{1,40}:\s+/, "");
+/** Questions this short are too generic to call a repeat (a fixture's "Q", a bare "Escape: How?"). */
+const MIN_COMPARED_QUESTION_WORDS = 5;
+
+/**
+ * How many of a thread's steps repeat an earlier one: the same title, or the
+ * same question of five words or more, its leading label left out. The stage
+ * scoping's doubled plans wrote the last step in `steps` and again as
+ * `finalStep`, the title always the same, the question the same or relabelled.
+ */
+export function repeatedSteps(progression: unknown[]): number {
+  const titles = new Set<string>();
+  const questions = new Set<string>();
+  let repeats = 0;
+  for (const step of progression) {
+    const s = asObject(step);
+    const title = stepText(asString(s.title));
+    const question = stepText(unlabelled(asString(s.question)));
+    const compared = question.split(" ").filter(Boolean).length >= MIN_COMPARED_QUESTION_WORDS;
+    if ((title !== "" && titles.has(title)) || (compared && questions.has(question))) repeats++;
+    if (title !== "") titles.add(title);
+    if (compared) questions.add(question);
+  }
+  return repeats;
+}
+
 /** A chapter reply's threads as the planner wrote them: a single player's one thread, or a group's (and today's form's) list. */
 function writtenThreads(written: unknown): Loose[] {
   const reply = asObject(written);
@@ -383,6 +419,12 @@ export function checkThreadDesign(story: Story, plan: ThreadAnalysis, expectatio
   if (typeof duration === "number") {
     const allowed = allowedLengths(turnsLeftOf(story));
     checks.lengthAllowed = allowed.length === 0 || allowed.includes(duration);
+  }
+  // Planner v2e's fix (2026-09-30): every step listed once, the last one no copy of the one before it
+  if (threads.length > 0) {
+    const repeats = threads.map((t) => repeatedSteps(asArray(t.progression)));
+    checks.stepsOnce = repeats.every((n) => n === 0);
+    counts.repeatedSteps = repeats.reduce((sum, n) => sum + n, 0);
   }
 
   if (story.isMultiplayer() && !story.hasThreadAnalysis()) {

@@ -385,6 +385,50 @@ describe("the nearer chapter question and the concrete kind of milestone (owner,
       expect(checkThreadDesign(onStage(2), plan({ outcomeStages: STAGES })).checks.stagesNamed).toBe(true);
     });
   });
+
+  describe("each step listed once (planner v2e's fix, 2026-09-30)", () => {
+    const result = { favorable: "a", mixed: "b", unfavorable: "c" };
+    const step = (title: string, question: string) => ({ title, question, possibleResolutions: result, resolution: null });
+    const chapter = (...progressions: ReturnType<typeof step>[][]): ThreadAnalysis => {
+      const base = threadAnalysis("challenge", progressions[0].length, 4);
+      return { ...base, threads: progressions.map((progression, i) => ({ ...base.threads[0], id: `t${i}`, progression })) };
+    };
+    const opening = step("A Signal Beneath the City", "Technical Scan: How does Arielle follow the irregular waste-flow readings near the corridor?");
+    const trail = step("Into The Veins", "Following the Trace: How does Arielle keep the shipment in sight without losing its route?");
+    const site = step("The Hidden Disposal Site", "Decisive Evidence: How does Arielle secure proof of the route before the handlers erase the logs?");
+    const story = threadAnalysisAfterSwitch(1);
+
+    it("passes a chapter whose steps are all different, and counts no repeat", () => {
+      const { checks, counts } = checkThreadDesign(story, chapter([opening, trail, site]));
+      expect(checks.stepsOnce).toBe(true);
+      expect(counts.repeatedSteps).toBe(0);
+    });
+
+    it("fails a last step written twice: the same title, or the same question with or without its label", () => {
+      // The stage scoping's doubled plans: the steps list held the last step, and the final step repeated it
+      const sameTitle = checkThreadDesign(story, chapter([opening, site, step("The Hidden Disposal Site", "How does Arielle get the proof out before the patrols close in?")]));
+      expect(sameTitle.checks.stepsOnce).toBe(false);
+      expect(sameTitle.counts.repeatedSteps).toBe(1);
+      const unlabelled = step("The Chamber", "How does Arielle secure proof of the route before the handlers erase the logs?");
+      expect(checkThreadDesign(story, chapter([opening, site, unlabelled])).checks.stepsOnce).toBe(false);
+      expect(checkThreadDesign(story, chapter([opening, trail, site, site])).counts.repeatedSteps).toBe(1);
+    });
+
+    it("reads titles and questions without case, punctuation or curly quotes, and never compares questions under five words", () => {
+      const curly = step("Liam’s Quiet Arrangement", "Finding Prey: How does Victor ask Liam to arrange a discreet feeding?");
+      const straight = step("liam's quiet arrangement!", "How does Victor handle what Liam arranged for him tonight?");
+      expect(checkThreadDesign(story, chapter([curly, straight])).checks.stepsOnce).toBe(false);
+      // The fixtures' one-letter questions, and short labels alike, are no repeat
+      expect(checkThreadDesign(story, threadAnalysis("challenge", 3, 4)).checks.stepsOnce).toBe(true);
+      expect(checkThreadDesign(story, chapter([step("One", "Escape: How?"), step("Two", "Escape: How?")])).checks.stepsOnce).toBe(true);
+    });
+
+    it("reads every thread of a group chapter and sums the repeats", () => {
+      const doubled = chapter([opening, site, site], [opening, trail, site], [trail, trail]);
+      expect(checkThreadDesign(story, doubled).checks.stepsOnce).toBe(false);
+      expect(checkThreadDesign(story, doubled).counts.repeatedSteps).toBe(2);
+    });
+  });
 });
 
 describe("checkBeatDesign", () => {

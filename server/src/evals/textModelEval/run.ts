@@ -64,10 +64,11 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --dry-run (default) [--prompt-state <tag>, default round0]  cases, open jobs, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2 --prompt-state <tag> [filters]
+ *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e --prompt-state <tag> [filters]
  *     (options-continuity runs under adopted2: production's form beside the three arms, interleaved;
  *     options-o2 under adopted3: production's form beside version O2 on the stored rolled chapter steps, interleaved,
- *     then O2's retest turnO2b once on the same steps)
+ *     then O2's retest turnO2b once on the same steps; planner-v2e under round0, beside planner v2c's and v2d's
+ *     stored plans)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;

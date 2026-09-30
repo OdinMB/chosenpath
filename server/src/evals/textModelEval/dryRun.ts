@@ -95,6 +95,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "stage-scoping": "Stage scoping (planner v2d)",
   "options-continuity": "Options and continuity (turnO, turnC, turnOC; retest turnOb)",
   "options-o2": "Options O2 (turnO2 beside production's form; retest turnO2b)",
+  "planner-v2e": "Planner v2e (planner v2d, its last step listed once)",
 };
 
 /** Jobs by arm key, in plan order. */

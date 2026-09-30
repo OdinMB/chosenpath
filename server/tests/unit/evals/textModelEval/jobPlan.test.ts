@@ -690,6 +690,18 @@ describe("planJobs: the round stages and the migration check", () => {
     const scoping = planJobs([stored, frozenLater], { stage: "stage-scoping", promptState: "round1", roles: ["thread"], mode: "isolated", subset15: false, records: [] });
     expect([...new Set(scoping.map((j) => j.caseId))].sort()).toEqual([built, "sp-thread"]);
   });
+
+  it("plans planner v2e (planner-v2e, 2026-09-30) twice on every chapter-planning case, the stage scoping's built ones included, and nothing else", () => {
+    const [built] = STAGE_SCOPING_NEW_CASES;
+    const stored = evalCase("sp-thread", "thread", { state: threadAnalysisAfterSwitch(1).getState() });
+    const frozenLater = evalCase(built, "thread", { state: threadAnalysisAfterSwitch(1).getState(), tags: tags({ source: "round" }) });
+    const switchCase = evalCase("sp-switch", "switch", { state: threadAnalysisAfterSwitch(1).getState() });
+    const jobs = planJobs([stored, frozenLater, switchCase], { stage: "planner-v2e", promptState: "round0", roles: ["switch", "thread"], mode: "isolated", subset15: false, records: [] });
+    expect(jobs.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`).sort()).toEqual(
+      [built, "sp-thread"].flatMap((id) => [1, 2].map((s) => `${id} s${s} gpt-6-luna@low/planV2e`)).sort()
+    );
+    expect(planJobs([stored], { stage: "planner-v2e", promptState: "round0", roles: ["thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
+  });
 });
 
 describe("requestFor: the Stage 4 variants", () => {

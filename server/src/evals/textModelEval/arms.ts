@@ -34,7 +34,8 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * set (armsFor, pipelinePlans). The owner's feedback of 2026-09-29 adds the
  * stage scoping (planner v2d and its judged stage check), and that of
  * 2026-09-30 the options and continuity arms on production's turn form, then
- * version O2 beside production's form. Their caps and reasons are in budget.ts.
+ * version O2 beside production's form, then planner v2e (planner v2d with its
+ * last step listed once). Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -46,6 +47,7 @@ export const FEEDBACK_STAGES = [
   "stage-scoping",
   "options-continuity",
   "options-o2",
+  "planner-v2e",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -178,6 +180,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   planV2d: "planV2c",
   // The climax clause (the owner's open question, 2026-09-30) against planner v2d, whose last-chapter clause it replaces
   planV2dClimax: "planV2d",
+  // Planner v2e (2026-09-30, planner v2d with its last step listed once) against production's chapter planner, which it
+  // would replace
+  planV2e: "planV2c",
   // The options and continuity arms (the owner's feedback, 2026-09-30) against production's single-player turn form,
   // which they edit and which runs beside them
   turnO: "adopted",
@@ -205,6 +210,7 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   turnOb: "turnO",
   turnO2: "turnOb",
   turnO2b: "turnO2",
+  planV2e: "planV2d",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -284,6 +290,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "planV2d")]: [armKey(LUNA_LOW, "prod")],
   // The climax clause against production's planner v2c too, on the same last chapters
   [armKey(LUNA_LOW, "planV2dClimax")]: [armKey(LUNA_LOW, "planV2c")],
+  // Planner v2e against planner v2d, the form it fixes, and today's form (the carry-forward guard)
+  [armKey(LUNA_LOW, "planV2e")]: [armKey(LUNA_LOW, "planV2d"), armKey(LUNA_LOW, "prod")],
   // Both arms together against each part alone: what each adds on top of the other
   [armKey(LUNA_MEDIUM, "turnOC")]: [armKey(LUNA_MEDIUM, "turnO"), armKey(LUNA_MEDIUM, "turnC")],
   // Arm O's fix-and-retest against arm O, the text it fixes
@@ -486,6 +494,10 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return optionsContinuityArms(role);
     case "options-o2":
       return optionsO2Arms(role);
+    case "planner-v2e":
+      // Planner v2e (coordinator, 2026-09-30) on Luna low, twice on every chapter-planning case, stored and built; planner
+      // v2c, v2d and today's form read their stored records, and its switch planner is planner v2b's, so no switch case runs
+      return role === "thread" ? [{ arm: luna("low", "planV2e"), samples: 2, scope: "all" }] : [];
     default:
       return [];
   }
