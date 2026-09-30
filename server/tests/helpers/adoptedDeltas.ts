@@ -8,13 +8,16 @@
  * everything else production sends is the variant's request byte for byte
  * (.plans/2026-09-26_build-followup.md, "Adoption into production" and "The
  * owner's feedback of 2026-09-28"). The chapter planner has none: planV2c
- * carries the adopted "without a number" in the chapter title's field.
+ * carries the adopted "without a number" in the chapter title's field. The
+ * switch planner has one since 2026-09-30: the threads that fit near the end.
  */
 
 import type { Story } from "core/models/Story.js";
 import type { GameMode } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
+import { chaptersThatFit, turnsLeft } from "../../src/game/services/pacing.js";
 import { StoryStatePromptService } from "../../src/game/services/prompts/StoryStatePromptService.js";
+import { chaptersThatFit as measuredChaptersThatFit } from "../../src/game/services/storyTextRounds/pacing.js";
 import { KIDS_STATS, KIDS_STATS_VARIED } from "../../src/game/services/storyTextRounds/setupRound3Text.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
@@ -63,6 +66,30 @@ export function adoptedSetupPrompt(measured: string, players: number, mode: Game
  * measured variant endingStateB byte for byte, which carries the rule with its
  * unfinished half, so no ending delta is left.
  */
+
+/*
+ * The switch planner (2026-09-30, the playthroughs' review): PACING's threads
+ * that fit are never fewer than the length rule makes come
+ * (`chaptersThatFit` in production's pacing.ts), where planner v2b counted
+ * turns left ÷ 4 alone. The two differ only near a story's end (3, 6, 7 and 11
+ * turns left), where ÷ 4 had the planner read "about 0 more threads fit, the
+ * one this switch opens included" beside "it has exactly 2 beats". A
+ * correction of a contradiction in the measured request, unmeasured.
+ */
+const fitLine = (n: number) => `so about ${n} more ${n === 1 ? "thread fits" : "threads fit"}, the one this switch opens included.`;
+const neededLine = (n: number) => `still needed for about ${n} ${n === 1 ? "thread" : "threads"}.`;
+
+/** The measured switch planner's prompt with production's count of the threads that fit. */
+export function withThreadsThatFit(measured: string, story: Story): string {
+  const left = turnsLeft(story);
+  const was = measuredChaptersThatFit(left);
+  const now = chaptersThatFit(left);
+  if (was === now) return measured;
+  for (const line of [fitLine(was), neededLine(was)]) {
+    if (!measured.includes(line)) throw new Error(`The measured switch planner no longer says "${line}"`);
+  }
+  return measured.split(fitLine(was)).join(fitLine(now)).split(neededLine(was)).join(neededLine(now));
+}
 
 /** The chapter rules as the measured switch turn printed them: the story's thread types and switch/thread instructions. */
 export const CHAPTER_RULES_HEADING = "SPECIAL SWITCH/THREAD INSTRUCTIONS:";

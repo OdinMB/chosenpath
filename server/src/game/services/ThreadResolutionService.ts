@@ -87,32 +87,46 @@ export class ThreadResolutionService {
     }
   }
 
+  /**
+   * An exploration step's result is a choice, not a roll. A thread on one
+   * player's own outcome goes the way that player chose when they are in it;
+   * any other thread goes the way most of its players chose, a tie by the
+   * game's dice among the tied choices. Until 2026-09-30 the first player in
+   * the thread decided for everyone, so in a group thread on another player's
+   * outcome player1's choice wrote that player's milestone (the playthroughs'
+   * food truck and space pirates stories).
+   */
   private static determineExplorationThreadResolution(
     thread: Thread,
     story: Story
   ): Resolution {
-    // console.log(
-    //   `[ThreadResolutionService] Determining exploration thread resolution for ${thread.id}`
-    // );
-    // for now, just choose whatever the (hopefully) one player in the thread chose
-    const playerSlot = thread.playersSideA[0];
-    if (!playerSlot) {
+    const picks = thread.playersSideA.flatMap((slot) => {
+      const step = story.getCurrentBeat(slot);
+      return step && step.resolution !== null ? [{ slot, resolution: step.resolution }] : [];
+    });
+    if (picks.length === 0) {
       console.log(
-        `[ThreadResolutionService] ERROR: No playerSlot found in thread ${thread.id}, defaulting to "mixed"`
-      );
-      return "mixed";
-    }
-    const step = story.getCurrentBeat(playerSlot);
-
-    // If step is null or resolution is null, default to "mixed"
-    if (!step || step.resolution === null) {
-      console.log(
-        `[ThreadResolutionService] ERROR: No valid step or resolution found, defaulting to "mixed"`
+        `[ThreadResolutionService] ERROR: No valid step or resolution found in thread ${thread.id}, defaulting to "mixed"`
       );
       return "mixed";
     }
 
-    return step.resolution;
+    const owner = this.outcomeOwner(story, thread.outcomeId);
+    const ownersPick = picks.find((pick) => pick.slot === owner);
+    if (ownersPick) return ownersPick.resolution;
+
+    // The most chosen, in the order the thread lists its players; the dice only on a tie
+    const counts = new Map<Resolution, number>();
+    for (const { resolution } of picks) counts.set(resolution, (counts.get(resolution) ?? 0) + 1);
+    const most = Math.max(...counts.values());
+    const tied = [...counts.entries()].filter(([, count]) => count === most).map(([resolution]) => resolution);
+    return tied.length === 1 ? tied[0] : tied[Math.floor(Math.random() * tied.length)];
+  }
+
+  /** The slot whose own outcome this is; undefined for a shared outcome or an id no player holds. */
+  private static outcomeOwner(story: Story, outcomeId: string): string | undefined {
+    if (story.getSharedOutcomes().some((outcome) => outcome.id === outcomeId)) return undefined;
+    return story.getPlayerSlots().find((slot) => (story.getPlayer(slot)?.outcomes ?? []).some((outcome) => outcome.id === outcomeId));
   }
 
   private static determineChallengeThreadResolution(

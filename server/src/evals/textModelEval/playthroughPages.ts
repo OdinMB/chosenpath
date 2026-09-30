@@ -1,6 +1,6 @@
 import type { Outcome, Stat, StatValueEntry, StoryState, Switch, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import { playerParagraphs } from "./playerText.js";
-import { readStory, type ChapterReading, type StoryReadings } from "./playthroughChecks.js";
+import { readStory, type ChapterReading, type GroupStepReading, type StoryReadings } from "./playthroughChecks.js";
 import type { PlayPick, PlayRun, PlayTurn } from "./playthroughs.js";
 import { contextLinesHtml, escapeHtml } from "./ratingHtml.js";
 
@@ -204,7 +204,10 @@ function switchBlock(run: PlayRun, turn: PlayTurn, readings: StoryReadings): str
       return `<p><strong>${e(sw.title)}</strong> <span class="muted">(${e(who)}: a choice of directions)</span></p><ul>${asArray<string>(sw.topicChoices).map((d) => `<li>${e(d)}</li>`).join("")}</ul>`;
     })
     .join("");
-  const binding = pacing ? ` · ${pacing.threadsFit} more chapter${pacing.threadsFit === 1 ? "" : "s"} fit, ${pacing.stillNeeded} milestone${pacing.stillNeeded === 1 ? "" : "s"} still needed${pacing.binding ? ": the late pacing binds" : ""}` : "";
+  const told = pacing?.toldFit !== undefined ? ` (production told the planner ${pacing.toldFit})` : "";
+  const binding = pacing
+    ? ` · ${pacing.threadsFit} more ${pacing.threadsFit === 1 ? "chapter fits" : "chapters fit"}${told}, ${pacing.stillNeeded} milestone${pacing.stillNeeded === 1 ? "" : "s"} still needed${pacing.binding ? ": the late pacing binds" : ""}`
+    : "";
   const retried = plan.calls.length > 1 ? `<p class="flag">The plan was asked for again: ${e(plan.calls[0].problem ?? plan.calls[0].lengthProblem ?? "")}</p>` : "";
   const failed = plan.failure ? `<p class="flag">The switch plan failed: ${e(plan.failure)}</p>` : "";
   const stuck = stuckLines(plan)
@@ -232,7 +235,20 @@ function stuckLines(plan: NonNullable<PlayTurn["plan"]>, repicks: PlayTurn["repi
   ];
 }
 
-function chapterBlock(run: PlayRun, turn: PlayTurn, chapter: ChapterReading | undefined): string {
+/** What production's plan check changed in the plan it used: players moved out of a second thread, threads dropped, a one-sided contest made a challenge. */
+function planRepairLines(plan: NonNullable<PlayTurn["plan"]>, names: (slot: string) => string): string[] {
+  const repairs = plan.calls.at(-1)?.repairs ?? [];
+  const lines = repairs.flatMap((repair) => {
+    const [kind, ...rest] = repair.replace(/^note /, "").split(": ");
+    if (kind === "threadPlayerRepeated" && rest.length === 2) return [`${names(rest[1])} was also written into “${rest[0]}” and was taken out of it`];
+    if (kind === "threadDropped") return [`“${rest.join(": ")}” was dropped, left without players`];
+    if (kind === "contestOneSided") return [`“${rest.join(": ")}” had one side's players only and became their challenge`];
+    return [];
+  });
+  return lines.length ? [`Production's plan check changed the plan: ${lines.join("; ")}.`] : [];
+}
+
+function chapterBlock(run: PlayRun, turn: PlayTurn, chapter: ChapterReading | undefined, readings: StoryReadings): string {
   const plan = turn.plan;
   if (!plan || plan.kind !== "chapter plan") return "";
   const outcomes = outcomesById(run.start);
@@ -265,10 +281,20 @@ function chapterBlock(run: PlayRun, turn: PlayTurn, chapter: ChapterReading | un
 <details open><summary>The planned steps and results</summary><ol>${steps}</ol><p class="muted">Possible milestones</p><ul class="ctx-lines">${milestones}</ul></details>${judged}`;
     })
     .join("");
+  const names = (slot: string) => nameOf(run.start, slot);
+  const lostPicks = readings.switchPicks
+    .filter((p) => p.turn === turn.turn && !p.kept)
+    .map((p) => {
+      const picked = outcomes.get(p.pickedOutcome ?? "")?.outcome.question ?? p.pickedOutcome;
+      const placed = outcomes.get(p.placedOn ?? "")?.outcome.question ?? p.placedOn;
+      return `${names(p.slot)}'s switch pick is not followed: the pick was about “${picked}”, and the plan puts ${names(p.slot)} in “${p.thread ?? "no thread"}”, about “${placed}”${p.repickedTo !== undefined ? " (after the harness re-picked it)" : ""}.`;
+    });
   const flags = [
-    ...stuckLines(plan, turn.repicks, (slot) => nameOf(run.start, slot)),
+    ...stuckLines(plan, turn.repicks, names),
     ...(chapter && !chapter.lengthAllowed ? [`Its length is not one PACING allows (${chapter.duration} turns; allowed ${lengths.join(", ")}).`] : []),
     ...(plan.calls.length > 1 ? [`The plan was asked for again: ${plan.calls[0].problem ?? plan.calls[0].lengthProblem ?? ""}`] : []),
+    ...planRepairLines(plan, names),
+    ...lostPicks,
     ...(plan.failure ? [`The chapter plan failed: ${plan.failure}`] : []),
   ];
   return `<section class="chapter">${head}${body}${flags.map((f) => `<p class="flag">${e(f)}</p>`).join("")}</section>`;
@@ -284,7 +310,7 @@ function chapterResult(run: PlayRun, chapter: ChapterReading): string {
   return `<div class="result">${parts.join("")}</div>`;
 }
 
-function pickLine(pick: PlayPick): string {
+function pickLine(pick: PlayPick, step: GroupStepReading | undefined): string {
   const odds = pick.details
     ? `; odds favorable ${Math.round(pick.details.distribution.favorable)}%, mixed ${Math.round(pick.details.distribution.mixed)}%, unfavorable ${Math.round(pick.details.distribution.unfavorable)}%${pick.details.roll !== undefined ? `, rolled ${pick.details.roll.toFixed(1)}` : ""} on ${signed(pick.details.points)} points`
     : "";
@@ -292,21 +318,26 @@ function pickLine(pick: PlayPick): string {
     pick.repickedTo !== undefined
       ? ` <span class="flag">The harness later changed this pick to choice ${pick.repickedTo + 1}, where the next chapter could not be planned from it (see the chapter below).</span>`
       : "";
-  return `<p class="pick"><strong>Chosen</strong> (the player's policy: ${e(pick.rule)}, ${e(pick.why)}). Result: <strong>${e(pick.resolution ?? "–")}</strong>${e(odds)}.${repicked}</p>`;
+  // A group thread's step has one result for everyone in it, which may not be this choice's own
+  const used = step && step.result !== null && step.result !== pick.resolution ? ` The step's result for everyone in the thread: <strong>${e(step.result)}</strong>.` : "";
+  const overridden =
+    step?.ownerOverridden && step.owner === pick.slot ? ` <span class="flag">The game used another result: another player's choice decided this step, on this player's own outcome.</span>` : "";
+  return `<p class="pick"><strong>Chosen</strong> (the player's policy: ${e(pick.rule)}, ${e(pick.why)}). Its own result: <strong>${e(pick.resolution ?? "–")}</strong>${e(odds)}.${used}${overridden}${repicked}</p>`;
 }
 
-function beatBlock(run: PlayRun, turn: PlayTurn, slot: string): string {
+function beatBlock(run: PlayRun, turn: PlayTurn, slot: string, readings: StoryReadings): string {
   const beat = asObject(asObject(turn.reply)[slot]);
   // The game shows an ending without options or interludes (turn doc M21), whatever the reply wrote
   const ending = turn.kind === "ending";
   const options = ending ? [] : asArray<Loose>(beat.options);
   const mechanics = turn.mechanics?.choices[slot] ?? [];
   const pick = turn.picks.find((p) => p.slot === slot);
+  const step = readings.groupSteps.find((s) => s.turn === turn.turn && s.picks.some((p) => p.slot === slot));
   const optionItems = options
     .map((option, i) => {
       const chosen = pick?.option === i;
       const lines = mechanics[i] ? contextLinesHtml([mechanics[i]]) : "";
-      return `<li class="option${chosen ? " chosen" : ""}"><p>${e(asString(option.text))}</p>${lines}${chosen && pick ? pickLine(pick) : ""}</li>`;
+      return `<li class="option${chosen ? " chosen" : ""}"><p>${e(asString(option.text))}</p>${lines}${chosen && pick ? pickLine(pick, step) : ""}</li>`;
     })
     .join("");
   const interludes = ending ? [] : asArray<Loose>(beat.interludes);
@@ -330,12 +361,12 @@ function turnNotes(turn: PlayTurn): string {
   return notes.map((n) => `<p class="flag">${e(n)}</p>`).join("");
 }
 
-function turnBlock(run: PlayRun, turn: PlayTurn): string {
+function turnBlock(run: PlayRun, turn: PlayTurn, readings: StoryReadings): string {
   const slots = Object.keys(asObject(run.start?.players));
   const failed = !turn.reply ? `<p class="flag">No turn: ${e(run.stopped)}</p>` : "";
   return `<article class="turn" id="turn-${turn.turn}">
 <header><span class="turn-no">Turn ${turn.turn}</span><span class="kind">${e(turn.kind)}</span><span class="meta">wait ${seconds(turn.waitMs)} · ${usd(turn.costUsd)}</span></header>
-${turn.reply ? slots.map((slot) => beatBlock(run, turn, slot)).join("") : failed}
+${turn.reply ? slots.map((slot) => beatBlock(run, turn, slot, readings)).join("") : failed}
 ${turn.mechanics ? `<div class="changes"><h5>What this turn changes</h5>${contextLinesHtml(turn.mechanics.changes)}</div>` : ""}
 ${turnNotes(turn)}
 </article>`;
@@ -345,7 +376,7 @@ function storySection(run: PlayRun, readings: StoryReadings): string {
   const parts: string[] = [];
   for (const turn of run.turns) {
     const chapter = readings.chapters.find((c) => c.firstTurn === turn.turn);
-    parts.push(switchBlock(run, turn, readings), chapterBlock(run, turn, chapter), turnBlock(run, turn));
+    parts.push(switchBlock(run, turn, readings), chapterBlock(run, turn, chapter, readings), turnBlock(run, turn, readings));
     const ended = readings.chapters.find((c) => c.lastTurn === turn.turn);
     if (ended) parts.push(chapterResult(run, ended));
   }
@@ -396,11 +427,19 @@ function readingsSection(readings: StoryReadings): string {
     `Chapters: ${r.chapters.length}; lengths PACING allows: ${r.chapters.filter((c) => c.lengthAllowed).length} of ${r.chapters.length}; milestones that landed on their outcome: ${r.chapters.flatMap((c) => c.threads).filter((t) => t.milestoneLanded).length} of ${r.chapters.flatMap((c) => c.threads).length}.`,
     `Late pacing: ${r.latePacing.filter((p) => p.binding).length} of ${r.latePacing.length} switches bind; at those, the next chapter pushed an outcome that still needed milestones: ${r.latePacing.filter((p) => p.binding && p.nextNeeded).length}.`,
     `Sacrifices and rewards against the owner's rule: ${r.leverFlags.length ? r.leverFlags.map((f) => `chapter ${f.chapter} (${f.slot}): ${f.rule} at turn ${f.turns.join(", ")}`).join("; ") : "no chapter offered a second reward or sacrifice"}.`,
-    `Levers the player took, paid on the next turn: ${r.leversPaid.counts.applied} of ${Object.values(r.leversPaid.counts).reduce((a, b) => a + b, 0)}.`,
+    `Levers the player took, paid on the next turn: ${r.leversPaid.counts.applied} of ${Object.values(r.leversPaid.counts).reduce((a, b) => a + b, 0)}${
+      r.leversPaid.counts.sharedOnce ? `; ${r.leversPaid.counts.sharedOnce} more rode on one change of a shared stat that paid another player's (${r.leversPaid.sharedOnce.map((s) => `turn ${s.turn}, ${s.stat}`).join("; ")})` : ""
+    }.`,
     `Stat changes that don't fit their stat: ${r.unfit.length}.`,
+    ...(r.players > 1
+      ? [
+          `Group exploration steps where another player's choice decided the owner's own outcome: ${r.groupSteps.filter((s) => s.ownerOverridden).map((s) => `turn ${s.turn}`).join(", ") || "none"} (of ${r.groupSteps.filter((s) => s.kind === "exploration").length} group exploration steps).`,
+          `Switch picks the next chapter did not follow: ${r.switchPicks.filter((p) => !p.kept).map((p) => `turn ${p.turn} (${p.slot})`).join(", ") || "none"} (of ${r.switchPicks.length}).`,
+        ]
+      : []),
     `Turns production could not get past (the harness asked the planner again): ${r.repairs.stuckTurns.map((s) => `turn ${s.turn} (${s.kind})`).join(", ") || "none"}.`,
-    `Repairs: plans retried ${r.repairs.planRetries.length}, one-paragraph turns retried ${r.repairs.shortTextRetries.length}, calls re-sent ${r.repairs.resends.length}, beat repairs ${Object.values(r.repairs.beatRepairs).reduce((a, b) => a + b, 0)}.`,
-    `Waits over their allowance: ${r.waits.flatMap((w) => w.over.map((t) => `turn ${t} (${w.kind})`)).join(", ") || "none"}.`,
+    `Repairs: plans retried ${r.repairs.planRetries.length}, one-paragraph turns retried ${r.repairs.shortTextRetries.length} (the retry one paragraph too and used: ${r.repairs.shortTextUsedAsIs.length}), calls re-sent ${r.repairs.resends.length}, beat repairs ${Object.values(r.repairs.beatRepairs).reduce((a, b) => a + b, 0)}.`,
+    `Waits over their allowance: ${r.waits.flatMap((w) => w.over.map((t) => `turn ${t} (${w.kind})`)).join(", ") || "none"}${r.waitsLeftOut.length ? `; left out of the waits, where production would have stopped: ${r.waitsLeftOut.map((t) => `turn ${t}`).join(", ")}` : ""}.`,
     `Cost: ${usd(r.cost.storyUsd)} over ${r.cost.calls} calls (judged checks ${usd(r.cost.judgeUsd)}).`,
   ];
   return `<section id="readings"><h2>What the code read</h2><ul>${items.map((i) => `<li>${e(i)}</li>`).join("")}</ul><p class="muted">The report reads the story by hand as well: DOCS/2026-09-26_gpt6-text-eval/2026-09-30_playthroughs-report.md.</p></section>`;

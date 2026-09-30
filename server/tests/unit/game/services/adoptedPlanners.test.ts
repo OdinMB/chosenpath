@@ -16,6 +16,7 @@ import {
   switchAnalysisAfterThread,
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
+import { withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
 import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 
 /*
@@ -112,7 +113,7 @@ const THREAD_STORIES: [string, () => Story][] = [
 function expectSwitchLikeMeasured(story: Story) {
   const production = switchStep.request(story);
   const measured = plannerV2SwitchRequest(story, false);
-  expect(production.prompt).toBe(measured.prompt);
+  expect(production.prompt).toBe(withThreadsThatFit(measured.prompt, story));
   expect(json(production.schema)).toBe(json(measured.schema));
 }
 
@@ -131,6 +132,21 @@ function expectThreadLikeMeasured(story: Story) {
 
 describe("the switch planner: planner v2 as measured", () => {
   it.each(SWITCH_STORIES)("%s", (_, build) => expectSwitchLikeMeasured(build()));
+
+  it("differs from it only in the threads that fit near the end, where ÷ 4 undercounted them (2026-09-30)", () => {
+    // Turn 23 of 25 (3 turns left): measured "about 0 more threads fit" beside "exactly 2 beats"; production counts the last chapter
+    const late = singlePlayerAfterChapters(25, 22);
+    const measured = plannerV2SwitchRequest(late, false).prompt;
+    const production = switchStep.request(late).prompt;
+    expect(measured).toContain("so about 0 more threads fit, the one this switch opens included.");
+    expect(production).toContain("so about 1 more thread fits, the one this switch opens included.");
+    expect(production).toContain("still needed for about 1 thread.");
+    expect(production).toContain("it has exactly 2 beats.");
+    expect(production).not.toBe(measured);
+    // Everywhere the two counts agree, production is the measured request byte for byte
+    const middle = singlePlayerAfterChapters(25, 8);
+    expect(switchStep.request(middle).prompt).toBe(plannerV2SwitchRequest(middle, false).prompt);
+  });
 
   (frozen.length ? it : it.skip)("every frozen switch case", () => {
     const cases = frozen.filter((c) => c.role === "switch");

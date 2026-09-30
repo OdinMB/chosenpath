@@ -14,7 +14,8 @@ import { outcomeIdsNamed } from "./outcomeIds.js";
  * - turns left = the story's length minus the turns written, this one
  *   included (STORY PROGRESS counts it the same way);
  * - chapters that fit = turns left ÷ 4, rounded down (a switch and a chapter
- *   of about three turns);
+ *   of about three turns), and since 2026-09-30 never fewer than the length
+ *   rule makes come (the one change against the measured copy);
  * - still needed = intended − recorded − pending, never below 0; pending is
  *   the chapter that just ended, which the switch turn records only after the
  *   switch planner has run;
@@ -32,12 +33,37 @@ export const TURNS_PER_CHAPTER = 4;
 /** Turns left, this one included. */
 export const turnsLeft = (story: Story): number => story.getMaxTurns() - story.getCurrentTurn();
 
-export const chaptersThatFit = (left: number): number => Math.max(0, Math.floor(left / TURNS_PER_CHAPTER));
-
 /** The lengths a chapter may have when it starts with this many turns left, this one included. */
 export function allowedLengths(left: number): number[] {
   return [2, 3, 4].filter((length) => left - length === 0 || left - length >= 3);
 }
+
+/**
+ * The fewest threads, each a switch turn and a chapter of a length
+ * allowedLengths gives, that use up exactly this many turns; undefined when
+ * none can (1 or 2 turns left).
+ */
+export function fewestThreads(left: number): number | undefined {
+  const fewest: (number | undefined)[] = [0];
+  for (let n = 1; n <= left; n++) {
+    const after = allowedLengths(n - 1)
+      .map((length) => fewest[n - 1 - length])
+      .filter((count): count is number => count !== undefined);
+    fewest[n] = after.length ? 1 + Math.min(...after) : undefined;
+  }
+  return fewest[Math.max(0, left)];
+}
+
+/**
+ * Threads that fit: turns left ÷ 4, rounded down (a switch and a chapter of
+ * about three turns), but never fewer than the threads that must still come
+ * (fewestThreads). Near the end the length rule leaves few ways to finish, and
+ * ÷ 4 alone undercounted them: at 3 turns left the switch planner read "about
+ * 0 more threads fit" beside "exactly 2 beats", at 6 and 7 one where two come
+ * (the playthroughs of 2026-09-30). A logged delta against planner v2b's
+ * measured ÷ 4 (tests/helpers/adoptedDeltas.ts).
+ */
+export const chaptersThatFit = (left: number): number => Math.max(0, Math.floor(left / TURNS_PER_CHAPTER), fewestThreads(left) ?? 0);
 
 /** A chapter starting with this many turns left is the story's last: it takes exactly them. */
 export const isLastChapter = (left: number): boolean => left >= 2 && left <= 4;

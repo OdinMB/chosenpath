@@ -11,7 +11,7 @@ import { SCOREBOARD_ENDING_RULE as PRODUCTION_ENDING_RULE } from "../../../../sr
 import { ROUND3_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { ENDING_STATE_TEXT } from "../../../../src/game/services/storyTextRounds/endingState.js";
-import { adoptedSetupPrompt, adoptedTurn } from "../../../helpers/adoptedDeltas.js";
+import { adoptedSetupPrompt, adoptedTurn, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * The adoption's free final test (rounds status note, section 9, step 3):
@@ -67,8 +67,9 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     case "iteration":
       return { prompt: adoptedSetupPrompt(prompt, input.iteration.playerCount, input.iteration.gameMode), schema: json(measured) };
     case "thread":
-    case "switch":
       return { prompt, schema: json(measured) };
+    case "switch":
+      return { prompt: withThreadsThatFit(prompt, input.story), schema: json(measured) };
     case "beat":
       return { prompt: adoptedTurn(prompt, input.story), schema: json(measured) };
   }

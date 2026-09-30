@@ -3,6 +3,7 @@ import { GameModes } from "core/types/index.js";
 import {
   allowedLengths,
   chaptersThatFit,
+  fewestThreads,
   isLastChapter,
   lastChapterAfterSwitch,
   mainOutcomeId,
@@ -67,8 +68,18 @@ describe("the pacing arithmetic (turn doc A4)", () => {
     }
   });
 
-  it("counts the chapters that fit as turns left over four, rounded down", () => {
-    expect([13, 12, 5, 4, 3].map(chaptersThatFit)).toEqual([3, 3, 1, 1, 0]);
+  it("counts the chapters that fit as turns left over four, rounded down, but never fewer than the length rule makes come", () => {
+    expect([25, 13, 12, 10, 9, 8, 5, 4].map(chaptersThatFit)).toEqual([6, 3, 3, 2, 2, 2, 1, 1]);
+    // Near the end the length rule leaves one way to finish (the playthroughs of 2026-09-30, "about 0 more threads fit"
+    // beside "exactly 2 beats"): 3 turns are a switch and a 2-beat chapter, 6 and 7 two of them, 11 three
+    expect([3, 6, 7, 11].map(chaptersThatFit)).toEqual([1, 2, 2, 3]);
+    // Too few turns to end on the count: none
+    expect([2, 1, 0].map(chaptersThatFit)).toEqual([0, 0, 0]);
+  });
+
+  it("counts the fewest chapters, each after a switch turn, that end the story on its turn count", () => {
+    expect([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 25].map(fewestThreads)).toEqual([1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 4, 5]);
+    expect([0, 1, 2].map(fewestThreads)).toEqual([0, undefined, undefined]);
   });
 
   it("marks the chapter a switch opens as the last when 4 or fewer turns follow the switch, with exactly that many turns", () => {
@@ -129,6 +140,21 @@ describe("switchPacingBlock", () => {
         "Phase: the middle of the story. What it asks of the next thread: complicate what the player has built (a rival moves, an ally doubts, a price comes due).",
       ].join("\n")
     );
+  });
+
+  it("counts the last chapter as a thread that fits, so the block never says none fits beside its exact length", () => {
+    // Turn 23 of 25: 3 turns left, the switch and a 2-beat last chapter
+    const story = roundStory({
+      turns: 22,
+      maxTurns: 25,
+      playerOutcomes: { player1: [outcome(GUILD, { intendedNumberOfMilestones: 3, milestones: ["a"] }), outcome(ENCLAVE)] },
+      phases: [topicSwitch([["Guild", GUILD]], 18), endedChapter(GUILD, 3, 19, SUSPENDS)],
+    });
+    const block = switchPacingBlock(story);
+    expect(block).toContain("Turn 23 of 25; 3 turns left, this one included. A switch and its thread take about 4 turns, so about 1 more thread fits, the one this switch opens included.");
+    expect(block).toContain("milestones still needed for about 1 thread.");
+    expect(block).toContain("The thread this switch opens is the last before the ending: it has exactly 2 beats.");
+    expect(block).not.toContain("about 0");
   });
 
   it("names the last chapter's exact length late in the story, and the final phase", () => {

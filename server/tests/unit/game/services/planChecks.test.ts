@@ -2,6 +2,7 @@ import { jest } from "@jest/globals";
 import type { Story } from "core/models/Story.js";
 import type { GameMode, Outcome, Switch, SwitchAnalysis, Thread, ThreadAnalysis } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
+import { getThreadType } from "core/types/thread.js";
 import {
   checkedSwitchPlan,
   checkedThreadPlan,
@@ -17,6 +18,7 @@ import {
   switchAnalysisAfterThread,
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
+import { endedChapter, roundStory } from "../../../helpers/roundStories.js";
 import { outcome, switchAnalysis, thread, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
 
 beforeEach(() => {
@@ -85,6 +87,41 @@ function aThread(kind: ThreadKind, steps: number, sideA: string[], sideB: string
 
 function threadPlan(threads: Thread[], duration = threads[0]?.progression.length ?? 3): ThreadAnalysis {
   return { ...threadAnalysis("challenge", duration, 0), duration, threads };
+}
+
+/** A two-step contest on shared_crown with these sides, as planner v2 stores it (its kind riding along). */
+function contestThread(sideA: string[], sideB: string[], id: string): Thread {
+  const base = aThread("contest", 2, sideA, sideB, { outcomeId: "shared_crown", id });
+  return {
+    ...base,
+    kind: "contest",
+    possibleMilestones: { sideAWins: "A takes the crown", mixed: "They share it", sideBWins: "B takes the crown" },
+    progression: base.progression.map((step, i) => ({ ...step, possibleResolutions: { sideAWins: `A leads ${i}`, mixed: `Even ${i}`, sideBWins: `B leads ${i}` } })),
+  } as Thread;
+}
+
+const SHIP = outcome("player3_ship");
+
+/**
+ * A group at its chapter plan after a switch where each player picked the
+ * direction on the outcome given here, one switch per player; after one
+ * chapter, or, with `first`, before the story's first.
+ */
+function groupAfterPicks(gameMode: GameMode, picks: Record<string, string>, options: { first?: boolean } = {}): Story {
+  const slots = Object.keys(picks);
+  const own: Record<string, Outcome[]> = { player1: [TRUST], player2: [DEBT], player3: [SHIP] };
+  const switches = slots.map((slot) => topic([slot], [`Go after it (${picks[slot]})`], `${slot}_switch`));
+  const current = { ...switchAnalysis(slots, options.first ? 0 : 4), switches };
+  return roundStory({
+    players: slots.length,
+    turns: options.first ? 1 : 5,
+    maxTurns: 20,
+    gameMode,
+    sharedOutcomes: [ESCAPE, CROWN],
+    playerOutcomes: Object.fromEntries(slots.map((slot) => [slot, own[slot]])),
+    phases: options.first ? [current] : [switchAnalysis(slots, 0), endedChapter("shared_escape", 3, 1, "They slip the harbour", slots), current],
+    lastChoice: 0,
+  });
 }
 
 const kinds = (repairs: Repair[]) => repairs.filter((r) => !r.note).map((r) => r.kind);
@@ -377,6 +414,143 @@ describe("checkThreadPlan", () => {
       const result = checkThreadPlan(story, threadPlan([aThread("challenge", 3, ["player1"])]));
 
       expect(result.problem).toContain("player2 is in no thread");
+    });
+
+    // The playthroughs of 2026-09-30: the planner put two players into the contest another player picked as well as into
+    // the threads they picked, and keeping the first thread dropped both of their picks without a word
+    it("keeps a player written into two threads in the one on the outcome their switch pick named", () => {
+      const story = groupAfterPicks(GameModes.CooperativeCompetitive, { player1: "shared_crown", player2: "player2_debt", player3: "shared_escape" });
+      const reply = threadPlan([
+        contestThread(["player1"], ["player2", "player3"], "the_contest"),
+        aThread("exploration", 2, ["player2"], [], { id: "debt", outcomeId: "player2_debt" }),
+        aThread("challenge", 2, ["player3"], [], { id: "escape", outcomeId: "shared_escape" }),
+      ]);
+
+      const result = checkThreadPlan(story, reply);
+
+      expect(result.problem).toBeUndefined();
+      expect(result.plan.threads.map((t) => [t.id, t.playersSideA, t.playersSideB])).toEqual([
+        ["the_contest", ["player1"], []],
+        ["debt", ["player2"], []],
+        ["escape", ["player3"], []],
+      ]);
+      expect(result.repairs).toContainEqual({ kind: "threadPlayerRepeated", detail: "the_contest: player2" });
+      expect(result.repairs).toContainEqual({ kind: "threadPlayerRepeated", detail: "the_contest: player3" });
+      expect(kinds(result.repairs)).not.toContain("threadDropped");
+    });
+
+    it("keeps a player in the first of their threads when their pick names none of them, or in a story's first chapter", () => {
+      const picks = { player1: "shared_crown", player2: "player2_debt" };
+      const later = checkThreadPlan(groupAfterPicks(GameModes.Cooperative, picks), threadPlan([
+        aThread("challenge", 2, ["player1", "player2"], [], { id: "t1" }),
+        aThread("challenge", 2, ["player2"], [], { id: "t2", outcomeId: "player1_trust" }),
+      ]));
+      expect(later.plan.threads.map((t) => t.id)).toEqual(["t1"]);
+      // The first chapter groups every player by rule, whatever they picked
+      const first = checkThreadPlan(groupAfterPicks(GameModes.Cooperative, picks, { first: true }), threadPlan([
+        aThread("challenge", 2, ["player1", "player2"], [], { id: "together" }),
+        aThread("challenge", 2, ["player2"], [], { id: "own", outcomeId: "player2_debt" }),
+      ]));
+      expect(first.plan.threads.map((t) => t.id)).toEqual(["together"]);
+      expect(first.problem).toBeUndefined();
+    });
+  });
+
+  /*
+   * A contest only one side's players are in (the playthroughs of
+   * 2026-09-30: the players picked different directions and one side alone
+   * picked the contest; the planner wrote the contest anyway, the check found
+   * it unusable, its one retry repeated it and the turn failed for good) is
+   * that side's challenge for this chapter: its results turn from "a side
+   * wins" into how the attempt goes for the players in it.
+   */
+  describe("one-sided contests (PL-12)", () => {
+    const THREE = { player1: "shared_escape", player2: "shared_crown", player3: "player3_ship" };
+
+    it("makes a contest with only side B's player, the others in threads of their own, that player's challenge", () => {
+      const story = groupAfterPicks(GameModes.CooperativeCompetitive, THREE);
+      const reply = threadPlan([
+        aThread("challenge", 2, ["player1"], [], { id: "escape" }),
+        contestThread([], ["player2"], "the_ledger"),
+        aThread("exploration", 2, ["player3"], [], { id: "ship", outcomeId: "player3_ship" }),
+      ]);
+
+      const result = checkThreadPlan(story, reply, { lengths: true });
+
+      expect(result.problem).toBeUndefined();
+      const ledger = result.plan.threads[1];
+      expect([ledger.playersSideA, ledger.playersSideB]).toEqual([["player2"], []]);
+      expect(ledger.possibleMilestones).toEqual({ favorable: "B takes the crown", mixed: "They share it", unfavorable: "A takes the crown" });
+      expect(ledger.progression.map((step) => step.possibleResolutions)).toEqual([
+        { favorable: "B leads 0", mixed: "Even 0", unfavorable: "A leads 0" },
+        { favorable: "B leads 1", mixed: "Even 1", unfavorable: "A leads 1" },
+      ]);
+      expect(getThreadType(ledger)).toBe("challenge");
+      expect((ledger as Thread & { kind?: string }).kind).toBe("challenge");
+      expect(result.repairs).toContainEqual({ kind: "contestOneSided", detail: "the_ledger" });
+    });
+
+    it("makes a contest with only side A's players that side's challenge, side A's win its favorable result", () => {
+      const story = groupAfterPicks(GameModes.Competitive, { player1: "shared_crown", player2: "player2_debt" });
+      const reply = threadPlan([contestThread(["player1"], [], "the_route"), aThread("exploration", 2, ["player2"], [], { id: "debt", outcomeId: "player2_debt" })]);
+
+      const result = checkThreadPlan(story, reply);
+
+      expect(result.problem).toBeUndefined();
+      expect(result.plan.threads[0]).toMatchObject({
+        playersSideA: ["player1"],
+        playersSideB: [],
+        possibleMilestones: { favorable: "A takes the crown", mixed: "They share it", unfavorable: "B takes the crown" },
+      });
+      expect(kinds(result.repairs)).toEqual(["contestOneSided"]);
+    });
+
+    it("keeps a one-sided contest a problem in a contest game when every player is in it: the opponents are missing, not elsewhere", () => {
+      const story = groupAfterPicks(GameModes.Competitive, { player1: "shared_crown", player2: "shared_crown" });
+
+      expect(checkThreadPlan(story, threadPlan([contestThread(["player1", "player2"], [], "all_a")])).problem).toContain("side B");
+      expect(checkThreadPlan(story, threadPlan([contestThread([], ["player1", "player2"], "all_b")])).problem).toContain("side A");
+    });
+
+    it("makes contest results with one side a challenge in a cooperative group, where no contest can be played", () => {
+      const story = groupAfterPicks(GameModes.Cooperative, { player1: "shared_crown", player2: "shared_crown" });
+
+      const result = checkThreadPlan(story, threadPlan([contestThread(["player1", "player2"], [], "together")]));
+
+      expect(result.problem).toBeUndefined();
+      expect(getThreadType(result.plan.threads[0])).toBe("challenge");
+      // Both sides filled stays a problem there
+      expect(checkThreadPlan(story, threadPlan([contestThread(["player1"], ["player2"], "apart")])).problem).toContain("competitive");
+    });
+
+    it("leaves a single player's contest results a problem: a single player's outcomes are never contested", () => {
+      const result = checkThreadPlan(threadStory(1), threadPlan([contestThread(["player1"], [], "alone")]));
+
+      expect(result.problem).toContain("side B");
+    });
+
+    it("uses a first reply whose only fault was the one-sided contest: no retry, every player where they picked", async () => {
+      // The space pirates' turn 6: Ari alone in the contest he picked, the other two in the threads they picked
+      const story = groupAfterPicks(GameModes.CooperativeCompetitive, { player1: "shared_crown", player2: "player2_debt", player3: "shared_escape" });
+      const reply = threadPlan([
+        contestThread(["player1"], [], "the_clerk"),
+        aThread("exploration", 2, ["player2"], [], { id: "debt", outcomeId: "player2_debt" }),
+        aThread("challenge", 2, ["player3"], [], { id: "escape" }),
+      ]);
+      const prompts: string[] = [];
+      const invoke = async (prompt: string) => {
+        prompts.push(prompt);
+        return reply;
+      };
+
+      const plan = await checkedThreadPlan(story, "PROMPT", invoke, () => undefined);
+
+      expect(prompts).toEqual(["PROMPT"]);
+      expect(plan.threads.map((t) => [t.id, t.playersSideA, getThreadType(t)])).toEqual([
+        ["the_clerk", ["player1"], "challenge"],
+        ["debt", ["player2"], "exploration"],
+        ["escape", ["player3"], "challenge"],
+      ]);
     });
   });
 

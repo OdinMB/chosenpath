@@ -1,7 +1,10 @@
-import type { SetOfBeatGenerationSchema, Thread, ThreadAnalysis } from "core/types/index.js";
+import type { SetOfBeatGenerationSchema, StoryState, Switch, SwitchAnalysis, Thread, ThreadAnalysis } from "core/types/index.js";
+import { getThreadType, type ThreadType } from "core/types/thread.js";
 import type { OutcomeState } from "../../game/services/endingStates.js";
+import { outcomeIdsNamed } from "../../game/services/outcomeIds.js";
+import { chaptersThatFit } from "../../game/services/pacing.js";
 import { percentile } from "./armStats.js";
-import type { LeverStatus } from "./ratingMechanics.js";
+import type { LeverReading, LeverStatus } from "./ratingMechanics.js";
 import { playRunId, playthroughArm, type JudgedItem, type PlayCallLog, type PlayRun } from "./playthroughs.js";
 import { allowanceFor, type TurnKind } from "./turnWaits.js";
 
@@ -11,16 +14,21 @@ import { allowanceFor, type TurnKind } from "./turnWaits.js";
  * is one PACING allows, and the milestone its switch turn (or the ending)
  * writes lands on its outcome, one per chapter, stage by stage; each switch's
  * late pacing (binding once fewer threads fit than milestones are still
- * needed: every direction on an outcome that still needs milestones, those no
- * chapter has pushed first); sacrifices and rewards per chapter against the
+ * needed, the threads that fit by production's count from the turns left:
+ * every direction on an outcome that still needs milestones, those no
+ * chapter has pushed first); in group chapters, whose choice decided each
+ * step and whether each player's switch pick was followed (both since the
+ * review of 2026-09-30); sacrifices and rewards per chapter against the
  * owner's rule ("At most one reward is good. Several sacrifices can sometimes
  * make sense, but should have a strong justification starting at the second
  * one": a second reward or sacrifice offered is flagged, and whether a second
  * sacrifice has its reason is read by hand); every lever the player took,
- * paid or not on the next turn; stat changes that don't fit their stat; what
+ * paid or not on the next turn, one shared change paying several players'
+ * levers counted once; stat changes that don't fit their stat; what
  * production's repairs, retries and re-sends did; the turn design checks that
  * failed; the ending's outcomes as its milestones leave them, with the judged
- * checks; waits per turn kind against their allowances; cost.
+ * checks; waits per turn kind against their allowances, and the turns left
+ * out of them; cost.
  */
 
 export type ThreadReading = {
@@ -87,7 +95,10 @@ export type OutcomeTrack = {
 
 export type PacingReading = {
   turn: number;
+  /** Threads that fit, from the turns left by production's count (pacing.ts, chaptersThatFit) */
   threadsFit: number;
+  /** The count production's request told the planner, where it differs (a run recorded before the count's fix of 2026-09-30) */
+  toldFit?: number;
   /** The most milestones any seat still needs, the chapter that just ended counted as pending */
   stillNeeded: number;
   binding: boolean;
@@ -100,6 +111,57 @@ export type PacingReading = {
 
 export type WaitReading = { kind: TurnKind; turns: number; p50S?: number; p95S?: number; maxS?: number; allowanceS: number; over: number[] };
 
+/**
+ * One step of a group chapter's thread (two or more players): each player's
+ * choice with the result its own option leads to, and the step's result the
+ * game used for everyone in the thread. An exploration step is a choice, so
+ * the reading flags one where the outcome's owner is in the thread and the
+ * game used another result than theirs (production before 2026-09-30 took the
+ * first player's). A challenge or contest step combines everyone's rolls by
+ * design.
+ */
+export type GroupStepReading = {
+  turn: number;
+  chapter: number;
+  /** 1-based */
+  step: number;
+  thread: string;
+  outcomeId: string;
+  /** "shared", or the slot whose own outcome it is */
+  owner: string;
+  kind: ThreadType;
+  picks: { slot: string; option: number; resolution: string | null }[];
+  result: string | null;
+  ownerOverridden: boolean;
+};
+
+/**
+ * A group player's switch pick against the chapter planned after it: the
+ * outcome the pick named, the one of the thread the plan put them in, and the
+ * threads production's plan check dropped that held them. The story's first
+ * chapter groups every player by rule, so it is not read.
+ */
+export type SwitchPickReading = {
+  /** The chapter opening */
+  turn: number;
+  slot: string;
+  option: number;
+  /** The harness re-picked the switch here (a stuck chapter), to this option */
+  repickedTo?: number;
+  pickedOutcome?: string;
+  thread?: string;
+  placedOn?: string;
+  /** The plan went where the pick named (or the pick named no outcome) */
+  kept: boolean;
+  /** Threads the plan check dropped once it took this player out of them (a player in two threads) */
+  droppedThreads: string[];
+};
+
+/** Levers one shared stat's single change paid for several players: the first counts as paid, the rest as riding on it. */
+export type SharedLeverReading = { turn: number; stat: string; slots: string[] };
+
+export type LeverCount = LeverStatus | "sharedOnce";
+
 export type StoryReadings = {
   id: string;
   title: string;
@@ -111,8 +173,14 @@ export type StoryReadings = {
   chapters: ChapterReading[];
   outcomes: OutcomeTrack[];
   latePacing: PacingReading[];
+  groupSteps: GroupStepReading[];
+  switchPicks: SwitchPickReading[];
   leverFlags: LeverFlag[];
-  leversPaid: { counts: Record<LeverStatus, number>; missed: { turn: number; slot: string; kind: string; stat?: string; status: LeverStatus }[] };
+  leversPaid: {
+    counts: Record<LeverCount, number>;
+    missed: { turn: number; slot: string; kind: string; stat?: string; status: LeverStatus }[];
+    sharedOnce: SharedLeverReading[];
+  };
   unfit: { turn: number; group: string; name: string; kinds: string[] }[];
   repairs: {
     setupRetries: number;
@@ -121,6 +189,8 @@ export type StoryReadings = {
     planRepairs: Record<string, number>;
     beatRepairs: Record<string, number>;
     shortTextRetries: number[];
+    /** Of those, the turns whose retry was one paragraph too, and was used (production uses a second short reply) */
+    shortTextUsedAsIs: number[];
     resends: { turn: number; caseId: string; outcomes: string[] }[];
     failedCalls: string[];
     /** Turns production could not get past (a plan unusable twice fails the turn; nothing sends it again), where the harness asked the planner again */
@@ -132,6 +202,8 @@ export type StoryReadings = {
   planCheckFailures: Record<string, number[]>;
   ending?: { turn: number; states: OutcomeState[]; judged: JudgedItem[] };
   waits: WaitReading[];
+  /** Turns whose wait no count holds: production could not get past them (the harness's rounds) */
+  waitsLeftOut: number[];
   cost: { storyUsd: number; judgeUsd: number; calls: number };
 };
 
@@ -280,7 +352,9 @@ function pacingReadings(run: PlayRun): PacingReading[] {
     const bySlot = new Map<string, number>();
     for (const need of needs) bySlot.set(need.slot, (bySlot.get(need.slot) ?? 0) + need.stillNeeded);
     const stillNeeded = Math.max(0, ...bySlot.values());
-    const threadsFit = planned.pacing.threadsFit ?? 0;
+    // Production's count from the turns left: a run recorded before its fix told the planner ÷ 4 alone
+    const threadsFit = chaptersThatFit(planned.pacing.turnsLeft);
+    const told = planned.pacing.threadsFit;
     const checks = Object.fromEntries(
       Object.entries(planned.checks?.checks ?? {}).filter(([name]) => ["lateDirectionsOnNeeded", "lateOffersUntouched", "noCompleteOutcomeOffered"].includes(name))
     );
@@ -291,6 +365,7 @@ function pacingReadings(run: PlayRun): PacingReading[] {
       {
         turn: turn.turn,
         threadsFit,
+        ...(told !== undefined && told !== threadsFit ? { toldFit: told } : {}),
         stillNeeded,
         binding: threadsFit < stillNeeded,
         checks,
@@ -299,6 +374,136 @@ function pacingReadings(run: PlayRun): PacingReading[] {
       },
     ];
   });
+}
+
+/** Whose outcome this is: "shared", or the slot that holds it (the first, for an id held twice). */
+function ownerOf(state: StoryState | undefined, outcomeId: string): string {
+  if (!state || state.sharedOutcomes?.some((o) => o.id === outcomeId)) return "shared";
+  return Object.entries(state.players).find(([, player]) => (player.outcomes ?? []).some((o) => o.id === outcomeId))?.[0] ?? "shared";
+}
+
+/** Every step of each group chapter's threads that hold two or more players: each choice, and the result the game used. */
+function groupStepReadings(run: PlayRun, chapters: ChapterReading[]): GroupStepReading[] {
+  const byTurn = new Map(run.turns.map((t) => [t.turn, t]));
+  return chapters.flatMap((chapter) => {
+    const plan = byTurn.get(chapter.firstTurn)?.plan?.plan as ThreadAnalysis | undefined;
+    const phase = resolvedPhase(run, chapter.firstTurn);
+    return (plan?.threads ?? []).flatMap((thread, i) => {
+      const players = [...thread.playersSideA, ...thread.playersSideB];
+      if (players.length < 2) return [];
+      const resolved = phase?.threads.find((t) => t.id === thread.id) ?? phase?.threads[i];
+      const owner = ownerOf(run.start, thread.outcomeId);
+      const kind = getThreadType(resolved ?? thread);
+      return Array.from({ length: chapter.duration }, (_, k): GroupStepReading => {
+        const turn = chapter.firstTurn + k;
+        const picks = (byTurn.get(turn)?.picks ?? []).filter((p) => players.includes(p.slot)).map((p) => ({ slot: p.slot, option: p.option, resolution: p.resolution }));
+        const result = resolved?.progression[k]?.resolution ?? null;
+        const ownersPick = picks.find((p) => p.slot === owner);
+        return {
+          turn,
+          chapter: chapter.index,
+          step: k + 1,
+          thread: thread.title,
+          outcomeId: thread.outcomeId,
+          owner,
+          kind,
+          picks,
+          result,
+          ownerOverridden: kind === "exploration" && ownersPick !== undefined && result !== null && ownersPick.resolution !== result,
+        };
+      });
+    });
+  });
+}
+
+/** The outcome a switch pick names: a flavor switch's, else the chosen direction's by position (its structured outcome, or the first id its text names). */
+function outcomeOfPick(sw: Switch | undefined, option: number, known: string[]): string | undefined {
+  if (!sw) return undefined;
+  if (sw.type === "flavor") return sw.outcomeId || undefined;
+  const structured = (sw as Switch & { topicDirections?: { outcomeId?: unknown }[] }).topicDirections;
+  if (Array.isArray(structured)) {
+    const id = structured[option]?.outcomeId;
+    return typeof id === "string" && known.includes(id) ? id : undefined;
+  }
+  const text = sw.topicChoices?.[option] ?? "";
+  return outcomeIdsNamed(text, known).known.sort((a, b) => text.indexOf(a) - text.indexOf(b))[0];
+}
+
+/** Each group player's switch pick against the chapter planned after it, for every chapter but the story's first. */
+function switchPickReadings(run: PlayRun, chapters: ChapterReading[]): SwitchPickReading[] {
+  if (run.input.playerCount < 2) return [];
+  const byTurn = new Map(run.turns.map((t) => [t.turn, t]));
+  const state = run.start;
+  const known = [...(state?.sharedOutcomes ?? []), ...Object.values(state?.players ?? {}).flatMap((p) => p.outcomes ?? [])].map((o) => o.id);
+  return chapters.slice(1).flatMap((chapter) => {
+    const opening = byTurn.get(chapter.firstTurn);
+    const switchTurn = byTurn.get(chapter.firstTurn - 1);
+    const plan = opening?.plan?.plan as ThreadAnalysis | undefined;
+    const switches = (switchTurn?.plan?.plan as SwitchAnalysis | undefined)?.switches ?? [];
+    if (!plan || !switchTurn) return [];
+    const repairs = opening?.plan?.calls.at(-1)?.repairs ?? [];
+    const dropped = repairs.filter((r) => r.startsWith("threadDropped: ")).map((r) => r.slice("threadDropped: ".length));
+    return switchTurn.picks.map((pick): SwitchPickReading => {
+      const sw = switches.find((s) => s.players.includes(pick.slot));
+      const pickedOutcome = outcomeOfPick(sw, pick.option, known);
+      const thread = plan.threads.find((t) => t.playersSideA.includes(pick.slot) || t.playersSideB.includes(pick.slot));
+      const removedFrom = repairs.filter((r) => r.startsWith("threadPlayerRepeated: ") && r.endsWith(`: ${pick.slot}`)).map((r) => r.slice("threadPlayerRepeated: ".length, -`: ${pick.slot}`.length));
+      return {
+        turn: chapter.firstTurn,
+        slot: pick.slot,
+        option: pick.option,
+        ...(pick.repickedTo !== undefined ? { repickedTo: pick.repickedTo } : {}),
+        ...(pickedOutcome ? { pickedOutcome } : {}),
+        ...(thread ? { thread: thread.title, placedOn: thread.outcomeId } : {}),
+        kept: pickedOutcome === undefined || thread?.outcomeId === pickedOutcome,
+        droppedThreads: removedFrom.filter((id) => dropped.includes(id)),
+      };
+    });
+  });
+}
+
+/** How many levers of its size one lever's change pays: items removed or added, or the change over the amount its text names; at least one. */
+function timesPaid(lever: LeverReading): number {
+  const { before, after } = lever;
+  if (Array.isArray(before) && Array.isArray(after)) {
+    const moved = lever.kind === "sacrifice" ? before.filter((v) => !after.includes(v)).length : after.filter((v) => !before.includes(v)).length;
+    return Math.max(1, moved);
+  }
+  if (typeof before === "number" && typeof after === "number") {
+    const amount = Number(/\d+/.exec(lever.text)?.[0] ?? 0);
+    return amount > 0 ? Math.max(1, Math.floor(Math.abs(after - before) / amount)) : 1;
+  }
+  return 1;
+}
+
+/**
+ * Every lever taken, paid or not on the next turn; where several players took
+ * a lever on one shared stat and its one change pays fewer of them than took
+ * it (one favor called in by two), the rest ride on it (`sharedOnce`).
+ */
+function leverReadings(run: PlayRun): StoryReadings["leversPaid"] {
+  const counts: Record<LeverCount, number> = { applied: 0, notApplied: 0, otherWay: 0, noChange: 0, unnamed: 0, sharedOnce: 0 };
+  const missed: StoryReadings["leversPaid"]["missed"] = [];
+  const sharedOnce: SharedLeverReading[] = [];
+  const shared = new Set((run.start?.sharedStats ?? []).map((s) => s.id));
+  for (const turn of run.turns) {
+    const onShared = new Map<string, LeverReading[]>();
+    for (const lever of turn.levers) {
+      if (lever.status === "applied" && lever.stat && shared.has(lever.stat.id)) {
+        onShared.set(lever.stat.id, [...(onShared.get(lever.stat.id) ?? []), lever]);
+        continue;
+      }
+      counts[lever.status]++;
+      if (lever.status !== "applied") missed.push({ turn: turn.turn, slot: lever.slot, kind: lever.kind, ...(lever.stat ? { stat: lever.stat.name } : {}), status: lever.status });
+    }
+    for (const levers of onShared.values()) {
+      const paid = Math.min(levers.length, timesPaid(levers[0]));
+      counts.applied += paid;
+      counts.sharedOnce += levers.length - paid;
+      if (levers.length > paid) sharedOnce.push({ turn: turn.turn, stat: levers[0].stat?.name ?? "", slots: levers.map((l) => l.slot) });
+    }
+  }
+  return { counts, missed, sharedOnce };
 }
 
 const kindOf = (line: string) => line.replace(/^note /, "").split(":")[0];
@@ -341,6 +546,7 @@ function repairReadings(run: PlayRun): StoryReadings["repairs"] {
     planRepairs: countKinds(run.turns.flatMap((t) => t.plan?.calls.flatMap((c) => c.repairs) ?? [])),
     beatRepairs: countKinds(run.turns.flatMap((t) => t.repairs)),
     shortTextRetries: run.turns.filter((t) => t.calls[0]?.problem !== undefined && t.calls.length > 1).map((t) => t.turn),
+    shortTextUsedAsIs: run.turns.filter((t) => t.calls[0]?.problem !== undefined && t.calls[1]?.problem !== undefined).map((t) => t.turn),
     resends,
     failedCalls,
     stuckTurns: run.turns.flatMap((t) => {
@@ -384,14 +590,6 @@ export function readStory(run: PlayRun): StoryReadings {
       ...(tally.sacrificeSets > 1 ? [{ chapter: chapter.index, slot: tally.slot, rule: "second sacrifice" as const, turns: tally.sacrificeTurns.slice(1) }] : []),
     ])
   );
-  const counts: Record<LeverStatus, number> = { applied: 0, notApplied: 0, otherWay: 0, noChange: 0, unnamed: 0 };
-  const missed: StoryReadings["leversPaid"]["missed"] = [];
-  for (const turn of run.turns) {
-    for (const lever of turn.levers) {
-      counts[lever.status]++;
-      if (lever.status !== "applied") missed.push({ turn: turn.turn, slot: lever.slot, kind: lever.kind, ...(lever.stat ? { stat: lever.stat.name } : {}), status: lever.status });
-    }
-  }
   const checkFailures: Record<string, number[]> = {};
   const planCheckFailures: Record<string, number[]> = {};
   for (const turn of run.turns) {
@@ -415,14 +613,17 @@ export function readStory(run: PlayRun): StoryReadings {
     chapters,
     outcomes: outcomeTracks(run, chapters),
     latePacing: pacingReadings(run),
+    groupSteps: groupStepReadings(run, chapters),
+    switchPicks: switchPickReadings(run, chapters),
     leverFlags,
-    leversPaid: { counts, missed },
+    leversPaid: leverReadings(run),
     unfit: run.turns.flatMap((t) => t.unfit.map((u) => ({ turn: t.turn, ...u }))),
     repairs: repairReadings(run),
     checkFailures,
     planCheckFailures,
     ...(ending ? { ending: { turn: ending.turn, states: ending.endingStates ?? [], judged: (run.judged ?? []).filter((j) => j.kind === "ending") } } : {}),
     waits: waitReadings(run),
+    waitsLeftOut: run.turns.filter((t) => t.plan?.failedRounds?.length).map((t) => t.turn),
     cost: {
       storyUsd: sum(setupCalls.map((c) => c.costUsd)) + sum(run.turns.map((t) => t.costUsd)),
       judgeUsd: sum((run.judged ?? []).map((j) => j.costUsd)),
@@ -471,10 +672,41 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     lines.push(`- ${o.id} (${o.owner}): ${o.milestones.length} of ${o.intended}, ${o.complete ? "complete" : "unfinished"}; chapters ${list(o.chapters)}${o.problems.length ? `; problems: ${o.problems.join("; ")}` : ""}`);
     for (const m of o.milestones) lines.push(`  - turn ${m.turn}${m.chapter ? ` (chapter ${m.chapter})` : ""}: ${cell(m.text)}`);
   }
-  lines.push("", "### Late pacing", "", "| Switch turn | Threads fit | Still needed | Binds | Checks | Next chapter's outcome | Still needed then |", "|---|---|---|---|---|---|---|");
+  lines.push(
+    "",
+    "### Late pacing",
+    "",
+    "Threads fit by production's count from the turns left (never fewer than the length rule makes come; \"told\" where the planner's request said another, before that count's fix). The checks read the late rule as they were measured (turns left ÷ 4).",
+    "",
+    "| Switch turn | Threads fit | Still needed | Binds | Checks | Next chapter's outcome | Still needed then |",
+    "|---|---|---|---|---|---|---|"
+  );
   for (const p of r.latePacing) {
     const checks = Object.entries(p.checks).map(([name, ok]) => `${name} ${yes(ok)}`);
-    lines.push(`| ${p.turn} | ${p.threadsFit} | ${p.stillNeeded} | ${yes(p.binding)} | ${list(checks)} | ${list(p.nextOutcomes)} | ${yes(p.nextNeeded)} |`);
+    lines.push(`| ${p.turn} | ${p.threadsFit}${p.toldFit !== undefined ? ` (told ${p.toldFit})` : ""} | ${p.stillNeeded} | ${yes(p.binding)} | ${list(checks)} | ${list(p.nextOutcomes)} | ${yes(p.nextNeeded)} |`);
+  }
+  if (r.groupSteps.length) {
+    lines.push(
+      "",
+      "### Group chapters: whose choice decided each step",
+      "",
+      "Every step of a thread with two or more players: each player's choice and the result its own option leads to, and the result the game used for the thread. An exploration step is a choice: \"overridden\" where the outcome's owner is in the thread and the game used another result than theirs. A challenge or contest step combines the rolls.",
+      "",
+      "| Turn | Chapter | Step | Thread | Outcome (owner) | Kind | Choices | Result used | Owner's choice overridden |",
+      "|---|---|---|---|---|---|---|---|---|"
+    );
+    for (const s of r.groupSteps) {
+      const choices = s.picks.map((p) => `${p.slot} ${p.option + 1} → ${p.resolution ?? "–"}`).join("; ");
+      lines.push(`| ${s.turn} | ${s.chapter} | ${s.step} | ${cell(s.thread)} | ${s.outcomeId} (${s.owner}) | ${s.kind} | ${choices || "–"} | ${s.result ?? "–"} | ${s.kind === "exploration" ? yes(s.ownerOverridden) : "–"} |`);
+    }
+  }
+  if (r.players > 1) {
+    const lost = r.switchPicks.filter((p) => !p.kept);
+    const described = lost.map(
+      (p) =>
+        `turn ${p.turn}, ${p.slot} picked ${p.pickedOutcome}, planned on ${p.placedOn ?? "no thread"}${p.droppedThreads.length ? ` (the plan check dropped ${p.droppedThreads.join(", ")}, the thread it was also written into)` : ""}${p.repickedTo !== undefined ? ` (the harness re-picked it to direction ${p.repickedTo + 1})` : ""}`
+    );
+    lines.push("", `Switch picks not followed: ${described.length ? described.join("; ") : "none"} (of ${r.switchPicks.length} picks before chapters after the first).`);
   }
   lines.push("", "### Sacrifices and rewards", "", "| Chapter | Seat | Sets | Sacrifice sets (turns) | Reward sets (turns) | Taken |", "|---|---|---|---|---|---|");
   for (const c of r.chapters) {
@@ -486,8 +718,9 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
   const paid = r.leversPaid.counts;
   lines.push(
     "",
-    `Levers taken and paid on the next turn: applied ${paid.applied}, not applied ${paid.notApplied}, the other way ${paid.otherWay}, written without effect ${paid.noChange}, stat unnamed ${paid.unnamed}.`,
+    `Levers taken and paid on the next turn: applied ${paid.applied}, not applied ${paid.notApplied}, the other way ${paid.otherWay}, written without effect ${paid.noChange}, stat unnamed ${paid.unnamed}, riding on another player's paid change of a shared stat ${paid.sharedOnce}.`,
     ...r.leversPaid.missed.map((m) => `- turn ${m.turn}, ${m.slot}: the previous ${m.kind}${m.stat ? ` of ${m.stat}` : ""}: ${m.status}`),
+    ...r.leversPaid.sharedOnce.map((s) => `- turn ${s.turn}: one change of the shared ${s.stat} paid the levers of ${s.slots.join(", ")}`),
     "",
     `Stat changes that don't fit their stat: ${r.unfit.length ? "" : "none"}`,
     ...r.unfit.map((u) => `- turn ${u.turn}, ${u.group}: ${u.name}: ${u.kinds.join("; ")}`),
@@ -498,7 +731,7 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     `- plans retried: ${r.repairs.planRetries.length ? r.repairs.planRetries.map((p) => `turn ${p.turn} ${p.kind} (${[p.problem, p.lengthProblem].filter(Boolean).join("; ")})`).join("; ") : "none"}`,
     `- plan repairs: ${counted(r.repairs.planRepairs)}`,
     `- beat repairs: ${counted(r.repairs.beatRepairs)}`,
-    `- one-paragraph turns retried: ${list(r.repairs.shortTextRetries)}`,
+    `- one-paragraph turns retried: ${list(r.repairs.shortTextRetries)}${r.repairs.shortTextUsedAsIs.length ? ` (the retry was one paragraph too, and was used: ${list(r.repairs.shortTextUsedAsIs)})` : r.repairs.shortTextRetries.length ? " (each retry came back in paragraphs)" : ""}`,
     `- calls re-sent by the runner: ${r.repairs.resends.length ? r.repairs.resends.map((s) => `turn ${s.turn} ${s.caseId} (${s.outcomes.join(", ")})`).join("; ") : "none"}`,
     `- calls with no usable reply: ${list(r.repairs.failedCalls)}`,
     `- production would have stopped at: ${r.repairs.stuckTurns.length ? r.repairs.stuckTurns
@@ -521,6 +754,8 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     "| Turn kind | Turns | p50 | p95 | Longest | Allowance | Over it (turns) |",
     "|---|---|---|---|---|---|---|",
     ...r.waits.map((w) => `| ${w.kind} | ${w.turns} | ${w.p50S ?? "–"} s | ${w.p95S ?? "–"} s | ${w.maxS ?? "–"} s | ${w.allowanceS} s | ${list(w.over)} |`),
+    "",
+    `Turns left out of the waits (production would have stopped there): ${r.waitsLeftOut.length ? r.waitsLeftOut.map((t) => `turn ${t}`).join(", ") : "none"}.`,
     "",
     "### The ending",
     "",

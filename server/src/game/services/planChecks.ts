@@ -19,8 +19,9 @@ import { logRepairs, type Repair } from "./textRepairs.js";
 /*
  * Checks on a switch or thread plan before it becomes the story's next
  * phase. What can be put right without guessing is repaired (a player in two
- * switches, junk directions, a length the steps disagree with, contest sides
- * in the wrong order); what can't is a problem, and the planner is called once
+ * switches or threads, junk directions, a length the steps disagree with,
+ * contest sides in the wrong order, a contest with one side's players only);
+ * what can't is a problem, and the planner is called once
  * more with the problem stated (checkedSwitchPlan, checkedThreadPlan). A
  * second problem fails the turn, as a failed call does. A story that holds no
  * outcomes at all (one that started before the start check) skips every
@@ -82,7 +83,8 @@ function unknownOutcomeProblem(what: string, outcomeId: string, known: string[])
 
 /**
  * The slots of this list that stay: a slot the story doesn't have, or one
- * already placed in an earlier list, leaves it (repaired).
+ * already placed in an earlier list, leaves it (repaired); so does one
+ * `belongsElsewhere` keeps for another list.
  */
 function placePlayers(
   written: string[],
@@ -90,14 +92,15 @@ function placePlayers(
   placed: Set<string>,
   prefix: "switch" | "thread",
   label: string,
-  repairs: Repair[]
+  repairs: Repair[],
+  belongsElsewhere: (slot: string) => boolean = () => false
 ): string[] {
   return written.filter((slot) => {
     if (!slots.has(slot)) {
       repairs.push({ kind: `${prefix}SlotUnknown`, detail: `${label}: ${slot}` });
       return false;
     }
-    if (placed.has(slot)) {
+    if (placed.has(slot) || belongsElsewhere(slot)) {
       repairs.push({ kind: `${prefix}PlayerRepeated`, detail: `${label}: ${slot}` });
       return false;
     }
@@ -303,14 +306,57 @@ function withPlayer1OnSideA(thread: Thread, repairs: Repair[]): Thread {
   };
 }
 
-/** One thread's contest, outcome and result kind (PL-5, PL-6, PL-8), then its contest sides (PL-11). */
+/** Contest results as a challenge's, the given side's win the favorable result and the other side's the unfavorable one. */
+function asChallengeResults(results: Results, won: "sideAWins" | "sideBWins"): Results {
+  if (!("sideAWins" in results)) return results;
+  return { favorable: results[won], mixed: results.mixed, unfavorable: won === "sideAWins" ? results.sideBWins : results.sideAWins };
+}
+
+/**
+ * A contest only one side's players are in is that side's challenge for this
+ * chapter (PL-12): its results become favorable (that side's win), mixed and
+ * unfavorable (the other side's win), its players go on side A, and a stored
+ * kind says challenge. Found by the playthroughs of 2026-09-30: where a
+ * group's players picked different directions and only one side picked the
+ * contest, the planner wrote the contest with that side alone, the check
+ * found it unusable, its one retry repeated it (or pulled the other players
+ * in, dropping their picks) and the turn failed for good. In a contest game a
+ * one-sided contest holding every player stays a problem (the opponents are
+ * missing, not elsewhere; the first chapter's contest is one); in a
+ * cooperative group, which plays no contest, contest results on one side are
+ * that challenge whoever is in it. A single player's outcomes are never
+ * contested, so there contest results stay a problem.
+ */
+function oneSidedAsChallenge(story: Story, thread: Thread, repairs: Repair[]): Thread {
+  const sideA = thread.playersSideA;
+  const sideB = thread.playersSideB;
+  if (!story.isMultiplayer() || sideA.length > 0 === sideB.length > 0) return thread;
+  const kinds = [thread.possibleMilestones, ...(thread.progression ?? []).map((step) => step.possibleResolutions)].map(resultKind);
+  if (!kinds.every((kind) => kind === "contest")) return thread;
+  const players = [...sideA, ...sideB];
+  if (CONTEST_MODES.includes(story.getGameMode()) && story.getPlayerSlots().every((slot) => players.includes(slot))) return thread;
+  const won = sideA.length > 0 ? "sideAWins" : "sideBWins";
+  repairs.push({ kind: "contestOneSided", detail: thread.id });
+  const stored = thread as Thread & { kind?: unknown };
+  return {
+    ...thread,
+    ...(typeof stored.kind === "string" ? { kind: "challenge" } : {}),
+    playersSideA: players,
+    playersSideB: [],
+    possibleMilestones: asChallengeResults(thread.possibleMilestones, won),
+    progression: (thread.progression ?? []).map((step) => ({ ...step, possibleResolutions: asChallengeResults(step.possibleResolutions, won) })),
+  };
+}
+
+/** One thread's one-sided contest (PL-12), its contest, outcome and result kind (PL-5, PL-6, PL-8), then its contest sides (PL-11). */
 function checkThread(
   story: Story,
-  thread: Thread,
+  written: Thread,
   outcomes: StoryOutcomes,
   repairs: Repair[],
   problems: string[]
 ): Thread {
+  const thread = oneSidedAsChallenge(story, written, repairs);
   const label = `the thread "${thread.id}"`;
   const isContest = thread.playersSideB.length > 0;
   let sidesUsable = isContest;
@@ -402,7 +448,32 @@ function chapterLengthProblem(story: Story, duration: number): string | undefine
 }
 
 /**
- * Checks a thread plan (PL-4 to PL-11): the plan with its repairs, and the
+ * The thread each group player written into two or more threads stays in
+ * (PL-4), by the threads' position in the reply: the first one on the outcome
+ * their switch pick named (pickedOutcome), else the first they are in. Before
+ * 2026-09-30 it was always the first, so a planner that put players into the
+ * contest another player picked as well as into the threads they picked
+ * dropped their picks without a word (the playthroughs' space pirates, turn
+ * 6). A story's first chapter groups every player by rule, so there, and for
+ * a single player, the first. A player kept elsewhere than their first thread
+ * is noted.
+ */
+function threadsKept(story: Story, threads: Thread[], slots: Set<string>, repairs: Repair[]): Map<string, number> {
+  const kept = new Map<string, number>();
+  const byPick = story.isMultiplayer() && story.hasThreadAnalysis();
+  for (const slot of slots) {
+    const listed = threads.flatMap((thread, index) => ((thread.playersSideA ?? []).includes(slot) || (thread.playersSideB ?? []).includes(slot) ? [index] : []));
+    if (listed.length < 2) continue;
+    const picked = byPick ? pickedOutcome(story, slot)?.outcomeId : undefined;
+    const onPick = picked === undefined ? undefined : listed.find((index) => threads[index].outcomeId === picked);
+    kept.set(slot, onPick ?? listed[0]);
+    if (onPick !== undefined && onPick !== listed[0]) repairs.push({ kind: "threadKeptOnPick", note: true, detail: `${threads[onPick].id}: ${slot}` });
+  }
+  return kept;
+}
+
+/**
+ * Checks a thread plan (PL-4 to PL-12): the plan with its repairs, and the
  * problem that keeps it from use, if any; with `lengths`, also a chapter
  * length PACING does not allow, apart (production's planner call reads it;
  * the eval's plan readings stay on the check as it was measured).
@@ -414,10 +485,12 @@ export function checkThreadPlan(story: Story, reply: ThreadAnalysis, options: Th
   const slots = new Set<string>(story.getPlayerSlots());
   const placed = new Set<string>();
 
-  // Every player in one thread, the first they are in (PL-4)
-  const placedThreads = (reply.threads ?? []).flatMap((written): Thread[] => {
-    const playersSideA = placePlayers(written.playersSideA ?? [], slots, placed, "thread", written.id, repairs);
-    const playersSideB = placePlayers(written.playersSideB ?? [], slots, placed, "thread", written.id, repairs);
+  // Every player in one thread: the one on the outcome their pick named, else the first they are in (PL-4)
+  const kept = threadsKept(story, reply.threads ?? [], slots, repairs);
+  const placedThreads = (reply.threads ?? []).flatMap((written, index): Thread[] => {
+    const elsewhere = (slot: string) => kept.has(slot) && kept.get(slot) !== index;
+    const playersSideA = placePlayers(written.playersSideA ?? [], slots, placed, "thread", written.id, repairs, elsewhere);
+    const playersSideB = placePlayers(written.playersSideB ?? [], slots, placed, "thread", written.id, repairs, elsewhere);
     if (playersSideA.length + playersSideB.length === 0) {
       repairs.push({ kind: "threadDropped", detail: written.id });
       return [];

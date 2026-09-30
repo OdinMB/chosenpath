@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { indexPage, storyFileName, storyPage } from "../../../../src/evals/textModelEval/playthroughPages.js";
 import { PLAYTHROUGHS, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
-import { beatSet, SIX_PARAGRAPHS } from "../../../helpers/textFixtures.js";
+import { beatSet, SIX_PARAGRAPHS, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
 /*
@@ -75,6 +75,43 @@ describe("storyPage", () => {
     const html = storyPage(run);
     expect(html).toContain("after turn 2 (the turns asked for)");
     expect(html).not.toContain('id="ending"');
+  });
+});
+
+describe("storyPage: what a group's choices did", () => {
+  // player2's own outcome in the second chapter, both players in it; a switch before it where player2 picks that outcome
+  async function group(): Promise<PlayRun> {
+    const { call } = fakeCall(2, {
+      reply: (role, nth) => {
+        if (role !== "thread" || nth !== 1) return DEFAULT;
+        const plan = threadAnalysis("exploration", 4, 0, ["player1", "player2"]);
+        return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "player2_main", title: "Luz's Promise" }] };
+      },
+    });
+    const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1 });
+    return run;
+  }
+
+  it("shows, beside a group step's choice, the result the game used for the thread, and flags the owner's choice overridden", async () => {
+    const run = await group();
+    const html = storyPage(run);
+    expect(html).toContain("The step's result for everyone in the thread");
+    expect(html).not.toContain("another player's choice decided this step");
+    // As production played it before 2026-09-30: player1's choice decided player2's outcome
+    const old = structuredClone(run);
+    const phase = old.end?.storyPhases.find((p) => "threads" in p && p.firstBeatIndex === 6);
+    if (!phase || !("threads" in phase)) throw new Error("no second chapter");
+    phase.threads[0].progression[0].resolution = run.turns.find((t) => t.turn === 7)?.picks[0].resolution as never;
+    expect(storyPage(old)).toContain("another player's choice decided this step, on this player's own outcome");
+  });
+
+  it("says where the planner was told another count of the threads that fit than the turns left give", async () => {
+    const run = await played();
+    const told = structuredClone(run);
+    const plan = told.turns.find((t) => t.turn === 6)?.plan;
+    if (!plan) throw new Error("no switch plan at turn 6");
+    plan.pacing.threadsFit = 0;
+    expect(storyPage(told)).toContain("1 more chapter fits (production told the planner 0)");
   });
 });
 
