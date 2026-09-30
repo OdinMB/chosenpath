@@ -249,7 +249,9 @@ function turnedAround(change: StatChange, before: number): StatChange {
  * side B's win: "Luz's Side B victory shifts the race 15 points toward" her,
  * written as addNumber 15, which moved 35|65 to 50|50. Moves are read in
  * order, each from the score the ones before it leave; after a mixed result,
- * and on turns that follow no contest result, every move stays as written.
+ * on turns that follow no contest result, and where the outcome names no
+ * scoreboard or player1 is not on the contest's side A, every move stays as
+ * written.
  */
 function repairScoreboardMoves(story: Story, changes: Change[], repairs: Repair[]): Change[] {
   const winners = scoreboardWinners(story);

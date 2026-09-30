@@ -6,26 +6,32 @@ import { EventEmitter } from "events";
  * are told: "Unable to continue the story. Please try again." The handler
  * that says so had lost its listener on the queue's operationError event
  * (2025-05, when the storyInitialized listener was removed beside it), so no
- * failure reached anyone.
+ * failure reached anyone. A player's own failed choice or character selection
+ * reaches that player as its friendly line, and so does the rejection its
+ * caller sends on.
  */
 
 const events = new EventEmitter();
+const addOperation = jest.fn<(operation: unknown) => Promise<string>>();
+const getStory = jest.fn<(id: string) => Promise<unknown>>();
+const getPlayerBySocket = jest.fn<(socketId: string) => unknown>();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockModule = (jest as any).unstable_mockModule;
 await mockModule("../../../src/game/services/GameQueueProcessor.js", () => ({
   __esModule: true,
-  gameQueueProcessor: { events, addOperation: jest.fn() },
+  gameQueueProcessor: { events, addOperation },
 }));
 await mockModule("../../../src/stories/StoryRepository.js", () => ({
   __esModule: true,
-  StoryRepository: { getInstance: () => ({ getStory: jest.fn() }) },
+  StoryRepository: { getInstance: () => ({ getStory }) },
 }));
 await mockModule("../../../src/game/ConnectionManager.js", () => ({
   __esModule: true,
   connectionManager: {
     getActivePlayersInGame: jest.fn(() => [{ playerSlot: "player1" }, { playerSlot: "player2" }]),
     getActiveSockets: jest.fn((_gameId: string, slot: string) => new Set([`socket-${slot}`])),
+    getPlayerBySocket,
   },
 }));
 
@@ -90,5 +96,44 @@ describe("GameHandler: a turn that fails for good", () => {
     events.emit("operationError", turnFailed);
 
     for (const socket of sockets) expect(socket.emit).not.toHaveBeenCalled();
+  });
+});
+
+describe("GameHandler: a player's own choice or character selection that fails in the queue", () => {
+  /** A write error's text, which names the server's data path. */
+  const RAW = "ENOSPC: no space left on device, open 'D:\\srv\\data\\stories\\game-1.json'";
+  const story = {
+    getPlayer: () => ({ beatHistory: [{ choice: -1 }] }),
+    getCurrentBeatType: () => "thread",
+    getState: () => ({
+      characterSelectionOptions: { player1: { possibleCharacterIdentities: [{}], possibleCharacterBackgrounds: [{}] } },
+      characterSelectionCompleted: false,
+    }),
+  };
+  /** Lets the handler queue the operation and wait on it. */
+  const queued = () => new Promise((resolve) => setImmediate(resolve));
+
+  beforeEach(() => {
+    getPlayerBySocket.mockReturnValue({ storyId: "game-1", playerSlot: "player1" });
+    getStory.mockResolvedValue(story);
+    addOperation.mockResolvedValue("op-own");
+  });
+
+  const cases: [string, string, (socket: FakeSocket) => Promise<void>][] = [
+    ["recordChoice", "Unable to process your choice. Please try again.", (socket) => handler.makeChoice(socket as never, 0)],
+    ["recordCharacterSelection", "Unable to save your character choice. Please try again.", (socket) => handler.selectCharacter(socket as never, 0, 0)],
+  ];
+
+  it.each(cases)("answers a failed %s with its friendly line only, never the error's own text", async (operationType, friendly, send) => {
+    const [chooser] = sockets;
+    const pending = send(chooser);
+    await queued();
+    events.emit("operationError", { ...turnFailed, operationId: "op-own", operationType, error: RAW });
+
+    // The rejection's message is what websocket.ts sends back as the response's errorMessage
+    await expect(pending).rejects.toThrow(friendly);
+    const sent = chooser.emit.mock.calls.map((call) => JSON.stringify(call)).join("\n");
+    expect(sent).toContain(friendly);
+    expect(sent).not.toContain("ENOSPC");
   });
 });

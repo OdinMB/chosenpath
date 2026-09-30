@@ -116,6 +116,10 @@ export class GameHandler {
         userFriendlyMessage =
           "Unable to process your choice. Please try again.";
         break;
+      case "recordCharacterSelection":
+        userFriendlyMessage =
+          "Unable to save your character choice. Please try again.";
+        break;
       case "moveStoryForward":
         userFriendlyMessage = "Unable to continue the story. Please try again.";
         break;
@@ -143,8 +147,10 @@ export class GameHandler {
         });
       }
 
-      // Reject the pending operation
-      reject(new Error(event.error));
+      // Reject the pending operation with the friendly line: makeChoice and selectCharacter
+      // send its message on to the client (and websocket.ts as the response's errorMessage),
+      // and the error's own text can name the server's paths or model-written ids (logged above)
+      reject(new Error(userFriendlyMessage));
       this.pendingOperations.delete(event.operationId);
     } else if (event.gameId) {
       // If we don't have the operation but we do have the gameId, try to notify all sockets in the game

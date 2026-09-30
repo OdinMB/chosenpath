@@ -689,9 +689,15 @@ describe("repairBeatReply: the scoreboard moves toward the side that won (TR-8)"
   const RACE = stat("shared_license_race", { type: "opposites", name: "License Race" });
   type ContestResult = "sideAWins" | "mixed" | "sideBWins";
 
-  /** A contest chapter on the license (player1 against player2), its first `resolvedSteps` steps resolved as `result`. */
-  function licenseChapter(result: ContestResult, firstBeatIndex: number, duration = 2, resolvedSteps = duration): ThreadAnalysis {
-    const analysis = threadAnalysis("contest", duration, firstBeatIndex, ["player1"], ["player2"]);
+  /** A contest chapter on the license (player1 against player2 unless `sides` says otherwise), its first `resolvedSteps` steps resolved as `result`. */
+  function licenseChapter(
+    result: ContestResult,
+    firstBeatIndex: number,
+    duration = 2,
+    resolvedSteps = duration,
+    sides: [string[], string[]] = [["player1"], ["player2"]]
+  ): ThreadAnalysis {
+    const analysis = threadAnalysis("contest", duration, firstBeatIndex, ...sides);
     const [written] = analysis.threads;
     const progression = written.progression.map((step, i) => ({ ...step, resolution: i < resolvedSteps ? result : null }));
     const resolved = resolvedSteps === duration ? result : null;
@@ -715,7 +721,7 @@ describe("repairBeatReply: the scoreboard moves toward the side that won (TR-8)"
   const race = (change: StatChange["change"], value: number) => statChange("shared", RACE.id, change, value);
 
   function repairScore(story: Story, changes: Change[]) {
-    const { reply, repairs } = repairBeatReply(story, beatSet(2, { statChanges: changes }));
+    const { reply, repairs } = repairBeatReply(story, beatSet(story.getPlayerSlots().length, { statChanges: changes }));
     return { changes: reply.statChanges, kinds: kinds(repairs, "scoreboard"), repairs };
   }
 
@@ -771,16 +777,40 @@ describe("repairBeatReply: the scoreboard moves toward the side that won (TR-8)"
     expect(repairScore(afterChallenge, [race("subtractNumber", 10)])).toMatchObject({ changes: [race("subtractNumber", 10)], kinds: [] });
   });
 
-  it("moves only the contest's own scoreboard: the stat its resonance names, else the story's one shared opposites stat", () => {
+  it("moves only the contest's own scoreboard: the stat its resonance names", () => {
     const calm = stat("shared_calm", { type: "opposites", name: "Calm|Storm" });
     const twoStats = { sharedStats: [RACE, calm], sharedStatValues: [{ statId: RACE.id, value: 35 }, { statId: calm.id, value: 50 }] };
     const named = repairScore(switchAfter("sideBWins", 35, twoStats), [statChange("shared", calm.id, "addNumber", 10), race("addNumber", 10)]);
     expect(named.changes).toEqual([statChange("shared", calm.id, "addNumber", 10), race("subtractNumber", 10)]);
+  });
 
-    const unnamed = { sharedOutcomes: [{ ...CONTESTED, resonance: "Both owners need the license." }] };
-    expect(repairScore(switchAfter("sideBWins", 35, unnamed), [race("addNumber", 10)]).changes).toEqual([race("subtractNumber", 10)]);
-    // Two opposites stats and no "Scored by": no stat is known to be the scoreboard
-    expect(repairScore(switchAfter("sideBWins", 35, { ...twoStats, ...unnamed }), [race("addNumber", 10)]).kinds).toEqual([]);
+  it("reads no scoreboard where the contested outcome names none: a story set up before setup round 3, whose one shared opposites stat is a meter with either side first", () => {
+    // The old setup's opposites were meters for what changes often; here player1 is the Enclave, so side A's win moves "Printers|Enclave" down
+    const meter = stat("shared_printers_enclave", { type: "opposites", name: "Printers|Enclave" });
+    const oldSetup = {
+      sharedOutcomes: [{ ...CONTESTED, resonance: "Both owners need the license." }],
+      sharedStats: [meter],
+      sharedStatValues: [{ statId: meter.id, value: 50 }],
+    };
+    const towardEnclave = statChange("shared", meter.id, "subtractNumber", 15);
+    expect(repairScore(switchAfter("sideAWins", 50, oldSetup), [towardEnclave])).toMatchObject({ changes: [towardEnclave], kinds: [] });
+    // Nor after each contest step in a chapter
+    const inChapter = withContest(threadBeat(2, { storyPhases: [switchAnalysis(slotsOf(2), 1), licenseChapter("sideAWins", 2, 3, 1)] }), 50, oldSetup);
+    expect(repairScore(inChapter, [towardEnclave])).toMatchObject({ changes: [towardEnclave], kinds: [] });
+  });
+
+  it("leaves a scoreboard alone after a contest player1 is not on side A of: which camp its side A is lives only in the planner's text", () => {
+    // Three players, camps {player1, player3} against {player2}: the planner put player2 on side A, player3 won, the move up is toward player1's camp
+    const satOut = licenseChapter("sideBWins", 1, 2, 2, [["player2"], ["player3"]]);
+    const threePlayers = withContest(laterSwitchBeat(3, { storyPhases: [switchAnalysis(slotsOf(3), 0), satOut, switchAnalysis(slotsOf(3), 3)] }), 50);
+    expect(repairScore(threePlayers, [race("addNumber", 10)])).toMatchObject({ changes: [race("addNumber", 10)], kinds: [] });
+    // player1 on side B (a plan the plan check's PL-11 never saw), and a second contest like it on the same scoreboard
+    const onSideB = licenseChapter("sideBWins", 1, 2, 2, [["player2"], ["player1"]]);
+    expect(repairScore(switchAfter("sideAWins", 50, { storyPhases: [switchAnalysis(slotsOf(2), 0), onSideB, switchAnalysis(slotsOf(2), 3)] }), [race("addNumber", 10)]).kinds).toEqual([]);
+    const chapter = licenseChapter("sideAWins", 1);
+    const rematch = { ...licenseChapter("sideAWins", 1, 2, 2, [["player2"], ["player1"]]).threads[0], id: "rematch" };
+    const both = { ...chapter, threads: [...chapter.threads, rematch] };
+    expect(repairScore(switchAfter("sideAWins", 50, { storyPhases: [switchAnalysis(slotsOf(2), 0), both, switchAnalysis(slotsOf(2), 3)] }), [race("subtractNumber", 10)]).kinds).toEqual([]);
   });
 
   it("leaves a scoreboard alone when two contests this turn follows disagree on who won", () => {
