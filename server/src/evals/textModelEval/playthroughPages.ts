@@ -438,7 +438,7 @@ function readingsSection(readings: StoryReadings): string {
         ]
       : []),
     `Turns production could not get past (the harness asked the planner again): ${r.repairs.stuckTurns.map((s) => `turn ${s.turn} (${s.kind})`).join(", ") || "none"}.`,
-    `Repairs: plans retried ${r.repairs.planRetries.length}, one-paragraph turns retried ${r.repairs.shortTextRetries.length} (the retry one paragraph too and used: ${r.repairs.shortTextUsedAsIs.length}), calls re-sent ${r.repairs.resends.length}, beat repairs ${Object.values(r.repairs.beatRepairs).reduce((a, b) => a + b, 0)}.`,
+    `Repairs: plans retried ${r.repairs.planRetries.length}, one-paragraph turns retried ${r.repairs.shortTextRetries.length} (the retry one paragraph too and used: ${r.repairs.shortTextUsedAsIs.length}), turns without options retried ${r.repairs.optionsRetries.length}, calls re-sent ${r.repairs.resends.length}, beat repairs ${Object.values(r.repairs.beatRepairs).reduce((a, b) => a + b, 0)}.`,
     `Waits over their allowance: ${r.waits.flatMap((w) => w.over.map((t) => `turn ${t} (${w.kind})`)).join(", ") || "none"}${r.waitsLeftOut.length ? `; left out of the waits, where production would have stopped: ${r.waitsLeftOut.map((t) => `turn ${t}`).join(", ")}` : ""}.`,
     `Cost: ${usd(r.cost.storyUsd)} over ${r.cost.calls} calls (judged checks ${usd(r.cost.judgeUsd)}).`,
   ];

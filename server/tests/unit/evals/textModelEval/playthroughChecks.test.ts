@@ -279,6 +279,15 @@ describe("readStory", () => {
     expect(text).toContain("one-paragraph turns retried: 4 (the retry was one paragraph too, and was used: 4)");
   });
 
+  it("lists the turns retried for a beat without options apart from the one-paragraph retries", async () => {
+    const run = await played(1, { reply: (role, nth) => (role === "beat" && nth === 3 ? beatSet(1, { player1: { ...beatSet(1).player1, options: [] } } as never) : DEFAULT) });
+    const readings = readStory(run);
+    expect(readings.repairs.optionsRetries).toEqual([4]);
+    expect(readings.repairs.shortTextRetries).toEqual([]);
+    expect(readings.repairs.shortTextUsedAsIs).toEqual([]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain("turns without options retried: 4");
+  });
+
   it("renders the readings as markdown, a section per story", async () => {
     const run = await played();
     const text = renderPlaythroughReadings([run], new Date("2026-09-30T12:00:00Z"));

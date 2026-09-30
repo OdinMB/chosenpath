@@ -21,7 +21,7 @@ import { resolveTextModelConfig, settingsFor } from "shared/llm/textModelSetting
 import { BeatResolutionService } from "../../game/services/BeatResolutionService.js";
 import { ChangeService } from "../../game/services/ChangeService.js";
 import { ThreadResolutionService } from "../../game/services/ThreadResolutionService.js";
-import { checkedBeatReply, shortTextProblem } from "../../game/services/beatChecks.js";
+import { beatReplyProblem, checkedBeatReply } from "../../game/services/beatChecks.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { outcomeStatesAtEnding, type OutcomeState } from "../../game/services/endingStates.js";
 import { allowedLengths, chaptersThatFit, isLastChapter, lastChapterAfterSwitch, outcomeNeeds, pickedOutcome, stageOf, turnsLeft } from "../../game/services/pacing.js";
@@ -55,7 +55,8 @@ import { isSplitRequest, requestFor, type EvalRequest, type SetupInput } from ".
  * check, the switch and chapter planners with production's plan check and its
  * one retry told the problem (checkedSwitchPlan, checkedThreadPlan, which
  * carry the PACING block and the stage a chapter settles), the turn with its
- * one retry on a one-paragraph text (checkedBeatReply), the beat repairs, the
+ * one retry on a one-paragraph text or a beat without options outside the
+ * ending (checkedBeatReply), the beat repairs, the
  * stat changes (ChangeService), each choice's resolution
  * (BeatResolutionService) and the chapter's (ThreadResolutionService), and
  * the ending. Every request is production's (the adopted variant, with
@@ -724,14 +725,16 @@ export async function playStory(
 
     const before = story;
     const request = requestFor("adopted", { role: "beat", story: before });
+    // As AIStoryGenerator checks a beat reply: the ending shows no options
+    const beatCheck = { ending: before.getCurrentBeatType() === "ending" };
     const invoke = invoker(turn.kind, "beat", request, turn.calls, (log, parsed) => {
-      const problem = shortTextProblem(parsed as SetOfBeatGenerationSchema);
+      const problem = beatReplyProblem(parsed as SetOfBeatGenerationSchema, beatCheck);
       if (problem) log.problem = problem;
     });
     if (turn.kind === "ending") turn.endingStates = outcomeStatesAtEnding(before);
     let reply: SetOfBeatGenerationSchema;
     try {
-      const response = await checkedBeatReply(promptOf(request), async (prompt) => (await invoke(prompt)) as SetOfBeatGenerationSchema, (line) => turn.notes.push(line));
+      const response = await checkedBeatReply(promptOf(request), async (prompt) => (await invoke(prompt)) as SetOfBeatGenerationSchema, (line) => turn.notes.push(line), beatCheck);
       const repaired = repairBeatReply(before, response);
       reply = repaired.reply;
       turn.reply = reply;

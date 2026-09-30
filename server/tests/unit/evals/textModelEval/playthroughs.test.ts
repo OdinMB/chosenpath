@@ -383,10 +383,30 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(stopped.run.stopped).toMatch(/turn 1.*switch plan.*no usable reply/);
   });
 
-  it("stops at a turn that leaves a player nothing to choose", async () => {
-    const { call } = fakeCall(1, { reply: (role, nth) => (role === "beat" && nth === 1 ? beatSet(1, { player1: { ...beatSet(1).player1, options: [] } } as never) : DEFAULT) });
+  const withoutOptions = () => beatSet(1, { player1: { ...beatSet(1).player1, options: [] } } as never);
+
+  it("gives a turn with no options production's one retry, told so, and plays on with the retry's options", async () => {
+    const { call, calls } = fakeCall(1, { reply: (role, nth) => (role === "beat" && nth === 1 ? withoutOptions() : DEFAULT) });
     const { run } = await playStory(spec, input(1), call, { sample: 1 });
-    expect(run.stopped).toMatch(/turn 2.*no options.*player1/);
+    const second = run.turns[1];
+    expect(second.calls).toHaveLength(2);
+    expect(second.calls[0].problem).toMatch(/no options/);
+    const [one, two] = second.calls.map((c) => calls.find((s) => s.caseId === c.caseId));
+    expect(requestText(two?.request as never)).toBe(withBeatProblem(requestText(one?.request as never), second.calls[0].problem as string));
+    expect(run.complete).toBe(true);
+  });
+
+  it("stops where production fails the turn: the retry has no options either", async () => {
+    const { call } = fakeCall(1, { reply: (role, nth) => (role === "beat" && (nth === 1 || nth === 2) ? withoutOptions() : DEFAULT) });
+    const { run } = await playStory(spec, input(1), call, { sample: 1 });
+    expect(run.stopped).toMatch(/turn 2.*no usable reply/);
+  });
+
+  it("asks no ending for options: the game shows none there", async () => {
+    const { call, calls } = fakeCall(1, { reply: (role, _nth, s) => (role === "beat" && /-ending$/.test(s.caseId) ? withoutOptions() : DEFAULT) });
+    const { run } = await playStory(spec, input(1), call, { sample: 1 });
+    expect(run.complete).toBe(true);
+    expect(calls.filter((c) => /ending/.test(c.caseId))).toHaveLength(1);
   });
 
   it("starts from a setup production would start from, asking once more when it can't", async () => {

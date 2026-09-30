@@ -402,14 +402,15 @@ export class AIStoryGenerator {
       `Generating beats for turn: ${story.getCurrentTurn() + 1}`
     );
 
-    // A text that comes back as one short paragraph gets one more call, told so
+    // A text that comes back as one short paragraph, or a beat without options (outside the ending), gets one more call, told so
     const response = await checkedBeatReply(
       request.prompt,
       async (prompt) =>
         (await structuredModel.invoke(prompt, {
           metadata: storyTags(story, context, story.getCurrentBeatType()),
         })) as SetOfBeatGenerationSchema,
-      (line) => Logger.Story.warn(`${line} (story ${story.getId()}, turn ${story.getCurrentTurn() + 1})`)
+      (line) => Logger.Story.warn(`${line} (story ${story.getId()}, turn ${story.getCurrentTurn() + 1})`),
+      { ending: story.getCurrentBeatType() === "ending" }
     );
 
     Logger.Story.log("Beats generated");

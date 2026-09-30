@@ -191,6 +191,8 @@ export type StoryReadings = {
     shortTextRetries: number[];
     /** Of those, the turns whose retry was one paragraph too, and was used (production uses a second short reply) */
     shortTextUsedAsIs: number[];
+    /** Turns retried for a beat without options (production's retry since 2026-09-30; a second reply without options fails the turn) */
+    optionsRetries: number[];
     resends: { turn: number; caseId: string; outcomes: string[] }[];
     failedCalls: string[];
     /** Turns production could not get past (a plan unusable twice fails the turn; nothing sends it again), where the harness asked the planner again */
@@ -514,6 +516,10 @@ function countKinds(lines: string[]): Record<string, number> {
   return counts;
 }
 
+/** A beat call's recorded problem (beatReplyProblem) names a one-paragraph text, or a beat without options. */
+const isShort = (problem: string | undefined) => problem !== undefined && problem.includes("a single paragraph");
+const hasNoOptions = (problem: string | undefined) => problem !== undefined && problem.includes("no options");
+
 function repairReadings(run: PlayRun): StoryReadings["repairs"] {
   const setupCalls = run.setup?.calls ?? [];
   const planRetries: StoryReadings["repairs"]["planRetries"] = [];
@@ -545,8 +551,9 @@ function repairReadings(run: PlayRun): StoryReadings["repairs"] {
     planRetries,
     planRepairs: countKinds(run.turns.flatMap((t) => t.plan?.calls.flatMap((c) => c.repairs) ?? [])),
     beatRepairs: countKinds(run.turns.flatMap((t) => t.repairs)),
-    shortTextRetries: run.turns.filter((t) => t.calls[0]?.problem !== undefined && t.calls.length > 1).map((t) => t.turn),
-    shortTextUsedAsIs: run.turns.filter((t) => t.calls[0]?.problem !== undefined && t.calls[1]?.problem !== undefined).map((t) => t.turn),
+    shortTextRetries: run.turns.filter((t) => isShort(t.calls[0]?.problem) && t.calls.length > 1).map((t) => t.turn),
+    shortTextUsedAsIs: run.turns.filter((t) => isShort(t.calls[0]?.problem) && isShort(t.calls[1]?.problem)).map((t) => t.turn),
+    optionsRetries: run.turns.filter((t) => hasNoOptions(t.calls[0]?.problem) && t.calls.length > 1).map((t) => t.turn),
     resends,
     failedCalls,
     stuckTurns: run.turns.flatMap((t) => {
@@ -732,6 +739,7 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     `- plan repairs: ${counted(r.repairs.planRepairs)}`,
     `- beat repairs: ${counted(r.repairs.beatRepairs)}`,
     `- one-paragraph turns retried: ${list(r.repairs.shortTextRetries)}${r.repairs.shortTextUsedAsIs.length ? ` (the retry was one paragraph too, and was used: ${list(r.repairs.shortTextUsedAsIs)})` : r.repairs.shortTextRetries.length ? " (each retry came back in paragraphs)" : ""}`,
+    `- turns without options retried: ${list(r.repairs.optionsRetries)}`,
     `- calls re-sent by the runner: ${r.repairs.resends.length ? r.repairs.resends.map((s) => `turn ${s.turn} ${s.caseId} (${s.outcomes.join(", ")})`).join("; ") : "none"}`,
     `- calls with no usable reply: ${list(r.repairs.failedCalls)}`,
     `- production would have stopped at: ${r.repairs.stuckTurns.length ? r.repairs.stuckTurns
