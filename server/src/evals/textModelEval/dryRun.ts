@@ -223,7 +223,7 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     log(`  ${label}: $${spend.byStage[stage].toFixed(2)} of $${caps.stageCaps[stage]} (${STAGE_CAP_REASONS[stage]})`);
   }
   log(
-    `  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap, raised from $42 by the owner on 2026-10-01 for the fixes of that day and the measurements they need ("few bucks don't matter"), from $40 on 2026-09-30, $33 on 2026-09-28 and $30 on 2026-09-27; the first target was about $25; the stalled Stage 4 calls may add about $${UNRECORDED_STAGE4_USD.toFixed(2)} the ledger does not hold)`
+    `  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap, raised from $45 on the evening of 2026-10-01 for round 3's open defects, every one of them fixed or measured (decision A, settled as everything under the owner's "do all the fixes and the measurements needed for them" and "no need to be more frugal than before"), from $42 earlier that day, $40 on 2026-09-30, $33 on 2026-09-28 and $30 on 2026-09-27; the first target was about $25; the stalled Stage 4 calls may add about $${UNRECORDED_STAGE4_USD.toFixed(2)} the ledger does not hold)`
   );
   log(
     `Baseline arms (the pre-migration comparison, fixed in arms.ts): setup ${baselineArm("setup").key}, beat ${baselineArm("beat").key}, analysis ${baselineArm("switch").key}`

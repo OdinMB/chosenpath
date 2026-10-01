@@ -20,7 +20,16 @@ export { FEEDBACK_STAGES };
  * measurements they need (the owner: "do all the fixes and the measurements
  * needed for them", "few bucks don't matter. I just want to make sure that we
  * stay frugal and only run what's needed"; the ledger read $39.94, so the $42
- * left $2.06, about $0.76 with the stalled Stage 4 calls on top). The
+ * left $2.06, about $0.76 with the stalled Stage 4 calls on top), and to $48
+ * on the evening of 2026-10-01, for round 3's open defects (the status note's
+ * decision A, which the coordinator settled as everything, (d): the no-call
+ * fixes, both group changes measured, the seal, the money setup rule and turn
+ * line, the result-words line and a full confirming round, about $2 more than
+ * the $45 left; under the owner's standing instructions "do all the fixes and
+ * the measurements needed for them", "Few bucks don't matter. I just want to
+ * make sure that we stay frugal and only run what's needed" and "No need to be
+ * more frugal than before"; the ledger read $43.61, so the $45 left $1.39,
+ * about $0.09 with the stalled Stage 4 calls on top). The
  * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
  * the setup rounds, the turn rounds and the migration check, and $0.10 /
  * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 / $1.20 / $0.39 / $0.26 / $0.26 / $0.195 / $0.195 / $0.195 / $0.195 / $0.78 / $0.39 / $0.43 / $0.60 / $0.60 / $0.85 / $1.50 / $1.00 for the feedback
@@ -79,10 +88,12 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   "playthroughs-3": 1,
 };
 /**
- * The owner's hard cap: $30, raised to $33 on 2026-09-27, to $40 on 2026-09-28, to $42 on 2026-09-30 (more playthroughs)
- * and to $45 on 2026-10-01 (the fixes of that day and the measurements they need; "few bucks don't matter").
+ * The owner's hard cap: $30, raised to $33 on 2026-09-27, to $40 on 2026-09-28, to $42 on 2026-09-30 (more playthroughs),
+ * to $45 on 2026-10-01 (the fixes of that day and the measurements they need; "few bucks don't matter") and to $48 on the
+ * evening of that day (round 3's open defects, decision A settled as everything: "do all the fixes and the measurements
+ * needed for them", "no need to be more frugal than before").
  */
-export const HARD_CEILING = 45;
+export const HARD_CEILING = 48;
 export const DEFAULT_GLOBAL_CAP = HARD_CEILING;
 
 /** The ledger total when the round stages opened (2026-09-27): $26.39 of the then $33 hard cap, $6.61 left. */
@@ -103,6 +114,13 @@ export const LEDGER_WHEN_REVIEW_OPENED = 37.99;
  * stage is capped at its estimate plus 30%; the caps fit the $45 with the stalled Stage 4 calls on top.
  */
 export const LEDGER_WHEN_DECISIONS_OPENED = 39.94;
+
+/**
+ * The ledger total when the hard cap went to $48 for round 3's open defects (decision A, the evening of 2026-10-01):
+ * $43.61, every stage before it closed at what it spent; $1.39 was left under the $45, about $0.09 with the stalled
+ * Stage 4 calls on top. Each paid run still gets its own stage, cap and reason, a smoke first and a dry-run count.
+ */
+export const LEDGER_WHEN_DECISION_A_OPENED = 43.61;
 
 /**
  * What the ledger may not record: Stage 4's 43 hung GPT-6 calls are booked at

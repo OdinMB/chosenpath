@@ -71,7 +71,7 @@ describe("printDryRun: the prompt state it plans under", () => {
     expect(lines.some((line) => /Stage migration: \$0\.00 of \$1\.2 \(.+\)/.test(line))).toBe(true);
   });
 
-  it("plans a row for each run of the owner's feedback workflow against its own cap, and names the $45 hard cap and why it was raised", async () => {
+  it("plans a row for each run of the owner's feedback workflow against its own cap, and names the $48 hard cap and why it was raised", async () => {
     const lines = await dryRun([]);
     for (const [label, cap] of [
       ["Plan refresh", "0.1"],
@@ -87,7 +87,7 @@ describe("printDryRun: the prompt state it plans under", () => {
     expect(lines.some((line) => /Stage final-check: \$0\.00 of \$0\.6 \(.*2026-09-28.*\)/.test(line))).toBe(true);
     expect(lines).toContainEqual(
       expect.stringMatching(
-        /^ {2}Total: \$\d+\.\d\d of \$45 \(hard cap, raised from \$42 by the owner on 2026-10-01 for the fixes of that day and the measurements they need \("few bucks don't matter"\), from \$40 on 2026-09-30, \$33 on 2026-09-28 and \$30 on 2026-09-27;/
+        /^ {2}Total: \$\d+\.\d\d of \$48 \(hard cap, raised from \$45 on the evening of 2026-10-01 for round 3's open defects, every one of them fixed or measured \(decision A, settled as everything under the owner's "do all the fixes and the measurements needed for them" and "no need to be more frugal than before"\), from \$42 earlier that day, \$40 on 2026-09-30, \$33 on 2026-09-28 and \$30 on 2026-09-27;/
       )
     );
   });
