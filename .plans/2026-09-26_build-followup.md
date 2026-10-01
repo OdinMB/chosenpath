@@ -2186,3 +2186,15 @@ A review of fixes 1-8 left four verified findings, all minor. Two change product
 - **Test-first:** this work came from an earlier pass of this step that stopped before its commit; I found the tests and their code together in the tree, reviewed both, and did not see the red run myself. The tests fail on the last commit's code by construction: they import `kidAgeAnswer`, `KIDS_IMAGE_DISTRIBUTION`, `KIDS_FIELD_IMAGE_DISTRIBUTION`, `KIDS_FIELD_IMAGE_LATE` and `withKidsImageSlots`, which it doesn't export, and expect "6 years" → "6", the log line and the second-paragraph image lines, which it doesn't give.
 - **Docs and checks:** `.context/story.md` (the kids turn's image places and the age parser) and `.context/text-model-eval.md` (the kids delta in the kept tests' list and in `beatStep.request`, fix 4's marginal reading). `npm run check:all` clean (server 3,926, client 256).
 - **Spend:** $0. The ledger stays $39.94 of $42; the review's workflow spent $1.95 of its $2.40.
+
+## 2026-10-01: the owner's decisions on the fixes, and the $45 hard cap (no calls, $0)
+
+- **The owner's decisions (2026-10-01), verbatim where quoted:**
+  - Ending milestones: "The idea was -not- for the engine to invent missing milestones for open outcomes. Unfinished outcomes should be narrated as unfinished. Only what was played."
+  - Group challenges on one player's own outcome: "Yes, only count the owner's roll."
+  - "do all the fixes and the measurements needed for them." "Stories saved before the fixes can be ignored." "Few bucks don't matter. I just want to make sure that we stay frugal and only run what's needed." "No need to be more frugal than before."
+  - Rewards: "14 reward options in 32 choice sets is a bit too much." "At most one reward is good. Several sacrifices can sometimes make sense, but should have a strong justification starting at the second one." Options should use different stats, not differ only in risk.
+  - Kids: "this should depend on the age range that should be part of kids stories settings."
+  - The coordinator's calls: adopt fix 3's lever-direction line; retest fix 8's pacing and clue lines inside short whole-story runs; another attempt at the reasoning-runaway turn's cause.
+- **The hard cap: $45** (`HARD_CEILING`, also the default global cap). The ledger read $39.94 of $42, so $2.06 was left, or about $0.76 if the stalled Stage 4 calls of 26 September were billed: too little for the measurements the decisions need. The reason is in `budget.ts`'s header and the constant's comment, the dry run's total line ("raised from $42 by the owner on 2026-10-01 for the fixes of that day and the measurements they need ("few bucks don't matter"), …") and `.context/text-model-eval.md`. `--global-cap` still only lowers it. Every paid run still gets its own stage, cap and reason, a smoke first and a dry-run count to compare.
+- **Tests (test-first; 3 failed first, then the two older cap checks that still read $42 were moved to $45 and all passed):** `armsBudget.test.ts` (the $45 ceiling, lowering to $42, the global-cap check), `dryRun.test.ts` (the total line names $45 and why), `resultsReport.test.ts` (the total row's cap).

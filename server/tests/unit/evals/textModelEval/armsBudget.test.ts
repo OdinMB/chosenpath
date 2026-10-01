@@ -345,11 +345,11 @@ describe("budget caps", () => {
     expect(budgetCheck(caps, spend(7.5), 0, "0", 0.2)).toEqual({ ok: true });
     expect(budgetCheck(caps, spend(8, 12.9), 0, "1-2", 0.05)).toEqual({ ok: true });
     expect(budgetCheck(caps, spend(8, 12.9), 0, "1-2", 0.2)).toMatchObject({ ok: false });
-    // Stage caps sum to $28, so the $42 global cap only binds after a raised stage cap
-    const nearGlobal = spentByStage([{ stage: "0", costUsd: 8 }, { stage: "1-2", costUsd: 26.9 }, { stage: "3", costUsd: 3 }, { stage: "4", costUsd: 4 }]);
+    // Stage caps sum to $28, so the $45 global cap only binds after a raised stage cap
+    const nearGlobal = spentByStage([{ stage: "0", costUsd: 8 }, { stage: "1-2", costUsd: 29.9 }, { stage: "3", costUsd: 3 }, { stage: "4", costUsd: 4 }]);
     const { caps: raised } = resolveCaps({ stage: "4", stageCap: 10, overTargetReason: "rerun the rewrite" });
     expect(budgetCheck(raised, nearGlobal, 0, "4", 0.05)).toEqual({ ok: true });
-    expect(budgetCheck(raised, nearGlobal, 0, "4", 0.2)).toMatchObject({ ok: false, reason: expect.stringMatching(/Global cap \$42/) });
+    expect(budgetCheck(raised, nearGlobal, 0, "4", 0.2)).toMatchObject({ ok: false, reason: expect.stringMatching(/Global cap \$45/) });
     expect(budgetCheck(caps, spend(0), 0.95, "0", 0.1)).toMatchObject({ ok: false });
   });
 
@@ -360,7 +360,7 @@ describe("budget caps", () => {
       () => new Date("2026-09-27T00:00:00Z")
     );
     expect(caps.stageCaps["1-2"]).toBe(14);
-    expect(caps.globalCap).toBe(42);
+    expect(caps.globalCap).toBe(45);
     expect(override).toEqual({ at: "2026-09-27T00:00:00.000Z", stage: "1-2", stageCap: 14, globalCap: undefined, reason: "more Sol setup samples" });
     // Lowering a cap needs no reason
     expect(resolveCaps({ stage: "0", stageCap: 2 }).override).toBeUndefined();
@@ -875,13 +875,14 @@ describe("budget caps", () => {
     expect(STAGES.filter(stageRunsBaseline)).toEqual(["0", "1-2", "3", "4"]);
   });
 
-  it("never lets the global cap pass $42 (the owner's raise of 2026-09-30, for more playthroughs), whatever the reason", () => {
-    expect(HARD_CEILING).toBe(42);
-    expect(() => resolveCaps({ globalCap: 42.01, overTargetReason: "anything" })).toThrow(/\$42/);
-    expect(() => resolveCaps({ globalCap: 50, overTargetReason: "the owner's old ceiling" })).toThrow(/\$42/);
-    expect(resolveCaps({ globalCap: 42 }).caps.globalCap).toBe(42);
-    expect(resolveCaps({}).caps.globalCap).toBe(42);
+  it("never lets the global cap pass $45 (the owner's raise of 2026-10-01, for the fixes of that day and their measurements), whatever the reason", () => {
+    expect(HARD_CEILING).toBe(45);
+    expect(() => resolveCaps({ globalCap: 45.01, overTargetReason: "anything" })).toThrow(/\$45/);
+    expect(() => resolveCaps({ globalCap: 50, overTargetReason: "the owner's old ceiling" })).toThrow(/\$45/);
+    expect(resolveCaps({ globalCap: 45 }).caps.globalCap).toBe(45);
+    expect(resolveCaps({}).caps.globalCap).toBe(45);
     // Lowering it back to an old hard cap needs no reason
+    expect(resolveCaps({ globalCap: 42 })).toEqual({ caps: expect.objectContaining({ globalCap: 42 }) });
     expect(resolveCaps({ globalCap: 40 })).toEqual({ caps: expect.objectContaining({ globalCap: 40 }) });
     expect(resolveCaps({ globalCap: 33 }).caps.globalCap).toBe(33);
   });

@@ -93,7 +93,7 @@ describe("renderResults", () => {
       generatedAt: new Date(0),
     });
     expect(text).toContain("| turn-rounds | $0.50 | $2.00 |");
-    expect(text).toContain("| total | $0.75 | $42.00 |");
+    expect(text).toContain("| total | $0.75 | $45.00 |");
   });
 
   it("reads a job attempt recorded twice once, and still counts both calls' spend", () => {
