@@ -231,6 +231,22 @@ describe("readTurn and turnMechanics: what the turn changes, after the game's re
     expect(flat(none?.changes)[0]).toBe("Previous choice sacrificed: Supplies: written, but nothing changed, 40 → 40");
   });
 
+  it("reads a sacrifice that raises a stat where more is worse as applied when it rises, as its words say (the lever direction adopted 2026-10-01)", () => {
+    const HEAT = stat("shared_heat", { type: "number", name: "Patrol Heat", optionsToSacrifice: "Let Patrol Heat rise 10 by making a conspicuous move" });
+    const story = withStats(threadBeat(1), sacrificeLast("Let the Patrol Heat rise 10 and cut straight across the square"), {
+      sharedStats: [SUPPLIES, ORDER, HEAT],
+      sharedStatValues: [
+        { statId: "shared_supplies", value: 40 },
+        { statId: "shared_order", value: 60 },
+        { statId: "shared_heat", value: 20 },
+      ],
+    });
+    const rose = turnMechanics(story, reply({ statChanges: [change("shared", "shared_heat", "addNumber", 10)] }));
+    expect(flat(rose?.changes)[0]).toBe("Previous choice sacrificed: Patrol Heat: applied, 20 → 30");
+    const fell = turnMechanics(story, reply({ statChanges: [change("shared", "shared_heat", "subtractNumber", 10)] }));
+    expect(flat(fell?.changes)[0]).toBe("Previous choice sacrificed: Patrol Heat: changed the other way, 20 → 10");
+  });
+
   it("reads a previous reward, a sacrificed list item and a sacrifice whose stat can't be told", () => {
     const [lever, a, b] = challengeOptions();
     const reward = withStats(threadBeat(1), { options: [a, { ...lever, resourceType: "reward", basePoints: -30, text: "Rest and regain your Nerve" }, b], choice: 1 });

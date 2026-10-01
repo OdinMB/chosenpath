@@ -127,13 +127,25 @@ const effects = (call: Call) =>
     contested(call) ? " (one or two for a contest's scoreboard, its catch-up among them)" : ""
   }, each a situation or threshold and a value in absolute terms: +5 slight, +10 clear, +15 decisive (and the same below zero), never beyond 15 either way and never a formula. At most two stats count for any one choice, so write effects for the situations in which this stat is the one that matters, in scenes this story's thread types create. Examples: 'Above 70%: +10 in social challenges'; '-15 when the ship is Damaged and a risky maneuver is needed'.`;
 
+/*
+ * The lever fields' first sentences say what the lever does to the player, with
+ * an example for a stat where more is worse (the lever-direction stage of
+ * 2026-09-30, adopted on 2026-10-01; LEVER_DIRECTION_LINE in setupPromptText.ts).
+ * Before, "What the player gives up from this stat" and "What the player gains
+ * of this stat", beside examples where more is always better, had setups lower a
+ * pressure as its sacrifice.
+ */
+export const SACRIFICE_FIRST_SENTENCE =
+  "What the player pays in this stat, in its own units, to get the game's fixed sacrifice bonus in one scene. It always leaves the player worse off: spending some of a stat where more is better ('Spend 10% fuel', 'Burn one contact to call in a favor'), taking on more of one where more is worse ('Let Suspicion rise 10% by slipping past the guards in plain sight').";
+export const REWARD_FIRST_SENTENCE =
+  "What the player gets in this stat, in its own units, for accepting the game's fixed reward malus in one scene. It always leaves the player better off: more of a stat where more is better ('Regain 10% health by resting instead of pressing on'), less of one where more is worse ('Lower Suspicion 10% by lying low instead of pressing on').";
+
 const sacrifice = (call: Call) =>
-  `What the player gives up from this stat, in its own units, to get the game's fixed sacrifice bonus in one scene: 'Spend 10% fuel', 'Burn one contact to call in a favor'. The bonus is always the same, so never state it, and the loss is certain, never a risk. A stat that is not adjustable anytime still gets a sacrifice. Write 'None' only for a special power, a standing earned over the whole story, trust that must be earned in a thread${
+  `${SACRIFICE_FIRST_SENTENCE} The bonus is always the same, so never state it, and the loss is certain, never a risk. A stat that is not adjustable anytime still gets a sacrifice. Write 'None' only for a special power, a standing earned over the whole story, trust that must be earned in a thread${
     contested(call) ? ", or a contested outcome's scoreboard" : ""
   }.`;
 
-const REWARD =
-  "What the player gains of this stat, in its own units, for accepting the game's fixed reward malus in one scene: 'Regain 10% health by resting instead of pressing on'. The gain is certain. A stat that is not adjustable anytime still gets a reward. Write 'None' only for the stats whose sacrifice is 'None'.";
+const REWARD = `${REWARD_FIRST_SENTENCE} The gain is certain. A stat that is not adjustable anytime still gets a reward. Write 'None' only for the stats whose sacrifice is 'None'.`;
 
 /** The flag in the two labels the beats' stat view prints. */
 const ADJUSTABLE_ANYTIME =

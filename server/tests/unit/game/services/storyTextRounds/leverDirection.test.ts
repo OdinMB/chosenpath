@@ -36,31 +36,43 @@ const occurrences = (text: string, passage: string) => text.split(passage).lengt
 /** A description as it sits inside the JSON schema's text */
 const inJson = (text: string) => JSON.stringify(text).slice(1, -1);
 
+/*
+ * Adopted on 2026-10-01 (the coordinator's call): production prints the line
+ * and the reworded fields, so production is the variant byte for byte; the
+ * variant takes production's copies out first (measuredBase), so it builds on
+ * production's setup as the stage measured it.
+ */
 describe("the lever-direction setup", () => {
-  it.each(INPUTS)("%i players, %s: production's prompt with the line after the spend-or-earn rule, every length, with and without a child", (players, mode) => {
+  it.each(INPUTS)("%i players, %s: production's prompt as measured with the line after the spend-or-earn rule, every length, with and without a child", (players, mode) => {
     const { anchor, line } = LEVER_DIRECTION_TEXT;
     for (const maxTurns of [10, 25]) {
       for (const kids of [false, true]) {
         const production = setupStep.request(PREMISE, players, mode, maxTurns, "story", { kids });
         const variant = leverDirectionRequest(PREMISE, players, mode, maxTurns, "story", { kids });
-        expect(occurrences(production.prompt, anchor)).toBe(1);
-        expect(variant.prompt).toBe(production.prompt.replace(anchor, `${anchor}\n${line}`));
+        // Production as the stage measured it: without the adopted line
+        const measured = production.prompt.replace(`${anchor}\n${line}`, anchor);
+        expect(occurrences(measured, anchor)).toBe(1);
+        expect(occurrences(measured, line)).toBe(0);
+        expect(variant.prompt).toBe(measured.replace(anchor, `${anchor}\n${line}`));
+        expect(variant.prompt).toBe(production.prompt);
         // In the stat rules, before the rule on what player stats are about
         expect(variant.prompt.indexOf(line)).toBeLessThan(variant.prompt.indexOf("- Player stats are about the person"));
       }
     }
   });
 
-  it.each(INPUTS)("%i players, %s: production's schema with the two lever fields' first sentences reworded", (players, mode) => {
+  it.each(INPUTS)("%i players, %s: production's schema as measured with the two lever fields' first sentences reworded", (players, mode) => {
     const { sacrifice, reward } = LEVER_DIRECTION_TEXT;
     for (const kids of [false, true]) {
       const production = json(setupStep.request(PREMISE, players, mode, 25, "story", { kids }).schema);
       const variant = json(leverDirectionRequest(PREMISE, players, mode, 25, "story", { kids }).schema);
-      expect(production).toContain(inJson(sacrifice.from));
-      expect(production).toContain(inJson(reward.from));
+      const measured = production.split(inJson(sacrifice.to)).join(inJson(sacrifice.from)).split(inJson(reward.to)).join(inJson(reward.from));
+      expect(measured).toContain(inJson(sacrifice.from));
+      expect(measured).toContain(inJson(reward.from));
       expect(variant).not.toContain(inJson(sacrifice.from));
       expect(variant).not.toContain(inJson(reward.from));
-      expect(variant).toBe(production.split(inJson(sacrifice.from)).join(inJson(sacrifice.to)).split(inJson(reward.from)).join(inJson(reward.to)));
+      expect(variant).toBe(measured.split(inJson(sacrifice.from)).join(inJson(sacrifice.to)).split(inJson(reward.from)).join(inJson(reward.to)));
+      expect(variant).toBe(production);
     }
   });
 

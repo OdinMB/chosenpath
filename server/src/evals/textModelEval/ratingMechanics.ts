@@ -3,6 +3,7 @@ import type { BeatOption, Change, SetOfBeatGenerationSchema, Stat, StatValue, St
 import { MAX_STAT_MODIFIER_POINTS, MAX_STAT_MODIFIERS_PER_OPTION } from "core/config.js";
 import { ChangeService } from "../../game/services/ChangeService.js";
 import { isOffLadder, repairBeatReply } from "../../game/services/beatRepairs.js";
+import { leverDirection } from "../../game/services/leverPayments.js";
 import { canAddMilestones, isPlayerBeat } from "../../game/services/storyTextSteps.js";
 import type { EvalCase } from "./cases.js";
 import { beatInput } from "./outputChecks.js";
@@ -301,11 +302,15 @@ function readStatChanges(story: Story, reply: SetOfBeatGenerationSchema, exempt:
   });
 }
 
-/** Paid, paid the other way, written without effect, or left out: a sacrifice lowers or removes, a reward raises or adds. */
-function leverStatus(kind: Lever, stat: Stat, before: StatValue | undefined, after: StatValue | undefined): LeverStatus {
+/**
+ * Paid, paid the other way, written without effect, or left out: a number moves the lever's way (leverDirection, the
+ * game's reading: a sacrifice down and a reward up unless its words say otherwise, as on a stat where more is worse),
+ * a list loses an item for a sacrifice and gains one for a reward.
+ */
+function leverStatus(kind: Lever, stat: Stat, text: string, before: StatValue | undefined, after: StatValue | undefined): LeverStatus {
   if (same(before, after)) return "noChange";
   if (typeof before === "number" && typeof after === "number" && stat.type !== "opposites") {
-    return (kind === "sacrifice") === after < before ? "applied" : "otherWay";
+    return Math.sign(after - before) === leverDirection(stat, kind, text) ? "applied" : "otherWay";
   }
   if (Array.isArray(before) && Array.isArray(after)) {
     const removed = before.some((v) => !after.includes(v));
@@ -322,7 +327,7 @@ function leverReading(state: StoryState, slot: string, kind: Lever, text: string
   if (own.length === 0) return { slot, kind, text, stat, status: "notApplied" };
   const before = own[0].before;
   const after = own[own.length - 1].after;
-  return { slot, kind, text, stat, status: leverStatus(kind, stat, before, after), before, after };
+  return { slot, kind, text, stat, status: leverStatus(kind, stat, text, before, after), before, after };
 }
 
 const DROPPED: Record<string, string> = {

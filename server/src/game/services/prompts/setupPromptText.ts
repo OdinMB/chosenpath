@@ -121,6 +121,19 @@ Don't borrow story elements from established franchises.
 export const CONTESTED_FAVOR =
   "--- If the players compete for one NPC's favor, that favor is a contest: one shared scoreboard stat, not a relationship stat for each player.";
 
+/**
+ * Which way a lever runs (fix 3 of the second playthroughs' review, the
+ * lever-direction stage of 2026-09-30, adopted on 2026-10-01): a sacrifice
+ * always costs the player and a reward always helps, also on a stat where more
+ * is worse. Production's setups wrote 19 pressures' levers backwards against 7
+ * the right way (the mouse story's "Give up 10% Cat's Nearness" moved the cat
+ * away, a second benefit beside the sacrifice's +30); with this line and the
+ * lever fields' wording (setupSchema.ts) every lever ran the right way in 12
+ * of 12 measured setups, against production's 11 of 12.
+ */
+export const LEVER_DIRECTION_LINE =
+  "- A sacrifice always costs the player and a reward always helps, whichever way the stat runs. On a stat where more is worse for the player (a danger, suspicion, a pursuer's nearness, pressure or strain), the sacrifice raises it and the reward lowers it: 'Let the guards' Suspicion rise 10% to slip past them in plain sight'; 'Lower Suspicion 10% by lying low instead of pressing on'.";
+
 /** A4.1's stats that act in play, in place of today's "don't use stats for…" lines. */
 export function statsThatAct(players: number, contested: boolean): string {
   const multiplayer = players > 1;
@@ -129,6 +142,7 @@ export function statsThatAct(players: number, contested: boolean): string {
     "- Every stat earns its place in play in at least two ways: it shifts chances in challenge scenes the thread types create (effects), it can be spent or earned in a scene (sacrifice or reward), or its thresholds change which threads and scenes happen (narrative implications).",
     "- Name the stats after what the premise says the characters care about or have to manage or balance: its resources, relationships and pressures (for example the Queen's opinion in a court intrigue, fuel on a long voyage, burnout for an activist).",
     "- Most player stats can be spent or earned in a scene: resources, reserves, contacts, items, moods. Only special powers, standings earned over the whole story (a rank, a faction's stance on a four-step scale) and trust that must be earned in a thread are 'None'.",
+    LEVER_DIRECTION_LINE,
     `- Player stats are about the person: their values, their approach, their resilience, the people who support them.${
       multiplayer
         ? " A relationship between the player characters themselves is one shared stat, not a copy for each player. Every player gets every player stat, so none is written for one role or named after one player."

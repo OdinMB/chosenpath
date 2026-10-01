@@ -2,7 +2,7 @@ import { jest } from "@jest/globals";
 import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { GameModes, type Beat, type ChallengeOption, type Change } from "core/types/index.js";
-import { POINTS_FOR_SACRIFICE } from "core/config.js";
+import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import {
   analysisBefore,
   beatStep,
@@ -187,6 +187,65 @@ describe("beatStep.apply records the lever a turn paid on its new beat (for the 
     const paid = [change("shared", CRUMBS.id, "subtractNumber", 1)];
     expect(paidOn(story, paid, "player2")).toEqual({ kind: "sacrifice", group: "shared", stat: CRUMBS.id, step: -1 });
     expect(paidOn(story, paid, "player1")).toBeUndefined();
+  });
+
+  /*
+   * A lever on a stat where more is worse (fix 3 of the second playthroughs'
+   * review, adopted 2026-10-01): the setup writes its sacrifice as a rise
+   * ("Let Suspicion rise 10% …") and its reward as a fall ("Lower Suspicion
+   * 10% …"). Its payment is the change that moves the stat the way the lever's
+   * words say: the chosen option's, else the stat's lever rule's, else a
+   * sacrifice down and a reward up.
+   */
+  describe("on a stat where more is worse", () => {
+    const SUSPICION = stat("player_suspicion", {
+      name: "Suspicion",
+      optionsToSacrifice: "Let Suspicion rise 10% to slip past the guards in plain sight.",
+      optionsToGainAsReward: "Lower Suspicion 10% by lying low instead of pressing on.",
+    });
+    function choseOn(text: string, resourceType: "sacrifice" | "reward"): Story {
+      const base = threadBeat(1);
+      const players = Object.fromEntries(
+        Object.entries(base.getPlayers()).map(([slot, player]) => {
+          const beats = [...player.beatHistory];
+          const lever: ChallengeOption = { ...option(text), resourceType, basePoints: resourceType === "sacrifice" ? POINTS_FOR_SACRIFICE : POINTS_FOR_REWARD };
+          beats[beats.length - 1] = { ...beats[beats.length - 1], options: [...challengeOptions().slice(0, 2), lever], choice: 2 };
+          return [slot, { ...player, beatHistory: beats, statValues: [{ statId: SUSPICION.id, value: 40 }] }];
+        })
+      );
+      return base.clone({ playerStats: [SUSPICION], players });
+    }
+
+    it("records a sacrifice that raises the stat, as its words say, and nothing for a fall", () => {
+      const story = choseOn("Let the guards' Suspicion rise 10% and walk through the gate in plain sight.", "sacrifice");
+      expect(paidOn(story, [change("player1", SUSPICION.id, "addNumber", 10)])).toEqual({ kind: "sacrifice", group: "player1", stat: SUSPICION.id, step: 10 });
+      expect(paidOn(story, [change("player1", SUSPICION.id, "subtractNumber", 10)])).toBeUndefined();
+    });
+
+    it("records a reward that lowers the stat, as its words say, and nothing for a rise", () => {
+      const story = choseOn("Lie low behind the stalls and let your Suspicion drop 10%.", "reward");
+      expect(paidOn(story, [change("player1", SUSPICION.id, "setNumber", 30)])).toEqual({ kind: "reward", group: "player1", stat: SUSPICION.id, step: -10 });
+      expect(paidOn(story, [change("player1", SUSPICION.id, "addNumber", 10)])).toBeUndefined();
+    });
+
+    it("reads a sign in the option's text, and the stat's lever rule where the option's words say no direction", () => {
+      expect(paidOn(choseOn("Slip past the guards in plain sight (+10% Suspicion).", "sacrifice"), [change("player1", SUSPICION.id, "addNumber", 10)])).toMatchObject({ step: 10 });
+      const unsaid = choseOn("Walk through the gate under the guards' Suspicion.", "sacrifice");
+      expect(paidOn(unsaid, [change("player1", SUSPICION.id, "addNumber", 10)])).toMatchObject({ kind: "sacrifice", step: 10 });
+      expect(paidOn(choseOn("Wait out the guards' Suspicion behind the stalls.", "reward"), [change("player1", SUSPICION.id, "subtractNumber", 10)])).toMatchObject({ kind: "reward", step: -10 });
+    });
+
+    it("keeps a sacrifice down and a reward up where neither the option nor the stat's rule says a direction", () => {
+      const plain = stat("player_resolve", { name: "Resolve", optionsToSacrifice: "Steel yourself with 10% Resolve.", optionsToGainAsReward: "Take heart for 10% Resolve." });
+      const story = (text: string, kind: "sacrifice" | "reward") => {
+        const base = choseOn(text, kind);
+        const players = Object.fromEntries(Object.entries(base.getPlayers()).map(([slot, player]) => [slot, { ...player, statValues: [{ statId: plain.id, value: 50 }] }]));
+        return base.clone({ playerStats: [plain], players });
+      };
+      expect(paidOn(story("Steel your Resolve and step into the ring.", "sacrifice"), [change("player1", plain.id, "subtractNumber", 10)])).toMatchObject({ step: -10 });
+      expect(paidOn(story("Steel your Resolve and step into the ring.", "sacrifice"), [change("player1", plain.id, "addNumber", 10)])).toBeUndefined();
+      expect(paidOn(story("Take a breath for your Resolve.", "reward"), [change("player1", plain.id, "addNumber", 10)])).toMatchObject({ step: 10 });
+    });
   });
 });
 

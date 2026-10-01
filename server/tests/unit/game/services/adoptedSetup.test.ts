@@ -6,7 +6,10 @@ import { iterationStep, setupStep } from "../../../../src/game/services/storyTex
 import { ROUND3_PARTS, ROUND3B_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { assembleGenerationOrder, iterationRound2Request, setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { PLAYER_STATS_NAMELESS } from "../../../../src/game/services/storyTextRounds/setupRound3Text.js";
-import { KIDS_EXAMPLES, SCOREBOARD_SENTENCES, adoptedSetupPrompt, isContestSetup } from "../../../helpers/adoptedDeltas.js";
+import { KIDS_EXAMPLES, SCOREBOARD_SENTENCES, adoptedSetupPrompt, isContestSetup, withLeverDirectionSchema } from "../../../helpers/adoptedDeltas.js";
+import { LEVER_DIRECTION_TEXT, leverDirectionRequest } from "../../../../src/game/services/storyTextRounds/leverDirection.js";
+import { LEVER_DIRECTION_LINE } from "../../../../src/game/services/prompts/setupPromptText.js";
+import { REWARD_FIRST_SENTENCE, SACRIFICE_FIRST_SENTENCE } from "../../../../src/game/services/setupSchema.js";
 
 /*
  * Production's setup form is setup round 3's as the eval measured it
@@ -36,10 +39,14 @@ const SECTION_SETS: TemplateIterationSections[][] = Array.from({ length: 2 ** SE
 const json = (schema: Parameters<typeof toJsonSchema>[0]) => JSON.stringify(toJsonSchema(schema));
 
 /*
- * The one deliberate change to the measured text (adoptedDeltas.ts): with the
+ * The deliberate changes to the measured text (adoptedDeltas.ts): with the
  * scoreboard ending rule, three sentences that were true only while no stat
  * decided an outcome say that a contested outcome's scoreboard does, in the
- * setups that have one. Everywhere else the text is as measured.
+ * setups that have one; the kids stat examples of the setup retests; and,
+ * since 2026-10-01, the lever-direction stage's measured line and lever
+ * fields (withLeverDirection, withLeverDirectionSchema: not deltas but the
+ * variant leverDirection, adopted as measured). Everywhere else the text is as
+ * measured.
  */
 const isContest = isContestSetup;
 const adopted = adoptedSetupPrompt;
@@ -52,7 +59,7 @@ describe("custom-story and template setup: the measured form", () => {
           const production = setupStep.request(PREMISE, players, mode, maxTurns, kind, { kids });
           const measured = setupRound2Request(PREMISE, players, mode, maxTurns, kind, "generationOrder", ROUND3_PARTS, { kids });
           expect(production.prompt).toBe(adopted(measured.prompt, players, mode));
-          expect(json(production.schema)).toBe(json(measured.schema));
+          expect(json(production.schema)).toBe(withLeverDirectionSchema(json(measured.schema)));
         }
       }
     });
@@ -65,6 +72,37 @@ describe("custom-story and template setup: the measured form", () => {
         expect(prompt.split(isContest(players, mode) ? to : from)).toHaveLength(2);
         expect(prompt).not.toContain(isContest(players, mode) ? from : to);
       }
+    }
+  });
+
+  /*
+   * Fix 3 of the second playthroughs' review (2026-10-01, the lever-direction
+   * stage, adopted on the coordinator's call): a sacrifice always costs the
+   * player and a reward always helps, also on a stat where more is worse.
+   * Production is the measured variant byte for byte on every custom-story
+   * setup, prompt and schema; templates and AI Iteration print the same lines.
+   */
+  it.each(INPUTS)("custom story, %i players, %s: the measured lever-direction setup byte for byte", (players, mode) => {
+    for (const maxTurns of [10, 25]) {
+      for (const kids of [false, true]) {
+        const production = setupStep.request(PREMISE, players, mode, maxTurns, "story", { kids });
+        const variant = leverDirectionRequest(PREMISE, players, mode, maxTurns, "story", { kids });
+        expect(production.prompt).toBe(variant.prompt);
+        expect(json(production.schema)).toBe(json(variant.schema));
+      }
+    }
+  });
+
+  it("prints the lever-direction line once, after the spend-or-earn rule, in a story's and a template's setup, from production's own constants", () => {
+    const { anchor, line, sacrifice, reward } = LEVER_DIRECTION_TEXT;
+    expect(LEVER_DIRECTION_LINE).toBe(line);
+    expect(SACRIFICE_FIRST_SENTENCE).toBe(sacrifice.to);
+    expect(REWARD_FIRST_SENTENCE).toBe(reward.to);
+    for (const kind of ["story", "template"] as const) {
+      const request = setupStep.request(PREMISE, 2, GameModes.Competitive, 25, kind);
+      expect(request.prompt.split(`${anchor}\n${line}`)).toHaveLength(2);
+      expect(json(request.schema)).toContain(JSON.stringify(sacrifice.to).slice(1, -1));
+      expect(json(request.schema)).not.toContain(JSON.stringify(sacrifice.from).slice(1, -1));
     }
   });
 
@@ -101,7 +139,7 @@ describe("AI Iteration: the measured form on today's field order", () => {
         const production = iterationStep.request(FEEDBACK, players, mode, maxTurns, sections, TEMPLATE);
         const measured = iterationRound2Request(FEEDBACK, players, mode, maxTurns, sections, TEMPLATE, ROUND3_PARTS);
         expect(production.prompt).toBe(adopted(measured.prompt, players, mode));
-        expect(json(production.schema)).toBe(json(measured.schema));
+        expect(json(production.schema)).toBe(withLeverDirectionSchema(json(measured.schema)));
       }
     }
   });

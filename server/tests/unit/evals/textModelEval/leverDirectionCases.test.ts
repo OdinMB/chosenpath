@@ -6,6 +6,7 @@ import { requestInputFor } from "../../../../src/evals/textModelEval/jobPlan.js"
 import { LEVER_MOUSE_CASE_ID, leverDirectionCases, leverCasesToFreeze } from "../../../../src/evals/textModelEval/leverDirectionCases.js";
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
+import { LEVER_DIRECTION_TEXT } from "../../../../src/game/services/storyTextRounds/leverDirection.js";
 import { evalCase, tags } from "./fixtures.js";
 
 /*
@@ -27,7 +28,18 @@ const ROUND2_SETUP_HASHES = {
   avalon: "6a4d510620e2c81b903677bc6c2d38cdbd545f0a55b574e41a83f97d727d7ada",
 };
 
-const hashOf = (c: Parameters<typeof requestInputFor>[0]) => sha256(requestText(requestFor("adopted", requestInputFor(c))));
+/**
+ * Production's setup prompt as it stood before the stage's variant was adopted (2026-10-01): today's without the
+ * lever-direction line, which it prints once after the spend-or-earn rule.
+ */
+function productionThen(c: Parameters<typeof requestInputFor>[0]): string {
+  const { anchor, line } = LEVER_DIRECTION_TEXT;
+  const today = requestText(requestFor("adopted", requestInputFor(c)));
+  expect(today.split(`${anchor}\n${line}`)).toHaveLength(2);
+  return today.replace(`${anchor}\n${line}`, anchor);
+}
+
+const hashOf = (c: Parameters<typeof requestInputFor>[0]) => sha256(productionThen(c));
 
 describe("the mouse story's setup case", () => {
   const [mouse] = leverDirectionCases();
@@ -41,7 +53,7 @@ describe("the mouse story's setup case", () => {
     expect(mouse.tags).toMatchObject({ players: 1, kids: true, source: "round", category: "read-with-kids" });
   });
 
-  it("sends production's request the second round sent, byte for byte, and so does New Avalon's frozen premise", () => {
+  it("sends production's request the second round sent, byte for byte, and so does New Avalon's frozen premise (production as it stood before the lever-direction adoption)", () => {
     expect(hashOf(mouse)).toBe(ROUND2_SETUP_HASHES.mouse);
     const avalon = SETUP_PREMISES.find((p) => p.id === "setup-custom-avalon");
     if (!avalon) throw new Error("no Avalon premise");

@@ -18,6 +18,7 @@ import {
   withEndingOnlyPlayed,
   withKidsImageSlots,
   withKidsImageSlotsSchema,
+  withLeverDirectionSchema,
   withResultsAsOutcomes,
   withResultsAsOutcomesSchema,
   withThreadsThatFit,
@@ -85,10 +86,11 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
   const measured = requestFor(measuredVariant(input), input);
   const prompt = requestText(measured);
   switch (input.role) {
+    // Since the lever-direction adoption (2026-10-01): the measured line and lever fields, wherever the setup carries them
     case "setup":
-      return { prompt: adoptedSetupPrompt(prompt, input.setup.playerCount, input.setup.gameMode), schema: json(measured) };
+      return { prompt: adoptedSetupPrompt(prompt, input.setup.playerCount, input.setup.gameMode), schema: withLeverDirectionSchema(json(measured)) };
     case "iteration":
-      return { prompt: adoptedSetupPrompt(prompt, input.iteration.playerCount, input.iteration.gameMode), schema: json(measured) };
+      return { prompt: adoptedSetupPrompt(prompt, input.iteration.playerCount, input.iteration.gameMode), schema: withLeverDirectionSchema(json(measured)) };
     case "thread":
       // Since the challenge-results stage (2026-10-01): results and milestones that never restate the approach, as measured
       return { prompt: withResultsAsOutcomes(prompt, input.story), schema: withResultsAsOutcomesSchema(json(measured), input.story) };
@@ -140,7 +142,7 @@ whenFrozen("production builds the measured requests on every frozen case", () =>
       expect({
         id: c.id,
         prompt: requestText(production) === adoptedSetupPrompt(measured.prompt, playerCount, gameMode),
-        schema: json(production) === json(measured),
+        schema: json(production) === withLeverDirectionSchema(json(measured)),
       }).toEqual({ id: c.id, prompt: true, schema: true });
     }
   });

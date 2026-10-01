@@ -32,6 +32,7 @@ import { KIDS_STATS, KIDS_STATS_VARIED } from "../../src/game/services/storyText
 import { PARALLEL_THREADS_TEXT, takesLastStageLine } from "../../src/game/services/storyTextRounds/parallelThreads.js";
 import { RESULTS_AS_OUTCOMES_TEXT } from "../../src/game/services/storyTextRounds/resultsAsOutcomes.js";
 import { ENDING_STATE_TEXT } from "../../src/game/services/storyTextRounds/endingState.js";
+import { LEVER_DIRECTION_TEXT } from "../../src/game/services/storyTextRounds/leverDirection.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -65,9 +66,39 @@ export const SCOREBOARD_SENTENCES: [string, string][] = [
  */
 export const KIDS_EXAMPLES: [string, string] = [KIDS_STATS, KIDS_STATS_VARIED];
 
+/*
+ * Setup (2026-10-01, fix 3 of the second playthroughs' review, adopted on the
+ * coordinator's call): a sacrifice always costs the player and a reward always
+ * helps, also on a stat where more is worse; one line after the stat rule on
+ * what can be spent or earned, and the two lever fields' first sentences
+ * worded by what the lever does to the player. Not a delta: measured (the
+ * variant leverDirection on custom-story setups: every lever the right way in
+ * 12 of 12 setups by hand against production's 11 of 12, the judge 9 -> 11 of
+ * 12 within the noise, nothing moved the wrong way) and adopted as measured,
+ * though the stop rule never read its target as moved; setup round 3, the
+ * measured base the other setup tests read, never carried it. The template
+ * and AI Iteration forms print the same stat rules and fields (unmeasured
+ * there).
+ */
+const inJsonText = (text: string) => JSON.stringify(text).slice(1, -1);
+
+/** The measured setup prompt with the lever-direction line after the spend-or-earn rule, wherever the prompt carries that rule. */
+export function withLeverDirection(measured: string): string {
+  const { anchor, line } = LEVER_DIRECTION_TEXT;
+  const count = measured.split(anchor).length - 1;
+  if (count > 1) throw new Error("The measured setup carries the spend-or-earn rule more than once");
+  return count === 0 ? measured : measured.replace(anchor, () => `${anchor}\n${line}`);
+}
+
+/** The measured setup schema's JSON text with the two lever fields' first sentences reworded, wherever the schema has them. */
+export function withLeverDirectionSchema(measuredJson: string): string {
+  const { sacrifice, reward } = LEVER_DIRECTION_TEXT;
+  return [sacrifice, reward].reduce((text, edit) => text.split(inJsonText(edit.from)).join(inJsonText(edit.to)), measuredJson);
+}
+
 /** The measured setup prompt as production sends it. */
 export function adoptedSetupPrompt(measured: string, players: number, mode: GameMode): string {
-  const kids = measured.split(KIDS_EXAMPLES[0]).join(KIDS_EXAMPLES[1]);
+  const kids = withLeverDirection(measured).split(KIDS_EXAMPLES[0]).join(KIDS_EXAMPLES[1]);
   return isContestSetup(players, mode) ? SCOREBOARD_SENTENCES.reduce((text, [from, to]) => text.split(from).join(to), kids) : kids;
 }
 

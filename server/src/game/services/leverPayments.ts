@@ -80,15 +80,43 @@ export function leverStatOf(story: Story, slot: string, kind: Lever, text: strin
   return pool.length === 1 ? pool[0] : undefined;
 }
 
-type ChosenLever = { kind: Lever; stat: Stat; group: string };
+/** Words and signs that say a lever raises its stat, and those that say it lowers it. */
+const RAISES =
+  /(?:^|[^a-z])(?:ris(?:e|es|en|ing)|rose|rais(?:e|es|ed|ing)|increas(?:e|es|ed|ing)|add(?:s|ed|ing)?|grow(?:s|n|ing)?|grew|climb(?:s|ed|ing)?|gain(?:s|ed|ing)?|regain(?:s|ed|ing)?|more|take on|takes on|taking on)(?![a-z])|\+\s*\d/gi;
+const LOWERS =
+  /(?:^|[^a-z])(?:lower(?:s|ed|ing)?|reduc(?:e|es|ed|ing)|decreas(?:e|es|ed|ing)|drop(?:s|ped|ping)?|fall(?:s|en|ing)?|fell|eas(?:e|es|ed|ing)|spend(?:s|ing)?|spent|los(?:e|es|ing)|lost|give up|gives up|giving up|burn(?:s|ed|t|ing)?|use(?:s|d)?|using|pay(?:s|ing)?|paid|less|fewer)(?![a-z])|(?:^|[\s(])-\s*\d/gi;
 
-/** The sacrifice or reward a player chose on this beat, where its text makes the stat clear: its kind, stat and the stat's group. */
+/** The way these words move a stat, when they say one way only: 1 up, -1 down; undefined when they say neither or both. */
+function saidDirection(text: string | undefined): 1 | -1 | undefined {
+  if (typeof text !== "string") return undefined;
+  const up = (text.match(RAISES) ?? []).length > 0;
+  const down = (text.match(LOWERS) ?? []).length > 0;
+  return up === down ? undefined : up ? 1 : -1;
+}
+
+/**
+ * Which way a lever moves its stat: as the chosen option's words say, else as
+ * the stat's own lever rule for that kind says, else a sacrifice down and a
+ * reward up. Since the lever-direction adoption (2026-10-01) a setup writes the
+ * sacrifice of a stat where more is worse as a rise ("Let Suspicion rise 10% to
+ * slip past the guards") and its reward as a fall ("Lower Suspicion 10% by lying
+ * low"), so a lever's direction can't be read from its kind alone.
+ */
+export function leverDirection(stat: Stat, kind: Lever, optionText: string): 1 | -1 {
+  const rule = kind === "sacrifice" ? stat.optionsToSacrifice : stat.optionsToGainAsReward;
+  return saidDirection(optionText) ?? saidDirection(rule) ?? (kind === "sacrifice" ? -1 : 1);
+}
+
+type ChosenLever = { kind: Lever; stat: Stat; group: string; direction: 1 | -1 };
+
+/** The sacrifice or reward a player chose on this beat, where its text makes the stat clear: its kind, stat, the stat's group and the way it moves the stat. */
 function chosenLever(story: Story, slot: string, beat: Beat | null, stats: LeverStats): ChosenLever | undefined {
   const option = beat && beat.choice >= 0 ? beat.options?.[beat.choice] : undefined;
   const kind = option?.resourceType;
   if (kind !== "sacrifice" && kind !== "reward") return undefined;
-  const lever = leverStatOf(story, slot, kind, typeof option?.text === "string" ? option.text : "", stats);
-  return lever ? { kind, stat: lever.stat, group: lever.shared ? "shared" : slot } : undefined;
+  const text = typeof option?.text === "string" ? option.text : "";
+  const lever = leverStatOf(story, slot, kind, text, stats);
+  return lever ? { kind, stat: lever.stat, group: lever.shared ? "shared" : slot, direction: leverDirection(lever.stat, kind, text) } : undefined;
 }
 
 /** A lever of these stat types is read; a list's or a ladder's payment isn't a size a second charge could repeat. */
@@ -135,9 +163,10 @@ const isStatChange = (change: Change): change is StatChange => change.type === "
 
 /**
  * The levers these stat changes pay, by the slot that chose them on the
- * story's current beat: a sacrifice paid by a change that lowers its stat, a
- * reward by one that raises it, the first such change in order, with the
- * step it made. Percentage and number stats only.
+ * story's current beat: the first change in order that moves the lever's stat
+ * the lever's way (leverDirection: a sacrifice down and a reward up unless its
+ * words say otherwise, as on a stat where more is worse), with the step it
+ * made. Percentage and number stats only.
  */
 export function paidLevers(story: Story, changes: Change[]): Record<string, PaidLever> {
   const stats = leverStatsOf(story);
@@ -149,7 +178,7 @@ export function paidLevers(story: Story, changes: Change[]): Record<string, Paid
     for (const change of changes.filter(isStatChange)) {
       const step = working.step(change);
       working.apply(change, step);
-      const pays = step !== undefined && (lever.kind === "sacrifice" ? step < 0 : step > 0);
+      const pays = step !== undefined && Math.sign(step) === lever.direction;
       if (pays && change.group === lever.group && change.stat === lever.stat.id) {
         paid[slot] = { kind: lever.kind, group: lever.group, stat: lever.stat.id, step };
         break;

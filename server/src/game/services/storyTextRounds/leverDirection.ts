@@ -39,6 +39,16 @@ import { replaceOnce } from "./roundEdits.js";
  *   as production has it.
  * Everywhere else production's request byte for byte, its reply assembled as
  * production assembles it.
+ *
+ * Run 2026-09-30 (stage lever-direction): every lever the right way by hand
+ * 11 of 12 -> 12 of 12 setups, the judge 9 -> 11 of 12 (within the noise:
+ * production erred too rarely for a setup-level check to move), nothing moved
+ * the wrong way, waits and cost level. Adopted on the coordinator's call
+ * (2026-10-01): production's LEVER_DIRECTION_LINE (setupPromptText.ts) and the
+ * lever fields' SACRIFICE_FIRST_SENTENCE and REWARD_FIRST_SENTENCE
+ * (setupSchema.ts) are this variant's text, so production is this variant byte
+ * for byte; the variant takes production's copies out before it inserts its
+ * own (measuredBase), so it builds as measured.
  */
 
 const LABEL = "Lever-direction setup";
@@ -63,25 +73,29 @@ const REWARD = {
 /** The passages the tests pin. */
 export const LEVER_DIRECTION_TEXT = { anchor: ANCHOR, line: LINE, sacrifice: SACRIFICE, reward: REWARD };
 
-function reworded(schema: z.ZodTypeAny, edit: { from: string; to: string }): z.ZodTypeAny {
-  return schema.describe(replaceOnce(LABEL, schema.description ?? "", edit.from, edit.to));
+type Direction = "forward" | "back";
+
+function reworded(schema: z.ZodTypeAny, edit: { from: string; to: string }, direction: Direction): z.ZodTypeAny {
+  const [from, to] = direction === "forward" ? [edit.from, edit.to] : [edit.to, edit.from];
+  return schema.describe(replaceOnce(LABEL, schema.description ?? "", from, to));
 }
 
 /**
- * The generation-order schema with the lever fields reworded. The shared and
- * the player list hold one stat instance (setupSchema.ts), which the JSON
- * schema writes once and points the other list at; the edited instance is
- * shared the same way, so only the two descriptions change.
+ * The generation-order schema with the lever fields reworded (or, `back`, the
+ * reworded fields as the stage measured production's). The shared and the
+ * player list hold one stat instance (setupSchema.ts), which the JSON schema
+ * writes once and points the other list at; the edited instance is shared the
+ * same way, so only the two descriptions change.
  */
-function withLeverWording(schema: z.AnyZodObject): z.AnyZodObject {
+function withLeverWording(schema: z.AnyZodObject, direction: Direction = "forward"): z.AnyZodObject {
   const shared = schema.shape.sharedStats;
   const player = schema.shape.playerStats;
   if (!(shared instanceof z.ZodArray) || !(player instanceof z.ZodArray)) throw new Error(`${LABEL}: the setup schema has no stat lists`);
   const stat = shared.element;
   if (!(stat instanceof z.ZodObject) || player.element !== stat) throw new Error(`${LABEL}: the stat lists do not share one stat schema`);
   const edited = stat.extend({
-    optionsToSacrifice: reworded(stat.shape.optionsToSacrifice, SACRIFICE),
-    optionsToGainAsReward: reworded(stat.shape.optionsToGainAsReward, REWARD),
+    optionsToSacrifice: reworded(stat.shape.optionsToSacrifice, SACRIFICE, direction),
+    optionsToGainAsReward: reworded(stat.shape.optionsToGainAsReward, REWARD, direction),
   });
   const list = (original: z.ZodArray<z.ZodTypeAny>) => {
     const cap = original._def.maxLength?.value;
@@ -91,7 +105,24 @@ function withLeverWording(schema: z.AnyZodObject): z.AnyZodObject {
   return schema.extend({ sharedStats: list(shared), playerStats: list(player) });
 }
 
-/** Production's setup request with the lever line and the lever fields reworded; production's byte for byte elsewhere. */
+/**
+ * Production's setup as the stage measured it: since the adoption (2026-10-01)
+ * production prints the line and the reworded fields, so they are taken out
+ * first and the variant builds as it was measured.
+ */
+function measuredBase(
+  premise: string,
+  playerCount: PlayerCount,
+  gameMode: GameMode,
+  maxTurns: number,
+  kind: "story" | "template",
+  options: SetupPromptOptions
+): SetupRequest {
+  const production = setupStep.request(premise, playerCount, gameMode, maxTurns, kind, options);
+  return { ...production, prompt: production.prompt.split(`${ANCHOR}\n${LINE}`).join(ANCHOR), schema: withLeverWording(production.schema, "back") };
+}
+
+/** Production's setup request as measured with the lever line and the lever fields reworded; production's byte for byte elsewhere. */
 export function leverDirectionRequest(
   premise: string,
   playerCount: PlayerCount,
@@ -100,7 +131,7 @@ export function leverDirectionRequest(
   kind: "story" | "template",
   options: SetupPromptOptions = {}
 ): SetupRequest {
-  const base = setupStep.request(premise, playerCount, gameMode, maxTurns, kind, options);
+  const base = measuredBase(premise, playerCount, gameMode, maxTurns, kind, options);
   return {
     ...base,
     prompt: replaceOnce(LABEL, base.prompt, ANCHOR, `${ANCHOR}\n${LINE}`),
