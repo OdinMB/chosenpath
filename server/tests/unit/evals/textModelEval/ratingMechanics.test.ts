@@ -247,6 +247,20 @@ describe("readTurn and turnMechanics: what the turn changes, after the game's re
     expect(flat(fell?.changes)[0]).toBe("Previous choice sacrificed: Patrol Heat: changed the other way, 20 → 10");
   });
 
+  it("reads an ordinary stat's sacrifice as applied when it falls, whatever else its words say (a stored option's 'so more delegates can stay')", () => {
+    const CREDITS = stat("shared_resource_credits", { type: "number", name: "Resource Credits", optionsToSacrifice: "Can spend 20 credits for a one-time bonus in a beat." });
+    const story = withStats(threadBeat(1), sacrificeLast("Put 20 resource credits toward transit and childcare stipends so more delegates can stay for the meeting."), {
+      sharedStats: [SUPPLIES, ORDER, CREDITS],
+      sharedStatValues: [
+        { statId: "shared_supplies", value: 40 },
+        { statId: "shared_order", value: 60 },
+        { statId: "shared_resource_credits", value: 60 },
+      ],
+    });
+    const paid = turnMechanics(story, reply({ statChanges: [change("shared", "shared_resource_credits", "subtractNumber", 20)] }));
+    expect(flat(paid?.changes)[0]).toBe("Previous choice sacrificed: Resource Credits: applied, 60 → 40");
+  });
+
   it("reads a previous reward, a sacrificed list item and a sacrifice whose stat can't be told", () => {
     const [lever, a, b] = challengeOptions();
     const reward = withStats(threadBeat(1), { options: [a, { ...lever, resourceType: "reward", basePoints: -30, text: "Rest and regain your Nerve" }, b], choice: 1 });

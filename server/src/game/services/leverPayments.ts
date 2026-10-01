@@ -80,31 +80,101 @@ export function leverStatOf(story: Story, slot: string, kind: Lever, text: strin
   return pool.length === 1 ? pool[0] : undefined;
 }
 
-/** Words and signs that say a lever raises its stat, and those that say it lowers it. */
-const RAISES =
-  /(?:^|[^a-z])(?:ris(?:e|es|en|ing)|rose|rais(?:e|es|ed|ing)|increas(?:e|es|ed|ing)|add(?:s|ed|ing)?|grow(?:s|n|ing)?|grew|climb(?:s|ed|ing)?|gain(?:s|ed|ing)?|regain(?:s|ed|ing)?|more|take on|takes on|taking on)(?![a-z])|\+\s*\d/gi;
-const LOWERS =
-  /(?:^|[^a-z])(?:lower(?:s|ed|ing)?|reduc(?:e|es|ed|ing)|decreas(?:e|es|ed|ing)|drop(?:s|ped|ping)?|fall(?:s|en|ing)?|fell|eas(?:e|es|ed|ing)|spend(?:s|ing)?|spent|los(?:e|es|ing)|lost|give up|gives up|giving up|burn(?:s|ed|t|ing)?|use(?:s|d)?|using|pay(?:s|ing)?|paid|less|fewer)(?![a-z])|(?:^|[\s(])-\s*\d/gi;
+/*
+ * The words that say which way a lever moves its stat. Those that can tell
+ * what happens to the stat itself count on either side of it ("let Suspicion
+ * rise", "a 10% increase in Heat", "increasing your Stress"); those that act
+ * on it, or compare an amount of it, only before it ("spend 15% Reserve", "10%
+ * more Heat"): after it they speak of something else ("10% harmony to gain a
+ * boost", "credits toward stipends so more delegates can stay").
+ */
+const word = (words: string) => new RegExp(String.raw`(?<![a-z])(?:${words})(?![a-z])`, "g");
+const DIRECTION_WORDS: { pattern: RegExp; direction: 1 | -1; after: boolean }[] = [
+  { pattern: word(String.raw`ris(?:e|es|en|ing)|rose|grow(?:s|n|ing)?|grew|climb(?:s|ed|ing)?|increas(?:e|es|ed|ing)`), direction: 1, after: true },
+  { pattern: word(String.raw`decreas(?:e|es|ed|ing)|drop(?:s|ped|ping)?|fall(?:s|en|ing)?|fell|eas(?:e|es|ed|ing)`), direction: -1, after: true },
+  { pattern: word(String.raw`rais(?:e|es|ed|ing)|add(?:s|ed|ing)?|gain(?:s|ed|ing)?|regain(?:s|ed|ing)?|more|take on|takes on|taking on`), direction: 1, after: false },
+  {
+    pattern: word(String.raw`lower(?:s|ed|ing)?|reduc(?:e|es|ed|ing)|spend(?:s|ing)?|spent|los(?:e|es|ing)|lost|give up|gives up|giving up|burn(?:s|ed|t|ing)?|use(?:s|d)?|using|pay(?:s|ing)?|paid|less|fewer`),
+    direction: -1,
+    after: false,
+  },
+];
+/** A signed amount: "+10%", "-15", "−1". */
+const SIGNED_AMOUNTS: { pattern: RegExp; direction: 1 | -1 }[] = [
+  { pattern: /\+\s*\d/g, direction: 1 },
+  { pattern: /(?<![^\s(])[-−]\s*\d/g, direction: -1 },
+];
+/** A word at most this many words from the stat's name speaks of the stat: "increasing your Stress Level", "let the guards' Suspicion rise". */
+const NAME_REACH = 2;
+/** Or at most this many words from an unsigned amount: "spend 15% of your Reserve", "can increase by 10%". */
+const AMOUNT_REACH = 1;
+/** A signed amount speaks of the stat only right beside its name: "(+10% Suspicion)", "+20% in Family Pressure", "Suspicion +10". */
+const SIGN_REACH_BEFORE = 1;
 
-/** The way these words move a stat, when they say one way only: 1 up, -1 down; undefined when they say neither or both. */
-function saidDirection(text: string | undefined): 1 | -1 | undefined {
+/** The words a stat is named by in a lever's text or rule: its names, and each word of four letters or more in them ("stability" for Timeline Stability). */
+function mentionWords(stat: Stat): string[] {
+  const parts = statNameWords(stat).flatMap((name) => name.split(/\s+/)).filter((part) => part.length >= MIN_NAMED_LETTERS);
+  return [...new Set([...statNameWords(stat), ...parts])];
+}
+
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * The way the words of a lever's text that speak of its stat move it: 1 up,
+ * -1 down; undefined when they say neither or both. Such a word sits near the
+ * stat's name (NAME_REACH) or an amount (AMOUNT_REACH), before it, or on either
+ * side for a word that can tell what happens to the stat itself; a signed
+ * amount sits right beside the name. A word inside the stat's own name doesn't
+ * count ("Rising Panic").
+ */
+function saidOfStat(text: string | undefined, stat: Stat): 1 | -1 | undefined {
   if (typeof text !== "string") return undefined;
-  const up = (text.match(RAISES) ?? []).length > 0;
-  const down = (text.match(LOWERS) ?? []).length > 0;
-  return up === down ? undefined : up ? 1 : -1;
+  const lower = text.toLowerCase();
+  const spanOf = (match: RegExpMatchArray) => ({ start: match.index ?? 0, end: (match.index ?? 0) + match[0].length });
+  const words = [...lower.matchAll(/\S+/g)].map((match) => ({ ...spanOf(match), text: match[0] }));
+  const wordAt = (at: number) => words.findIndex((w) => at < w.end);
+  const names = mentionWords(stat).flatMap((name) => [...lower.matchAll(new RegExp(String.raw`(?<![a-z])${escaped(name)}(?:e?s)?(?![a-z])`, "g"))].map(spanOf));
+  // Where the stat's name and the unsigned amounts sit, in words
+  const nameAt = names.map((name) => ({ first: wordAt(name.start), last: wordAt(name.end - 1) }));
+  const amountAt = words.flatMap((w, at) => (/\d/.test(w.text) && !/^[([]?[+\-−]/.test(w.text) ? [{ first: at, last: at }] : []));
+  /** Whether word `at` is the span's, or sits at most `before` words before it, or, when `after` is given, at most that many after it. */
+  const near = (at: number, span: { first: number; last: number }, before: number, after?: number) =>
+    at < span.first ? span.first - at - 1 <= before : at <= span.last || (after !== undefined && at - span.last - 1 <= after);
+
+  const said = new Set<1 | -1>();
+  for (const { pattern, direction, after } of DIRECTION_WORDS) {
+    for (const match of lower.matchAll(pattern)) {
+      const { start, end } = spanOf(match);
+      if (names.some((name) => start < name.end && end > name.start)) continue;
+      const at = wordAt(start);
+      const nearName = nameAt.some((span) => near(at, span, NAME_REACH, after ? NAME_REACH : undefined));
+      const nearAmount = amountAt.some((span) => near(at, span, AMOUNT_REACH, after ? AMOUNT_REACH : undefined));
+      if (nearName || nearAmount) said.add(direction);
+    }
+  }
+  for (const { pattern, direction } of SIGNED_AMOUNTS) {
+    for (const match of lower.matchAll(pattern)) {
+      if (nameAt.some((span) => near(wordAt(spanOf(match).start), span, SIGN_REACH_BEFORE, 0))) said.add(direction);
+    }
+  }
+  return said.size === 1 ? [...said][0] : undefined;
 }
 
 /**
- * Which way a lever moves its stat: as the chosen option's words say, else as
- * the stat's own lever rule for that kind says, else a sacrifice down and a
- * reward up. Since the lever-direction adoption (2026-10-01) a setup writes the
- * sacrifice of a stat where more is worse as a rise ("Let Suspicion rise 10% to
- * slip past the guards") and its reward as a fall ("Lower Suspicion 10% by lying
- * low"), so a lever's direction can't be read from its kind alone.
+ * Which way a lever moves its stat: as the chosen option's words about the
+ * stat say, else as the stat's own lever rule for that kind says, else a
+ * sacrifice down and a reward up. Since the lever-direction adoption
+ * (2026-10-01) a setup writes the sacrifice of a stat where more is worse as a
+ * rise ("Let Suspicion rise 10% to slip past the guards") and its reward as a
+ * fall ("Lower Suspicion 10% by lying low"), so a lever's direction can't be
+ * read from its kind alone. Only words that speak of the stat count
+ * (saidOfStat): an option describes an action, and read whole, "greatly
+ * increasing disruption" or a rule's "+30 bonus" turned an ordinary stat's
+ * sacrifice into a rise, so its correct payment went unrecorded.
  */
 export function leverDirection(stat: Stat, kind: Lever, optionText: string): 1 | -1 {
   const rule = kind === "sacrifice" ? stat.optionsToSacrifice : stat.optionsToGainAsReward;
-  return saidDirection(optionText) ?? saidDirection(rule) ?? (kind === "sacrifice" ? -1 : 1);
+  return saidOfStat(optionText, stat) ?? saidOfStat(rule, stat) ?? (kind === "sacrifice" ? -1 : 1);
 }
 
 type ChosenLever = { kind: Lever; stat: Stat; group: string; direction: 1 | -1 };
@@ -165,7 +235,7 @@ const isStatChange = (change: Change): change is StatChange => change.type === "
  * The levers these stat changes pay, by the slot that chose them on the
  * story's current beat: the first change in order that moves the lever's stat
  * the lever's way (leverDirection: a sacrifice down and a reward up unless its
- * words say otherwise, as on a stat where more is worse), with the step it
+ * words about the stat say otherwise, as on a stat where more is worse), with the step it
  * made. Percentage and number stats only.
  */
 export function paidLevers(story: Story, changes: Change[]): Record<string, PaidLever> {

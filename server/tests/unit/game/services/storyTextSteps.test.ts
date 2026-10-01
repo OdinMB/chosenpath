@@ -247,6 +247,27 @@ describe("beatStep.apply records the lever a turn paid on its new beat (for the 
       expect(paidOn(story("Take a breath for your Resolve.", "reward"), [change("player1", plain.id, "addNumber", 10)])).toMatchObject({ step: 10 });
     });
   });
+
+  /*
+   * An option describes an action, so its words about something else ("greatly
+   * increasing disruption") say nothing about its stat: read as if they did, the
+   * correct payment went unrecorded and the next turn's second charge was kept.
+   */
+  describe("on an ordinary stat, whatever else the option's words say", () => {
+    const AGENCY = stat("player_personal_agency", { name: "Personal Agency", optionsToSacrifice: "Can spend 10% agency for a one-time major advantage in a beat." });
+    const BLACKOUT = "Expend an additional 10% of your Personal Agency to intensify the blackout, risking exhaustion but greatly increasing disruption.";
+    function choseAgency(text: string): Story {
+      const base = chose(threadBeat(1), { player1: text });
+      const players = Object.fromEntries(Object.entries(base.getPlayers()).map(([slot, player]) => [slot, { ...player, statValues: [...player.statValues, { statId: AGENCY.id, value: 60 }] }]));
+      return base.clone({ playerStats: [...base.getState().playerStats, AGENCY], players });
+    }
+
+    it("records the sacrifice that lowers it (a stored option's blackout: Personal Agency 60 → 50), and nothing for a rise", () => {
+      const story = choseAgency(BLACKOUT);
+      expect(paidOn(story, [change("player1", AGENCY.id, "subtractNumber", 10)])).toEqual({ kind: "sacrifice", group: "player1", stat: AGENCY.id, step: -10 });
+      expect(paidOn(story, [change("player1", AGENCY.id, "addNumber", 10)])).toBeUndefined();
+    });
+  });
 });
 
 describe("analysis steps", () => {
