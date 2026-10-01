@@ -44,6 +44,7 @@ import type { CallRecord } from "./runner.js";
  *   kids-turns.md|json     the kids-turns stage's report, each turn read whole with production's retry in the loop, its length and plainness (--kids-turns)
  *   kids-ages.md|json      the kids-ages stage's report, turns per age band and player count against each band's limits, and the setups' stats (--kids-ages)
  *   group-levers.md|json   the group-levers stage's report, each group turn read whole, its players' sacrifices and rewards against their computed lines, own stats and shared ones (--group-levers)
+ *   short-replies.md|json  the short-replies stage's report, each turn read whole, each player's paragraphs in the first reply and the reply kept (--short-replies)
  *   judged-money.md|json   the money-adds-up stage's judged check, the figures adding up, and every reply with its stat changes (--judge-money)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  *   playthroughs.md|json   the whole-story playthroughs on production's own code (--playthroughs)
@@ -203,6 +204,11 @@ export function evalFiles(outDir: string) {
     writeGroupLevers: (markdown: string, json: unknown) => {
       writeJson(at("group-levers.json"), json);
       fs.writeFileSync(at("group-levers.md"), markdown);
+    },
+    /** The short-replies stage's report: each turn read whole, each player's paragraphs before and after production's retry (--short-replies, shortRepliesPrep.ts) */
+    writeShortReplies: (markdown: string, json: unknown) => {
+      writeJson(at("short-replies.json"), json);
+      fs.writeFileSync(at("short-replies.md"), markdown);
     },
     /** The choice-line-sp stage's report: each turn read whole, production's retry in the loop (--choice-line-sp, choiceLinePrep.ts) */
     writeChoiceLine: (markdown: string, json: unknown) => {

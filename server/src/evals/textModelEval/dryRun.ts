@@ -115,6 +115,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "kids-ages":
     "Read-with-kids turns and setups by the children's age band (kidsAges beside production under adopted16: --role beat, each turn with production's checked retry, and --role setup)",
   "group-levers": "Group sacrifices, rewards and own stats (groupLevers beside production's group turn under adopted17, --role beat, each with production's checked retry)",
+  "short-replies": "Turns that come back as one short paragraph (shortReplies beside production's turn under adopted18, --role beat, each with production's checked retry)",
 };
 
 /** Jobs by arm key, in plan order. */

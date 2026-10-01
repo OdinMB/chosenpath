@@ -60,6 +60,7 @@ import { moneyAddsUpRequest } from "../../game/services/storyTextRounds/moneyAdd
 import { latePacingRequest } from "../../game/services/storyTextRounds/latePacing.js";
 import { kidsAgesSetupRequest, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../game/services/storyTextRounds/kidsAges.js";
 import { groupLeversRequest } from "../../game/services/storyTextRounds/groupLevers.js";
+import { shortRepliesRequest } from "../../game/services/storyTextRounds/shortReplies.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -347,6 +348,15 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * (where it says one fits, one sacrifice or reward on the player's own stats
  * first, with the scene's reason; "None" only where it says none or no stat
  * allows one).
+ * "shortReplies" is the short-replies stage's turn (2026-10-01, the
+ * coordinator's brief after the second playthroughs: 13 of 126 first replies
+ * one short paragraph, 2 short again after production's retry;
+ * storyTextRounds/shortReplies.ts): production's turn, every turn kind and
+ * player count, with one line in the text rules (after the first paragraph's
+ * rules) and one in each player's text field (after its count): the text never
+ * ends after its first paragraph, a blank line between paragraphs; production's
+ * request byte for byte otherwise, with production's turn limits and retry
+ * count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -419,7 +429,8 @@ export type VariantId =
   | "latePacingB"
   | "kidsAges"
   | "groupLevers"
-  | "groupLeversB";
+  | "groupLeversB"
+  | "shortReplies";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -489,6 +500,7 @@ export const VARIANTS: VariantId[] = [
   "kidsAges",
   "groupLevers",
   "groupLeversB",
+  "shortReplies",
 ];
 
 /**
@@ -995,6 +1007,13 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     if (input.role !== "beat") throw new Error(`Variant groupLeversB does not cover role ${input.role}`);
     const count = beatCheckOptions(input.story).textCount;
     return { ...groupLeversRequest(input.story, { b: true }), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // The short-replies stage's turn: the text goes on after its first paragraph, a blank line between paragraphs, in the
+  // text rules and each player's text field; production's turn limits and production's retry count where it has its own
+  shortReplies: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant shortReplies does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...shortRepliesRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
   },
 };
 

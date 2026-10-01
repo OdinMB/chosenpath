@@ -75,7 +75,11 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * turn with production's one checked retry, and beside production's kids setup
  * at 10), then group sacrifices, rewards and players' own stats (group-levers:
  * the variant beside production's group turn on group chapter steps of the
- * second round's stored runs, each turn with production's one checked retry).
+ * second round's stored runs, each turn with production's one checked retry),
+ * then turns that come back as one short paragraph (short-replies: the
+ * variant beside production's turn on the second round's short turns, the
+ * stored turns that came back short most often and ordinary ones, each turn
+ * with production's one checked retry).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -105,6 +109,7 @@ export const FEEDBACK_STAGES = [
   "late-pacing",
   "kids-ages",
   "group-levers",
+  "short-replies",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -306,6 +311,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // Its one fix-and-retest (the plan's lever question asked from the player's line), against production's, the run's
   // variant second
   groupLeversB: "adopted",
+  // The short-replies stage (2026-10-01): the text goes on after its first paragraph, against production's turn, which
+  // runs beside it
+  shortReplies: "adopted",
 };
 
 /**
@@ -650,9 +658,28 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return kidsAgesArms(role);
     case "group-levers":
       return groupLeversArms(role);
+    case "short-replies":
+      return shortRepliesArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The short-replies stage (the coordinator's brief of 2026-10-01, after the
+ * second playthroughs: 13 of 126 first replies one short paragraph, 2 short
+ * again after production's retry): production's turn (adopted) and the
+ * variant (shortReplies) on each player count's turn model (Luna medium for
+ * one player, Luna low for groups), twice on the stage's cases, interleaved,
+ * under adopted18, each turn with production's one checked retry.
+ */
+function shortRepliesArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  const variants = ["adopted", "shortReplies"] as const;
+  return [
+    ...variants.map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: [...SHORT_REPLIES_CASES.single] })),
+    ...variants.map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: [...SHORT_REPLIES_CASES.groups] })),
+  ];
 }
 
 /**
@@ -1048,6 +1075,73 @@ export const GROUP_LEVERS_CASES = [
 ] as const;
 
 /**
+ * The prompt state of the short-replies stage (2026-10-01): production's own
+ * code since the group-levers adoption, under a tag no earlier stage used, so
+ * production runs beside the variant in the same minutes.
+ */
+export const SHORT_REPLIES_PROMPT_STATE = "adopted18";
+
+/**
+ * The second round's short turns no stage had frozen (shortRepliesCases.ts, no
+ * calls): New Avalon's chapter openings at turns 2 and 24, its switch turns at 8
+ * and 12 and its exploration step at 14, and the food trucks' first turn (both
+ * players short, and short again after the retry).
+ */
+export const SHORT_REPLIES_BUILT_CASES = [
+  "round-short-avalon-t2",
+  "round-short-avalon-t8",
+  "round-short-avalon-t12",
+  "round-short-avalon-t14",
+  "round-short-avalon-t24",
+  "round-short-food-trucks-t1",
+] as const;
+
+/**
+ * The stage's cases, by the turn model that plays them. The second round's
+ * short turns: the built ones and those earlier stages froze (the mouse
+ * story's step 3 and switch turn 5, the switch turn short again after the
+ * retry; the food trucks' chapter opening 21 and ending 26; the space pirates'
+ * step 16; the estate agents' switch turn 15; their switch turn 22 follows the
+ * owner's roll at 21, so its stored state is not production's story). The
+ * stored turns that came back short most often over the earlier stages
+ * (synth-8988006e-t3's step, 13 of 56; the first playthroughs' New Avalon turns
+ * 6 and 11, 3 and 2 of 11; the lemonade story's switch turn 4 and step 6, 2 of
+ * 6 and 2 of 5, and its ending, 2 of 9; the space pirates' step 25, 2 of 4).
+ * Ordinary ones, never short over 5 or 6 earlier replies each: New Avalon's
+ * switch turn 23, the lemonade story's chapter opening 2, the estate agents'
+ * step 10 and the space pirates' first chapter opening.
+ */
+export const SHORT_REPLIES_CASES = {
+  single: [
+    "round-short-avalon-t2",
+    "round-short-avalon-t8",
+    "round-short-avalon-t12",
+    "round-short-avalon-t14",
+    "round-short-avalon-t24",
+    "round-kids-mouse-t3",
+    "round-kids-mouse-t5",
+    "synth-8988006e-t3-pregeneration_2_player1_1-noimg",
+    "round-choice-avalon-t6",
+    "round-choice-avalon-t11",
+    "round-money-lemonade-t4",
+    "round-money-lemonade-t6",
+    "round-settled-lemonade-t11",
+    "round-settled-avalon-t23",
+    "round-money-lemonade-t2",
+  ],
+  groups: [
+    "round-short-food-trucks-t1",
+    "round-levers-food-trucks-t21",
+    "round-settled-food-trucks-t26",
+    "round-levers-space-pirates-t16",
+    "round-settled-estate-agents-t15",
+    "round-recorded-space-pirates-t25",
+    "round-levers-estate-agents-t10",
+    "round-levers-space-pirates-t2",
+  ],
+} as const;
+
+/**
  * The prompt state of the recorded-result stage (2026-09-30, fix 2 of the
  * second playthroughs' review): production's own code, unchanged since the
  * outcome-settled stage (every turn request is adopted7's byte for byte),
@@ -1177,7 +1271,7 @@ function choiceLineSpArms(role: EvalRole): ArmPlan[] {
 export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
-const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers"];
+const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies"];
 
 export function stageChecksTurns(stage: Stage): boolean {
   return CHECKED_TURN_STAGES.includes(stage);
@@ -1497,6 +1591,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "late-pacing",
   "kids-ages",
   "group-levers",
+  "short-replies",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1562,6 +1657,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The group-levers stage's group chapter steps from the second playthroughs (2026-10-01), frozen after every earlier
   // stage had closed
   ...GROUP_LEVERS_CASES.map((id): [string, Stage] => [id, "group-levers"]),
+  // The short-replies stage's short turns from the second playthroughs (2026-10-01), frozen after every earlier stage had
+  // closed; the frozen turns it runs beside were planned by earlier stages and stay plannable
+  ...SHORT_REPLIES_BUILT_CASES.map((id): [string, Stage] => [id, "short-replies"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

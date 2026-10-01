@@ -56,6 +56,7 @@ import { buildKidsCasesMode, kidsTurnsMode } from "./kidsTurnPrep.js";
 import { buildKidsAgesCasesMode } from "./kidsAgesCases.js";
 import { kidsAgesMode } from "./kidsAgesPrep.js";
 import { buildGroupLeverCasesMode, groupLeversMode } from "./groupLeversPrep.js";
+import { buildShortReplyCasesMode, shortRepliesMode } from "./shortRepliesPrep.js";
 import { buildMoneyCasesMode, judgeMoneyMode } from "./moneyAddsUpPrep.js";
 import { buildLatePacingCasesMode, judgeCluesMode, latePacingPlayMode, printLatePacingPlan } from "./latePacingPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
@@ -104,7 +105,10 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     the mouse story's turns read with a child aged 4 and 10 and a two-player kids story's turns at 4, 7 and 10,
  *     interleaved, each with production's one checked retry, and --role setup, production's setup and kidsAges at 10;
  *     group-levers --role beat under adopted17: production's group turn and groupLevers on group chapter steps of the
- *     second playthroughs, interleaved, each with production's one checked retry)
+ *     second playthroughs, interleaved, each with production's one checked retry; short-replies --role beat under
+ *     adopted18: production's turn and shortReplies on the second playthroughs' short turns, the stored turns that came
+ *     back short most often and ordinary ones, on each player count's turn model, interleaved, each with production's
+ *     one checked retry)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -250,6 +254,14 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     read for its sacrifice or reward, that lever's stat (own or shared, allowed or not) and the line B6 computes for
  *     the player, the variant against production under the stop rule, every lever's text, the retries, the automatic
  *     checks, the waits and cost; group-levers.md and .json
+ *   Turns that come back as one short paragraph (shortRepliesPrep.ts, 2026-10-01), in the short-replies stage:
+ *   --build-short-reply-cases [--rebuild-cases]  the second playthroughs' short turns no stage had frozen
+ *     (shortRepliesCases.ts); no calls; they then run with the stage's other cases with --run --stage short-replies
+ *     --prompt-state adopted18 --role beat (production's turn and shortReplies, each with production's checked retry)
+ *   --short-replies  the stage's report, no calls: each turn read whole (checkedTurns.ts), each player's paragraphs and
+ *     words in the first reply and the reply kept against the count its form asks for, production and the variant
+ *     pooled and per turn model under the stop rule, every one-paragraph text's opening, the retries, the automatic
+ *     checks, the waits and cost; short-replies.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -319,6 +331,8 @@ type Mode =
   | "kids-ages"
   | "build-group-lever-cases"
   | "group-levers"
+  | "build-short-reply-cases"
+  | "short-replies"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -466,6 +480,8 @@ function parseArgs(argv: string[]): Args {
       case "--kids-ages":
       case "--build-group-lever-cases":
       case "--group-levers":
+      case "--build-short-reply-cases":
+      case "--short-replies":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1217,6 +1233,11 @@ async function main() {
     case "group-levers":
       // A deterministic reading: no calls, so no key and no caps
       return groupLeversMode({ files, log: (line) => console.log(line) });
+    case "build-short-reply-cases":
+      return buildShortReplyCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "short-replies":
+      // A deterministic reading: no calls, so no key and no caps
+      return shortRepliesMode({ files, log: (line) => console.log(line) });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":
