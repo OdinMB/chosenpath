@@ -18,7 +18,7 @@ import {
   printPlaythroughPlan,
   type ModeCall,
 } from "../../../../src/evals/textModelEval/playthroughMode.js";
-import { PLAYTHROUGHS, PLAYTHROUGHS_2, playthroughArm, type JudgeTarget, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
+import { PLAYTHROUGHS, PLAYTHROUGHS_2, PLAYTHROUGHS_3, playthroughArm, type JudgeTarget, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import type { PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
 import { executed, record } from "./fixtures.js";
@@ -108,6 +108,16 @@ describe("playthroughCall: the stories' calls in their own stage", () => {
     const { ctx, prep } = context();
     await playthroughCall(ctx, 1, 1, round)(spec);
     expect(prep[0]).toMatchObject({ caseId: spec.caseId, stage: "playthroughs-2", promptState: "adopted7" });
+  });
+
+  it("records round 3's calls in its own stage under its own tag: production's code after the fixes of 2026-10-01", async () => {
+    const round = PLAYTHROUGH_ROUNDS[3];
+    expect(round).toMatchObject({ round: 3, stage: "playthroughs-3", promptState: "adopted22", fileBase: "playthroughs-3", pagesDir: "stories/round3", tryAgain: 1, report: "2026-10-01_playthroughs-3-report.md" });
+    expect(round.specs).toBe(PLAYTHROUGHS_3);
+    expect(DEFAULT_STAGE_CAPS[round.stage]).toBe(1);
+    const { ctx, prep } = context();
+    await playthroughCall(ctx, 1, 1, round)(spec);
+    expect(prep[0]).toMatchObject({ caseId: spec.caseId, stage: "playthroughs-3", promptState: "adopted22" });
   });
 
   it("sends nothing past the spend limit, and says so", async () => {
@@ -234,6 +244,16 @@ describe("the estimate the dry run prints", () => {
     expect(text).toMatch(/All six: est \$\d\.\d{3} before retries, plus the judged checks \(about \d+ calls, about \$0\.\d{2}\)/);
   });
 
+  it("prints round 3's six stories under its stage, cap and tag", () => {
+    const lines: string[] = [];
+    const files = { readRecords: () => [], readPlaythroughs: () => undefined, readPrepRecords: () => [] } as unknown as EvalFiles;
+    printPlaythroughPlan(files, (line) => lines.push(line), PLAYTHROUGH_ROUNDS[3]);
+    const text = lines.join("\n");
+    expect(text).toContain("Whole-story playthroughs, round 3 (--playthroughs --round 3, stage playthroughs-3, cap $1, under adopted22)");
+    for (const p of PLAYTHROUGHS_3) expect(text).toContain(`  ${p.id}: `);
+    expect(text).toMatch(/All six: est \$\d\.\d{3} before retries/);
+  });
+
   it("reads the measured cost of production's own calls per arm, role and player count", () => {
     const records = [
       record({ callArmKey: "gpt-6-luna@medium/adopted", role: "beat", players: 1, promptState: "adopted1", costUsd: 0.003 }),
@@ -281,5 +301,20 @@ describe("the files: playthroughs.json and .md, a page per story and an index", 
     expect(Object.keys(pages).sort()).toEqual(["round2/index.html", "round2/play-lemonade.html"]);
     expect(byFile["playthroughs-2"].markdown).toContain("# Whole-story playthroughs on production's own code, round 2");
     expect(pages["round2/index.html"]).toContain("Round 2");
+  });
+
+  it("writes round 3 to its own files and pages (playthroughs-3, stories/round3), leaving the earlier rounds' as they are", async () => {
+    const { ctx, written, byFile, pages } = context();
+    const { call } = fakeCall(1);
+    const played = await playAndJudge(PLAYTHROUGHS_3[0], async (s) => (s.kind === "judge" ? { latencyMs: 0, costUsd: 0, sends: [] } : ((await call(s)) ?? { latencyMs: 0, costUsd: 0, sends: [] })), { sample: 1 }, undefined, PLAYTHROUGH_ROUNDS[3]);
+    expect(played.round).toBe(3);
+    byFile["playthroughs-3"] = { markdown: "", json: { runs: [played] } };
+    await playthroughsMode(ctx, { sample: 1, reportOnly: true, round: PLAYTHROUGH_ROUNDS[3] });
+    expect(written.json).toBeUndefined();
+    expect(byFile["playthroughs-2"]).toBeUndefined();
+    expect(Object.keys(pages).sort()).toEqual(["round3/index.html", "round3/play-lemonade.html"]);
+    expect(byFile["playthroughs-3"].markdown).toContain("# Whole-story playthroughs on production's own code, round 3");
+    expect(byFile["playthroughs-3"].json).toMatchObject({ round: 3, stage: "playthroughs-3", promptState: "adopted22" });
+    expect(pages["round3/index.html"]).toContain("Round 3");
   });
 });

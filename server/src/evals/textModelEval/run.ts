@@ -295,14 +295,16 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     prep-calls.jsonl, in the setup-rounds stage; writes setup-chain.md and .json with the runs the file already
  *     holds (--samples picks the chain's sample, default 1; --report-only renders afresh without calls; --merge adds
  *     another chain file's runs)
- *   --playthroughs [--round 2] [--cases <story ids>] [--samples N] [--turns N] [--max-spend 0.70] [--report-only]  whole-story
+ *   --playthroughs [--round 2|3] [--cases <story ids>] [--samples N] [--turns N] [--max-spend 0.70] [--report-only]  whole-story
  *     playthroughs on production's own code (playthroughs.ts, playthroughMode.ts): four new setups played to their
  *     ending by an automated player, then the judged stage and ending checks; prep-calls.jsonl, in the playthroughs
  *     stage under adopted4; writes playthroughs.md and .json and a page per story in stories/ (--turns stops each
  *     story after that many turns, the smoke; --report-only renders afresh without calls). --round 2: the second round
  *     on production's current code (the same four and two more, the player pressing Try again once where a turn fails
  *     twice, the judged options and results checks too), in the playthroughs-2 stage under adopted7; writes
- *     playthroughs-2.md and .json and its pages in stories/round2/
+ *     playthroughs-2.md and .json and its pages in stories/round2/. --round 3: the third round on production's code
+ *     after the fixes of 2026-10-01 (round 2's six, the mouse story's age through the read-with-kids setting), in the
+ *     playthroughs-3 stage under adopted22; writes playthroughs-3.md and .json and its pages in stories/round3/
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
@@ -416,8 +418,8 @@ type Args = {
   mergeFile?: string;
   /** --playthroughs --turns N: each story only to that many turns (the smoke) */
   turns?: number;
-  /** --playthroughs --round N: the round to play or render (1, the default, or 2) */
-  round?: 1 | 2;
+  /** --playthroughs --round N: the round to play or render (1, the default, 2 or 3) */
+  round?: 1 | 2 | 3;
   /** --frames nearer: the nearer chapter frames (the owner's feedback of 2026-09-28) for the backfill, the judge and a turn page */
   frames?: FrameSet;
   /** --chain-cases: the chapter-opening items' cases on a pairwise turn page (turns-r1b: the old page's four) */
@@ -528,7 +530,8 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--round": {
         const round = numberArg(arg, next());
-        if (round !== 1 && round !== 2) throw new UsageError("--round is 1 (the first playthroughs) or 2 (the second, on production's current code)");
+        if (round !== 1 && round !== 2 && round !== 3)
+          throw new UsageError("--round is 1 (the first playthroughs), 2 (the second) or 3 (the third, on production's code after the fixes of 2026-10-01)");
         args.round = round;
         break;
       }

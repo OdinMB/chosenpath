@@ -1,4 +1,4 @@
-import { PLAYTHROUGHS_2_PROMPT_STATE, RUNAWAY_PROMPT_STATE, type Stage } from "./arms.js";
+import { PLAYTHROUGHS_2_PROMPT_STATE, PLAYTHROUGHS_3_PROMPT_STATE, RUNAWAY_PROMPT_STATE, type Stage } from "./arms.js";
 import { DEFAULT_STAGE_CAPS, spentByStage } from "./budget.js";
 import { CHOICE_JUDGE_PROMPT_VERSION, OPTIONS_CHECK, RESULTS_CHECK, evidenceFrom as choiceEvidenceFrom, verdictFrom as choiceVerdictFrom } from "./choiceResultJudge.js";
 import { ENDING_JUDGE_PROMPT_VERSION, endingEvidenceFrom, endingVerdictFrom } from "./endingJudge.js";
@@ -6,7 +6,18 @@ import type { EvalFiles } from "./evalFiles.js";
 import { JUDGE_ARMS } from "./judgedChecks.js";
 import { readStory, renderPlaythroughReadings } from "./playthroughChecks.js";
 import { PLAYTHROUGH_REPORTS, indexPage, storyFileName, storyPage } from "./playthroughPages.js";
-import { PLAYTHROUGHS, PLAYTHROUGHS_2, playStory, playthroughArm, playthroughSetupInput, type JudgeTarget, type JudgedItem, type PlayRun, type PlaythroughSpec } from "./playthroughs.js";
+import {
+  PLAYTHROUGHS,
+  PLAYTHROUGHS_2,
+  PLAYTHROUGHS_3,
+  playStory,
+  playthroughArm,
+  playthroughSetupInput,
+  type JudgeTarget,
+  type JudgedItem,
+  type PlayRun,
+  type PlaythroughSpec,
+} from "./playthroughs.js";
 import { usable, type CallRecord } from "./runner.js";
 import { budgetedPrepCall, type PrepCallResult, type PrepCallSpec } from "./setupChainMode.js";
 import { STAGE_JUDGE_PROMPT_VERSION, stageEvidenceFrom, stageVerdictFrom } from "./stageJudge.js";
@@ -23,7 +34,11 @@ import type { SetupInput } from "./variants.js";
  * owner OK'd "a few more dollars to do useful playthroughs"): the same four
  * and two more in the playthroughs-2 stage under adopted7, production's
  * current code, the automated player pressing Try again once where a turn
- * fails twice. The stories play side by side, each call after the one before
+ * fails twice. Round 3 (--round 3, the coordinator's brief of 2026-10-01, the
+ * final playthroughs after the owner's decisions and that day's fixes): round
+ * 2's six premises in the playthroughs-3 stage under adopted22, the mouse
+ * story's age set through the read-with-kids setting, pages in stories/round3/.
+ * The stories play side by side, each call after the one before
  * it; the invocation never spends past the least of --max-spend, what the
  * stage's cap leaves and what the hard cap leaves, with the calls in flight
  * counted. After each story, the judged checks (Luna low): each chapter's
@@ -39,8 +54,10 @@ import type { SetupInput } from "./variants.js";
  */
 
 /** One round of playthroughs: its stage and tag, its stories, its files and pages, and how often the player presses Try again. */
+export type PlaythroughRoundNumber = 1 | 2 | 3;
+
 export type PlaythroughRound = {
-  round: 1 | 2;
+  round: PlaythroughRoundNumber;
   stage: Stage;
   promptState: string;
   specs: PlaythroughSpec[];
@@ -54,9 +71,10 @@ export type PlaythroughRound = {
   tryAgain: number;
 };
 
-export const PLAYTHROUGH_ROUNDS: Record<1 | 2, PlaythroughRound> = {
+export const PLAYTHROUGH_ROUNDS: Record<PlaythroughRoundNumber, PlaythroughRound> = {
   1: { round: 1, stage: "playthroughs", promptState: RUNAWAY_PROMPT_STATE, specs: PLAYTHROUGHS, fileBase: "playthroughs", pagesDir: "stories", report: PLAYTHROUGH_REPORTS[1], tryAgain: 0 },
   2: { round: 2, stage: "playthroughs-2", promptState: PLAYTHROUGHS_2_PROMPT_STATE, specs: PLAYTHROUGHS_2, fileBase: "playthroughs-2", pagesDir: "stories/round2", report: PLAYTHROUGH_REPORTS[2], tryAgain: 1 },
+  3: { round: 3, stage: "playthroughs-3", promptState: PLAYTHROUGHS_3_PROMPT_STATE, specs: PLAYTHROUGHS_3, fileBase: "playthroughs-3", pagesDir: "stories/round3", report: PLAYTHROUGH_REPORTS[3], tryAgain: 1 },
 };
 
 export const PLAYTHROUGH_STAGE: Stage = PLAYTHROUGH_ROUNDS[1].stage;

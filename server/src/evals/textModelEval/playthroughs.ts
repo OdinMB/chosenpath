@@ -5,6 +5,7 @@ import {
   type BeatOption,
   type BeatType,
   type GameMode,
+  type KidAges,
   type PlayerCount,
   type PlayerSlot,
   type ResolutionDetails,
@@ -25,7 +26,18 @@ import { beatReplyProblem, checkedBeatReply } from "../../game/services/beatChec
 import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { outcomeStatesAtEnding, type OutcomeState } from "../../game/services/endingStates.js";
-import { allowedLengths, chaptersThatFit, isLastChapter, lastChapterAfterSwitch, outcomeNeeds, pickedOutcome, stageOf, turnsLeft } from "../../game/services/pacing.js";
+import {
+  allowedLengths,
+  chaptersThatFit,
+  isLastChapter,
+  lastChapterAfterSwitch,
+  outcomeNeeds,
+  pacedLengths,
+  pickedOutcome,
+  stageOf,
+  switchPacingProblem,
+  turnsLeft,
+} from "../../game/services/pacing.js";
 import { checkSwitchPlan, checkThreadPlan, checkedSwitchPlan, checkedThreadPlan } from "../../game/services/planChecks.js";
 import { TURN_RESENDS, UnusableResultError, withOneRetry } from "../../game/services/retryOnce.js";
 import { resultsFollowed, scoreboardOf } from "../../game/services/scoreboards.js";
@@ -104,8 +116,12 @@ export type PlaythroughSpec = {
   id: string;
   /** A frozen setup premise (setupPremises.ts) */
   premiseId?: string;
-  /** A new premise in the same spirit: one of the site's own suggestions, merged as the client merges it (its category and fields; flexible when none) */
-  premise?: { text: string; playerCount: PlayerCount; gameMode: GameMode; source: string; category?: Category; fields?: Record<string, string> };
+  /**
+   * A new premise in the same spirit: one of the site's own suggestions, merged as the client merges it (its category and
+   * fields; flexible when none). `kidAges`: the read-with-kids setting the setup form sends beside the premise since
+   * 2026-10-01 (StoryInitializer, as the request's kidAges; it still merges the age line into the premise too)
+   */
+  premise?: { text: string; playerCount: PlayerCount; gameMode: GameMode; source: string; category?: Category; fields?: Record<string, string>; kidAges?: KidAges };
   maxTurns: number;
   tests: string;
 };
@@ -175,7 +191,26 @@ export const PLAYTHROUGHS_2: PlaythroughSpec[] = [
   },
 ];
 
-/** A playthrough's setup input: the frozen premise's text, or the new one as the client merges its suggestion (its category and fields), at the story's length; a read-with-kids story gets production's kids setup. */
+/**
+ * The third round (the coordinator's brief of 2026-10-01, the final playthroughs after the owner's decisions and that
+ * day's fixes): round 2's six premises again on production's current code, the mouse story's child's age set through the
+ * read-with-kids setting (the request's kidAges, as the setup form sends it since 2026-10-01) beside the premise, into
+ * which the client still merges the same age line, so its setup reads the same premise as round 2's.
+ */
+export const PLAYTHROUGHS_3: PlaythroughSpec[] = PLAYTHROUGHS_2.map((spec) =>
+  spec.id === "play-kids-mouse" && spec.premise
+    ? {
+        ...spec,
+        premise: {
+          ...spec.premise,
+          source: "the site's suggestions, read-with-kids, singlePlayer #1, age 5 set through the read-with-kids setting (client/src/page/data/suggestionData.ts)",
+          kidAges: { min: 5, max: 5 },
+        },
+      }
+    : spec
+);
+
+/** A playthrough's setup input: the frozen premise's text, or the new one as the client merges its suggestion (its category and fields), at the story's length; a read-with-kids story gets production's kids setup, with the read-with-kids setting where the spec sets one. */
 export function playthroughSetupInput(spec: PlaythroughSpec, premises = SETUP_PREMISES): SetupInput {
   if (spec.premiseId) {
     const frozen = premises.find((p) => p.id === spec.premiseId);
@@ -183,8 +218,9 @@ export function playthroughSetupInput(spec: PlaythroughSpec, premises = SETUP_PR
     return { premise: frozen.premise, playerCount: frozen.playerCount, gameMode: frozen.gameMode, maxTurns: spec.maxTurns, ...(frozen.tags.kids ? { kids: true } : {}) };
   }
   if (!spec.premise) throw new Error(`Playthrough ${spec.id}: no premise`);
-  const { text, playerCount, gameMode, category = "flexible", fields = {} } = spec.premise;
-  return { premise: buildMergedPrompt(category, fields, text), playerCount, gameMode, maxTurns: spec.maxTurns, ...(category === "read-with-kids" ? { kids: true } : {}) };
+  const { text, playerCount, gameMode, category = "flexible", fields = {}, kidAges } = spec.premise;
+  const kids = category === "read-with-kids";
+  return { premise: buildMergedPrompt(category, fields, text), playerCount, gameMode, maxTurns: spec.maxTurns, ...(kids ? { kids: true } : {}), ...(kids && kidAges ? { kidAges } : {}) };
 }
 
 /** Production's text settings with no env set: its code defaults, which apply once the text-model variables are deleted at merge. */
@@ -367,7 +403,11 @@ export type PlanPacing = {
   lastChapterLength?: number;
   /** A thread plan: the lengths PACING allows */
   allowedLengths?: number[];
-  /** A thread plan under a variant's own length rule (the late-pacing stage): the lengths it allows */
+  /**
+   * A thread plan: the lengths its PACING printed and its check read, production's paced ones (pacedLengths, since the
+   * pacing-clues adoption of 2026-10-01) or a variant's own rule (the late-pacing stage); runs recorded before that adoption
+   * hold it for a variant's rule only
+   */
   pacedLengths?: number[];
   /** Each seat's outcomes as PACING counts them */
   needs: { slot: string; id: string; recorded: number; intended: number; pending: number; stillNeeded: number; noChapterYet: boolean }[];
@@ -531,7 +571,10 @@ function turnKind(story: Story, next: BeatType, analysis: "switch" | "thread" | 
   return "chapter step";
 }
 
-function planPacing(story: Story, kind: "switch" | "thread", planLengths?: (story: Story) => number[]): PlanPacing {
+/** The lengths production's chapter planner is given and its plan check reads where no variant brings its own (checkedThreadPlan's default). */
+const productionLengths = (story: Story) => pacedLengths(story).lengths;
+
+function planPacing(story: Story, kind: "switch" | "thread", planLengths: (story: Story) => number[] = productionLengths): PlanPacing {
   const left = turnsLeft(story);
   const needs = story.getPlayerSlots().flatMap((slot) =>
     outcomeNeeds(story, slot, kind === "switch").map((n) => ({
@@ -548,7 +591,7 @@ function planPacing(story: Story, kind: "switch" | "thread", planLengths?: (stor
     const last = lastChapterAfterSwitch(left);
     return { turnsLeft: left, lastChapter: last !== undefined, threadsFit: chaptersThatFit(left), ...(last !== undefined ? { lastChapterLength: last } : {}), needs };
   }
-  return { turnsLeft: left, lastChapter: isLastChapter(left), allowedLengths: allowedLengths(left), ...(planLengths ? { pacedLengths: planLengths(story) } : {}), needs };
+  return { turnsLeft: left, lastChapter: isLastChapter(left), allowedLengths: allowedLengths(left), pacedLengths: planLengths(story), needs };
 }
 
 /** The option of a topic switch whose direction pushes the outcome: its structured direction, else the direction text naming the id. */
@@ -797,8 +840,9 @@ export async function playStory(
           : checkThreadPlan(before, parsed as ThreadAnalysis, { lengths: true, ...(options.planLengths ? { allowedLengths: options.planLengths } : {}) });
       if (result.problem) log.problem = result.problem;
       if (result.lengthProblem) log.lengthProblem = result.lengthProblem;
-      // A switch plan a variant's pacing rule finds wanting: the soft problem, as the checked call reads it
-      const pacing = kind === "switch" && !result.problem ? options.switchProblem?.(before, result.plan as SwitchAnalysis) : undefined;
+      // A switch plan the pacing rule finds wanting (a variant's, else production's own, checkedSwitchPlan's default since
+      // 2026-10-01): the soft problem, as the checked call reads it
+      const pacing = kind === "switch" && !result.problem ? (options.switchProblem ?? switchPacingProblem)(before, result.plan as SwitchAnalysis) : undefined;
       if (pacing) log.lengthProblem = pacing;
       log.repairs = result.repairs.map(repairLine);
     };

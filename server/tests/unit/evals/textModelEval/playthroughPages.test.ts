@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { indexPage, storyFileName, storyPage } from "../../../../src/evals/textModelEval/playthroughPages.js";
-import { PLAYTHROUGHS, PLAYTHROUGHS_2, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
+import { PLAYTHROUGHS, PLAYTHROUGHS_2, PLAYTHROUGHS_3, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { beatSet, SIX_PARAGRAPHS, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
@@ -168,5 +168,50 @@ describe("indexPage and file names", () => {
     expect(html).toContain('href="../index.html"');
     expect(html).toContain("2026-09-30_playthroughs-2-report.md");
     expect(indexPage([run], new Date(0))).toContain("<h1>One story on production's own code</h1>");
+  });
+
+  it("titles round 3's index by its round, links both earlier rounds' pages and names round 3's report", async () => {
+    const run = { ...(await played()), round: 3 };
+    const html = indexPage([run], new Date("2026-10-01T20:00:00Z"), 3);
+    expect(html).toContain("<h1>Round 3: one story on production's current code</h1>");
+    expect(html).toContain('href="../index.html"');
+    expect(html).toContain('href="../round2/index.html"');
+    expect(html).toContain("2026-10-01_playthroughs-3-report.md");
+    expect(storyPage(run)).toContain("2026-10-01_playthroughs-3-report.md");
+  });
+});
+
+describe("storyPage: round 3's readings (a child's age band, the owner's roll, the pacing)", () => {
+  it("shows, under each turn of a story read with a child, how it reads against the band's limits", async () => {
+    const { call } = fakeCall(1);
+    const { run } = await playStory(PLAYTHROUGHS_3[5], { ...input(1), kids: true, kidAges: { min: 5, max: 5 } }, call, { sample: 1 });
+    const html = storyPage({ ...run, round: 3 });
+    const turn1 = html.slice(html.indexOf('id="turn-1"'), html.indexOf("</article>", html.indexOf('id="turn-1"')));
+    expect(turn1).toMatch(/For a child aged 5 \(the 3-5 band\): \d+ words, \d+\.\d words a sentence, grade -?\d+\.\d: (within|outside) the band&#39;s limits/);
+    expect(html).toContain("Read with a child aged 5 (the 3-5 band)");
+    // Not on a grown-up story
+    expect(storyPage(await played())).not.toContain("For a child aged");
+  });
+
+  it("flags a group step on a player's own outcome that went another way than the owner's roll, and lists the pacing among the readings", async () => {
+    const { call } = fakeCall(2, {
+      reply: (role, nth) => {
+        if (role !== "thread" || nth !== 1) return DEFAULT;
+        const plan = threadAnalysis("challenge", 2, 0, ["player1", "player2"]);
+        return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "player2_main", title: "Luz's Trial" }] };
+      },
+    });
+    const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1 });
+    const html = storyPage(run);
+    expect(html).toContain("the owner&#39;s roll decided 2 of 2");
+    expect(html).not.toContain("went another way than the owner");
+    expect(html).toContain("Pacing: the last chapter keeps a milestone to settle");
+    // As production pooled the rolls before 2026-10-01
+    const pooled = structuredClone(run);
+    const phase = pooled.end?.storyPhases.find((p) => "threads" in p && p.firstBeatIndex === 5);
+    if (!phase || !("threads" in phase)) throw new Error("no second chapter");
+    const own = run.turns.find((t) => t.turn === 6)?.picks.find((p) => p.slot === "player2")?.resolution;
+    phase.threads[0].progression[0].resolution = (own === "mixed" ? "favorable" : "mixed") as never;
+    expect(storyPage(pooled)).toContain("The step went another way than the owner&#39;s own roll, on the owner&#39;s own outcome.");
   });
 });

@@ -1,11 +1,26 @@
 import type { Outcome, Stat, StatValueEntry, StoryState, Switch, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import { playerParagraphs } from "./playerText.js";
-import { chargedAgainLine, choiceLine, fixesLine, ownStatsLine, readStory, resentLine, scoreboardLine, type ChapterReading, type GroupStepReading, type StoryReadings } from "./playthroughChecks.js";
+import {
+  chargedAgainLine,
+  choiceLine,
+  fixesLine,
+  kidsLine,
+  kidsWho,
+  ownStatsLine,
+  ownersRollLine,
+  pacingLine,
+  readStory,
+  resentLine,
+  scoreboardLine,
+  type ChapterReading,
+  type GroupStepReading,
+  type StoryReadings,
+} from "./playthroughChecks.js";
 import type { PlayPick, PlayRun, PlayTurn } from "./playthroughs.js";
 import { contextLinesHtml, escapeHtml } from "./ratingHtml.js";
 
 /** Each round's hand-read report, in the output folder (the pages point to it). */
-export const PLAYTHROUGH_REPORTS: Record<number, string> = { 1: "2026-09-30_playthroughs-report.md", 2: "2026-09-30_playthroughs-2-report.md" };
+export const PLAYTHROUGH_REPORTS: Record<number, string> = { 1: "2026-09-30_playthroughs-report.md", 2: "2026-09-30_playthroughs-2-report.md", 3: "2026-10-01_playthroughs-3-report.md" };
 
 const reportOf = (round: number | undefined) => `DOCS/2026-09-26_gpt6-text-eval/${PLAYTHROUGH_REPORTS[round ?? 1] ?? PLAYTHROUGH_REPORTS[1]}`;
 
@@ -23,8 +38,11 @@ const reportOf = (round: number | undefined) => `DOCS/2026-09-26_gpt6-text-eval/
  * stats over the story; and the code's readings (playthroughChecks.ts). Since
  * round 2 a page also says where production sent a failed turn again (the
  * queue's resend, the player's Try again) and shows the judged options and
- * results checks. Every story string goes through escapeHtml. No rating page:
- * one version, no blinding.
+ * results checks. Since round 3 a page also flags a group step on a player's
+ * own outcome that went another way than the owner's roll, shows under each
+ * turn of a story read with a child how it reads against the band's limits,
+ * and lists the pacing among the readings. Every story string goes through
+ * escapeHtml. No rating page: one version, no blinding.
  */
 
 const e = escapeHtml;
@@ -333,7 +351,8 @@ function pickLine(pick: PlayPick, step: GroupStepReading | undefined): string {
   const used = step && step.result !== null && step.result !== pick.resolution ? ` The step's result for everyone in the thread: <strong>${e(step.result)}</strong>.` : "";
   const overridden =
     step?.ownerOverridden && step.owner === pick.slot ? ` <span class="flag">The game used another result: another player's choice decided this step, on this player's own outcome.</span>` : "";
-  return `<p class="pick"><strong>Chosen</strong> (the player's policy: ${e(pick.rule)}, ${e(pick.why)}). Its own result: <strong>${e(pick.resolution ?? "–")}</strong>${e(odds)}.${used}${overridden}${repicked}</p>`;
+  const notOwners = step?.ownersRoll === "not counted" && step.owner === pick.slot ? ` <span class="flag">${e("The step went another way than the owner's own roll, on the owner's own outcome.")}</span>` : "";
+  return `<p class="pick"><strong>Chosen</strong> (the player's policy: ${e(pick.rule)}, ${e(pick.why)}). Its own result: <strong>${e(pick.resolution ?? "–")}</strong>${e(odds)}.${used}${overridden}${notOwners}${repicked}</p>`;
 }
 
 function beatBlock(run: PlayRun, turn: PlayTurn, slot: string, readings: StoryReadings): string {
@@ -359,9 +378,18 @@ function beatBlock(run: PlayRun, turn: PlayTurn, slot: string, readings: StoryRe
     : judged.verdict === false
       ? `<p class="flag">Judged: the options don't each carry out the result at their position${judged.evidence ? ` (${e(judged.evidence)})` : ""}</p>`
       : `<p class="muted">Judged: ${judged.verdict ? "each option carries out the result at its position" : "no answer"}${judged.evidence ? ` (${e(judged.evidence)})` : ""}</p>`;
+  // A story read with a child: this text against its age band's limits
+  const read = readings.kids?.turns.find((t) => t.turn === turn.turn && t.slot === slot);
+  const kids =
+    readings.kids && read
+      ? `<p class="${read.passes ? "muted" : "flag"}">${e(
+          `For ${kidsWho(readings.kids)}: ${read.words} words, ${read.wordsPerSentence.toFixed(1)} words a sentence, grade ${read.grade.toFixed(1)}: ${read.passes ? "within" : "outside"} the band's limits.`
+        )}</p>`
+      : "";
   return `<div class="beat">
 <h4>${multi ? `${e(nameOf(run.start, slot))}: ` : ""}${e(asString(beat.title))}</h4>
 ${prose(asString(beat.text))}
+${kids}
 ${options.length ? `<ol class="options">${optionItems}</ol>` : ending ? "" : `<p class="flag">No options: the player could not go on.</p>`}
 ${verdict}
 ${interludes.length ? `<details><summary>Shown while the next turn was written</summary><ul>${interludes.map((i) => `<li>${e(asString(i.text))}</li>`).join("")}</ul></details>` : ""}
@@ -463,7 +491,12 @@ function readingsSection(run: PlayRun, readings: StoryReadings): string {
     `Ends on its turn count: ${r.endsOnTurnCount.ok ? "yes" : "no"} (${r.endsOnTurnCount.turnsBeforeEnding} turns${r.endsOnTurnCount.endingTurn ? `, the ending at turn ${r.endsOnTurnCount.endingTurn}` : ", no ending"}).`,
     `Chapters: ${r.chapters.length}; lengths PACING allows: ${r.chapters.filter((c) => c.lengthAllowed).length} of ${r.chapters.length}; milestones that landed on their outcome: ${r.chapters.flatMap((c) => c.threads).filter((t) => t.milestoneLanded).length} of ${r.chapters.flatMap((c) => c.threads).length}.`,
     `Late pacing: ${r.latePacing.filter((p) => p.binding).length} of ${r.latePacing.length} switches bind; at those, the next chapter pushed an outcome that still needed milestones: ${r.latePacing.filter((p) => p.binding && p.nextNeeded).length}.`,
-    `Sacrifices and rewards against the owner's rule: ${r.leverFlags.length ? r.leverFlags.map((f) => `chapter ${f.chapter} (${f.slot}): ${f.rule} at turn ${f.turns.join(", ")}`).join("; ") : "no chapter offered a second reward or sacrifice"}.`,
+    pacingLine(r),
+    `Sacrifices and rewards against the owner's rule: ${
+      r.leverFlags.length
+        ? r.leverFlags.map((f) => `chapter ${f.chapter} (${f.slot}): ${f.rule} at turn ${f.turns.join(", ")}`).join("; ")
+        : `no chapter offered a second reward or sacrifice${r.players === 1 ? " or a reward after its first step" : ""}, and none offered rewards in consecutive chapters`
+    }.`,
     `Levers the player took, paid on the next turn: ${r.leversPaid.counts.applied} of ${Object.values(r.leversPaid.counts).reduce((a, b) => a + b, 0)}${
       r.leversPaid.counts.sharedOnce ? `; ${r.leversPaid.counts.sharedOnce} more rode on one change of a shared stat that paid another player's (${r.leversPaid.sharedOnce.map((s) => `turn ${s.turn}, ${s.stat}`).join("; ")})` : ""
     }.`,
@@ -473,11 +506,13 @@ function readingsSection(run: PlayRun, readings: StoryReadings): string {
       ? [
           `Group exploration steps where another player's choice decided the owner's own outcome: ${r.groupSteps.filter((s) => s.ownerOverridden).map((s) => `turn ${s.turn}`).join(", ") || "none"} (of ${r.groupSteps.filter((s) => s.kind === "exploration").length} group exploration steps).`,
           `Switch picks the next chapter did not follow: ${r.switchPicks.filter((p) => !p.kept).map((p) => `turn ${p.turn} (${p.slot})`).join(", ") || "none"} (of ${r.switchPicks.length}).`,
+          ownersRollLine(r) ?? "",
         ]
       : []),
+    ...(r.kids ? [kidsLine(r) ?? ""] : []),
     ...(r.repairs.stuckTurns.length ? [`Turns production could not get past (the harness asked the planner again): ${r.repairs.stuckTurns.map((s) => `turn ${s.turn} (${s.kind})`).join(", ")}.`] : []),
     `Turns production sent again: ${r.repairs.resentTurns.length ? r.repairs.resentTurns.map(resentLine).join("; ") : "none"}.`,
-    `Production's fixes of 2026-09-30 that fired: ${fixesLine(r)}.`,
+    `Production's fixes that fired: ${fixesLine(r)}.`,
     `Repairs: plans retried ${r.repairs.planRetries.length}, one-paragraph turns retried ${r.repairs.shortTextRetries.length} (the retry one paragraph too and used: ${r.repairs.shortTextUsedAsIs.length}), turns without options retried ${r.repairs.optionsRetries.length}, calls re-sent ${r.repairs.resends.length}, beat repairs ${Object.values(r.repairs.beatRepairs).reduce((a, b) => a + b, 0)}.`,
     ownStatsLine(r),
     scoreboardLine(r),
@@ -533,7 +568,12 @@ export function indexPage(runs: PlayRun[], generatedAt: Date, round = 1): string
     .join("");
   const count = `${COUNT_WORDS[runs.length] ?? String(runs.length)} ${runs.length === 1 ? "story" : "stories"}`;
   const heading = round > 1 ? `Round ${round}: ${count} on production's current code` : `${count[0].toUpperCase()}${count.slice(1)} on production's own code`;
-  const earlier = round > 1 ? `<p class="muted">The first round's pages, played before the fixes since (production's code of the morning of 30 September): <a href="../index.html">round 1</a>.</p>` : "";
+  const earlier =
+    round > 2
+      ? `<p class="muted">The earlier rounds' pages, played before the fixes since: <a href="../index.html">round 1</a> (production's code of the morning of 30 September) and <a href="../round2/index.html">round 2</a> (its code of the evening of 30 September).</p>`
+      : round > 1
+        ? `<p class="muted">The first round's pages, played before the fixes since (production's code of the morning of 30 September): <a href="../index.html">round 1</a>.</p>`
+        : "";
   const body = `<header>
 <p class="kicker">Whole-story playthroughs${round > 1 ? `, round ${round}` : ""}</p>
 <h1>${heading}</h1>

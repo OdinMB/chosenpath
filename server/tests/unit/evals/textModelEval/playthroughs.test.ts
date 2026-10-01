@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { GameModes, type BeatOption } from "core/types/index.js";
 import { withBeatProblem } from "../../../../src/game/services/beatChecks.js";
-import { withPlanProblem } from "../../../../src/game/services/planChecks.js";
+import { pacedLengths, switchPacingProblem } from "../../../../src/game/services/pacing.js";
+import { checkSwitchPlan, withPlanProblem } from "../../../../src/game/services/planChecks.js";
 import { TURN_RESENDS } from "../../../../src/game/services/retryOnce.js";
+import { replayRun } from "../../../../src/evals/textModelEval/playthroughReplay.js";
 import { SETUP_PREMISES, buildMergedPrompt } from "../../../../src/evals/textModelEval/setupPremises.js";
 import {
   PLAYTHROUGHS,
   PLAYTHROUGHS_2,
+  PLAYTHROUGHS_3,
   START_POLICY,
   countedBonus,
   nextPolicy,
@@ -101,6 +104,22 @@ describe("the four playthroughs", () => {
     expect(storyFromSetup({}, { ...mouse, kidAges: { min: 10, max: 10 } }, "mouse-story").kidAges).toEqual({ min: 10, max: 10 });
     const lemonade = storyFromSetup({}, playthroughSetupInput(PLAYTHROUGHS[0]), "lemonade-story");
     expect([lemonade.category, lemonade.kidAges]).toEqual([undefined, undefined]);
+  });
+
+  it("plays round 3 on round 2's six premises, the story read with a child given its age through the read-with-kids setting (since 2026-10-01)", () => {
+    expect(PLAYTHROUGHS_3.map((p) => [p.id, p.maxTurns])).toEqual(PLAYTHROUGHS_2.map((p) => [p.id, p.maxTurns]));
+    const now = PLAYTHROUGHS_3.map((p) => playthroughSetupInput(p));
+    const then = PLAYTHROUGHS_2.map((p) => playthroughSetupInput(p));
+    // Round 2's setups, input for input, all but the mouse story's
+    expect(now.slice(0, 5)).toEqual(then.slice(0, 5));
+    // The setup form sends the setting beside the premise, into which it still merges the age line (StoryInitializer): round
+    // 2's premise, and the ages as the setting
+    const mouse = now[5];
+    expect(PLAYTHROUGHS_3[5].premise?.kidAges).toEqual({ min: 5, max: 5 });
+    expect(mouse).toEqual({ ...then[5], kidAges: { min: 5, max: 5 } });
+    expect(mouse.premise).toBe(then[5].premise);
+    // The story records the setting, as StoryCreationService does
+    expect(storyFromSetup({}, mouse, "mouse-story").kidAges).toEqual({ min: 5, max: 5 });
   });
 
   it("plays every call on production's own code (adopted) and production's settings for the role and player count", () => {
@@ -330,6 +349,35 @@ describe("playStory: a whole story as the game plays it", () => {
     const first = calls.find((c) => c.caseId === planned?.calls[0].caseId);
     expect(requestText(retry?.request as never)).toBe(withPlanProblem(requestText(first?.request as never), planned?.calls[0].problem as string));
     expect(run.complete).toBe(true);
+  });
+
+  it("records the paced lengths production's chapter planner is given, and the pacing problem its switch plan check asks once more over (since 2026-10-01)", async () => {
+    // The last switch (turn 8, one chapter left) offers the complete main outcome while the side one still needs its milestone
+    const onMain = () => {
+      const base = switchAnalysis(["player1"]);
+      return { ...base, switches: [{ ...base.switches[0], type: "flavor", outcomeId: "player1_main", question: "Again?", topicChoices: [] }] };
+    };
+    const { call } = fakeCall(1, { reply: (role, nth) => (role === "switch" && nth === 2 ? onMain() : DEFAULT) });
+    const { run } = await playStory(spec, input(1), call, { sample: 1 });
+    expect(run.complete).toBe(true);
+    const replayed = replayRun(run);
+    const switchPlan = run.turns.find((t) => t.turn === 8)?.plan;
+    const before = replayed.find((r) => r.turn === 8)?.beforePlan;
+    if (!switchPlan || !before) throw new Error("no switch plan at turn 8");
+    // Production's check (checkedSwitchPlan, switchPacingProblem by default) asked once more; the record says why
+    expect(switchPlan.calls).toHaveLength(2);
+    expect(switchPlan.calls[0].lengthProblem).toBe(switchPacingProblem(before, checkSwitchPlan(before, onMain() as never).plan));
+    expect(switchPlan.calls[0].lengthProblem).toMatch(/player1 still needs/);
+    expect(switchPlan.calls[1].retry).toBe(true);
+    expect(switchPlan.calls[1].lengthProblem).toBeUndefined();
+    // Each chapter plan records the lengths production's PACING printed for it (pacedLengths)
+    const chapterPlans = run.turns.filter((t) => t.plan?.kind === "chapter plan");
+    expect(chapterPlans).toHaveLength(3);
+    for (const turn of chapterPlans) {
+      const story = replayed.find((r) => r.turn === turn.turn)?.beforePlan;
+      if (!story) throw new Error(`no story before turn ${turn.turn}`);
+      expect(turn.plan?.pacing.pacedLengths).toEqual(pacedLengths(story).lengths);
+    }
   });
 
   const unusablePlan = () => {

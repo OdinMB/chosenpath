@@ -1,5 +1,5 @@
 import { Story } from "core/models/Story.js";
-import type { SetOfBeatGenerationSchema, Stat, StoryState, Switch, SwitchAnalysis, Thread, ThreadAnalysis } from "core/types/index.js";
+import { kidAgesFrom, kidAgesFromPremise, kidsBandOf, type KidAges, type KidsBand, type SetOfBeatGenerationSchema, type Stat, type StoryState, type Switch, type SwitchAnalysis, type Thread, type ThreadAnalysis } from "core/types/index.js";
 import { getThreadType, type ThreadType } from "core/types/thread.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import type { OutcomeState } from "../../game/services/endingStates.js";
@@ -8,6 +8,8 @@ import { chaptersThatFit } from "../../game/services/pacing.js";
 import { scoreboardOf } from "../../game/services/scoreboards.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { percentile } from "./armStats.js";
+import { KIDS_BAND_LIMITS, readabilityOf, readsForBand } from "./kidsReadability.js";
+import { readLatePacing } from "./latePacingPlay.js";
 import type { LeverReading, LeverStatus } from "./ratingMechanics.js";
 import { playRunId, playthroughArm, turnCalls, type JudgedItem, type PlayCallLog, type PlayPlan, type PlayRun, type PlayTurn } from "./playthroughs.js";
 import { replayRun } from "./playthroughReplay.js";
@@ -32,11 +34,16 @@ import { allowanceFor, type TurnKind } from "./turnWaits.js";
  * levers counted once; stat changes that don't fit their stat; whether each
  * player's own stats moved; each contest scoreboard's move against the result
  * it follows (both since round 2); what production's repairs, retries,
- * re-sends and resends of a failed turn did, and which of its fixes of
- * 2026-09-30 fired; the turn design checks that failed; the judged options
- * and results checks; the ending's outcomes as its milestones leave them,
- * with the judged checks; waits per turn kind against their allowances, and
- * the turns left out of them; cost.
+ * re-sends and resends of a failed turn did, and which of its fixes fired;
+ * the turn design checks that failed; the judged options and results checks;
+ * the ending's outcomes as its milestones leave them, with the judged checks;
+ * waits per turn kind against their allowances, and the turns left out of
+ * them; cost. Since round 3 (2026-10-01): whether a group challenge or contest
+ * step on one player's own outcome went the owner's roll's way (the owner's
+ * decision of that day), a single player's reward after a chapter's first step
+ * and rewards in consecutive chapters (O2c's placement), the story's pacing as
+ * the pacing-clues stage read it (readLatePacing), and a story read with a
+ * child against its age band's limits, turn by turn (kidsReadability.ts).
  */
 
 export type ThreadReading = {
@@ -88,7 +95,18 @@ export type ChapterReading = {
   levers: LeverTally[];
 };
 
-export type LeverFlag = { chapter: number; slot: string; rule: "second reward" | "second sacrifice"; turns: number[] };
+/**
+ * A chapter's levers against the owner's rule: a second reward or sacrifice offered (the reason a second sacrifice states
+ * is read by hand); since round 3 a single player's reward after the chapter's first step (O2c places it on the reward turn,
+ * the chapter's first step, since 2026-10-01) and a reward in a chapter right after one that offered one (O2c's "never two
+ * chapters running"; a group's B6 rate line doesn't hold it, so for groups it reads the gap the review found)
+ */
+export type LeverFlag = {
+  chapter: number;
+  slot: string;
+  rule: "second reward" | "second sacrifice" | "reward after the chapter's first step" | "reward in consecutive chapters";
+  turns: number[];
+};
 
 export type OutcomeTrack = {
   id: string;
@@ -128,7 +146,8 @@ export type WaitReading = { kind: TurnKind; turns: number; p50S?: number; p95S?:
  * first player's). A challenge or contest step combines everyone's rolls by
  * design on a shared outcome; on one player's own outcome, with the owner in
  * the thread, production reads the owner's roll alone since 2026-10-01 (the
- * owner's decision, ThreadResolutionService.rollingSides).
+ * owner's decision, ThreadResolutionService.rollingSides): `ownersRoll` says
+ * whether the step's result is the one the owner's roll alone gives.
  */
 export type GroupStepReading = {
   turn: number;
@@ -143,6 +162,12 @@ export type GroupStepReading = {
   picks: { slot: string; option: number; resolution: string | null }[];
   result: string | null;
   ownerOverridden: boolean;
+  /**
+   * A challenge or contest step on one player's own outcome, the owner in the thread and their roll made: whether the
+   * step's result is the one the owner's roll alone gives (a challenge: the owner's own result; a contest: the owner's side
+   * on a favorable roll, the other on an unfavorable one, mixed on mixed); undefined elsewhere (rolls pool)
+   */
+  ownersRoll?: "counted" | "not counted";
 };
 
 /**
@@ -215,20 +240,41 @@ export type ScoreboardMove = {
   repaired: boolean;
 };
 
-/** Production's fixes of 2026-09-30 that show in its repairs, by kind: the turns each fired at. */
+/** Production's fixes that show in its repairs (those of 2026-09-30, and since round 3 those of 2026-10-01), by kind: the turns each fired at. */
 export const FIX_LABELS = {
   lastStepRepeated: "last step written twice, the copy dropped",
   lastStepRepeatedKept: "last step written twice, kept (dropping it would break the plan)",
   contestOneSided: "a contest with one side's players made their challenge",
+  contestInCooperative: "a contest in a cooperative story made the group's shared challenge",
   threadKeptOnPick: "a player written into two threads kept in the one they picked",
   scoreboardDirection: "a scoreboard move turned toward the side that won",
   sharedLeverRepeated: "a shared sacrifice or reward kept to one player",
   leverChargedAgain: "a sacrifice or reward charged again on the turn after its payment, dropped",
+  milestoneNotPlayed: "a milestone on an outcome no chapter that just ended pushed, dropped",
 } as const;
 export type FixKind = keyof typeof FIX_LABELS;
 
 /** A judged check on an option set (a player at an exploration step) or a chapter plan's results. */
 export type ChoiceJudged = { turn: number; slot: string; verdict?: boolean; evidence?: string; lines: string[] };
+
+/** A switch plan read against PACING (switchPacingReading), and whether production asked once more over the pacing. */
+export type SwitchPacing = { turn: number; fit: number; completeWhileNeeded: boolean; spare: boolean; keepsLast?: boolean; retried: boolean };
+
+/**
+ * The story's pacing as the pacing-clues stage read its short playthroughs (readLatePacing): whether the last chapter keeps
+ * a milestone to settle (undefined where it was never planned), the chapters before it whose every thread is an aftermath,
+ * the milestones left unfinished once it settles its stages, and each switch against PACING.
+ */
+export type PacingSummary = { lastChapterSettles?: boolean; aftermathsBeforeLast: number; leftUnfinished: number; switches: SwitchPacing[] };
+
+/** One player's turn read with a child: its length and plainness (readabilityOf), and whether it is within its band's limits (readsForBand). */
+export type KidsTurnReading = { turn: number; slot: string; words: number; paragraphs: number; wordsPerSentence: number; grade: number; passes: boolean };
+
+/**
+ * A story read with a child: the children's ages as the story records them (its read-with-kids setting; a run stored
+ * before it, the premise's age line; none: production's 6-8 band), the band, every turn the child hears, the ending's too.
+ */
+export type KidsReading = { ages: string | undefined; band: KidsBand; turns: KidsTurnReading[]; passed: number };
 
 export type StoryReadings = {
   id: string;
@@ -256,8 +302,12 @@ export type StoryReadings = {
   ownStats: OwnStatReading[];
   /** Each contest scoreboard's moves against the results they follow */
   scoreboard: ScoreboardMove[];
-  /** Production's fixes of 2026-09-30 that fired, by kind */
+  /** Production's fixes that fired, by kind */
   fixes: Record<FixKind, number[]>;
+  /** The story's pacing (undefined: the run could not be replayed) */
+  pacing?: PacingSummary;
+  /** A story read with a child, turn by turn against its age band */
+  kids?: KidsReading;
   /** The judged options check per player at an exploration step, and the results check per chapter plan (label: the plan's outcomes) */
   choices: { options: ChoiceJudged[]; results: ChoiceJudged[] };
   repairs: {
@@ -330,7 +380,9 @@ function chapterReadings(run: PlayRun): ChapterReading[] {
     const lastTurn = firstTurn + duration - 1;
     const endedAt = lastTurn + 1;
     const after = byTurn.get(endedAt);
-    const allowed = planned.pacing.allowedLengths ?? [];
+    // The lengths the plan's PACING printed and its check read: production's paced ones where the run recorded them (since
+    // 2026-10-01), else the allowed ones
+    const allowed = planned.pacing.pacedLengths ?? planned.pacing.allowedLengths ?? [];
     const phase = resolvedPhase(run, firstTurn);
     const threads = plan.threads.map((thread: Thread, i): ThreadReading => {
       const stage = planned.stages?.[i];
@@ -464,6 +516,18 @@ function ownerOf(state: StoryState | undefined, outcomeId: string): string {
   return Object.entries(state.players).find(([, player]) => (player.outcomes ?? []).some((o) => o.id === outcomeId))?.[0] ?? "shared";
 }
 
+/**
+ * The result the owner's roll alone gives a challenge or contest step (ThreadResolutionService with the owner as the only
+ * roller): a challenge, the owner's own result; a contest, the owner's side on a favorable roll, the other side on an
+ * unfavorable one, mixed on mixed.
+ */
+export function ownersRollResult(kind: ThreadType, ownersResult: string, ownerOnSideA: boolean): string {
+  if (kind !== "contest") return ownersResult;
+  if (ownersResult === "mixed") return "mixed";
+  const ownSideWins = ownersResult === "favorable";
+  return ownSideWins === ownerOnSideA ? "sideAWins" : "sideBWins";
+}
+
 /** Every step of each group chapter's threads that hold two or more players: each choice, and the result the game used. */
 function groupStepReadings(run: PlayRun, chapters: ChapterReading[]): GroupStepReading[] {
   const byTurn = new Map(run.turns.map((t) => [t.turn, t]));
@@ -481,6 +545,10 @@ function groupStepReadings(run: PlayRun, chapters: ChapterReading[]): GroupStepR
         const picks = (byTurn.get(turn)?.picks ?? []).filter((p) => players.includes(p.slot)).map((p) => ({ slot: p.slot, option: p.option, resolution: p.resolution }));
         const result = resolved?.progression[k]?.resolution ?? null;
         const ownersPick = picks.find((p) => p.slot === owner);
+        // On one player's own outcome, the owner in the thread and rolled: the owner's roll alone decides (since 2026-10-01)
+        const rolled = (kind === "challenge" || kind === "contest") && ownersPick?.resolution && result !== null;
+        const ownersRoll =
+          rolled && ownersPick?.resolution ? (ownersRollResult(kind, ownersPick.resolution, thread.playersSideA.includes(owner)) === result ? ("counted" as const) : ("not counted" as const)) : undefined;
         return {
           turn,
           chapter: chapter.index,
@@ -492,6 +560,7 @@ function groupStepReadings(run: PlayRun, chapters: ChapterReading[]): GroupStepR
           picks,
           result,
           ownerOverridden: kind === "exploration" && ownersPick !== undefined && result !== null && ownersPick.resolution !== result,
+          ...(ownersRoll ? { ownersRoll } : {}),
         };
       });
     });
@@ -790,7 +859,7 @@ function scoreboardReadings(run: PlayRun): ScoreboardMove[] {
   return moves;
 }
 
-/** The turns each of production's fixes of 2026-09-30 fired at: the plan check's (the plan the turn kept) and the beat repairs'. */
+/** The turns each of production's fixes fired at: the plan check's (the plan the turn kept) and the beat repairs'. */
 function fixReadings(run: PlayRun): Record<FixKind, number[]> {
   const fixes = Object.fromEntries(Object.keys(FIX_LABELS).map((kind) => [kind, [] as number[]])) as Record<FixKind, number[]>;
   for (const turn of run.turns) {
@@ -810,17 +879,73 @@ function choiceReadings(run: PlayRun): StoryReadings["choices"] {
   return { options: of("options"), results: of("results") };
 }
 
+/** Each chapter's levers against the owner's rule (LeverFlag); a reward after the chapter's first step reads a single player only. */
+function leverFlagReadings(run: PlayRun, chapters: ChapterReading[]): LeverFlag[] {
+  const single = run.input.playerCount === 1;
+  return chapters.flatMap((chapter, i) =>
+    chapter.levers.flatMap((tally): LeverFlag[] => {
+      const flag = (rule: LeverFlag["rule"], turns: number[]): LeverFlag[] => [{ chapter: chapter.index, slot: tally.slot, rule, turns }];
+      const late = tally.rewardTurns.filter((t) => t > chapter.firstTurn);
+      const before = i > 0 ? chapters[i - 1].levers.find((l) => l.slot === tally.slot) : undefined;
+      return [
+        ...(tally.rewardSets > 1 ? flag("second reward", tally.rewardTurns.slice(1)) : []),
+        ...(tally.sacrificeSets > 1 ? flag("second sacrifice", tally.sacrificeTurns.slice(1)) : []),
+        ...(single && late.length ? flag("reward after the chapter's first step", late) : []),
+        ...(tally.rewardSets > 0 && (before?.rewardSets ?? 0) > 0 ? flag("reward in consecutive chapters", tally.rewardTurns) : []),
+      ];
+    })
+  );
+}
+
+/** The story's pacing as the pacing-clues stage read it (readLatePacing); undefined where the run can't be replayed. */
+function pacingSummary(run: PlayRun): PacingSummary | undefined {
+  try {
+    const read = readLatePacing(run);
+    return {
+      ...(read.lastChapterSettles !== undefined ? { lastChapterSettles: read.lastChapterSettles } : {}),
+      aftermathsBeforeLast: read.aftermathsBeforeLast,
+      leftUnfinished: read.leftUnfinished,
+      switches: read.switches.map(({ turn, reading, retried }) => ({
+        turn,
+        fit: reading.fit,
+        completeWhileNeeded: reading.completeWhileNeeded,
+        spare: reading.spare,
+        ...(reading.keepsLast !== undefined ? { keepsLast: reading.keepsLast } : {}),
+        retried,
+      })),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+const agesText = (ages: KidAges) => (ages.min === ages.max ? `${ages.min}` : `${ages.min}-${ages.max}`);
+
+/** A story read with a child, turn by turn against the band of the ages it records (its setting, else its premise's line, else production's 6-8). */
+function kidsReadings(run: PlayRun): KidsReading | undefined {
+  if (!run.input.kids && run.start?.category !== "read-with-kids") return undefined;
+  const ages = kidAgesFrom(run.start?.kidAges) ?? kidAgesFrom(run.input.kidAges) ?? kidAgesFromPremise(run.input.premise);
+  const band = ages ? kidsBandOf(ages) : "6-8";
+  const slots = Object.keys(run.start?.players ?? {});
+  const turns = run.turns.flatMap((turn) =>
+    slots.flatMap((slot): KidsTurnReading[] => {
+      const text = asString(asObject(asObject(turn.reply)[slot]).text);
+      if (!turn.reply || !text) return [];
+      const r = readabilityOf(text);
+      return [{ turn: turn.turn, slot, words: r.words, paragraphs: r.paragraphs, wordsPerSentence: r.wordsPerSentence, grade: r.grade, passes: readsForBand(r, band) }];
+    })
+  );
+  return { ages: ages ? agesText(ages) : undefined, band, turns, passed: turns.filter((t) => t.passes).length };
+}
+
 /** Every reading the code takes on one played story. */
 export function readStory(run: PlayRun): StoryReadings {
   const chapters = chapterReadings(run);
   const ending = run.turns.find((t) => t.kind === "ending");
   const endingTurn = run.complete ? ending?.turn : undefined;
-  const leverFlags = chapters.flatMap((chapter) =>
-    chapter.levers.flatMap((tally): LeverFlag[] => [
-      ...(tally.rewardSets > 1 ? [{ chapter: chapter.index, slot: tally.slot, rule: "second reward" as const, turns: tally.rewardTurns.slice(1) }] : []),
-      ...(tally.sacrificeSets > 1 ? [{ chapter: chapter.index, slot: tally.slot, rule: "second sacrifice" as const, turns: tally.sacrificeTurns.slice(1) }] : []),
-    ])
-  );
+  const leverFlags = leverFlagReadings(run, chapters);
+  const pacing = pacingSummary(run);
+  const kids = kidsReadings(run);
   const checkFailures: Record<string, number[]> = {};
   const planCheckFailures: Record<string, number[]> = {};
   for (const turn of run.turns) {
@@ -852,6 +977,8 @@ export function readStory(run: PlayRun): StoryReadings {
     ownStats: ownStatReadings(run),
     scoreboard: scoreboardReadings(run),
     fixes: fixReadings(run),
+    ...(pacing ? { pacing } : {}),
+    ...(kids ? { kids } : {}),
     choices: choiceReadings(run),
     repairs: repairReadings(run),
     checkFailures,
@@ -953,6 +1080,53 @@ export function fixesLine(r: StoryReadings): string {
   return fired.length ? fired.map((kind) => `${FIX_LABELS[kind]}: turn ${r.fixes[kind].join(", ")}`).join("; ") : "none";
 }
 
+/** Whether the owner's roll decided each group challenge or contest step on a player's own outcome, one line; none for a single player. */
+export function ownersRollLine(r: StoryReadings): string | undefined {
+  if (r.players < 2) return undefined;
+  const label = "Group challenge and contest steps on one player's own outcome, the owner in the thread";
+  const steps = r.groupSteps.filter((s) => s.ownersRoll !== undefined);
+  if (steps.length === 0) return `${label}: none.`;
+  const not = steps.filter((s) => s.ownersRoll === "not counted").map((s) => s.turn);
+  return `${label}: the owner's roll decided ${steps.length - not.length} of ${steps.length}${not.length ? ` (not at turn ${not.join(", ")})` : ""}.`;
+}
+
+/** The story's pacing, one line. */
+export function pacingLine(r: StoryReadings): string {
+  const p = r.pacing;
+  if (!p) return "Pacing: not read (the run could not be replayed).";
+  const turns = (values: number[]) => (values.length ? `turn ${values.join(", ")}` : "none");
+  const count = (n: number) => (n ? String(n) : "none");
+  const last = p.lastChapterSettles === undefined ? "not planned" : p.lastChapterSettles ? "yes" : "no";
+  return [
+    `Pacing: the last chapter keeps a milestone to settle: ${last}`,
+    `aftermath chapters before it: ${count(p.aftermathsBeforeLast)}`,
+    `milestones left unfinished: ${count(p.leftUnfinished)}`,
+    `switches where a complete outcome took a thread a player needed: ${turns(p.switches.filter((s) => s.completeWhileNeeded).map((s) => s.turn))}`,
+    `switches whose spare thread left the last thread nothing to settle: ${turns(p.switches.filter((s) => s.keepsLast === false).map((s) => s.turn))}`,
+    `switches production asked once more over the pacing: ${turns(p.switches.filter((s) => s.retried).map((s) => s.turn))}.`,
+  ].join("; ");
+}
+
+/** A band's limits in words (KIDS_BAND_LIMITS). */
+export function bandLimitsText(band: KidsBand): string {
+  const l = KIDS_BAND_LIMITS[band];
+  return `${l.minWords > 1 ? `${l.minWords}-${l.maxWords} words` : `at most ${l.maxWords} words`}, at most ${l.wordsPerSentence} words a sentence, grade ${l.grade} or below`;
+}
+
+/** Who the story is read with, in words: "a child aged 5 (the 3-5 band)", or no age recorded. */
+export const kidsWho = (k: Pick<KidsReading, "ages" | "band">) => (k.ages ? `a child aged ${k.ages} (the ${k.band} band)` : `a child, no age recorded (production's ${k.band} band)`);
+
+/** A story read with a child against its band, one line; none for other stories. */
+export function kidsLine(r: StoryReadings): string | undefined {
+  const k = r.kids;
+  if (!k) return undefined;
+  const median = (values: number[]) => (values.length ? percentile(values, 50) ?? 0 : 0);
+  const words = Math.round(median(k.turns.map((t) => t.words)));
+  const grade = median(k.turns.map((t) => t.grade)).toFixed(1);
+  const who = kidsWho(k);
+  return `Read with ${who}: ${k.passed} of ${k.turns.length} turns within the band's limits (${bandLimitsText(k.band)}); words a turn median ${words}, grade median ${grade}.`;
+}
+
 /** A judged check's tally, one line: the passes of those answered, and where it failed with the judge's evidence. */
 export function choiceLine(label: string, items: ChoiceJudged[], where: (c: ChoiceJudged) => string): string {
   const answered = items.filter((c) => c.verdict !== undefined);
@@ -1002,20 +1176,24 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     const checks = Object.entries(p.checks).map(([name, ok]) => `${name} ${yes(ok)}`);
     lines.push(`| ${p.turn} | ${p.threadsFit}${p.toldFit !== undefined ? ` (told ${p.toldFit})` : ""} | ${p.stillNeeded} | ${yes(p.binding)} | ${list(checks)} | ${list(p.nextOutcomes)} | ${yes(p.nextNeeded)} |`);
   }
+  lines.push("", pacingLine(r));
   if (r.groupSteps.length) {
     lines.push(
       "",
       "### Group chapters: whose choice decided each step",
       "",
-      "Every step of a thread with two or more players: each player's choice and the result its own option leads to, and the result the game used for the thread. An exploration step is a choice: \"overridden\" where the outcome's owner is in the thread and the game used another result than theirs. A challenge or contest step combines the rolls.",
+      "Every step of a thread with two or more players: each player's choice and the result its own option leads to, and the result the game used for the thread. An exploration step is a choice: \"overridden\" where the outcome's owner is in the thread and the game used another result than theirs. A challenge or contest step combines the rolls, except on one player's own outcome with the owner in the thread, where only the owner's roll counts (since 2026-10-01): \"owner's roll counted\" says whether the result is the one the owner's roll alone gives.",
       "",
-      "| Turn | Chapter | Step | Thread | Outcome (owner) | Kind | Choices | Result used | Owner's choice overridden |",
-      "|---|---|---|---|---|---|---|---|---|"
+      "| Turn | Chapter | Step | Thread | Outcome (owner) | Kind | Choices | Result used | Owner's choice overridden | Owner's roll counted |",
+      "|---|---|---|---|---|---|---|---|---|---|"
     );
     for (const s of r.groupSteps) {
       const choices = s.picks.map((p) => `${p.slot} ${p.option + 1} → ${p.resolution ?? "–"}`).join("; ");
-      lines.push(`| ${s.turn} | ${s.chapter} | ${s.step} | ${cell(s.thread)} | ${s.outcomeId} (${s.owner}) | ${s.kind} | ${choices || "–"} | ${s.result ?? "–"} | ${s.kind === "exploration" ? yes(s.ownerOverridden) : "–"} |`);
+      const ownersRoll = s.ownersRoll === undefined ? "–" : s.ownersRoll === "counted" ? "yes" : "no";
+      lines.push(`| ${s.turn} | ${s.chapter} | ${s.step} | ${cell(s.thread)} | ${s.outcomeId} (${s.owner}) | ${s.kind} | ${choices || "–"} | ${s.result ?? "–"} | ${s.kind === "exploration" ? yes(s.ownerOverridden) : "–"} | ${ownersRoll} |`);
     }
+    const ownersRoll = ownersRollLine(r);
+    if (ownersRoll) lines.push("", ownersRoll);
   }
   if (r.players > 1) {
     const lost = r.switchPicks.filter((p) => !p.kept);
@@ -1031,7 +1209,8 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
       lines.push(`| ${c.index} | ${l.slot} | ${l.sets} | ${l.sacrificeSets} (${list(l.sacrificeTurns)}) | ${l.rewardSets} (${list(l.rewardTurns)}) | ${list(l.taken.map((t) => `${t.kind} at ${t.turn}`))} |`);
     }
   }
-  lines.push("", `Against the owner's rule: ${r.leverFlags.length ? r.leverFlags.map((f) => `chapter ${f.chapter}, ${f.slot}: ${f.rule} offered at turn ${list(f.turns)}`).join("; ") : "no second reward or sacrifice offered in any chapter"}.`);
+  const noFlags = `no second reward or sacrifice offered in any chapter${r.players === 1 ? ", no reward after a chapter's first step" : ""}, no reward in consecutive chapters`;
+  lines.push("", `Against the owner's rule: ${r.leverFlags.length ? r.leverFlags.map((f) => `chapter ${f.chapter}, ${f.slot}: ${f.rule} offered at turn ${list(f.turns)}`).join("; ") : noFlags}.`);
   const paid = r.leversPaid.counts;
   lines.push(
     "",
@@ -1061,7 +1240,7 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     `- calls with no usable reply: ${list(r.repairs.failedCalls)}`,
     `- turns production sent again: ${r.repairs.resentTurns.length ? r.repairs.resentTurns.map(resentLine).join("; ") : "none"}`,
     ...r.repairs.resentTurns.flatMap((t) => t.failures.map((f, i) => `  - turn ${t.turn}, ${t.failed[i] === "first" ? "the first send" : `the ${t.failed[i]}`}: ${cell(f)}`)),
-    `- production's fixes of 2026-09-30 that fired: ${fixesLine(r)}`,
+    `- production's fixes that fired: ${fixesLine(r)}`,
     `- production would have stopped at: ${r.repairs.stuckTurns.length ? r.repairs.stuckTurns
             .map(
               (s) =>
@@ -1084,6 +1263,18 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     choiceLine("Option sets that carry out the result at each position", r.choices.options, (c) => `turn ${c.turn} ${c.slot}`),
     choiceLine("Chapter plans whose results fit their kind", r.choices.results, (c) => `turn ${c.turn}`),
     "",
+    ...(r.kids
+      ? [
+          "### Read with a child",
+          "",
+          `${kidsLine(r)} The kids-ages stage's deterministic check (kidsReadability.ts), on the text the child hears.`,
+          "",
+          "| Turn | Seat | Words | Paragraphs | Words a sentence | Grade | Within the band |",
+          "|---|---|---|---|---|---|---|",
+          ...r.kids.turns.map((t) => `| ${t.turn} | ${t.slot} | ${t.words} | ${t.paragraphs} | ${t.wordsPerSentence.toFixed(1)} | ${t.grade.toFixed(1)} | ${yes(t.passes)} |`),
+          "",
+        ]
+      : []),
     "### Waits",
     "",
     "| Turn kind | Turns | p50 | p95 | Longest | Allowance | Over it (turns) |",

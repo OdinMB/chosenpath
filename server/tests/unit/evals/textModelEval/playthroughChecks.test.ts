@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { BeatOption } from "core/types/index.js";
-import { ownStatsLine, readStory, renderPlaythroughReadings } from "../../../../src/evals/textModelEval/playthroughChecks.js";
-import { PLAYTHROUGHS, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
+import { kidsLine, ownStatsLine, ownersRollLine, pacingLine, readStory, renderPlaythroughReadings } from "../../../../src/evals/textModelEval/playthroughChecks.js";
+import { readabilityOf, readsForBand } from "../../../../src/evals/textModelEval/kidsReadability.js";
+import { PLAYTHROUGHS, PLAYTHROUGHS_3, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
+import { buildMergedPrompt } from "../../../../src/evals/textModelEval/setupPremises.js";
+import type { SetupInput } from "../../../../src/evals/textModelEval/variants.js";
 import { beatSet, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input, leverSet, type Overrides } from "./playFixtures.js";
 
@@ -83,6 +86,22 @@ describe("readStory", () => {
     const reward: BeatOption = { optionType: "challenge", resourceType: "reward", riskType: "normal", text: "Take the harbour master's coin, gain 10 Supplies", basePoints: -30, modifiersToSuccessRate: [] };
     const rewards = readStory(await played(1, { chapterOptions: () => [leverSet()[0], leverSet()[1], reward] }));
     expect(rewards.leverFlags).toContainEqual({ chapter: 1, slot: "player1", rule: "second reward", turns: [3, 4] });
+  });
+
+  it("flags a single player's reward after the chapter's first step, and rewards in consecutive chapters (the owner's rule as the game places rewards since 2026-10-01)", async () => {
+    const reward: BeatOption = { optionType: "challenge", resourceType: "reward", riskType: "normal", text: "Take the harbour master's coin, gain 10 Supplies", basePoints: -30, modifiersToSuccessRate: [] };
+    const options = () => [leverSet()[0], leverSet()[1], reward];
+    // Chapters at turns 2-4, 6-7 and 9-10, each offering a reward on every step
+    const single = readStory(await played(1, { chapterOptions: options }));
+    expect(single.leverFlags).toContainEqual({ chapter: 1, slot: "player1", rule: "reward after the chapter's first step", turns: [3, 4] });
+    expect(single.leverFlags).toContainEqual({ chapter: 2, slot: "player1", rule: "reward in consecutive chapters", turns: [6, 7] });
+    expect(single.leverFlags).toContainEqual({ chapter: 3, slot: "player1", rule: "reward in consecutive chapters", turns: [9, 10] });
+    expect(single.leverFlags.some((f) => f.chapter === 1 && f.rule === "reward in consecutive chapters")).toBe(false);
+    // A group's players keep B6's rate line, which places no reward on a chapter's first step: that flag reads a single player only
+    const group = readStory(await played(2, { chapterOptions: options }));
+    expect(group.leverFlags.some((f) => f.rule === "reward after the chapter's first step")).toBe(false);
+    expect(group.leverFlags).toContainEqual(expect.objectContaining({ chapter: 2, slot: "player1", rule: "reward in consecutive chapters" }));
+    expect(renderPlaythroughReadings([await played(1, { chapterOptions: options })], new Date(0))).toContain("chapter 2, player1: reward in consecutive chapters offered at turn 6, 7");
   });
 
   it("reads whether each sacrifice or reward the player took was paid, and the stat changes that don't fit their stat", async () => {
@@ -221,7 +240,7 @@ describe("readStory", () => {
     );
   });
 
-  it("lists which of production's fixes of 2026-09-30 fired, by turn", async () => {
+  it("lists which of production's fixes fired, by turn", async () => {
     // The last step written twice, word for word: production's plan check drops the copy (PL-14)
     const doubled = () => {
       const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
@@ -235,8 +254,28 @@ describe("readStory", () => {
     const group = readStory(await played(2, { chapterOptions: () => [leverSet()[0], leverSet()[1], shared] }));
     expect(group.fixes.sharedLeverRepeated.length).toBeGreaterThan(0);
     expect(renderPlaythroughReadings([await played(1, { reply: (role, nth) => (role === "thread" && nth === 0 ? doubled() : DEFAULT) })], new Date(0))).toContain(
-      "- production's fixes of 2026-09-30 that fired: last step written twice, the copy dropped: turn 2"
+      "- production's fixes that fired: last step written twice, the copy dropped: turn 2"
     );
+  });
+
+  it("lists the milestones production dropped on outcomes no chapter that just ended pushed (only what was played, since 2026-10-01)", async () => {
+    // The ending writes the last chapter's milestone (the side outcome) and one more on the main outcome, complete since turn 8
+    const ending = () =>
+      beatSet(1, {
+        player1: { ...beatSet(1).player1, options: [] },
+        newMilestones: [
+          { type: "newMilestone", outcomeGroup: "player1", outcome: "player1_side", newMilestone: "The side is settled." },
+          { type: "newMilestone", outcomeGroup: "player1", outcome: "player1_main", newMilestone: "The main one again." },
+        ],
+      } as never);
+    const run = await played(1, { reply: (role, _nth, s) => (role === "beat" && /-ending$/.test(s.caseId) ? ending() : DEFAULT) });
+    const readings = readStory(run);
+    expect(readings.fixes.milestoneNotPlayed).toEqual([11]);
+    // The kept reply holds the played milestone alone: the main outcome keeps its two, and no outcome has more than intended
+    expect(readings.outcomes.find((o) => o.id === "player1_main")?.milestones).toHaveLength(2);
+    expect(readings.outcomes.find((o) => o.id === "player1_side")?.milestones.map((m) => m.text)).toEqual(["The side is settled."]);
+    expect(readings.outcomes.flatMap((o) => o.problems)).toEqual([]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain("- production's fixes that fired: a milestone on an outcome no chapter that just ended pushed, dropped: turn 11");
   });
 
   it("reads the judged checks on each option set at an exploration step and on each chapter plan's results", async () => {
@@ -372,6 +411,39 @@ describe("readStory", () => {
       expect(renderPlaythroughReadings([overridden], new Date(0))).toMatch(/### Group chapters: whose choice decided each step[\s\S]*\| 6 \| 2 \|[^\n]*player2_main \(player2\)[^\n]*\| yes \|/);
     });
 
+    it("reads whether a group challenge step on one player's own outcome went the owner's roll's way (since 2026-10-01), and leaves a shared outcome's pooled steps unread", async () => {
+      // The second chapter (turns 6-7) a challenge on player2's own outcome, both players in it
+      const run = await played(2, {
+        reply: (role, nth) => {
+          if (role !== "thread" || nth !== 1) return DEFAULT;
+          const plan = threadAnalysis("challenge", 2, 0, ["player1", "player2"]);
+          return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "player2_main", title: "Luz's Trial" }] };
+        },
+      });
+      const readings = readStory(run);
+      const owned = readings.groupSteps.filter((s) => s.chapter === 2);
+      expect(owned.map((s) => [s.turn, s.owner, s.kind, s.ownersRoll])).toEqual([
+        [6, "player2", "challenge", "counted"],
+        [7, "player2", "challenge", "counted"],
+      ]);
+      for (const step of owned) expect(step.result).toBe(step.picks.find((p) => p.slot === "player2")?.resolution);
+      // The first chapter is on the shared outcome: every roll pools, so there is nothing to read
+      expect(readings.groupSteps.filter((s) => s.chapter === 1).map((s) => s.ownersRoll)).toEqual([undefined, undefined, undefined]);
+      expect(ownersRollLine(readings)).toBe("Group challenge and contest steps on one player's own outcome, the owner in the thread: the owner's roll decided 2 of 2.");
+      // As production pooled the rolls before: the step's result another than the owner's own
+      const pooled = structuredClone(run);
+      const phase = pooled.end?.storyPhases.find((p) => "threads" in p && p.firstBeatIndex === 5);
+      if (!phase || !("threads" in phase)) throw new Error("no second chapter");
+      const own = owned[0].picks.find((p) => p.slot === "player2")?.resolution;
+      phase.threads[0].progression[0].resolution = (own === "mixed" ? "favorable" : "mixed") as never;
+      const read = readStory(pooled);
+      expect(read.groupSteps.find((s) => s.turn === 6)?.ownersRoll).toBe("not counted");
+      expect(ownersRollLine(read)).toBe("Group challenge and contest steps on one player's own outcome, the owner in the thread: the owner's roll decided 1 of 2 (not at turn 6).");
+      expect(renderPlaythroughReadings([pooled], new Date(0))).toMatch(/\| 6 \| 2 \| 1 \| Luz's Trial \| player2_main \(player2\) \| challenge \|[^\n]*\| – \| no \|/);
+      // A single player's story has no group steps to read
+      expect(ownersRollLine(readStory(await played()))).toBeUndefined();
+    });
+
     it("lists each group player's switch pick against the thread they were planned into", async () => {
       // A topic switch where player2 picks their own outcome, then a chapter putting both players on the shared one
       const switchWithPicks = () => {
@@ -434,6 +506,57 @@ describe("readStory", () => {
     expect(readings.repairs.shortTextRetries).toEqual([]);
     expect(readings.repairs.shortTextUsedAsIs).toEqual([]);
     expect(renderPlaythroughReadings([run], new Date(0))).toContain("turns without options retried: 4");
+  });
+
+  it("reads a story read with a child against its age band's limits, turn by turn (the kids-ages stage's check), and nothing on other stories", async () => {
+    const kids: SetupInput = { ...input(1), kids: true, kidAges: { min: 5, max: 5 } };
+    const { run } = await playStory(PLAYTHROUGHS_3[5], kids, fakeCall(1).call, { sample: 1 });
+    const readings = readStory(run);
+    expect(readings.kids).toMatchObject({ ages: "5", band: "3-5" });
+    // Every turn the child hears, the ending too
+    expect(readings.kids?.turns.map((t) => [t.turn, t.slot])).toEqual(run.turns.map((t) => [t.turn, "player1"]));
+    const text = (run.turns[0].reply as unknown as { player1: { text: string } }).player1.text;
+    const expected = readabilityOf(text);
+    expect(readings.kids?.turns[0]).toEqual({ turn: 1, slot: "player1", words: expected.words, paragraphs: expected.paragraphs, wordsPerSentence: expected.wordsPerSentence, grade: expected.grade, passes: readsForBand(expected, "3-5") });
+    expect(readings.kids?.passed).toBe(readings.kids?.turns.filter((t) => t.passes).length);
+    expect(kidsLine(readings)).toMatch(/^Read with a child aged 5 \(the 3-5 band\): \d+ of 11 turns within the band's limits \(30-100 words, at most 9 words a sentence, grade 3 or below\); words a turn median \d+, grade median -?\d+\.\d\.$/);
+    // A run stored before the setting (round 2's mouse story): the age its premise states
+    const stored = structuredClone(run);
+    if (!stored.start) throw new Error("no start");
+    delete stored.start.kidAges;
+    stored.input = { ...stored.input, kidAges: undefined, premise: buildMergedPrompt("read-with-kids", { kidAge: "5" }, "A field mouse.") };
+    expect(readStory(stored).kids).toMatchObject({ ages: "5", band: "3-5" });
+    // No age anywhere: production's 6-8 band
+    stored.input = { ...stored.input, premise: "A field mouse." };
+    expect(readStory(stored).kids).toMatchObject({ ages: undefined, band: "6-8" });
+    // Not read with a child
+    const grown = readStory(await played());
+    expect(grown.kids).toBeUndefined();
+    expect(kidsLine(grown)).toBeUndefined();
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain("### Read with a child");
+  });
+
+  it("reads the story's pacing as the pacing-clues stage did: whether its last chapter keeps a milestone to settle, aftermaths before it, milestones left unfinished, and each switch against PACING", async () => {
+    const readings = readStory(await played());
+    expect(readings.pacing).toMatchObject({ lastChapterSettles: true, aftermathsBeforeLast: 0, leftUnfinished: 0 });
+    expect(readings.pacing?.switches.map((s) => [s.turn, s.fit, s.completeWhileNeeded, s.retried])).toEqual([
+      [1, 2, false, false],
+      [5, 2, false, false],
+      [8, 1, false, false],
+    ]);
+    expect(pacingLine(readings)).toBe(
+      "Pacing: the last chapter keeps a milestone to settle: yes; aftermath chapters before it: none; milestones left unfinished: none; switches where a complete outcome took a thread a player needed: none; switches whose spare thread left the last thread nothing to settle: none; switches production asked once more over the pacing: none."
+    );
+    // The last switch offers the complete main outcome first: production asks once more, and the retry takes the side one
+    const onMain = () => {
+      const base = switchAnalysis(["player1"]);
+      return { ...base, switches: [{ ...base.switches[0], type: "flavor", outcomeId: "player1_main", question: "Again?", topicChoices: [] }] };
+    };
+    const forced = readStory(await played(1, { reply: (role, nth) => (role === "switch" && nth === 2 ? onMain() : DEFAULT) }));
+    expect(forced.pacing?.switches.find((s) => s.turn === 8)).toMatchObject({ completeWhileNeeded: false, retried: true });
+    expect(forced.pacing?.lastChapterSettles).toBe(true);
+    expect(pacingLine(forced)).toContain("switches production asked once more over the pacing: turn 8.");
+    expect(renderPlaythroughReadings([await played()], new Date(0))).toContain("Pacing: the last chapter keeps a milestone to settle: yes");
   });
 
   it("renders the readings as markdown, a section per story", async () => {

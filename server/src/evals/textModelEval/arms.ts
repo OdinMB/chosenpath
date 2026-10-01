@@ -88,7 +88,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * in whole short playthroughs (pacing-clues: no --run arms, the
  * --pacing-clues-play mode's prep calls, production's code and the variant
  * from four mid-story starts to the story's last chapter plan, and the clue
- * judge's v2 on the late turns both played).
+ * judge's v2 on the late turns both played), then a third round of whole-story
+ * playthroughs on production's code after the fixes of 2026-10-01
+ * (playthroughs-3: no --run arms, the --playthroughs --round 3 mode's prep
+ * calls).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -122,6 +125,7 @@ export const FEEDBACK_STAGES = [
   "runaway-2",
   "options-o2c",
   "pacing-clues",
+  "playthroughs-3",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -1384,6 +1388,18 @@ function choiceLineSpArms(role: EvalRole): ArmPlan[] {
  * (adopted4) is reused for a request today's code builds differently.
  */
 export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
+
+/**
+ * The prompt state of the third round of playthroughs (playthroughs-3,
+ * 2026-10-01): production's own code after that day's fixes and adoptions
+ * (only what was played gets a milestone, the owner's roll, a contest in a
+ * cooperative story, the lever-direction setup, the kids age bands and their
+ * setting, group levers and the owner's-roll lever line, the short-replies
+ * lines, O2c's options, the late clue lines and the paced planners), under a
+ * tag no earlier stage used, so no call recorded before those changes is
+ * reused for a request today's code builds differently.
+ */
+export const PLAYTHROUGHS_3_PROMPT_STATE = "adopted22";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
 const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies"];

@@ -120,6 +120,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "options-o2c": "Option variety with fewer rewards (turnO2c beside production's turn under adopted20, --role beat, on the stored rolled chapter steps)",
   "pacing-clues":
     "Fix 8's retest in whole short playthroughs (pacingClues beside production under adopted21: no --run arms; --pacing-clues-play, listed below, then --pacing-clues-blind and --judge-pacing-clues)",
+  "playthroughs-3": "Whole-story playthroughs, round 3, on production's code after the fixes of 2026-10-01 (no --run jobs: --playthroughs --round 3 plays them, listed below)",
 };
 
 /** Jobs by arm key, in plan order. */

@@ -15,6 +15,9 @@ import {
   estimateBaseKey,
   FINAL_CHECK_SETUP_PREMISES,
   FINAL_CHECK_TEMPLATE_PREMISES,
+  GROUP_LEVERS_PROMPT_STATE,
+  KIDS_AGES_PROMPT_STATE,
+  LATE_PACING_PROMPT_STATE,
   makeArm,
   OPTIONS_CONTINUITY_PROMPT_STATE,
   OPTIONS_CONTINUITY_RETEST_CASES,
@@ -24,6 +27,7 @@ import {
   PACING_CLUES_PROMPT_STATE,
   pipelinePlans,
   PLAYTHROUGHS_2_PROMPT_STATE,
+  PLAYTHROUGHS_3_PROMPT_STATE,
   productionArm,
   referenceKey,
   ROUND1_SETUP_PAGE_PREMISES,
@@ -455,6 +459,8 @@ describe("budget caps", () => {
       // The coordinator's call of 2026-10-01: fix 8's retest in whole short playthroughs, its estimate (16 runs, the clue
       // judge's calibration and its run on the late turns) plus 30% ($1.30), raised for its one fix-and-retest's 8 runs
       "pacing-clues": 1.5,
+      // The coordinator's brief of 2026-10-01: the final whole-story playthroughs on production's code after that day's fixes
+      "playthroughs-3": 1,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -487,6 +493,7 @@ describe("budget caps", () => {
       "runaway-2",
       "options-o2c",
       "pacing-clues",
+      "playthroughs-3",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -515,8 +522,11 @@ describe("budget caps", () => {
     expect(LEDGER_WHEN_DECISIONS_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisions)).toBeLessThanOrEqual(HARD_CEILING);
     // Fix 8's retest (pacing-clues) opened with those five closed at what they spent (the ledger at $41.59): its cap fits
     // with the $1.3 on top
-    expect(after).toEqual(["pacing-clues"]);
+    expect(after).toEqual(["pacing-clues", "playthroughs-3"]);
     expect(41.59 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["pacing-clues"]).toBeLessThanOrEqual(HARD_CEILING);
+    // The third round of playthroughs opened with everything before it closed at what it spent (the ledger at $42.87): its
+    // cap fits the $45 on the recorded ledger; with the $1.3 on top it would reach about $45.17 at the cap (the report says so)
+    expect(42.87 + DEFAULT_STAGE_CAPS["playthroughs-3"]).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
     const { caps: defaults } = resolveCaps({});
@@ -910,6 +920,33 @@ describe("budget caps", () => {
     // The coordinator's cap: $1.20, inside the $42 hard cap with the ledger at $37.24 and the stalled Stage 4 calls on top
     expect(DEFAULT_STAGE_CAPS["playthroughs-2"]).toBe(1.2);
     expect(37.24 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["playthroughs-2"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("gives the third round of playthroughs (playthroughs-3, 2026-10-01) a stage of its own on production's code after that day's fixes, under a tag of its own", () => {
+    for (const role of ["setup", "beat", "switch", "thread", "iteration"] as const) expect(armsFor("playthroughs-3", role)).toEqual([]);
+    expect(pipelinePlans("playthroughs-3")).toEqual([]);
+    expect(stageRunsBaseline("playthroughs-3")).toBe(false);
+    expect(stageChecksTurns("playthroughs-3")).toBe(false);
+    expect(STAGE_CAP_REASONS["playthroughs-3"]).toMatch(/2026-10-01/);
+    expect(STAGE_CAP_REASONS["playthroughs-3"]).toMatch(/few bucks don't matter/);
+    expect(STAGE_CAP_REASONS["playthroughs-3"]).toMatch(/production's current code/);
+    // Production's code since the fixes of 2026-10-01 (every request a stage before measured has changed since): a tag no
+    // earlier stage used
+    expect(PLAYTHROUGHS_3_PROMPT_STATE).toBe("adopted22");
+    expect([
+      PLAYTHROUGHS_2_PROMPT_STATE,
+      OPTIONS_O2C_PROMPT_STATE,
+      PACING_CLUES_PROMPT_STATE,
+      RUNAWAY_2_PROMPT_STATE,
+      SHORT_REPLIES_PROMPT_STATE,
+      GROUP_LEVERS_PROMPT_STATE,
+      KIDS_AGES_PROMPT_STATE,
+      LATE_PACING_PROMPT_STATE,
+    ]).not.toContain(PLAYTHROUGHS_3_PROMPT_STATE);
+    // The coordinator's cap: about $1.00 (round 2 came to $0.75 for the same six premises, and round 3 plays more levers
+    // and the switch plan check's pacing retries), inside the $45 hard cap with the ledger at $42.87
+    expect(DEFAULT_STAGE_CAPS["playthroughs-3"]).toBe(1);
+    expect(42.87 + DEFAULT_STAGE_CAPS["playthroughs-3"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {
