@@ -186,12 +186,19 @@ function notPlayed(runs: PlayRun[], before: (run: PlayRun) => number = () => Num
 }
 
 describe("replayRun on the stored round 2 (skipped where the output folder is absent)", () => {
-  (stored2.length ? it : it.skip)("rebuilds every turn's request byte for byte, as production sent it on 30 September", () => {
+  /*
+   * The estate agents' chapter 6 (turns 20-21) was a group challenge on Nia's own protégé outcome: at turn 21 her roll
+   * was unfavorable and Rory's favorable, pooled into a mixed step. Production reads the owner's roll alone since
+   * 2026-10-01 (the owner's decision), so from turn 22 the replayed story is production's, not the one played.
+   */
+  const firstChanged2: Record<string, number> = { "play-estate-agents": 22 };
+
+  (stored2.length ? it : it.skip)("rebuilds every turn's request byte for byte, as production sent it on 30 September, up to the estate agents' step the owner's roll now decides", () => {
     let turns = 0;
     let kids = 0;
     let endings = 0;
     for (const run of stored2) {
-      for (const r of replayRun(run)) {
+      for (const r of replayRun(run).filter((t) => t.turn < (firstChanged2[run.spec.id] ?? Number.POSITIVE_INFINITY))) {
         const sentHash = promptHashes.get(outputIdOf(r.played.calls[0]?.outputFile ?? ""));
         // The turn as production sent it then (playthroughs2Sent): today's but for the kids rules, which a single player's
         // read-with-kids turn takes since 2026-10-01 (the mouse story recorded its category), and every ending's lines on
@@ -208,10 +215,22 @@ describe("replayRun on the stored round 2 (skipped where the output folder is ab
         turns++;
       }
     }
-    // Six stories: 11 + 26 + 26 + 26 + 26 + 11 turns, the mouse story's 11 read with a child, one ending each
-    expect(turns).toBe(126);
+    // Six stories: 11 + 26 + 26 + 26 + 21 + 11 turns (the estate agents' up to turn 21), the mouse story's 11 read with a
+    // child, one ending each but the estate agents'
+    expect(turns).toBe(121);
     expect(kids).toBe(11);
-    expect(endings).toBe(6);
+    expect(endings).toBe(5);
+  });
+
+  (stored2.length ? it : it.skip)("reads Nia's roll alone at the estate agents' turn 21, a group challenge on her own outcome: unfavorable where the pooled rolls gave mixed", () => {
+    const run = stored2.find((r) => r.spec.id === "play-estate-agents");
+    const atSwitch = run && replayRun(run).find((r) => r.turn === 22)?.before;
+    const chapter = atSwitch?.getResolvedThreadAnalysis()?.threads ?? [];
+    expect(chapter.map((t) => [t.outcomeId, t.playersSideA])).toEqual([["player2_protege", ["player1", "player2"]]]);
+    const rolls = ["player1", "player2"].map((slot) => atSwitch?.getPlayer(slot)?.beatHistory[20]?.resolution);
+    expect(rolls).toEqual(["favorable", "unfavorable"]);
+    expect(chapter[0].progression[1].resolution).toBe("unfavorable");
+    expect(chapter[0].milestone).toBe((chapter[0].possibleMilestones as Record<string, string>).unfavorable);
   });
 
   (stored2.length ? it : it.skip)("production now drops the estate agents' ending's milestones on outcomes the last chapter didn't push, and nothing else in either round (only what was played, 2026-10-01)", () => {

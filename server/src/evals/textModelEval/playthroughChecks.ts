@@ -126,7 +126,9 @@ export type WaitReading = { kind: TurnKind; turns: number; p50S?: number; p95S?:
  * the reading flags one where the outcome's owner is in the thread and the
  * game used another result than theirs (production before 2026-09-30 took the
  * first player's). A challenge or contest step combines everyone's rolls by
- * design.
+ * design on a shared outcome; on one player's own outcome, with the owner in
+ * the thread, production reads the owner's roll alone since 2026-10-01 (the
+ * owner's decision, ThreadResolutionService.rollingSides).
  */
 export type GroupStepReading = {
   turn: number;

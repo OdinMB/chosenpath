@@ -129,6 +129,25 @@ export class ThreadResolutionService {
     return story.getPlayerSlots().find((slot) => (story.getPlayer(slot)?.outcomes ?? []).some((outcome) => outcome.id === outcomeId));
   }
 
+  /**
+   * Whose rolls decide a challenge or contest step: on one player's own
+   * outcome, only that owner's, when the owner is in the thread and their step
+   * has a result (the owner's decision of 2026-10-01: "Yes, only count the
+   * owner's roll."); otherwise every player's in the thread, pooled. The second
+   * playthroughs' estate agents, chapter 6: a group challenge on Nia's own
+   * protégé outcome, her roll unfavorable and Rory's favorable, pooled into the
+   * mixed result her milestone records. A single player is always the owner of
+   * their outcomes, so their result is unchanged.
+   */
+  private static rollingSides(thread: Thread, story: Story): { sideA: string[]; sideB: string[] } {
+    const owner = this.outcomeOwner(story, thread.outcomeId);
+    const inThread = owner !== undefined && (thread.playersSideA.includes(owner) || thread.playersSideB.includes(owner));
+    if (!owner || !inThread || (story.getCurrentBeat(owner)?.resolution ?? null) === null) {
+      return { sideA: thread.playersSideA, sideB: thread.playersSideB };
+    }
+    return thread.playersSideA.includes(owner) ? { sideA: [owner], sideB: [] } : { sideA: [], sideB: [owner] };
+  }
+
   private static determineChallengeThreadResolution(
     thread: Thread,
     story: Story
@@ -142,8 +161,8 @@ export class ThreadResolutionService {
     let mixedCount = 0;
     let unfavorableCount = 0;
 
-    // Go through all steps in the thread progression
-    thread.playersSideA.forEach((playerSlot) => {
+    // Go through all steps in the thread progression: the owner's alone on their own outcome
+    this.rollingSides(thread, story).sideA.forEach((playerSlot) => {
       const step = story.getCurrentBeat(playerSlot);
       if (!step || step.resolution === null) {
         console.log(
@@ -216,8 +235,9 @@ export class ThreadResolutionService {
     let sideBMixedCount = 0;
     let sideBUnfavorableCount = 0;
 
-    // Go through all steps in the thread progression
-    thread.playersSideA.forEach((playerSlot) => {
+    // Go through all steps in the thread progression: the owner's alone on their own outcome
+    const rolling = this.rollingSides(thread, story);
+    rolling.sideA.forEach((playerSlot) => {
       const step = story.getCurrentBeat(playerSlot);
       if (!step || step.resolution === null) {
         console.log(
@@ -235,7 +255,7 @@ export class ThreadResolutionService {
       }
     });
 
-    thread.playersSideB.forEach((playerSlot) => {
+    rolling.sideB.forEach((playerSlot) => {
       const step = story.getCurrentBeat(playerSlot);
       if (!step || step.resolution === null) {
         console.log(

@@ -137,3 +137,84 @@ describe("ThreadResolutionService: whose choice decides a group exploration step
     expect([ended?.resolution, ended?.milestone]).toEqual(["resolution2", "two"]);
   });
 });
+
+/*
+ * A group challenge or contest step on one player's own outcome (the owner's
+ * decision of 2026-10-01: "Yes, only count the owner's roll."): only the
+ * owner's roll decides it when the owner is in the thread. The second
+ * playthroughs' estate agents, chapter 6: a group challenge on Nia's own
+ * protégé outcome, her roll unfavorable and Rory's favorable, pooled into the
+ * mixed result her milestone records. A shared outcome, and a player's own
+ * outcome its owner is not in, keep pooling every roll.
+ */
+describe("ThreadResolutionService: whose roll decides a group challenge or contest step", () => {
+  const slots = (players: number) => Array.from({ length: players }, (_, i) => `player${i + 1}`);
+
+  /** Step 1 of a two-step thread of this kind on `outcomeId`, each player's own outcome on their list. */
+  function rolledStep(players: number, kind: "challenge" | "contest", outcomeId: string, sideA = slots(players), sideB: string[] = []): Story {
+    const chapter = threadAnalysis(kind, 2, 1, sideA, sideB);
+    chapter.threads[0].outcomeId = outcomeId;
+    const story = threadBeat(players, { storyPhases: [switchAnalysis(slots(players), 0), chapter] });
+    const withOutcomes = Object.fromEntries(
+      Object.entries(story.getPlayers()).map(([slot, player]) => [slot, { ...player, outcomes: [outcome(`${slot}_own`)] }])
+    );
+    return story.clone({ sharedOutcomes: [outcome("shared_sale")], players: withOutcomes });
+  }
+
+  const roll = (story: Story, rolls: Resolution[]) => rolls.reduce((s, r, i) => s.updateBeatResolution(`player${i + 1}`, r), story);
+  const firstStep = (story: Story) => ThreadResolutionService.resolveCurrentThreads(story).getCurrentThreadAnalysis()?.threads[0].progression[0].resolution;
+
+  it("reads only the owner's roll in a challenge on their own outcome (the estate agents' chapter 6: Nia unfavorable, Rory favorable)", () => {
+    // The owner's roll is the result, whatever the game's dice then draw
+    for (const dice of [0, 0.999]) {
+      jest.spyOn(Math, "random").mockReturnValue(dice);
+      expect(firstStep(roll(rolledStep(2, "challenge", "player2_own"), ["favorable", "unfavorable"]))).toBe("unfavorable");
+      expect(firstStep(roll(rolledStep(2, "challenge", "player2_own"), ["unfavorable", "favorable"]))).toBe("favorable");
+      expect(firstStep(roll(rolledStep(3, "challenge", "player1_own"), ["mixed", "favorable", "favorable"]))).toBe("mixed");
+    }
+  });
+
+  it("keeps pooling every roll on a shared outcome, and on a player's own outcome its owner is not in", () => {
+    // Pooled: one favorable against one unfavorable leaves no side, so the step is mixed
+    expect(firstStep(roll(rolledStep(2, "challenge", "shared_sale"), ["favorable", "unfavorable"]))).toBe("mixed");
+    const random = jest.spyOn(Math, "random").mockReturnValue(0.2);
+    // Two favorable, one unfavorable: a 1-in-3 chance of favorable, which a roll of 20 takes
+    expect(firstStep(roll(rolledStep(3, "challenge", "shared_sale"), ["favorable", "favorable", "unfavorable"]))).toBe("favorable");
+    random.mockReturnValue(0.5);
+    expect(firstStep(roll(rolledStep(3, "challenge", "shared_sale"), ["favorable", "favorable", "unfavorable"]))).toBe("mixed");
+    // player3's own outcome, player3 not in the thread
+    random.mockReturnValue(0.5);
+    expect(firstStep(roll(rolledStep(3, "challenge", "player3_own", ["player1", "player2"]), ["favorable", "unfavorable"]))).toBe("mixed");
+  });
+
+  it("reads only the owner's roll in a contest on their own outcome, for the owner's side", () => {
+    // Owner on side A: their favorable roll wins it for side A, whatever side B rolled
+    expect(firstStep(roll(rolledStep(2, "contest", "player1_own", ["player1"], ["player2"]), ["favorable", "favorable"]))).toBe("sideAWins");
+    expect(firstStep(roll(rolledStep(2, "contest", "player1_own", ["player1"], ["player2"]), ["unfavorable", "unfavorable"]))).toBe("sideBWins");
+    // Owner on side B
+    expect(firstStep(roll(rolledStep(2, "contest", "player2_own", ["player1"], ["player2"]), ["favorable", "favorable"]))).toBe("sideBWins");
+    expect(firstStep(roll(rolledStep(2, "contest", "player2_own", ["player1"], ["player2"]), ["favorable", "mixed"]))).toBe("mixed");
+    // A camp: player1 and player3 against player2, on player3's own outcome
+    expect(firstStep(roll(rolledStep(3, "contest", "player3_own", ["player1", "player3"], ["player2"]), ["favorable", "unfavorable", "unfavorable"]))).toBe("sideBWins");
+  });
+
+  it("keeps the tug of war on a shared contested outcome", () => {
+    expect(firstStep(roll(rolledStep(2, "contest", "shared_sale", ["player1"], ["player2"]), ["favorable", "favorable"]))).toBe("mixed");
+    expect(firstStep(roll(rolledStep(3, "contest", "shared_sale", ["player1", "player3"], ["player2"]), ["favorable", "unfavorable", "favorable"]))).toBe("sideAWins");
+  });
+
+  it("pools the others' rolls when the owner's own step has no result", () => {
+    const rolled = roll(rolledStep(2, "challenge", "player2_own"), ["favorable", "unfavorable"]);
+    const players = structuredClone(rolled.getState().players);
+    const ownersBeats = players.player2.beatHistory;
+    ownersBeats[ownersBeats.length - 1] = { ...ownersBeats[ownersBeats.length - 1], resolution: null };
+    expect(firstStep(rolled.clone({ players }))).toBe("favorable");
+  });
+
+  it("sets the milestone the owner's roll leads to at the thread's last step", () => {
+    const afterFirst = ThreadResolutionService.resolveCurrentThreads(roll(rolledStep(2, "challenge", "player2_own"), ["favorable", "favorable"]));
+    const ended = ThreadResolutionService.resolveCurrentThreads(roll(afterFirst, ["favorable", "unfavorable"])).getCurrentThreadAnalysis()?.threads[0];
+    expect(ended?.progression.map((step) => step.resolution)).toEqual(["favorable", "unfavorable"]);
+    expect([ended?.resolution, ended?.milestone]).toEqual(["unfavorable", "bad"]);
+  });
+});
