@@ -79,7 +79,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * then turns that come back as one short paragraph (short-replies: the
  * variant beside production's turn on the second round's short turns, the
  * stored turns that came back short most often and ordinary ones, each turn
- * with production's one checked retry).
+ * with production's one checked retry), then the runaway turn's cause again
+ * (runaway-2: production's closing turn and two diagnostic variants, each
+ * without one of the two blocks only a turn that closes a chapter carries, on
+ * the case that ran away most).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -110,6 +113,7 @@ export const FEEDBACK_STAGES = [
   "kids-ages",
   "group-levers",
   "short-replies",
+  "runaway-2",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -314,6 +318,10 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // The short-replies stage (2026-10-01): the text goes on after its first paragraph, against production's turn, which
   // runs beside it
   shortReplies: "adopted",
+  // The second runaway replay (2026-10-01): a closing turn without its after-thread stat audit, or without the milestone it
+  // writes, against production's closing turn, which runs beside them on the case that ran away most
+  noThreadAudit: "adopted",
+  noNewMilestones: "adopted",
 };
 
 /**
@@ -660,9 +668,57 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return groupLeversArms(role);
     case "short-replies":
       return shortRepliesArms(role);
+    case "runaway-2":
+      return runaway2Arms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the second runaway replay (2026-10-01): production's own
+ * code since the short-replies adoption, under a tag no earlier stage used, so
+ * production runs beside the diagnostics in the same minutes.
+ */
+export const RUNAWAY_2_PROMPT_STATE = "adopted19";
+
+/**
+ * The case: story 8988006e's switch turn after its first chapter (the player's
+ * last choice a sacrifice that released the exposé, a flavor switch on its
+ * fallout), the closing turn that ran away most: 6 of 14 first tries since 29
+ * September over every form sent there, 4 of 7 of production's own request.
+ * Production's request on it is the one that ran away then, with the
+ * short-replies lines (a test holds it).
+ */
+export const RUNAWAY_2_CASES = ["cont-8988006e-t4-o1"];
+
+/**
+ * Sixteen samples an arm: a variant that never runs away moves under the stop
+ * rule once production runs away 4 times in 16 (Fisher p 0.05), which at
+ * production's rate there since 29 September (about 40%) 16 samples reach
+ * about nine times in ten, and at 30% three in four; the replay of 2026-09-30's
+ * three could show nothing either way.
+ */
+export const RUNAWAY_2_SAMPLES = 16;
+
+/**
+ * The second runaway replay (the coordinator's brief of 2026-10-01: another
+ * attempt at the runaway turn's cause): production's single-player turn
+ * (adopted) and the two diagnostics (noThreadAudit, noNewMilestones: a closing
+ * turn without one of its two closing blocks) on Luna medium, production's
+ * single-player turn model and limits, sixteen times each on the case,
+ * interleaved, so all three meet the same server minute by minute. First tries
+ * are what it counts, so no checked retry.
+ */
+function runaway2Arms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return (["adopted", "noThreadAudit", "noNewMilestones"] as const).map((variant) => ({
+    arm: adoptedDefault("beat", variant),
+    samples: RUNAWAY_2_SAMPLES,
+    scope: "single-player" as const,
+    source: "stored" as const,
+    caseIds: RUNAWAY_2_CASES,
+  }));
 }
 
 /**
@@ -1592,6 +1648,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "kids-ages",
   "group-levers",
   "short-replies",
+  "runaway-2",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {

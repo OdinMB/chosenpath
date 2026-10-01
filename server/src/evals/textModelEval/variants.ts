@@ -61,6 +61,7 @@ import { latePacingRequest } from "../../game/services/storyTextRounds/latePacin
 import { kidsAgesSetupRequest, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../game/services/storyTextRounds/kidsAges.js";
 import { groupLeversRequest } from "../../game/services/storyTextRounds/groupLevers.js";
 import { shortRepliesRequest } from "../../game/services/storyTextRounds/shortReplies.js";
+import { noNewMilestonesRequest, noThreadAuditRequest } from "../../game/services/storyTextRounds/closingTurn.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -357,6 +358,16 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * ends after its first paragraph, a blank line between paragraphs; production's
  * request byte for byte otherwise, with production's turn limits and retry
  * count.
+ * "noThreadAudit" and "noNewMilestones" are the second runaway replay's
+ * diagnostic variants (2026-10-01, storyTextRounds/closingTurn.ts): every
+ * stored runaway fell on a turn that closes a chapter (a switch turn after a
+ * chapter, or the ending), and those turns alone carry two blocks. Each is
+ * production's single-player closing turn with one of them taken out:
+ * noThreadAudit the after-thread stat audit (a chapter step's stat line in its
+ * place, the statChanges field's after-thread sentence cut), noNewMilestones
+ * the milestone block (newMilestones as "", as every other turn sends it);
+ * production's request byte for byte on every other turn, with production's
+ * single-player turn limits and retry count. Diagnostics, not forms to adopt.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -430,7 +441,9 @@ export type VariantId =
   | "kidsAges"
   | "groupLevers"
   | "groupLeversB"
-  | "shortReplies";
+  | "shortReplies"
+  | "noThreadAudit"
+  | "noNewMilestones";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -501,6 +514,8 @@ export const VARIANTS: VariantId[] = [
   "groupLevers",
   "groupLeversB",
   "shortReplies",
+  "noThreadAudit",
+  "noNewMilestones",
 ];
 
 /**
@@ -819,6 +834,15 @@ function roundTwoTurn(variant: VariantId, form: TurnRound2Form) {
   };
 }
 
+/** A second-runaway-replay diagnostic: turns only, with production's turn limits and retry count. */
+function closingTurnVariant(variant: VariantId, build: (story: Story) => TextRequest) {
+  return (input: RequestInput): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...build(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
+  };
+}
+
 const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   prod: prodRequest,
   adopted: adoptedRequest,
@@ -1015,6 +1039,10 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     const count = beatCheckOptions(input.story).textCount;
     return { ...shortRepliesRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
   },
+  // The second runaway replay's diagnostics: a single player's closing turn without the after-thread stat audit, or
+  // without the milestone it writes; production's turn limits and production's retry count where it has its own
+  noThreadAudit: closingTurnVariant("noThreadAudit", noThreadAuditRequest),
+  noNewMilestones: closingTurnVariant("noNewMilestones", noNewMilestonesRequest),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

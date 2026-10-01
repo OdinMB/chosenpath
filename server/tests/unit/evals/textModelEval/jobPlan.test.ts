@@ -35,6 +35,8 @@ import {
   ROUND3_PROBLEM_TURN,
   ROUND3_REPLAY_CASES,
   ROUND3_REPLAY_SAMPLES,
+  RUNAWAY_2_CASES,
+  RUNAWAY_2_SAMPLES,
   RUNAWAY_CASES,
   STAGE_SCOPING_NEW_CASES,
   STAGES,
@@ -42,6 +44,7 @@ import {
 } from "../../../../src/evals/textModelEval/arms.js";
 import { productionCallLimits } from "../../../../src/shared/llm/chatModel.js";
 import { SWITCH_REMINDER } from "../../../../src/game/services/storyTextRounds/switchReminder.js";
+import { CLOSING_TURN_TEXT } from "../../../../src/game/services/storyTextRounds/closingTurn.js";
 import { CHOICE_RESULT_TEXT, productionTurnToday } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { KIDS_TURN_TEXT } from "../../../../src/game/services/storyTextRounds/kidsTurn.js";
 import { KIDS_BAND_TURNS, beatCheckOptions } from "../../../../src/game/services/kidsTurnRules.js";
@@ -593,6 +596,35 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(beforeShortReplies(production).replace(SWITCH_REMINDER, "")).toBe(fix);
     expect(production).not.toBe(fix);
     expect(planJobs(cases, { stage: "runaway", promptState: "adopted4", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
+  });
+
+  it("plans the second runaway replay (2026-10-01): production's closing turn and both diagnostic variants sixteen times each on the case that ran away most, interleaved, with production's single-player turn limits", () => {
+    const [runaway] = RUNAWAY_2_CASES;
+    const cases = [
+      evalCase(runaway, "beat", { state: laterSwitchBeat(1, { id: "story-a" }).getState() }),
+      evalCase("sp-other-switch", "beat", { state: laterSwitchBeat(1, { id: "story-b" }).getState() }),
+    ];
+    const plan = (samples?: number) => planJobs(cases, { stage: "runaway-2", promptState: "adopted19", roles: ["beat"], mode: "isolated", subset15: false, records: [], ...(samples ? { samples } : {}) });
+    const variants = ["adopted", "noThreadAudit", "noNewMilestones"];
+    // Sample by sample, the three arms together: 48 jobs, as the dry run counts them
+    const jobs = plan();
+    expect(jobs).toHaveLength(48);
+    expect(jobs.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`)).toEqual(
+      Array.from({ length: RUNAWAY_2_SAMPLES }, (_, i) => i + 1).flatMap((s) => variants.map((v) => `${runaway} s${s} gpt-6-luna@medium/${v}`))
+    );
+    for (const job of jobs) {
+      expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+      // First tries are what the stage counts: no checked retry
+      expect(job.retry).toBeUndefined();
+    }
+    // The smoke: sample 1 of each; the first half: samples 1 to 8
+    expect(plan(1).map((j) => `${j.sample} ${j.armKey}`)).toEqual(variants.map((v) => `1 gpt-6-luna@medium/${v}`));
+    expect(plan(8)).toHaveLength(24);
+    // Each variant is production's request with its one block taken out
+    const [production, noAudit, noMilestones] = jobs.slice(0, 3).map((j) => requestText(j.first.request()));
+    expect(noAudit).toBe(production.replace(CLOSING_TURN_TEXT.threadAudit, CLOSING_TURN_TEXT.chapterStatLine));
+    expect(noMilestones).toBe(production.replace(CLOSING_TURN_TEXT.newMilestones, ""));
+    expect(planJobs(cases, { stage: "runaway-2", promptState: "adopted19", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
   });
 
   it("plans the choice-result stage (2026-09-30): production's turn and the exploration-order turn twice on the exploration steps, interleaved, each on its player count's model and limits; planner v2e and v2f on the chapter plans", () => {

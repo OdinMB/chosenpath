@@ -57,6 +57,7 @@ import { buildKidsAgesCasesMode } from "./kidsAgesCases.js";
 import { kidsAgesMode } from "./kidsAgesPrep.js";
 import { buildGroupLeverCasesMode, groupLeversMode } from "./groupLeversPrep.js";
 import { buildShortReplyCasesMode, shortRepliesMode } from "./shortRepliesPrep.js";
+import { runaway2Mode } from "./runaway2Prep.js";
 import { buildMoneyCasesMode, judgeMoneyMode } from "./moneyAddsUpPrep.js";
 import { buildLatePacingCasesMode, judgeCluesMode, latePacingPlayMode, printLatePacingPlan } from "./latePacingPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
@@ -81,7 +82,7 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --dry-run (default) [--prompt-state <tag>, default round0]  cases, open jobs, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e|ending-state|runaway --prompt-state <tag> [filters]
+ *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e|ending-state|runaway|…|short-replies|runaway-2 --prompt-state <tag> [filters]
  *     (options-continuity runs under adopted2: production's form beside the three arms, interleaved;
  *     options-o2 under adopted3: production's form beside version O2 on the stored rolled chapter steps, interleaved,
  *     then O2's retest turnO2b once on the same steps; planner-v2e under round0, beside planner v2c's and v2d's
@@ -108,7 +109,8 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     second playthroughs, interleaved, each with production's one checked retry; short-replies --role beat under
  *     adopted18: production's turn and shortReplies on the second playthroughs' short turns, the stored turns that came
  *     back short most often and ordinary ones, on each player count's turn model, interleaved, each with production's
- *     one checked retry)
+ *     one checked retry; runaway-2 --role beat under adopted19: production's closing turn, noThreadAudit and
+ *     noNewMilestones sixteen times each on the switch turn that ran away most, interleaved, first tries only)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -262,6 +264,10 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     words in the first reply and the reply kept against the count its form asks for, production and the variant
  *     pooled and per turn model under the stop rule, every one-paragraph text's opening, the retries, the automatic
  *     checks, the waits and cost; short-replies.md and .json
+ *   The runaway turn's cause again (runaway2Prep.ts, 2026-10-01), in the runaway-2 stage:
+ *   --runaway-2  the stage's report, no calls: each job's first try, answered or run away (cut at the output cap or by
+ *     the timeout), each diagnostic against production under the stop rule, the answered replies' reasoning tokens,
+ *     every runaway with its time, the answered replies' stat changes and milestones; runaway-2.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -333,6 +339,7 @@ type Mode =
   | "group-levers"
   | "build-short-reply-cases"
   | "short-replies"
+  | "runaway-2"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -482,6 +489,7 @@ function parseArgs(argv: string[]): Args {
       case "--group-levers":
       case "--build-short-reply-cases":
       case "--short-replies":
+      case "--runaway-2":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1238,6 +1246,9 @@ async function main() {
     case "short-replies":
       // A deterministic reading: no calls, so no key and no caps
       return shortRepliesMode({ files, log: (line) => console.log(line) });
+    case "runaway-2":
+      // A deterministic reading: no calls, so no key and no caps
+      return runaway2Mode({ files, log: (line) => console.log(line) });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

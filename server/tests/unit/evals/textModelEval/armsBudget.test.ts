@@ -28,9 +28,13 @@ import {
   ROUND3_PROBLEM_TURN,
   ROUND3_REPLAY_CASES,
   ROUND3_REPLAY_SAMPLES,
+  RUNAWAY_2_CASES,
+  RUNAWAY_2_PROMPT_STATE,
+  RUNAWAY_2_SAMPLES,
   RUNAWAY_CASES,
   RUNAWAY_PROMPT_STATE,
   RUNAWAY_SAMPLES,
+  SHORT_REPLIES_PROMPT_STATE,
   secondReferenceKeys,
   SETUP_R3C_PREMISES,
   SETUP_R3D_PREMISES,
@@ -440,6 +444,9 @@ describe("budget caps", () => {
       "group-levers": 0.43,
       // The coordinator's brief of 2026-10-01: turns that come back as one short paragraph, its estimate plus 30%
       "short-replies": 0.6,
+      // The coordinator's brief of 2026-10-01: the runaway turn's cause, a second attempt, its estimate (with the runaways
+      // and their retries, and room for one fix-and-retest) plus 30%
+      "runaway-2": 0.6,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -469,6 +476,7 @@ describe("budget caps", () => {
       "kids-ages",
       "group-levers",
       "short-replies",
+      "runaway-2",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -491,7 +499,7 @@ describe("budget caps", () => {
     expect(LEDGER_WHEN_REVIEW_OPENED + UNRECORDED_STAGE4_USD + capsOf(review)).toBeLessThanOrEqual(HARD_CEILING);
     // The owner's decisions of 2026-10-01 opened their measurements with the ledger at $39.94 of the $45 hard cap; their
     // caps fit with the $1.3 on top
-    expect(decisions).toEqual(["kids-ages", "group-levers", "short-replies"]);
+    expect(decisions).toEqual(["kids-ages", "group-levers", "short-replies", "runaway-2"]);
     expect(LEDGER_WHEN_DECISIONS_OPENED).toBe(39.94);
     expect(LEDGER_WHEN_DECISIONS_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisions)).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
@@ -693,6 +701,42 @@ describe("budget caps", () => {
     expect(stageRunsBaseline("runaway")).toBe(false);
     // The ledger read $36.17 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
     expect(36.17 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS.runaway).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("replays the runaway turn again (runaway-2, 2026-10-01): production's closing turn and the two diagnostic variants, each without one of its two closing blocks, sixteen times each on the case that ran away most, interleaved, under a tag of their own", () => {
+    const arms = ["adopted", "noThreadAudit", "noNewMilestones"].map((variant) =>
+      armKey({ model: TEXT_MODEL_GROUPS.beat.model, reasoningEffort: TEXT_MODEL_GROUPS.beat.reasoningEffort }, variant as "adopted")
+    );
+    expect(arms).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/noThreadAudit", "gpt-6-luna@medium/noNewMilestones"]);
+    expect(armsFor("runaway-2", "beat").map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source, p.caseIds])).toEqual(
+      arms.map((key) => [key, 1, RUNAWAY_2_SAMPLES, "single-player", "stored", RUNAWAY_2_CASES])
+    );
+    // The switch turn after story 8988006e's first chapter, the closing turn that ran away most (6 of 14 first tries since
+    // 2026-09-29); sixteen samples, so production's runaways can show a variant's none under the stop rule at that rate
+    expect(RUNAWAY_2_CASES).toEqual(["cont-8988006e-t4-o1"]);
+    expect(RUNAWAY_2_SAMPLES).toBe(16);
+    for (const role of ["setup", "switch", "thread", "iteration"] as const) expect(armsFor("runaway-2", role)).toEqual([]);
+    expect(pipelinePlans("runaway-2")).toEqual([]);
+    expect(stageInterleavesArms("runaway-2")).toBe(true);
+    // First tries are what it counts: no checked retry
+    expect(stageChecksTurns("runaway-2")).toBe(false);
+    // Production's code since the short-replies adoption, under a tag no earlier stage used
+    expect(RUNAWAY_2_PROMPT_STATE).toBe("adopted19");
+    expect([RUNAWAY_PROMPT_STATE, SHORT_REPLIES_PROMPT_STATE, PLAYTHROUGHS_2_PROMPT_STATE, CHOICE_LINE_SP_PROMPT_STATE]).not.toContain(RUNAWAY_2_PROMPT_STATE);
+    expect(stagePlansCase("runaway-2", RUNAWAY_2_CASES[0])).toBe(true);
+    // Each against production's request, which runs beside them, and priced from it
+    for (const key of arms.slice(1)) {
+      expect(referenceKey(key)).toBe(arms[0]);
+      expect(estimateBaseKey(key)).toBe(arms[0]);
+      expect(secondReferenceKeys(key)).toEqual([]);
+    }
+    expect(STAGE_CAP_REASONS["runaway-2"]).toMatch(/noThreadAudit/);
+    expect(STAGE_CAP_REASONS["runaway-2"]).toMatch(/noNewMilestones/);
+    expect(STAGE_CAP_REASONS["runaway-2"]).toMatch(/2026-10-01/);
+    expect(stageRunsBaseline("runaway-2")).toBe(false);
+    // The ledger read $40.93 when it opened: its cap fits under the $45 with the stalled Stage 4 calls on top
+    expect(DEFAULT_STAGE_CAPS["runaway-2"]).toBe(0.6);
+    expect(40.93 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["runaway-2"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("runs the choice-result stage (2026-09-30): production's turn and the exploration-order turn twice on the exploration steps, interleaved, and planner v2e and v2f on the chapter plans", () => {

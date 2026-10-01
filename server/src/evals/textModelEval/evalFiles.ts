@@ -45,6 +45,7 @@ import type { CallRecord } from "./runner.js";
  *   kids-ages.md|json      the kids-ages stage's report, turns per age band and player count against each band's limits, and the setups' stats (--kids-ages)
  *   group-levers.md|json   the group-levers stage's report, each group turn read whole, its players' sacrifices and rewards against their computed lines, own stats and shared ones (--group-levers)
  *   short-replies.md|json  the short-replies stage's report, each turn read whole, each player's paragraphs in the first reply and the reply kept (--short-replies)
+ *   runaway-2.md|json      the second runaway replay's report, each job's first try answered or run away, each arm against production (--runaway-2)
  *   judged-money.md|json   the money-adds-up stage's judged check, the figures adding up, and every reply with its stat changes (--judge-money)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  *   playthroughs.md|json   the whole-story playthroughs on production's own code (--playthroughs)
@@ -209,6 +210,11 @@ export function evalFiles(outDir: string) {
     writeShortReplies: (markdown: string, json: unknown) => {
       writeJson(at("short-replies.json"), json);
       fs.writeFileSync(at("short-replies.md"), markdown);
+    },
+    /** The second runaway replay's report: each job's first try, answered or run away, each arm against production (--runaway-2, runaway2Prep.ts) */
+    writeRunaway2: (markdown: string, json: unknown) => {
+      writeJson(at("runaway-2.json"), json);
+      fs.writeFileSync(at("runaway-2.md"), markdown);
     },
     /** The choice-line-sp stage's report: each turn read whole, production's retry in the loop (--choice-line-sp, choiceLinePrep.ts) */
     writeChoiceLine: (markdown: string, json: unknown) => {
