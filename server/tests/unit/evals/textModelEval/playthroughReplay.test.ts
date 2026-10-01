@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import fs from "node:fs";
 import path from "node:path";
-import type { SetOfBeatGenerationSchema } from "core/types/index.js";
+import { isDeepStrictEqual } from "node:util";
+import type { Story } from "core/models/Story.js";
+import type { SetOfBeatGenerationSchema, ThreadAnalysis } from "core/types/index.js";
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
+import { checkThreadPlan } from "../../../../src/game/services/planChecks.js";
 import { scoreboardWinners } from "../../../../src/game/services/scoreboards.js";
 import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthroughMode.js";
@@ -282,6 +285,48 @@ function chargedOnOffer(runs: PlayRun[], before: (run: PlayRun) => number = () =
   );
 }
 
+type ConvertedSide = { id: string; round: number; turn: number; thread: string; favorableSide?: "sideA" | "sideB"; recheckedEqualsStored: boolean };
+
+/** Each stored chapter plan the plan check converted a contest in, checked again from the reply its run used: the side the check stores now. */
+function convertedSides(runs: PlayRun[]): ConvertedSide[] {
+  return runs.flatMap((run) =>
+    replayRun(run).flatMap((r) => {
+      const plan = r.played.plan;
+      if (plan?.kind !== "chapter plan" || !plan.plan) return [];
+      const used = [...plan.calls].reverse().find((c) => !c.problem && c.outputFile);
+      if (!used?.outputFile || !used.repairs.some((line) => /^contest(OneSided|InCooperative):/.test(line))) return [];
+      // The reply as the planner call returned it to the check (the harness stores it assembled)
+      const parsed = (JSON.parse(fs.readFileSync(path.join(DIR, used.outputFile), "utf-8")) as { parsed?: unknown }).parsed;
+      const rechecked = checkThreadPlan(r.beforePlan, parsed as ThreadAnalysis).plan;
+      return rechecked.threads.flatMap((thread): ConvertedSide[] => {
+        if (!thread.favorableSide) return [];
+        const { favorableSide, ...rest } = thread;
+        const storedThread = (plan.plan as ThreadAnalysis).threads.find((s) => s.id === thread.id);
+        const recheckedEqualsStored = isDeepStrictEqual(JSON.parse(JSON.stringify(rest)), JSON.parse(JSON.stringify(storedThread ?? null)));
+        return [{ id: run.spec.id, round: run.round ?? 1, turn: r.turn, thread: thread.id, favorableSide, recheckedEqualsStored }];
+      });
+    })
+  );
+}
+
+/** The story with the converted threads' sides stored, or undefined where it holds none of them. */
+function withSidesStored(story: Story, sides: ConvertedSide[]): Story | undefined {
+  let patched = false;
+  const storyPhases = story.getState().storyPhases.map((phase) => {
+    if (!("threads" in phase)) return phase;
+    return {
+      ...phase,
+      threads: phase.threads.map((thread) => {
+        const side = sides.find((s) => s.thread === thread.id);
+        if (!side) return thread;
+        patched = true;
+        return { ...thread, favorableSide: side.favorableSide };
+      }),
+    };
+  });
+  return patched ? story.clone({ storyPhases }) : undefined;
+}
+
 /** The side each scoreboard's contest was won by on a stored turn, as production reads it now (scoreboardWinners). */
 function winnersAt(runs: PlayRun[], storyId: string, turn: number) {
   const run = runs.find((r) => r.spec.id === storyId);
@@ -332,6 +377,36 @@ describe("replayRun on the stored round 3 (skipped where the output folder is ab
     expect(scoreboardRepairs(stored2, (run) => (run.spec.id === "play-estate-agents" ? 22 : Number.POSITIVE_INFINITY))).toEqual([]);
     // Round 3: the food trucks' ending keeps 30 (30|70, Omar's side, the winner's) where the game kept 70 (70|30 for Amara)
     expect(scoreboardRepairs(stored3)).toEqual([["play-food-trucks", 26, "scoreboardWrittenTwice", "shared_contract_race: 70 after 30 in the same reply, the other side's share"]]);
+  });
+
+  /*
+   * Decision A's fix 2 (2026-10-01): a contest the plan check made one side's challenge stores its side (favorableSide).
+   * The stored plans were checked before, so each chapter plan with a conversion is checked again from the reply its run
+   * used; the stored story then carries the side, as production's would now.
+   */
+  (stored3.length ? it : it.skip)("a converted contest now stores its side, and the space pirates' turn-10 move toward the losing camp is turned around", () => {
+    const sides = [...convertedSides(stored), ...convertedSides(stored2), ...convertedSides(stored3)];
+    // Round 2's space pirates (Pip, the crew-plan camp) and round 3's (Oren, the salvagers): side B as the planner wrote
+    // them, their camp; round 3's food trucks (Amara, player1): side A. Round 1 converted none.
+    expect(sides.map(({ id, turn, thread, favorableSide }) => [id, turn, thread, favorableSide])).toEqual([
+      ["play-space-pirates", 10, "the_crew_benefit_on_the_slate", "sideB"],
+      ["play-food-trucks", 12, "the_scarce_slot_showcase", "sideA"],
+      ["play-space-pirates", 6, "the_first_claim_to_the_seal", "sideB"],
+    ]);
+    // Every converted thread is the stored one but for the side: the check is otherwise unchanged since the runs
+    expect(sides.map((s) => [s.id, s.turn, s.recheckedEqualsStored])).toEqual(sides.map((s) => [s.id, s.turn, true]));
+    // The turns after each converted chapter (or step), replayed with the side stored: only round 3's space pirates move a board
+    const runs = [...stored2, ...stored3];
+    const repaired = sides.flatMap(({ id, round }) => {
+      const run = runs.find((r) => r.spec.id === id && (r.round ?? 1) === round);
+      if (!run) return [];
+      return replayRun(run).flatMap((r) => {
+        const story = withSidesStored(r.before, sides.filter((s) => s.id === id && s.round === round));
+        if (!story || !r.played.reply) return [];
+        return repairBeatReply(story, r.played.reply as SetOfBeatGenerationSchema).repairs.filter((k) => k.kind === "scoreboardDirection").map((k) => [id, r.turn, k.detail]);
+      });
+    });
+    expect(repaired).toEqual([["play-space-pirates", 10, "shared_division_score: 50 -> 65 after side B won; 50 -> 35"]]);
   });
 
   (stored3.length ? it : it.skip)("the earlier rounds hold no other charge in the reply that offers the lever", () => {

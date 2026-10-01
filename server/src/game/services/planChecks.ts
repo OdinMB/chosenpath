@@ -398,7 +398,26 @@ function asChallengeResults(results: Results, won: "sideAWins" | "sideBWins"): R
  * outcome in a cooperative World (the editor only warns), and the planner
  * writes its chapter as a contest, which a cooperative game can't play: the
  * check refused it, its one retry wrote the same, and the turn failed for good.
+ *
+ * Either way the thread stores the scoreboard side whose win its favorable
+ * result is (`favorableSide`, boardSideOf, since 2026-10-01), so the
+ * scoreboard repair follows it: the third playthroughs' space pirates' seal
+ * contest held only Oren (side B), became his challenge, and the switch after
+ * his favorable result moved the score toward the other camp.
  */
+/**
+ * The side on the contest's scoreboard whose win a converted contest's favorable result is (the thread's stored
+ * `favorableSide`, since 2026-10-01): side A wherever player1 is among the winning side's players (the setup puts
+ * player1's side, or camp, first on the board, as PL-11 puts it on side A), side B for player2 in a two-player game,
+ * else the side the planner wrote (it is told player1's camp is side A; which camp a seat is in lives only in the setup's
+ * text). Both stored three-player conversions wrote the lone player's camp (the space pirates of rounds 2 and 3, side B).
+ */
+function boardSideOf(story: Story, winners: string[], won: "sideAWins" | "sideBWins"): "sideA" | "sideB" {
+  if (winners.includes("player1")) return "sideA";
+  if (story.getPlayerSlots().length === 2) return "sideB";
+  return won === "sideAWins" ? "sideA" : "sideB";
+}
+
 function oneSidedAsChallenge(story: Story, thread: Thread, repairs: Repair[]): Thread {
   const sideA = thread.playersSideA;
   const sideB = thread.playersSideB;
@@ -416,6 +435,7 @@ function oneSidedAsChallenge(story: Story, thread: Thread, repairs: Repair[]): T
   return {
     ...thread,
     ...(typeof stored.kind === "string" ? { kind: "challenge" } : {}),
+    favorableSide: boardSideOf(story, won === "sideAWins" ? sideA : sideB, won),
     playersSideA: players,
     playersSideB: [],
     possibleMilestones: asChallengeResults(thread.possibleMilestones, won),

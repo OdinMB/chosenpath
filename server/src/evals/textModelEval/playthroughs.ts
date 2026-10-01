@@ -40,11 +40,10 @@ import {
 } from "../../game/services/pacing.js";
 import { checkSwitchPlan, checkThreadPlan, checkedSwitchPlan, checkedThreadPlan } from "../../game/services/planChecks.js";
 import { TURN_RESENDS, UnusableResultError, withOneRetry } from "../../game/services/retryOnce.js";
-import { resultsFollowed, scoreboardOf } from "../../game/services/scoreboards.js";
+import { boardResultOf, resultsFollowed, scoreboardOf } from "../../game/services/scoreboards.js";
 import { analysisBefore, beatStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import type { Repair } from "../../game/services/textRepairs.js";
 import { withDistinctIdentityNames } from "../../stories/setupIdentities.js";
-import { getThreadType } from "core/types/thread.js";
 import { makeArm, productionRole, type Arm, type EvalRole } from "./arms.js";
 import { selectCharacters } from "./caseBuilder.js";
 import { optionsJudgeRequest, resultsJudgeRequest } from "./choiceResultJudge.js";
@@ -437,8 +436,12 @@ export type PlayPlan = {
 /** A send of a turn that failed (turnSends' label): its plan (when one was asked for), its turn calls, and why production failed it. */
 export type FailedSend = { send: string; plan?: PlayPlan; calls: PlayCallLog[]; failure: string };
 
-/** A contest step or chapter this turn follows (production's resultsFollowed): its result, its scoreboard, and whether player1 is on side A (the scoreboard's first side). */
-export type ContestResult = { outcomeId: string; board?: string; result: string | null; oriented: boolean };
+/**
+ * A contest step or chapter this turn follows (production's resultsFollowed): its result, its scoreboard, and whether
+ * player1 is on side A (the scoreboard's first side); `converted` for a contest the plan check made one side's challenge,
+ * its result in contest terms by the side it stored (boardResultOf, since 2026-10-01).
+ */
+export type ContestResult = { outcomeId: string; board?: string; result: string | null; oriented: boolean; converted?: true };
 
 export type PlayPick = {
   slot: string;
@@ -941,13 +944,14 @@ export async function playStory(
     } catch (error) {
       return failedWith(`the ${turn.kind}`, error, true);
     }
-    // The contest results this turn follows, as production's scoreboard repair reads them
-    const contests = resultsFollowed(before)
-      .filter(({ thread }) => getThreadType(thread) === "contest")
-      .map(({ thread, result }): ContestResult => {
-        const board = scoreboardOf(before, thread.outcomeId)?.id;
-        return { outcomeId: thread.outcomeId, ...(board ? { board } : {}), result, oriented: thread.playersSideA.includes("player1") };
-      });
+    // The contest results this turn follows, as production's scoreboard repair reads them (boardResultOf: since 2026-10-01 a
+    // contest the plan check made one side's challenge too, by the side it stored)
+    const contests = resultsFollowed(before).flatMap(({ thread, result }): ContestResult[] => {
+      const read = boardResultOf(thread, result);
+      if (!read) return [];
+      const board = scoreboardOf(before, thread.outcomeId)?.id;
+      return [{ outcomeId: thread.outcomeId, ...(board ? { board } : {}), ...read }];
+    });
     if (contests.length) turn.contestResults = contests;
     for (const slot of before.getPlayerSlots()) {
       const options = optionsJudgeRequest(before, reply, slot as PlayerSlot);

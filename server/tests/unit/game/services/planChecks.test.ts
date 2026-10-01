@@ -528,6 +528,37 @@ describe("checkThreadPlan", () => {
       expect(result.problem).toContain("side B");
     });
 
+    /*
+     * The third playthroughs' space pirates (2026-10-01): the seal's first contest held only Oren (player3), on side B, so
+     * the check made it his challenge; his favorable result was his camp's win, and the switch after it moved the score
+     * toward the other camp, since nothing stored which side the challenge was. It stores it now (favorableSide): the
+     * board side whose win the favorable result is, player1's side A wherever player1 is in it, player2's side B in a
+     * two-player game, else the side the planner wrote (the planner is told player1's camp is side A).
+     */
+    it("stores the board side whose win the challenge's favorable result is, so the scoreboard can follow it (the space pirates' turn 6)", () => {
+      const story = groupAfterPicks(GameModes.CooperativeCompetitive, THREE);
+      const sideB = checkThreadPlan(story, threadPlan([aThread("challenge", 2, ["player1"], [], { id: "escape" }), contestThread([], ["player2"], "the_ledger"), aThread("exploration", 2, ["player3"], [], { id: "ship", outcomeId: "player3_ship" })]));
+      expect(sideB.plan.threads.map((t) => t.favorableSide)).toEqual([undefined, "sideB", undefined]);
+      const sideA = checkThreadPlan(story, threadPlan([aThread("challenge", 2, ["player1"], [], { id: "escape" }), contestThread(["player2"], [], "the_ledger"), aThread("exploration", 2, ["player3"], [], { id: "ship", outcomeId: "player3_ship" })]));
+      expect(sideA.plan.threads[1].favorableSide).toBe("sideA");
+      // player1's own: side A
+      const own = checkThreadPlan(groupAfterPicks(GameModes.Competitive, { player1: "shared_crown", player2: "player2_debt" }), threadPlan([contestThread(["player1"], [], "the_route"), aThread("exploration", 2, ["player2"], [], { id: "debt", outcomeId: "player2_debt" })]));
+      expect(own.plan.threads[0].favorableSide).toBe("sideA");
+    });
+
+    it("takes player2's side as side B in a two-player game whatever side the planner wrote, the results staying the written side's", () => {
+      const story = groupAfterPicks(GameModes.Competitive, { player1: "player1_trust", player2: "shared_crown" });
+      const result = checkThreadPlan(story, threadPlan([aThread("challenge", 2, ["player1"], [], { id: "trust", outcomeId: "player1_trust" }), contestThread(["player2"], [], "the_route")]));
+      expect(result.problem).toBeUndefined();
+      expect(result.plan.threads[1]).toMatchObject({ favorableSide: "sideB", possibleMilestones: { favorable: "A takes the crown", unfavorable: "B takes the crown" } });
+    });
+
+    it("leaves every thread it doesn't convert without a stored side", () => {
+      const story = groupAfterPicks(GameModes.CooperativeCompetitive, { player1: "shared_crown", player2: "shared_crown", player3: "player3_ship" });
+      const result = checkThreadPlan(story, threadPlan([contestThread(["player1"], ["player2"], "the_crown"), aThread("exploration", 2, ["player3"], [], { id: "ship", outcomeId: "player3_ship" })]));
+      expect(result.plan.threads.map((t) => t.favorableSide)).toEqual([undefined, undefined]);
+    });
+
     it("uses a first reply whose only fault was the one-sided contest: no retry, every player where they picked", async () => {
       // The space pirates' turn 6: Ari alone in the contest he picked, the other two in the threads they picked
       const story = groupAfterPicks(GameModes.CooperativeCompetitive, { player1: "shared_crown", player2: "player2_debt", player3: "shared_escape" });
@@ -601,6 +632,9 @@ describe("checkThreadPlan", () => {
       ]));
       expect(elsewhere.problem).toBeUndefined();
       expect(elsewhere.plan.threads[1]).toMatchObject({ playersSideA: ["player3", "player2"], possibleMilestones: { favorable: "A takes the crown" } });
+      // The board side whose win the favorable result is: player1's, side A, wherever player1 is in it; else the written side
+      expect(onB.plan.threads[0].favorableSide).toBe("sideA");
+      expect(elsewhere.plan.threads[1].favorableSide).toBe("sideA");
     });
 
     it("uses the first reply: no retry, so the chapter is never refused twice", async () => {

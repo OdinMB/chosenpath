@@ -21,6 +21,7 @@ import {
   turnSends,
   withSeededDice,
   type PlayCall,
+  type PlayCallSpec,
 } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { storyFromSetup } from "../../../../src/evals/textModelEval/setupChain.js";
@@ -587,6 +588,33 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(step).toEqual([expect.objectContaining({ outcomeId: "shared_harbour", board: "shared_race", oriented: true })]);
     expect(["sideAWins", "mixed", "sideBWins"]).toContain(step[0].result);
     expect(run.turns[5].contestResults?.[0]).toMatchObject({ outcomeId: "shared_harbour", board: "shared_race" });
+  });
+
+  it("records a contest the plan check made one side's challenge by the side it stored, as production's scoreboard repair reads it (since 2026-10-01)", async () => {
+    const contested = outcome("shared_harbour", { intendedNumberOfMilestones: 3, possibleResolutions: { sideAWins: "A takes it.", mixed: "Split.", sideBWins: "B takes it." }, resonance: "The harbour. Scored by Harbour Race." } as never);
+    const board = stat("shared_race", { name: "Harbour Race", type: "opposites", initialValue: 50 } as never);
+    const setup = { ...setupReply(2), sharedOutcomes: [contested], sharedStats: [...setupReply(2).sharedStats, board] };
+    const length = (spec: PlayCallSpec) => Math.max(...(/Allowed lengths for this thread: ([^.]+) beats/.exec(requestText(spec.request))?.[1].match(/\d+/g) ?? ["2"]).map(Number));
+    // The first chapter: the contest with both rivals (a competitive story's first thread); the second: player2 alone on side B
+    // of the contest, player1 on their own outcome, which the plan check makes player2's challenge
+    const plan = (nth: number, spec: PlayCallSpec) => {
+      const steps = length(spec);
+      if (nth === 0) {
+        const both = threadAnalysis("contest", steps, 0, ["player1"], ["player2"]);
+        return { ...both, threads: [{ ...both.threads[0], outcomeId: "shared_harbour" }] };
+      }
+      const alone = threadAnalysis("contest", steps, 0, [], ["player2"]).threads[0];
+      const own = threadAnalysis("challenge", steps, 0, ["player1"]).threads[0];
+      return { ...threadAnalysis("challenge", steps, 0, ["player1"]), threads: [{ ...alone, id: "alone", outcomeId: "shared_harbour" }, { ...own, id: "own", outcomeId: "player1_main" }] };
+    };
+    const { call } = fakeCall(2, { reply: (role, nth, spec) => (role === "setup" ? setup : role === "thread" ? plan(nth, spec) : DEFAULT) });
+    const { run } = await playStory(PLAYTHROUGHS_2[4], { ...input(2), gameMode: GameModes.Competitive }, call, { sample: 1, turnLimit: 10 });
+    const converted = run.turns.flatMap((t) => (t.contestResults ?? []).filter((c) => c.converted).map((c) => ({ ...c, turn: t.turn })));
+    expect(converted.length).toBeGreaterThan(0);
+    for (const c of converted) {
+      expect(c).toMatchObject({ outcomeId: "shared_harbour", board: "shared_race", oriented: true, converted: true });
+      expect(["sideAWins", "mixed", "sideBWins"]).toContain(c.result);
+    }
   });
 
   it("asks no ending for options: the game shows none there", async () => {

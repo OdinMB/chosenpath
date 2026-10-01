@@ -891,6 +891,36 @@ describe("repairBeatReply: the scoreboard moves toward the side that won (TR-8)"
   });
 
   /*
+   * The third playthroughs' space pirates (2026-10-01): the plan check made the seal's first contest, which held only
+   * Oren (player3, side B), his challenge; his favorable result was his camp's win, and the switch after it moved the
+   * score 50 -> 65 toward the other camp. The converted thread stores its side (favorableSide), which the repair reads.
+   */
+  describe("a contest the plan check made one side's challenge (the space pirates' round 3, turn 10)", () => {
+    function convertedChapter(result: "favorable" | "mixed" | "unfavorable", favorableSide?: "sideA" | "sideB"): ThreadAnalysis {
+      const analysis = threadAnalysis("challenge", 2, 1, ["player3"], []);
+      const [written] = analysis.threads;
+      const progression = written.progression.map((step) => ({ ...step, resolution: result }));
+      return { ...analysis, threads: [{ ...written, outcomeId: CONTESTED.id, progression, resolution: result, milestone: "The crew decides.", ...(favorableSide ? { favorableSide } : {}) }] };
+    }
+    const switchAfterConverted = (result: "favorable" | "mixed" | "unfavorable", favorableSide?: "sideA" | "sideB") =>
+      withContest(laterSwitchBeat(3, { storyPhases: [switchAnalysis(slotsOf(3), 0), convertedChapter(result, favorableSide), switchAnalysis(slotsOf(3), 3)] }), 50, { gameMode: GameModes.CooperativeCompetitive });
+
+    it("turns a move toward the camp that lost the converted contest around: Oren's favorable result is side B's win", () => {
+      const result = repairScore(switchAfterConverted("favorable", "sideB"), [race("addNumber", 15)]);
+      expect(result.changes).toEqual([race("subtractNumber", 15)]);
+      expect(result.repairs.map((r) => r.detail)).toEqual(["shared_license_race: 50 -> 65 after side B won; 50 -> 35"]);
+      // Its unfavorable result is the other side's win
+      expect(repairScore(switchAfterConverted("unfavorable", "sideB"), [race("subtractNumber", 10)]).changes).toEqual([race("addNumber", 10)]);
+      expect(repairScore(switchAfterConverted("favorable", "sideA"), [race("subtractNumber", 10)]).changes).toEqual([race("addNumber", 10)]);
+    });
+
+    it("leaves moves after its mixed result, and after a challenge with no stored side (planned so, or converted before 2026-10-01), as written", () => {
+      expect(repairScore(switchAfterConverted("mixed", "sideB"), [race("addNumber", 10)]).kinds).toEqual([]);
+      expect(repairScore(switchAfterConverted("favorable"), [race("addNumber", 10)]).kinds).toEqual([]);
+    });
+  });
+
+  /*
    * The third playthroughs (2026-10-01): the food trucks' outcome reads "Scored by Contract Race" for the stat
    * shared_contract_race, named "Innovator's Lead|Circuit Caterer's Lead", so the repair never saw the board; and the
    * ending wrote the score twice, setNumber 30 and then 70, each side's share in turn, so the game kept 70|30 for the loser.
