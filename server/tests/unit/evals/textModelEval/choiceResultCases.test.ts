@@ -14,7 +14,9 @@ import {
 } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { CHOICE_RESULT_TEXT } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { threadBeat } from "../../../helpers/promptStories.js";
-import { beforeGroupLevers, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
+import { beforeGroupLevers, beforeOptionsO2c, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
+import { replayRun } from "../../../../src/evals/textModelEval/playthroughReplay.js";
+import { takesOptionRules } from "../../../../src/game/services/optionRules.js";
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import { requestInputFor } from "../../../../src/evals/textModelEval/jobPlan.js";
 import { outputIdOf } from "../../../../src/evals/textModelEval/judgedChecks.js";
@@ -51,8 +53,14 @@ async function playedFake() {
   const byId = new Map(calls.map((c: PlayCallSpec) => [c.caseId, sha256(requestText(c.request))]));
   // fakeCall writes each call's output as outputs/<case id>.json
   const hashOf = (outputFile: string) => byId.get(outputIdOf(outputFile));
-  // The same run as production sent it before the short-replies adoption (2026-10-01), as the stored playthroughs were
+  // The same run as production sent it before the short-replies adoption (2026-10-01), as the stored playthroughs were,
+  // and a single player's rolled step before the options-o2c adoption after it (beforeOptionsO2c reads the turn's story,
+  // so those come from the replay)
   const thenById = new Map(calls.map((c: PlayCallSpec) => [c.caseId, sha256(beforeShortReplies(requestText(c.request)))]));
+  for (const r of replayRun(run)) {
+    const id = outputIdOf(r.played.calls[0]?.outputFile ?? "");
+    if (thenById.has(id) && takesOptionRules(r.before)) thenById.set(id, sha256(beforeShortReplies(beforeOptionsO2c(productionSends({ role: "beat", story: r.before }), r.before))));
+  }
   const hashThen = (outputFile: string) => thenById.get(outputIdOf(outputFile));
   return { run, hashOf, hashThen };
 }
@@ -92,10 +100,16 @@ describe("playthroughsSent: what production sent in the stored playthroughs, bef
     expect(playthroughsSent(group)).toBe(beforeShortReplies(productionSends(group)).replace(CHOICE_RESULT_TEXT.explorationOrder, ""));
     // A group's challenge step as production sent it before the group-levers adoption (2026-10-01, beforeGroupLevers),
     // every turn before the short-replies adoption later that day (beforeShortReplies)
-    for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) expect(playthroughsSent({ role: "beat", story })).toBe(beforeGroupLevers(beforeShortReplies(productionSends({ role: "beat", story })), story));
+    // and a single player's rolled step before the options-o2c adoption after it (beforeOptionsO2c)
+    for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) expect(playthroughsSent({ role: "beat", story })).toBe(beforeGroupLevers(beforeShortReplies(beforeOptionsO2c(productionSends({ role: "beat", story }), story)), story));
     const { run, hashOf } = await playedFake();
     const [opening, step] = choiceResultCases([run], hashOf, SPECS, productionSends).cases;
-    for (const c of [opening, step]) expect(playthroughsSent(requestInputFor(c))).toBe(beforeShortReplies(productionSends(requestInputFor(c))));
+    for (const c of [opening, step]) {
+      const input = requestInputFor(c);
+      const story = input.role === "beat" ? input.story : undefined;
+      expect(story).toBeDefined();
+      expect(playthroughsSent(input)).toBe(beforeShortReplies(beforeOptionsO2c(productionSends(input), story!)));
+    }
   });
 });
 

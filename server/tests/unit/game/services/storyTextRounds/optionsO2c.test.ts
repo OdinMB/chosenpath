@@ -208,10 +208,15 @@ const SINGLE_PLAYER: [string, () => Story][] = [
 ];
 
 describe("the request: production's single-player turn with O2b's stat lines and O2c's lever line on rolled steps", () => {
-  it.each(SINGLE_PLAYER)("%s: the base is production's request byte for byte", (_, build) => {
+  // Adopted after the run of 2026-10-01: production prints O2c's lines on a rolled step, so the base, production as the
+  // stage measured it, takes them out there (B6's rate line back in the lever line's place); production's request
+  // byte for byte on every other turn, and the variant is production's request byte for byte everywhere
+  it.each(SINGLE_PLAYER)("%s: the base is production's request as the stage measured it, the variant production's as it is", (_, build) => {
     const story = build();
-    const [base, production] = [optionsO2cBase(story), beatStep.request(story)];
-    expect(base.prompt).toBe(production.prompt);
+    const [base, production, variant] = [optionsO2cBase(story), beatStep.request(story), optionsO2cRequest(story)];
+    expect(variant.prompt).toBe(production.prompt);
+    expect(json(variant.schema)).toBe(json(production.schema));
+    expect(base.prompt).toBe(withoutO2c(story, production.prompt));
     expect(json(base.schema)).toBe(json(production.schema));
   });
 

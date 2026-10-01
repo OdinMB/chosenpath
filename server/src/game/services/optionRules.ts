@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { getThreadType, type Beat } from "core/types/index.js";
+import { allowsLever } from "./leverPayments.js";
 
 /*
  * The option rules (turn doc B6), adopted on 2026-09-28 for single-player
@@ -15,16 +16,38 @@ import { getThreadType, type Beat } from "core/types/index.js";
  * turns stayed on today's form (B6 was never built or measured for groups)
  * until the group-levers stage of 2026-10-01, which gave each player in a
  * group's challenge or contest thread B6's lever parts (below,
- * groupSacrificeRewardLines). BeatPromptService prints the lines,
+ * groupSacrificeRewardLines). Since the options-o2c stage of the same day a
+ * single player's three ways carry O2b's stat lines and the single player's
+ * lever line is the one the game computes from B6's rate and the chapters
+ * (optionLeverLine, below). BeatPromptService prints the lines,
  * storyTextSteps.beatStep puts the field texts in the schema;
  * adoptedTurns.test.ts holds both equal to the measured forms.
  */
+
+/*
+ * Option variety with fewer rewards (the options-o2c stage of 2026-10-01,
+ * measured as the eval's turnO2c, storyTextRounds/optionsO2c.ts): after the
+ * third way, O2b's stat lines (the options draw on different stats, a lever
+ * option needs no bonus, risk alone never tells two apart, no option names its
+ * stat; the option that plays to the strength keeps -5 to -15), and after B6's
+ * weak example the risk-only one. Measured twice on the 32 stored rolled steps
+ * beside production: main stats distinct 13% -> 47% of sets, sets with a second
+ * sacrifice in the chapter 28% -> 9%, reasoning tokens level.
+ */
+const STATS_DIFFER =
+  "--- The options also draw on different stats: no two take their main stat bonus from the same stat, and at most one option that is neither a sacrifice nor a reward has no stat bonus (as far as the stats' current values give bonuses). A sacrifice or reward option needs no stat bonus: what it spends or gains already sets it apart. Risk alone never tells two options apart. An option's words say what the character does; they never name the stat its bonus comes from.";
+const NEGATIVE_BASE_HOLDS =
+  "--- Drawing on different stats doesn't change basePoints: the option that plays to the character's strength still takes -5 to -15, even when every option earns a bonus.";
+const RISK_ONLY_WEAK = "--- Weak: three options that each earn +10 from Nerve and differ only in how risky they are.";
 
 export const THREE_WAYS = `- The three options are three different ways to act, and a player can tell them apart from their words alone (players see nothing else before they choose):
 --- one is the sensible approach to the moment;
 --- one plays to the character's strength, asset or contact: tempting, but not the obvious move;
 --- one costs or risks something the others don't (a sacrifice, a chased reward, a relationship put on the line), or serves a different stake of the character's.
+${STATS_DIFFER}
+${NEGATIVE_BASE_HOLDS}
 --- Weak: "Use your speech skill to…" / "Use your charm to…" / "Use your knowledge of law to…" (one approach three times)
+${RISK_ONLY_WEAK}
 --- Good: "Quote the Guild's own charter back to Sir Bram, clause by clause." / "Bring Gruk's enclave into the hall to stand silently behind you." / "Offer Sir Bram a public apology from the movement (-10% Public Support) in exchange for a hearing."
 - A story element's Instructions can supply the tempting or the costly option.`;
 
@@ -102,6 +125,79 @@ export function sacrificeRewardLine(story: Story, slot: string): string {
   const other = kind === "sacrifice" ? "reward" : "sacrifice";
   const ago = history.length - last.index;
   return `Sacrifice or reward: one fits this turn if a stat allows it (the last one offered was a ${kind}, ${ago} turn${ago === 1 ? "" : "s"} ago; prefer a ${other}).`;
+}
+
+/*
+ * A single player's lever line (the options-o2c stage of 2026-10-01, measured as
+ * the eval's turnO2c and adopted; the owner on O2b: "14 reward options in 32
+ * choice sets is a bit too much. At most one reward is good. Several sacrifices
+ * can sometimes make sense, but should have a strong justification starting at
+ * the second one"). The game places a chapter's one reward (rewardTurn): the
+ * chapter's first step, where the player's previous chapter offered no reward
+ * (offered, chosen or not) and some stat's rules allow one, with no sacrifice
+ * beside it; so at most one a chapter and never two chapters running, about one
+ * chapter in two or three once a reward isn't always taken. Elsewhere no
+ * reward, and a sacrifice where B6's rate allows one (sacrificeRewardLine), a
+ * second in the chapter only for a strong reason in the option's text; today's
+ * "none this turn" where the rate gives none. Measured twice on the 32 stored
+ * rolled steps beside production: rewards 10 of 64 sets (target about 4-6 per
+ * 32), all on the reward turn (10 of 10) and none elsewhere (production 4 of
+ * 54), sacrifices 24 -> 12, second sacrifices 18 -> 6. A group's players keep
+ * B6's rate line (groupSacrificeRewardLines).
+ */
+const NONE_THIS_TURN = "Sacrifice or reward: none this turn.";
+const REWARD_TURN = "Sacrifice or reward: offer a reward this turn if a stat allows one. No sacrifice this turn.";
+const SACRIFICE_FITS = "Sacrifice or reward: a sacrifice fits this turn if a stat allows it. No reward this turn.";
+
+const offeredIn = (beats: Beat[], kind: string) => beats.reduce((sum, beat) => sum + (beat.options ?? []).filter((o) => o.resourceType === kind).length, 0);
+
+/** The current chapter's beats in this player's history so far. */
+function chapterBeats(story: Story, slot: string): Beat[] {
+  if (story.getCurrentBeatType() !== "thread") return [];
+  const thread = story.getCurrentThreadAnalysis()?.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
+  return thread ? (story.getThreadBeatTexts(thread)[slot] ?? []) : [];
+}
+
+/** The rewards the player's previous chapter (the last thread they played before the current one) offered, chosen or not; 0 before any. */
+function previousChapterRewards(story: Story, slot: string): number {
+  const phases = story.getState().storyPhases;
+  const current = story.getCurrentThreadAnalysis();
+  for (let i = phases.length - 1; i >= 0; i--) {
+    const phase = phases[i];
+    if (!("threads" in phase) || phase === current) continue;
+    const thread = phase.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
+    if (thread) return offeredIn(story.getThreadBeatTexts(thread)[slot] ?? [], "reward");
+  }
+  return 0;
+}
+
+const rewardAllowed = (story: Story) => {
+  const state = story.getState();
+  return [...state.sharedStats, ...state.playerStats].some((stat) => allowsLever(stat, "reward"));
+};
+
+/** The reward turn the game places: a single player's rolled chapter step that is the chapter's first, after a chapter that offered no reward, where a stat allows one. */
+export function rewardTurn(story: Story, slot: string): boolean {
+  if (!takesOptionRules(story) || slot !== "player1") return false;
+  return story.getCurrentThreadBeatsCompleted() === 0 && previousChapterRewards(story, slot) === 0 && rewardAllowed(story);
+}
+
+const WORDS = ["no", "one", "two", "three", "four", "five"];
+const inWords = (n: number) => WORDS[n] ?? String(n);
+
+/** A single player's lever line on a rolled chapter step, in B6's line's place: the reward turn's, a sacrifice that fits, a second only for a strong reason, or none. */
+export function optionLeverLine(story: Story, slot: string): string {
+  if (rewardTurn(story, slot)) return REWARD_TURN;
+  if (sacrificeRewardLine(story, slot) === NONE_THIS_TURN) return NONE_THIS_TURN;
+  const beats = chapterBeats(story, slot);
+  const sacrifices = offeredIn(beats, "sacrifice");
+  if (sacrifices === 0) return SACRIFICE_FITS;
+  const taken = beats.filter((beat) => beat.choice >= 0 && beat.options?.[beat.choice]?.resourceType === "sacrifice").length;
+  const soFar =
+    sacrifices === 1
+      ? `a sacrifice, which the player ${taken > 0 ? "took" : "didn't take"}`
+      : `${inWords(sacrifices)} sacrifices, and the player took ${taken === 0 ? "none of them" : taken === sacrifices ? (sacrifices === 2 ? "both" : "all of them") : `${inWords(taken)} of them`}`;
+  return `Sacrifice or reward: this thread already offered ${soFar}, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text. No reward this turn.`;
 }
 
 /*

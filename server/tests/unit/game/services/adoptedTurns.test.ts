@@ -22,6 +22,7 @@ import {
   withKidsBandImageSlots,
   withKidsImageSlots,
   withKidsImageSlotsSchema,
+  withOptionsO2c,
   withShortReplies,
 } from "../../../helpers/adoptedDeltas.js";
 import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../../../src/game/services/storyTextRounds/endingState.js";
@@ -31,7 +32,9 @@ import { KIDS_TURN_TEXT, kidsTurnRequest } from "../../../../src/game/services/s
 import { KIDS_AGES_TEXT, kidsAgesBand, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsAges.js";
 import { KIDS_BAND_TURNS, beatCheckOptions, takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { GROUP_LEVERS_TEXT, groupLeversBase, groupLeversRequest, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
-import { GROUP_LEVER_QUESTION, GROUP_SHARED_AND_OWN, REWARD_EXCEPTION, groupSacrificeRewardLines } from "../../../../src/game/services/optionRules.js";
+import { GROUP_LEVER_QUESTION, GROUP_SHARED_AND_OWN, REWARD_EXCEPTION, groupSacrificeRewardLines, takesOptionRules } from "../../../../src/game/services/optionRules.js";
+import { o2cLeverLine, optionsO2cBase, optionsO2cRequest } from "../../../../src/game/services/storyTextRounds/optionsO2c.js";
+import { OPTIONS_CONTINUITY_TEXT } from "../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -175,7 +178,8 @@ function expectSame(production: Request, measured: Request | Expected) {
  */
 function kidsAdopted(story: Story): Expected {
   const measured = kidsTurnRequest(story);
-  const lined = withShortReplies({ prompt: withEndingOnlyPlayed(withKidsImageSlots(measured.prompt, story), story), schema: measured.schema });
+  // Since the options-o2c stage, a rolled step carries O2c's lines too (withOptionsO2c, logged: unmeasured for kids)
+  const lined = withShortReplies({ prompt: withOptionsO2c(withEndingOnlyPlayed(withKidsImageSlots(measured.prompt, story), story), story), schema: measured.schema });
   return { prompt: lined.prompt, json: withKidsImageSlotsSchema(lined.json, story) };
 }
 
@@ -200,10 +204,33 @@ const kidsAgesAdopted = (story: Story): Expected => {
 const asAdopted = (measured: Request, story: Story): Expected =>
   takesKidsRules(story) ? kidsAgesAdopted(story) : withShortReplies({ prompt: adoptedTurn(measured.prompt, story), schema: measured.schema });
 
-describe("single-player turns: today's form with B6 as measured, an exploration step as choiceResult, the ending as endingStateB", () => {
+/**
+ * A single player's turn as production must send it. Since the options-o2c stage of 2026-10-01 a rolled chapter step
+ * (not read with a child) is the measured turnO2c byte for byte, prompt and JSON schema; its base, production with
+ * O2c's lines taken out (optionsO2cBase), is today's form with B6 as before, with the deltas and the short-replies lines
+ * (asAdopted), so the measured variant stands on the form measured before it.
+ */
+function expectSinglePlayer(story: Story) {
+  if (!takesKidsRules(story) && takesOptionRules(story)) {
+    expectSame(beatStep.request(story), optionsO2cRequest(story));
+    expectSame(optionsO2cBase(story), asAdopted(measuredTurn(story), story));
+    return;
+  }
+  expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
+}
+
+describe("single-player turns: today's form with B6 as measured, a rolled chapter step as turnO2c, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(SINGLE_PLAYER)("%s", (_, build) => {
-    const story = build();
-    expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
+    expectSinglePlayer(build());
+  });
+
+  it("gives a rolled chapter step O2c's lines once and its computed lever line in place of B6's rate line (the options-o2c stage, 2026-10-01); no other single-player turn", () => {
+    const opening = chapterStep("challenge", 0);
+    const prompt = beatStep.request(opening).prompt;
+    expect(prompt.split(OPTIONS_CONTINUITY_TEXT.o2Stats)).toHaveLength(2);
+    expect(prompt.split(OPTIONS_CONTINUITY_TEXT.riskOnlyWeak)).toHaveLength(2);
+    expect(prompt).toContain(`--- ${o2cLeverLine(opening, "player1")}\n`);
+    for (const story of [chapterStep("exploration", 1), firstSwitchBeat(1), endingBeat(1)]) expect(beatStep.request(story).prompt).not.toContain(OPTIONS_CONTINUITY_TEXT.o2Stats);
   });
 
   it("gives a challenge step B6's lines and a single player's other turns none", () => {
@@ -214,10 +241,7 @@ describe("single-player turns: today's form with B6 as measured, an exploration 
   (frozen.length ? it : it.skip)("every frozen single-player turn", () => {
     const cases = frozen.filter((c) => c.role === "beat" && !c.tags.multiplayer);
     expect(cases.length).toBeGreaterThan(40);
-    for (const c of cases) {
-      const story = caseStory(c);
-      expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
-    }
+    for (const c of cases) expectSinglePlayer(caseStory(c));
   });
 });
 

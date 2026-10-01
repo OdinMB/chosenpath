@@ -66,6 +66,12 @@ import { chapterLevers, OPTIONS_CONTINUITY_TEXT, type ChapterLevers } from "./tu
  *   leave, and O2b dropped it.
  * - today's "none this turn" where the rate gives none.
  * Everywhere else production's request byte for byte.
+ *
+ * Adopted after the run of 2026-10-01: production's copy is optionRules.ts
+ * (THREE_WAYS with the stat lines, rewardTurn, optionLeverLine), and the kept
+ * tests hold production to turnO2c byte for byte, prompt and JSON schema. The
+ * variant builds on production with those lines taken out (optionsO2cBase), so
+ * it still builds as measured.
  */
 
 const LABEL = "Options O2c turn";
@@ -140,9 +146,21 @@ export function o2cLeverLine(story: Story, slot: string): string {
   return `Sacrifice or reward: this thread already offered ${sacrificesSoFar(chapterLevers(story, slot))}, ${STRONG_REASON}. ${NO_REWARD}`;
 }
 
-/** Production's single-player turn as the stage measures it beside the variant. */
+/**
+ * Production's single-player turn as the stage measured it beside the variant.
+ * Since the adoption (2026-10-01) production prints O2c's lines on a rolled step
+ * (optionRules.ts: THREE_WAYS and optionLeverLine), so they are taken out there
+ * and B6's rate line put back in the lever line's place (the texts are the
+ * variant's, which a test holds); every other turn is production's as it is.
+ */
 export function optionsO2cBase(story: Story): TextRequest<z.AnyZodObject> {
-  return beatStep.request(story);
+  const production = beatStep.request(story);
+  if (!takesOptionRules(story)) return production;
+  const { instructions, state } = splitAtState(LABEL, production.prompt);
+  let edited = replaceOnce(LABEL, instructions, `${THIRD_WAY}${OPTIONS_CONTINUITY_TEXT.o2Stats}\n${OPTIONS_CONTINUITY_TEXT.o2NegativeBase}\n`, THIRD_WAY);
+  edited = replaceOnce(LABEL, edited, `${WEAK_ONE_APPROACH}${OPTIONS_CONTINUITY_TEXT.riskOnlyWeak}\n`, WEAK_ONE_APPROACH);
+  edited = replaceOnce(LABEL, edited, `--- ${o2cLeverLine(story, "player1")}\n`, `--- ${sacrificeRewardLine(story, "player1")}\n`);
+  return { prompt: edited + state, schema: production.schema };
 }
 
 /** Production's single-player turn with O2b's stat lines and O2c's lever line on a rolled chapter step; production's request elsewhere. */

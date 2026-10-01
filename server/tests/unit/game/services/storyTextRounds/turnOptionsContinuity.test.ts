@@ -30,7 +30,7 @@ import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../../helpers/roundStories.js";
 import { beatGeneration, challengeOptions, threadAnalysis, type ThreadKind } from "../../../../helpers/textFixtures.js";
-import { withEndingOnlyPlayed } from "../../../../helpers/adoptedDeltas.js";
+import { beforeOptionsO2c, withEndingOnlyPlayed } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * The owner's feedback of 2026-09-30 on options and continuity, as three eval
@@ -134,11 +134,14 @@ const SINGLE_PLAYER: [string, () => Story][] = [
  * ran beside. Nor did any turn then read a story's category: a single
  * player's read-with-kids turn takes the kids rules since 2026-10-01. Nor did
  * any turn carry the short-replies stage's lines, adopted that day too
- * (shortRepliesBase takes them out).
+ * (shortRepliesBase takes them out), nor a rolled step the options-o2c stage's
+ * lines, adopted later that day (beforeOptionsO2c takes them out).
  */
 function productionThen(story: Story) {
   if (story.getCurrentBeatType() === "ending") return productionEndingForm(story);
-  const today = shortRepliesBase(takesKidsRules(story) ? story.clone({ category: undefined, readingAge: undefined }) : story);
+  const plain = takesKidsRules(story) ? story.clone({ category: undefined, readingAge: undefined }) : story;
+  const lined = shortRepliesBase(plain);
+  const today = { ...lined, prompt: beforeOptionsO2c(lined.prompt, plain) };
   return takesExplorationOrder(story) ? { ...today, prompt: today.prompt.replace(EXPLORATION_ORDER, "") } : today;
 }
 

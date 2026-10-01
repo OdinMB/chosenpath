@@ -4,15 +4,20 @@ import type { Beat, BeatOption, ThreadAnalysis } from "core/types/index.js";
 import {
   GROUP_SHARED_AND_OWN,
   NO_DOUBLE_SACRIFICE,
+  THREE_WAYS,
   groupLeverSlots,
   groupSacrificeRewardLines,
+  optionLeverLine,
+  rewardTurn,
   sacrificeRewardLine,
   takesGroupLeverRules,
   takesOptionRules,
 } from "../../../../src/game/services/optionRules.js";
+import { OPTIONS_CONTINUITY_TEXT } from "../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
+import { OPTIONS_O2C_TEXT, o2cLeverLine, o2cRewardTurn } from "../../../../src/game/services/storyTextRounds/optionsO2c.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
-import { outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
-import { beatGeneration, challengeOptions, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
+import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
+import { beatGeneration, challengeOptions, stat, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
 
 /*
  * The option rules (B6) in production: which turns take them, and the lever
@@ -123,7 +128,7 @@ describe("sacrificeRewardLine (B6's computed rate)", () => {
     );
   });
 
-  it("fits again two challenge turns after a lever, naming how long ago it was offered", () => {
+  it("fits again two challenge turns after a lever, naming how long ago it was offered (group turns read it; a single player's turn reads optionLeverLine)", () => {
     const history = [challengeBeat(), challengeBeat(), challengeBeat(["reward"])];
     // The last two challenge turns include the reward, so none fits; one more challenge turn later it fits again
     expect(sacrificeRewardLine(chapterStep("challenge", history), "player1")).toBe("Sacrifice or reward: none this turn.");
@@ -131,5 +136,70 @@ describe("sacrificeRewardLine (B6's computed rate)", () => {
     expect(sacrificeRewardLine(chapterStep("challenge", later), "player1")).toBe(
       "Sacrifice or reward: one fits this turn if a stat allows it (the last one offered was a reward, 3 turns ago; prefer a sacrifice)."
     );
+  });
+});
+
+/*
+ * Option variety with fewer rewards (the options-o2c stage of 2026-10-01,
+ * measured as the eval's turnO2c and adopted): B6's three ways carry O2b's stat
+ * lines and the risk-only weak example, and a single player's lever line is the
+ * one the game computes: a reward only on the chapter's first step, where the
+ * player's previous chapter offered none and a stat allows one; elsewhere no
+ * reward, and a sacrifice on B6's rate, a second in a chapter only for a strong
+ * reason in the option's text.
+ */
+describe("the adopted O2c lines (options-o2c, 2026-10-01)", () => {
+  const NERVE = stat("player1_nerve", { name: "Nerve", optionsToSacrifice: "Spend 10% Nerve to push through", optionsToGainAsReward: "Regain 10% Nerve by stopping to catch your breath" });
+
+  /** A challenge chapter of `duration` steps from history index `first`, after these earlier phases, with a stat that allows levers. */
+  function withHistory(history: Beat[], first = 1, earlier: ThreadAnalysis[] = [], duration = 3): Story {
+    const done = history.length - first;
+    const analysis = threadAnalysis("challenge", duration, first);
+    const chapter: ThreadAnalysis = {
+      ...analysis,
+      threads: analysis.threads.map((t) => ({ ...t, outcomeId: GUILD, progression: t.progression.map((step, i) => ({ ...step, resolution: i < done ? ("favorable" as const) : null })) })),
+    };
+    const phases = first === 1 ? [topicSwitch([["Petition", GUILD]], 0), chapter] : [topicSwitch([["Petition", GUILD]], 0), ...earlier, topicSwitch([["Petition", GUILD]], first - 1), chapter];
+    const story = roundStory({ turns: history.length, maxTurns: 20, playerOutcomes: OUTCOMES, phases });
+    const state = story.getState();
+    return Story.create({ ...state, playerStats: [NERVE], players: { player1: { ...state.players.player1, beatHistory: history } } });
+  }
+  const offered = (levers: BeatOption["resourceType"][], choice = 1): Beat => ({ ...challengeBeat(levers), choice });
+
+  it("B6's three ways carry O2b's stat lines after the third way and the risk-only weak example after B6's, word for word as measured", () => {
+    expect(THREE_WAYS).toContain(`${OPTIONS_O2C_TEXT.thirdWay}${OPTIONS_CONTINUITY_TEXT.o2Stats}\n${OPTIONS_CONTINUITY_TEXT.o2NegativeBase}\n`);
+    expect(THREE_WAYS).toContain(`${OPTIONS_O2C_TEXT.weakOneApproach}${OPTIONS_CONTINUITY_TEXT.riskOnlyWeak}\n--- Good: `);
+  });
+
+  it("places the reward turn as the measured variant does: a chapter's first step after a chapter that offered no reward, where a stat allows one", () => {
+    const earlier = [endedChapter("player1_enclave", 2, 1, "The enclave listens")];
+    const cases: [string, Story, boolean][] = [
+      ["the story's first chapter, its first step", withHistory([switchBeat()]), true],
+      ["its second step", withHistory([switchBeat(), challengeBeat()]), false],
+      ["the next chapter after one that offered only a sacrifice", withHistory([switchBeat(), offered(["sacrifice"]), offered([]), switchBeat()], 4, earlier), true],
+      ["the next chapter after one that offered a reward, not taken", withHistory([switchBeat(), offered(["reward"]), offered([]), switchBeat()], 4, earlier), false],
+      ["no stat that allows a reward", Story.create({ ...withHistory([switchBeat()]).getState(), playerStats: [] }), false],
+      ["a group's chapter step", threadBeat(2), false],
+    ];
+    for (const [label, story, expected] of cases) {
+      expect({ label, turn: rewardTurn(story, "player1") }).toEqual({ label, turn: expected });
+      expect({ label, same: rewardTurn(story, "player1") === o2cRewardTurn(story, "player1") }).toEqual({ label, same: true });
+    }
+  });
+
+  it("words the line as the measured variant does: the reward turn's, a sacrifice that fits, a second only for a strong reason, or none", () => {
+    const stories = [
+      withHistory([switchBeat()]),
+      withHistory([switchBeat(), challengeBeat()]),
+      withHistory([switchBeat(), challengeBeat(["sacrifice"]), challengeBeat(), challengeBeat()], 1, [], 4),
+      withHistory([switchBeat(), challengeBeat(["sacrifice"])]),
+    ];
+    expect(stories.map((s) => optionLeverLine(s, "player1"))).toEqual([
+      "Sacrifice or reward: offer a reward this turn if a stat allows one. No sacrifice this turn.",
+      "Sacrifice or reward: a sacrifice fits this turn if a stat allows it. No reward this turn.",
+      "Sacrifice or reward: this thread already offered a sacrifice, which the player took, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text. No reward this turn.",
+      "Sacrifice or reward: none this turn.",
+    ]);
+    for (const story of stories) expect(optionLeverLine(story, "player1")).toBe(o2cLeverLine(story, "player1"));
   });
 });

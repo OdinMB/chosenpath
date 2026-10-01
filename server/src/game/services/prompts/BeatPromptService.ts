@@ -10,7 +10,7 @@ import {
   REWARD_EXCEPTION,
   THREE_WAYS,
   groupSacrificeRewardLines,
-  sacrificeRewardLine,
+  optionLeverLine,
   takesExplorationOrder,
   takesGroupLeverRules,
   takesOptionRules,
@@ -568,7 +568,7 @@ ${
 - Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).
 --- You can only define sacrifice and reward options for stats that allow to be sacrificed or gained as a reward in their stat definitions.
 --- You can only generate either 0 or 1 sacrifice/reward option (total) per beat. The rest of the options must be normal.
-${rules ? `--- ${sacrificeRewardLine(story, "player1")}\n--- ${NO_DOUBLE_SACRIFICE}\n` : ""}${groupLevers ? groupSacrificeRewardLines(story) : ""}--- Formulate the option with flavor in mind. Bad: 'Sacrifice 10% emotional stability for a higher chance of catching his attention.'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'
+${rules ? `--- ${optionLeverLine(story, "player1")}\n--- ${NO_DOUBLE_SACRIFICE}\n` : ""}${groupLevers ? groupSacrificeRewardLines(story) : ""}--- Formulate the option with flavor in mind. Bad: 'Sacrifice 10% emotional stability for a higher chance of catching his attention.'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'
 ${
   story.getCurrentBeatType() === "thread"
     ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +

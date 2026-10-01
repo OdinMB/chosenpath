@@ -32,7 +32,12 @@
  * short-replies stage's two lines since that stage's adoption, later that day
  * (the text goes on after its first paragraph: withShortReplies puts them into
  * a form measured before it, not a delta; beforeShortReplies and productionThen
- * take them out of production for the variants measured earlier).
+ * take them out of production for the variants measured earlier). A single
+ * player's rolled chapter step is the measured turnO2c since the options-o2c
+ * stage, later that day (O2b's stat lines and the lever line the game computes:
+ * not a delta on a grown-up story; beforeOptionsO2c and productionThen take
+ * them out for the variants measured earlier; on a single player's 6-8 kids
+ * turn a logged delta, withOptionsO2c, unmeasured for kids).
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
@@ -52,7 +57,9 @@ import { LEVER_DIRECTION_TEXT } from "../../src/game/services/storyTextRounds/le
 import { KIDS_AGES_TEXT, kidsAgesBand } from "../../src/game/services/storyTextRounds/kidsAges.js";
 import { GROUP_LEVERS_TEXT, groupLeversBase, takesGroupLevers } from "../../src/game/services/storyTextRounds/groupLevers.js";
 import { SHORT_REPLIES_TEXT, shortRepliesBase, withShortRepliesLines } from "../../src/game/services/storyTextRounds/shortReplies.js";
-import { REWARD_EXCEPTION } from "../../src/game/services/optionRules.js";
+import { REWARD_EXCEPTION, sacrificeRewardLine, takesOptionRules } from "../../src/game/services/optionRules.js";
+import { OPTIONS_O2C_TEXT, o2cLeverLine } from "../../src/game/services/storyTextRounds/optionsO2c.js";
+import { OPTIONS_CONTINUITY_TEXT } from "../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -303,14 +310,54 @@ export function beforeShortRepliesJson(json: string): string {
   return json.split(inJsonText(SHORT_REPLIES_TEXT.fieldLine)).join("");
 }
 
+/*
+ * The options-o2c stage's adoption (2026-10-01): a single player's rolled
+ * chapter step carries O2b's stat lines after B6's third way, the risk-only weak
+ * example after B6's, and the lever line the game computes (optionLeverLine) in
+ * place of B6's rate line. The measured turnO2c, not a delta, on a grown-up
+ * story (adoptedTurns.test.ts and adoptedForms.test.ts hold it); the forms
+ * measured before it carry none of it. A single player's read-with-kids turn
+ * at 6-8 (kidsTurn as measured) carries the same lines on a rolled step since
+ * the adoption (withOptionsO2c): a logged delta, unmeasured for kids (the stage's
+ * cases were grown-up stories; kidsAges, built on production's live turn,
+ * carries them already).
+ */
+const O2C_EDITS = (story: Story): [string, string][] => [
+  [OPTIONS_O2C_TEXT.thirdWay, `${OPTIONS_O2C_TEXT.thirdWay}${OPTIONS_CONTINUITY_TEXT.o2Stats}\n${OPTIONS_CONTINUITY_TEXT.o2NegativeBase}\n`],
+  [OPTIONS_O2C_TEXT.weakOneApproach, `${OPTIONS_O2C_TEXT.weakOneApproach}${OPTIONS_CONTINUITY_TEXT.riskOnlyWeak}\n`],
+  [`--- ${sacrificeRewardLine(story, "player1")}\n`, `--- ${o2cLeverLine(story, "player1")}\n`],
+];
+
+/** A measured single-player prompt with O2c's lines on a rolled chapter step (any other turn as it is). */
+export function withOptionsO2c(measured: string, story: Story): string {
+  if (!takesOptionRules(story)) return measured;
+  return O2C_EDITS(story).reduce((text, [from, to]) => {
+    if (text.split(from).length !== 2) throw new Error(`The measured turn no longer carries "${from.slice(0, 60)}" once`);
+    return text.replace(from, () => to);
+  }, measured);
+}
+
+/**
+ * Production's prompt as it stood before the options-o2c adoption: a single player's rolled step without O2c's lines,
+ * B6's rate line back (any other turn, and a prompt already without them, as it is).
+ */
+export function beforeOptionsO2c(production: string, story: Story): string {
+  if (!takesOptionRules(story) || !production.includes(OPTIONS_CONTINUITY_TEXT.o2Stats)) return production;
+  return O2C_EDITS(story).reduce((text, [from, to]) => {
+    if (text.split(to).length !== 2) throw new Error(`Production's rolled step no longer carries "${to.slice(0, 60)}" once`);
+    return text.replace(to, () => from);
+  }, production);
+}
+
 /**
  * A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones
  * (beforeEndingOnlyPlayed), before the group-levers adoption of the same day (beforeGroupLevers; a group's rolled
  * step's schema as it was built then, groupLeversBase) and before the short-replies adoption later that day
- * (beforeShortReplies; the schema as shortRepliesBase builds it). The variants measured before compare with it.
+ * (beforeShortReplies; the schema as shortRepliesBase builds it), and before the options-o2c adoption after it
+ * (beforeOptionsO2c; a single player's rolled step, prompt only). The variants measured before compare with it.
  */
 export function productionThen<R extends { prompt: string }>(request: R, story: Story): R {
-  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(beforeShortReplies(request.prompt), story), story);
+  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(beforeShortReplies(beforeOptionsO2c(request.prompt, story)), story), story);
   const schema = "schema" in request ? { schema: takesGroupLevers(story) ? groupLeversBase(story).schema : shortRepliesBase(story).schema } : {};
   return { ...request, prompt, ...schema };
 }
@@ -446,8 +493,9 @@ export function withKidsBandImageSlots(measured: RequestText, story: Story): Req
 /** Production's turn as it stood before the kids-ages adoption: its prompt and its JSON schema's text. */
 export function productionBeforeKidsAges(story: Story): { prompt: string; json: string } {
   // Without the short-replies stage's lines, which came later that day (groupLeversBase builds on shortRepliesBase)
+  // ... and without the options-o2c stage's lines on a single player's rolled step, which came later still
   const asText = (request: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) => ({
-    prompt: beforeShortReplies(request.prompt),
+    prompt: beforeShortReplies(beforeOptionsO2c(request.prompt, story)),
     json: beforeShortRepliesJson(JSON.stringify(toJsonSchema(request.schema))),
   });
   // A group's rolled step as it stood before the group-levers adoption too (groupLeversBase), which came later that day

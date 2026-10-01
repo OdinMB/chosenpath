@@ -27,6 +27,8 @@ import { kidsBandOf } from "core/types/index.js";
 import { takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
+import { takesOptionRules } from "../../../../src/game/services/optionRules.js";
+import { optionsO2cBase } from "../../../../src/game/services/storyTextRounds/optionsO2c.js";
 
 /*
  * The adoption's free final test (rounds status note, section 9, step 3):
@@ -48,7 +50,9 @@ import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
  * children's age band (kidsAges, 2026-10-01; a single player's 6-8 turn is
  * the kids-turns stage's kidsTurn, which adoptedTurns.test.ts holds), every
  * turn with the short-replies stage's two lines (shortReplies, 2026-10-01; a
- * kids turn's kidsAges carries them, built on production's live turn), and AI
+ * kids turn's kidsAges carries them, built on production's live turn), a
+ * single player's rolled chapter step with O2b's stat lines and the reward the
+ * game places (turnO2c, the options-o2c stage of 2026-10-01), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -91,6 +95,9 @@ function measuredVariant(input: RequestInput): VariantId {
       // An exploration step: the exploration-order line (choiceResult as measured), a group's since the choice-result stage,
       // a single player's since the choice-line-sp stage (measured with production's one retry of a short reply in the loop)
       if (takesExplorationOrder(input.story)) return "choiceResult";
+      // A single player's rolled chapter step since the options-o2c stage (2026-10-01): O2b's stat lines and the reward the
+      // game places (turnO2c, built on production with its lines taken out, which is turnB6 with the deltas as before)
+      if (takesOptionRules(input.story)) return "turnO2c";
       return input.story.isMultiplayer() ? "prod" : "turnB6";
   }
 }
@@ -106,6 +113,15 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     if (input.role !== "beat") return { prompt, schema: json(measured) };
     const adopted = withKidsBandImageSlots(kidsAgesAsMeasured({ prompt, json: json(measured) }, input.story), input.story);
     return { prompt: adopted.prompt, schema: adopted.json };
+  }
+  // turnO2c is built on production's live turn with its lines taken out; that base must be turnB6 as before, with the
+  // turn deltas and the short-replies lines, so the measured variant stands on the form measured before it
+  if (variant === "turnO2c" && input.role === "beat") {
+    const before = requestFor("turnB6", input);
+    const lined = withShortReplies({ prompt: adoptedTurn(requestText(before), input.story), schema: (before as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
+    const base = optionsO2cBase(input.story);
+    expect({ prompt: base.prompt === lined.prompt, schema: JSON.stringify(toJsonSchema(base.schema)) === lined.json }).toEqual({ prompt: true, schema: true });
+    return { prompt, schema: json(measured) };
   }
   switch (input.role) {
     // Since the lever-direction adoption (2026-10-01): the measured line and lever fields, wherever the setup carries them

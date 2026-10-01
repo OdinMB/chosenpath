@@ -1,6 +1,6 @@
 import type { Story } from "core/models/Story.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
-import { sacrificeRewardLine, takesOptionRules } from "../optionRules.js";
+import { optionLeverLine, takesOptionRules } from "../optionRules.js";
 import { beatStep } from "../storyTextSteps.js";
 import { splitAtState } from "./roundEdits.js";
 import {
@@ -62,7 +62,8 @@ function movesFor(story: Story): Move[] {
     if (later && challenge) moves.push({ passage: RESULTS, pointer: "" });
     // Without it the text reads as a chapter's first step does
     if (later) moves.push({ passage: TONE, pointer: "" });
-    if (takesOptionRules(story)) moves.push({ passage: `--- ${sacrificeRewardLine(story, "player1")}\n`, pointer: LEVER_POINTER });
+    // Production's computed lever line: B6's rate line until the options-o2c adoption (2026-10-01), the O2c line since
+    if (takesOptionRules(story)) moves.push({ passage: `--- ${optionLeverLine(story, "player1")}\n`, pointer: LEVER_POINTER });
   }
   if (showsImages(story)) moves.push({ passage: sourceLine(story), pointer: SOURCE_POINTER });
   return moves;
