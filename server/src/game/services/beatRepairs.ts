@@ -12,7 +12,7 @@ import { getThreadType } from "core/types/thread.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { checkStatValue, statValueFit } from "core/utils/statValueCheck.js";
 import { canAddMilestones, isPlayerBeat } from "./storyTextSteps.js";
-import { scoreboardWinners } from "./scoreboards.js";
+import { scoreboardsOf, scoreboardWinners } from "./scoreboards.js";
 import { dropLeversChargedAgain, leverStatOf, noteLeversChargedOnOffer } from "./leverPayments.js";
 import type { Repair } from "./textRepairs.js";
 
@@ -302,7 +302,36 @@ function turnedAround(change: StatChange, before: number): StatChange {
  * scoreboard or player1 is not on the contest's side A, every move stays as
  * written.
  */
-function repairScoreboardMoves(story: Story, changes: Change[], repairs: Repair[]): Change[] {
+/**
+ * A score written twice in one reply: on a contest's scoreboard (scoreboardsOf),
+ * a value set after another that is 100 minus it, the other side's share, is
+ * dropped (`scoreboardWrittenTwice`, since 2026-10-01), the first kept: an
+ * opposites stat's value is its first side's share. The third playthroughs'
+ * food trucks ending set the contract score to 30 and then 70, each side's
+ * share in turn, and the game kept 70|30 for the side that lost. Read after the
+ * number-as-text repair, before the direction repair, which then reads the
+ * value kept. Any other second value (another size, the same value) and a
+ * meter's values stay as written.
+ */
+function withoutOtherSidesShare(story: Story, changes: Change[], repairs: Repair[]): Change[] {
+  const boards = scoreboardsOf(story);
+  if (boards.size === 0) return changes;
+  const firstSet = new Map<string, number>();
+  return changes.filter((change) => {
+    if (change.type !== "statChange" || change.group !== "shared" || change.change !== "setNumber" || typeof change.value !== "number" || !boards.has(change.stat)) return true;
+    const first = firstSet.get(change.stat);
+    if (first === undefined) {
+      firstSet.set(change.stat, change.value);
+      return true;
+    }
+    if (change.value === first || change.value !== 100 - first) return true;
+    repairs.push({ kind: "scoreboardWrittenTwice", detail: `${change.stat}: ${change.value} after ${first} in the same reply, the other side's share` });
+    return false;
+  });
+}
+
+function repairScoreboardMoves(story: Story, written: Change[], repairs: Repair[]): Change[] {
+  const changes = withoutOtherSidesShare(story, written, repairs);
   const winners = scoreboardWinners(story);
   if (winners.size === 0) return changes;
   const scores = new Map(story.getState().sharedStatValues.map((entry) => [entry.statId, entry.value]));

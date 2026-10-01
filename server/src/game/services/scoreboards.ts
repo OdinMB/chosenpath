@@ -22,15 +22,57 @@ export type ScoreboardWinner = "sideA" | "sideB";
 
 const SCORED_BY = /Scored by ([^.]+)\.?\s*$/i;
 
-/** The scoreboard a contested shared outcome names, or undefined (not contested, or it names no shared opposites stat the story has). */
+/**
+ * A name as a setup writes it after "Scored by", for comparison: lower case,
+ * a possessive's 's and every other mark between words left out, a trailing
+ * "stat" or "scoreboard" too ("Youssef's Partnership|Friendship's Partnership
+ * stat" reads "youssef partnership friendship partnership").
+ */
+const plainName = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/['’]s\b/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+(?:stat|scoreboard)$/, "");
+
+/**
+ * The scoreboard a contested shared outcome names, or undefined (not contested,
+ * or it names no shared opposites stat the story has, or two). Setup round 3's
+ * form asks for the stat's name ("Scored by <name of its scoreboard stat>."),
+ * and the stored setups on that form wrote it 83 times in 91; the others named
+ * the stat's id or its id's words (the third playthroughs' food trucks: "Scored
+ * by Contract Race" for shared_contract_race, named "Innovator's Lead|Circuit
+ * Caterer's Lead"; the first round's space pirates: "Black Star Lead";
+ * "shared_bounty_score"), left a possessive out ("Youssef's Courtship" for
+ * shared_youssef_courtship) or put " stat" after the name. Until 2026-10-01
+ * the name alone was read, so those boards moved however the reply wrote them.
+ * The story's only opposites stat is never taken for it: a story set up before
+ * round 3 used its opposites stats as meters, with either side first.
+ */
 export function scoreboardOf(story: Story, outcomeId: string): Stat | undefined {
   const outcome = story.getSharedOutcomes().find((o) => o.id === outcomeId);
   if (!outcome || !isContestedOutcome(outcome)) return undefined;
-  const named = SCORED_BY.exec(outcome.resonance ?? "")?.[1]?.trim().toLowerCase();
+  const written = SCORED_BY.exec(outcome.resonance ?? "")?.[1]?.trim();
+  if (!written) return undefined;
+  const opposites = story.getSharedStats().filter((stat) => stat.type === "opposites");
+  const byName = opposites.find((stat) => stat.name.trim().toLowerCase() === written.toLowerCase());
+  if (byName) return byName;
+  const named = plainName(written);
   if (!named) return undefined;
-  return story
-    .getSharedStats()
-    .find((stat) => stat.type === "opposites" && stat.name.trim().toLowerCase() === named);
+  const matches = opposites.filter((stat) => [stat.name, stat.id, stat.id.replace(/^shared_/, "")].some((form) => plainName(form) === named));
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+/** Every contest's scoreboard (scoreboardOf), by its stat id. */
+export function scoreboardsOf(story: Story): Map<string, Stat> {
+  const boards = story
+    .getSharedOutcomes()
+    .flatMap((outcome) => {
+      const board = scoreboardOf(story, outcome.id);
+      return board ? [board] : [];
+    });
+  return new Map(boards.map((board) => [board.id, board]));
 }
 
 /**

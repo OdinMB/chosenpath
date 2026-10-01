@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { SetOfBeatGenerationSchema } from "core/types/index.js";
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
+import { scoreboardWinners } from "../../../../src/game/services/scoreboards.js";
 import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthroughMode.js";
 import { replayRun, replayedTurn } from "../../../../src/evals/textModelEval/playthroughReplay.js";
@@ -281,6 +282,22 @@ function chargedOnOffer(runs: PlayRun[], before: (run: PlayRun) => number = () =
   );
 }
 
+/** The side each scoreboard's contest was won by on a stored turn, as production reads it now (scoreboardWinners). */
+function winnersAt(runs: PlayRun[], storyId: string, turn: number) {
+  const run = runs.find((r) => r.spec.id === storyId);
+  const at = run && replayRun(run).find((r) => r.turn === turn);
+  return at ? [...scoreboardWinners(at.before)] : undefined;
+}
+
+/** The scoreboard repairs production's beat repairs make now (scoreboardDirection, scoreboardWrittenTwice), replaying each stored reply on the state its turn saw. */
+function scoreboardRepairs(runs: PlayRun[], before: (run: PlayRun) => number = () => Number.POSITIVE_INFINITY) {
+  return runs.flatMap((run) =>
+    replayRun(run)
+      .filter((r) => r.turn < before(run) && r.played.reply)
+      .flatMap((r) => repairBeatReply(r.before, r.played.reply as SetOfBeatGenerationSchema).repairs.filter((k) => k.kind.startsWith("scoreboard")).map((k) => [run.spec.id, r.turn, k.kind, k.detail]))
+  );
+}
+
 /*
  * The review of the third round (2026-10-01): three double charges the repair, reading the last beat's percentage and
  * number payments only, let through (the stored pages, stories/round3/). Played with the repair, the kept replies lack the
@@ -300,6 +317,21 @@ describe("replayRun on the stored round 3 (skipped where the output folder is ab
 
   (stored3.length ? it : it.skip)("production now notes a lever's stat moved in the reply that offers it: Davi's Nerve at the space pirates' turn 19", () => {
     expect(chargedOnOffer(stored3)).toEqual([["play-space-pirates", 19, "player2/player_nerve: -10, in the reply that offers that sacrifice"]]);
+  });
+
+  (stored3.length ? it : it.skip)("production's scoreboard repairs on every stored round, now that a board named by its id's words is read and a score written twice is dropped", () => {
+    const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 19 };
+    // Round 1: the food trucks' turn 22, the move that gave the repair its start (2026-09-30), as before
+    expect(scoreboardRepairs(stored, (run) => firstChanged[run.spec.id] ?? Number.POSITIVE_INFINITY)).toEqual([
+      ["play-food-trucks", 22, "scoreboardDirection", "shared_license_race: 35 -> 50 after side B won; 35 -> 20"],
+    ]);
+    // The space pirates' round-1 board ("Scored by Black Star Lead" for shared_black_star_lead) is read now; its one move,
+    // the switch at turn 9 to 65|35 after the captain's camp (side A) won, went the winner's way, so nothing changes there
+    expect(winnersAt(stored, "play-space-pirates", 9)).toEqual([["shared_black_star_lead", "sideA"]]);
+    // Round 2 named every board by its name; nothing new
+    expect(scoreboardRepairs(stored2, (run) => (run.spec.id === "play-estate-agents" ? 22 : Number.POSITIVE_INFINITY))).toEqual([]);
+    // Round 3: the food trucks' ending keeps 30 (30|70, Omar's side, the winner's) where the game kept 70 (70|30 for Amara)
+    expect(scoreboardRepairs(stored3)).toEqual([["play-food-trucks", 26, "scoreboardWrittenTwice", "shared_contract_race: 70 after 30 in the same reply, the other side's share"]]);
   });
 
   (stored3.length ? it : it.skip)("the earlier rounds hold no other charge in the reply that offers the lever", () => {

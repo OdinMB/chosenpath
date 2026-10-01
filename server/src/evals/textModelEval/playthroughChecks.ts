@@ -280,8 +280,6 @@ export type ScoreboardMove = {
   winner?: "sideA" | "sideB";
   reading: ScoreboardReadingKind;
   repaired: boolean;
-  /** The outcome names the board by the stat's id, not its name, so production's scoreboard repair can't find it (the food trucks of round 3) */
-  byId?: true;
 };
 
 /** Production's fixes that show in its repairs (those of 2026-09-30, and since round 3 those of 2026-10-01), by kind: the turns each fired at. */
@@ -292,6 +290,7 @@ export const FIX_LABELS = {
   contestInCooperative: "a contest in a cooperative story made the group's shared challenge",
   threadKeptOnPick: "a player written into two threads kept in the one they picked",
   scoreboardDirection: "a scoreboard move turned toward the side that won",
+  scoreboardWrittenTwice: "a scoreboard's other side's share, written after its score in the same reply, dropped",
   sharedLeverRepeated: "a shared sacrifice or reward kept to one player",
   leverChargedAgain: "a sacrifice or reward charged again on the turn after its payment, dropped",
   milestoneNotPlayed: "a milestone on an outcome no chapter that just ended pushed, dropped",
@@ -943,42 +942,26 @@ function ownStatReadings(run: PlayRun): OwnStatReading[] {
   );
 }
 
-/** The words of a stat's id, as an outcome's "Scored by …" may name it: shared_contract_race is "contract race". */
-const idWords = (id: string) => id.replace(/^shared_/, "").replace(/_+/g, " ").trim().toLowerCase();
-
-const SCORED_BY = /Scored by ([^.]+)\.?\s*$/i;
-
 /**
- * The scoreboard a contested shared outcome names: production's scoreboardOf (the stat's name), else, since the review of
- * round 3 (2026-10-01), the one shared opposites stat whose id's words the outcome names (the food trucks' "Scored by
- * Contract Race" for shared_contract_race, named "Innovator's Lead|Circuit Caterer's Lead"), which production's repair can't
- * find (`byId`).
+ * The contest scoreboards the story's contested shared outcomes name (production's scoreboardOf), and by which outcome.
+ * Since 2026-10-01 production reads a board its outcome names by the stat's id or the id's words (the food trucks' round 3:
+ * "Scored by Contract Race" for shared_contract_race), which this reading had read on its own since the review of round 3;
+ * a run played before then recorded no board there (`contestResults[].board`), so the outcome places it.
  */
-function boardOf(story: Story, outcomeId: string): { board: Stat; byId: boolean } | undefined {
-  const named = scoreboardOf(story, outcomeId);
-  if (named) return { board: named, byId: false };
-  const outcome = story.getSharedOutcomes().find((o) => o.id === outcomeId);
-  const words = outcome && isContestedOutcome(outcome) ? SCORED_BY.exec(outcome.resonance ?? "")?.[1]?.trim().toLowerCase() : undefined;
-  if (!words) return undefined;
-  const byId = story.getSharedStats().filter((stat) => stat.type === "opposites" && idWords(stat.id) === words);
-  return byId.length === 1 ? { board: byId[0], byId: true } : undefined;
-}
-
-/** The contest scoreboards the story's contested shared outcomes name (boardOf), and by which outcome. */
-function scoreboardsOf(state: StoryState | undefined): { boards: (Stat & { byId: boolean })[]; byOutcome: Map<string, string> } {
+function contestBoardsOf(state: StoryState | undefined): { boards: Stat[]; byOutcome: Map<string, string> } {
   if (!state) return { boards: [], byOutcome: new Map() };
   const story = Story.create(state);
   const found = (state.sharedOutcomes ?? []).filter(isContestedOutcome).flatMap((o) => {
-    const named = boardOf(story, o.id);
-    return named ? [{ outcomeId: o.id, ...named }] : [];
+    const board = scoreboardOf(story, o.id);
+    return board ? [{ outcomeId: o.id, board }] : [];
   });
-  const boards = [...new Map(found.map(({ board, byId }) => [board.id, { ...board, byId }])).values()];
+  const boards = [...new Map(found.map(({ board }) => [board.id, board])).values()];
   return { boards, byOutcome: new Map(found.map(({ outcomeId, board }) => [outcomeId, board.id])) };
 }
 
 /** Each scoreboard on each turn that follows a contest result on it or moves it, against the side that won. */
 function scoreboardReadings(run: PlayRun): ScoreboardMove[] {
-  const { boards, byOutcome } = scoreboardsOf(run.start);
+  const { boards, byOutcome } = contestBoardsOf(run.start);
   const numberIn = (values: { statId: string; value: unknown }[] | undefined, id: string) => {
     const value = values?.find((v) => v.statId === id)?.value;
     return typeof value === "number" ? value : undefined;
@@ -1020,7 +1003,6 @@ function scoreboardReadings(run: PlayRun): ScoreboardMove[] {
         ...(winner ? { winner } : {}),
         reading,
         repaired: turn.repairs.some((r) => r.startsWith(`scoreboardDirection: ${board.id}:`)),
-        ...(board.byId ? { byId: true as const } : {}),
       });
     }
     previous = now;
@@ -1249,8 +1231,7 @@ export function scoreboardLine(r: StoryReadings): string {
     });
     const repaired = moves.filter((m) => m.repaired).map((m) => m.turn);
     const turned = repaired.length ? `production turned ${repaired.length} move${repaired.length === 1 ? "" : "s"} around (turn ${repaired.join(", ")})` : "production turned no move around";
-    const byId = moves.some((m) => m.byId) ? " (its outcome names it by the stat's id, which production's scoreboard repair doesn't read)" : "";
-    return `${name}${byId}: ${moves.length} turn${moves.length === 1 ? "" : "s"} after a contest result or with a move: ${readings.join(", ")}; ${turned}`;
+    return `${name}: ${moves.length} turn${moves.length === 1 ? "" : "s"} after a contest result or with a move: ${readings.join(", ")}; ${turned}`;
   });
   return `Scoreboard moves: ${parts.join(". ")}.`;
 }

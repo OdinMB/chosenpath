@@ -311,10 +311,12 @@ describe("readStory", () => {
 
   /*
    * The review of the third round (2026-10-01): the food trucks' outcome reads "Scored by Contract Race" and its scoreboard
-   * is named "Innovator's Lead|Circuit Caterer's Lead" (id shared_contract_race). Production's scoreboardOf matches names
-   * only, so the reading saw no board and printed "none" where the board moved four times.
+   * is named "Innovator's Lead|Circuit Caterer's Lead" (id shared_contract_race). Production's scoreboardOf matched names
+   * only, so the reading saw no board and printed "none" where the board moved four times; the reading then found it on its
+   * own, marked as a board production couldn't read. Since the decision-A fixes of the same evening production reads it
+   * (scoreboardOf by the id's words), and the reading is production's again, with no mark.
    */
-  it("reads a scoreboard its outcome names by the stat's id, which production's repair can't find", async () => {
+  it("reads a scoreboard its outcome names by the stat's id's words, through production's lookup", async () => {
     const run = structuredClone(await played(2));
     const start = run.start;
     if (!start) throw new Error("no start");
@@ -329,8 +331,9 @@ describe("readStory", () => {
       t.contestResults = t.turn === 5 ? [{ outcomeId: start.sharedOutcomes[0].id, result: "sideAWins", oriented: true }] : undefined;
     });
     const moves = readStory(run).scoreboard;
-    expect(moves.map((m) => [m.turn, m.stat, m.before, m.after, m.reading, m.byId])).toEqual([[5, "shared_harbour_race", 50, 35, "the wrong way", true]]);
-    expect(renderPlaythroughReadings([run], new Date(0))).toContain("Pilot's Lead|Guild's Lead (its outcome names it by the stat's id, which production's scoreboard repair doesn't read): 1 turn after a contest result or with a move: the wrong way at turn 5");
+    expect(moves.map((m) => [m.turn, m.stat, m.before, m.after, m.reading])).toEqual([[5, "shared_harbour_race", 50, 35, "the wrong way"]]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain("Pilot's Lead|Guild's Lead: 1 turn after a contest result or with a move: the wrong way at turn 5");
+    expect(renderPlaythroughReadings([run], new Date(0))).not.toContain("doesn't read");
   });
 
   it("lists which of production's fixes fired, by turn", async () => {

@@ -889,6 +889,62 @@ describe("repairBeatReply: the scoreboard moves toward the side that won (TR-8)"
     const story = switchAfter("sideAWins", 50, { storyPhases: [switchAnalysis(slotsOf(2), 0), { ...chapter, threads: [...chapter.threads, other] }, switchAnalysis(slotsOf(2), 3)] });
     expect(repairScore(story, [race("subtractNumber", 10)]).kinds).toEqual([]);
   });
+
+  /*
+   * The third playthroughs (2026-10-01): the food trucks' outcome reads "Scored by Contract Race" for the stat
+   * shared_contract_race, named "Innovator's Lead|Circuit Caterer's Lead", so the repair never saw the board; and the
+   * ending wrote the score twice, setNumber 30 and then 70, each side's share in turn, so the game kept 70|30 for the loser.
+   */
+  describe("a board named by its id's words, and a score written twice in one reply (the food trucks' round 3)", () => {
+    const CONTRACT = stat("shared_contract_race", { type: "opposites", name: "Innovator's Lead|Circuit Caterer's Lead" });
+    const byIdWords = {
+      sharedOutcomes: [{ ...CONTESTED, resonance: "Both owners need the license. Scored by Contract Race." }],
+      sharedStats: [CONTRACT],
+    };
+    const contract = (change: StatChange["change"], value: number) => statChange("shared", CONTRACT.id, change, value);
+    const after = (result: ContestResult, score: number) => switchAfter(result, score, { ...byIdWords, sharedStatValues: [{ statId: CONTRACT.id, value: score }] });
+
+    it("turns a move on a board its outcome names by the id's words toward the side that won", () => {
+      const result = repairScore(after("sideBWins", 35), [contract("addNumber", 15)]);
+      expect(result.changes).toEqual([contract("subtractNumber", 15)]);
+      expect(result.kinds).toEqual(["scoreboardDirection"]);
+    });
+
+    it("keeps the first value set on a board and drops a later one that is the other side's share: the food trucks' ending, 30 then 70 after side B won", () => {
+      const result = repairScore(after("sideBWins", 45), [contract("setNumber", 30), contract("setNumber", 70)]);
+      expect(result.changes).toEqual([contract("setNumber", 30)]);
+      expect(result.kinds).toEqual(["scoreboardWrittenTwice"]);
+      expect(result.repairs.find((r) => r.kind === "scoreboardWrittenTwice")?.detail).toBe("shared_contract_race: 70 after 30 in the same reply, the other side's share");
+      // Applied as the game applies it: 30|70, the winner's way
+      const [withBeat, changes] = beatStep.apply(after("sideBWins", 45), beatSet(2, { statChanges: result.changes }), true);
+      expect(new ChangeService().applyChanges(withBeat, changes).getState().sharedStatValues).toEqual([{ statId: CONTRACT.id, value: 30 }]);
+    });
+
+    it("reads the kept value's direction as any other: the other order is turned toward the winner by the same size", () => {
+      const result = repairScore(after("sideBWins", 45), [contract("setNumber", 70), contract("setNumber", 30)]);
+      expect(result.changes).toEqual([contract("setNumber", 20)]);
+      expect(result.kinds).toEqual(["scoreboardWrittenTwice", "scoreboardDirection"]);
+    });
+
+    it("drops the other side's share also where the turn follows no contest result, and on a value written as 'a|b'", () => {
+      const opening = withContest(threadBeat(2, { storyPhases: [switchAnalysis(slotsOf(2), 1), licenseChapter("sideAWins", 3, 2, 0)] }), 50, {
+        ...byIdWords,
+        sharedStatValues: [{ statId: CONTRACT.id, value: 50 }],
+      });
+      expect(repairScore(opening, [contract("setNumber", 40), contract("setNumber", 60)])).toMatchObject({ changes: [contract("setNumber", 40)], kinds: ["scoreboardWrittenTwice"] });
+      const asText = repairScore(after("sideBWins", 45), [statChange("shared", CONTRACT.id, "setString", "30|70"), contract("setNumber", 70)]);
+      expect(asText.changes).toEqual([contract("setNumber", 30)]);
+    });
+
+    it("keeps a second value that is not the other side's share, the same value twice, and a meter's two values: only a board's other share is dropped", () => {
+      expect(repairScore(after("sideBWins", 45), [contract("setNumber", 35), contract("setNumber", 30)])).toMatchObject({ changes: [contract("setNumber", 35), contract("setNumber", 30)], kinds: [] });
+      expect(repairScore(after("sideBWins", 45), [contract("setNumber", 30), contract("setNumber", 30)])).toMatchObject({ changes: [contract("setNumber", 30), contract("setNumber", 30)], kinds: [] });
+      const calm = stat("shared_calm", { type: "opposites", name: "Calm|Storm" });
+      const meter = (value: number) => statChange("shared", calm.id, "setNumber", value);
+      const withMeter = switchAfter("sideBWins", 45, { ...byIdWords, sharedStats: [CONTRACT, calm], sharedStatValues: [{ statId: CONTRACT.id, value: 45 }, { statId: calm.id, value: 50 }] });
+      expect(repairScore(withMeter, [meter(40), meter(60)])).toMatchObject({ changes: [meter(40), meter(60)], kinds: [] });
+    });
+  });
 });
 
 describe("repairBeatReply: a shared sacrifice or reward goes to one player per turn (TR-9)", () => {
