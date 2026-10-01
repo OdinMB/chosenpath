@@ -12,7 +12,7 @@ import { THREAD_TYPE } from "core/types/thread.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { Logger } from "shared/logger.js";
 import { outcomeIdsNamed } from "./outcomeIds.js";
-import { allowedLengths, fallbackOutcomeId, pickedOutcome, turnsLeft } from "./pacing.js";
+import { allowedLengths, fallbackOutcomeId, pacedLengths, pickedOutcome, switchPacingProblem, turnsLeft } from "./pacing.js";
 import { UnusableResultError, errorClass } from "./retryOnce.js";
 import { logRepairs, type Repair } from "./textRepairs.js";
 
@@ -37,19 +37,19 @@ export type PlanCheck<P> = {
   problem?: string;
   /**
    * A chapter length PACING does not allow (only with the `lengths` option),
-   * or a switch plan an eval variant's pacing rule finds wanting
-   * (checkedSwitchPlan's `pacing`): worth the one retry, but never a reason to
-   * fail the turn, so a plan with only this problem is still used.
+   * or a switch plan that breaks PACING's arithmetic (checkedSwitchPlan's
+   * `pacing`): worth the one retry, but never a reason to fail the turn, so a
+   * plan with only this problem is still used.
    */
   lengthProblem?: string;
 };
 
-/** What a thread plan check reads beyond the plan's structure: `lengths`, the length PACING allows (production's planner call). */
 /**
  * `lengths`: also read the chapter's length against the lengths PACING allows
  * (production's planner call). `allowedLengths`: another length rule to read it
  * against (an eval variant's, which prints its own lengths); production's
- * (allowedLengths on the turns left) otherwise.
+ * otherwise (the paced lengths since the pacing-clues stage of 2026-10-01,
+ * pacedLengths; allowedLengths on the turns left before).
  */
 export type ThreadCheckOptions = { lengths?: boolean; allowedLengths?: (story: Story) => number[] };
 
@@ -512,10 +512,12 @@ const lengthsText = (lengths: number[]) =>
 /**
  * A chapter length the PACING block does not allow (turn doc A4): 2 to 4
  * beats that end the story on its turn count or leave at least a switch and a
- * two-beat chapter; the last chapter takes exactly the turns left. When no
- * length fits (too few turns left), any is accepted.
+ * two-beat chapter, and of those the ones whose threads after the chapter fit
+ * the milestones still needed (pacedLengths, since 2026-10-01); the last
+ * chapter takes exactly the turns left. When no length fits (too few turns
+ * left), any is accepted.
  */
-function chapterLengthProblem(story: Story, duration: number, allowed: (story: Story) => number[] = (s) => allowedLengths(turnsLeft(s))): string | undefined {
+function chapterLengthProblem(story: Story, duration: number, allowed: (story: Story) => number[] = (s) => pacedLengths(s).lengths): string | undefined {
   const left = turnsLeft(story);
   const lengths = allowed(story);
   if (lengths.length === 0 || lengths.includes(duration)) return undefined;
@@ -642,7 +644,7 @@ async function checkedPlan<P>(
   const attempt = async (previousProblem?: string): Promise<PlanCheck<P>> => {
     const reply = await invoke(previousProblem ? withPlanProblem(prompt, previousProblem) : prompt);
     const result = kind.check(story, reply);
-    // A thread plan's soft problem is its length; a switch plan's, an eval variant's pacing rule
+    // A thread plan's soft problem is its length; a switch plan's, PACING's arithmetic
     const soft = kind.what === "switch plan" ? "pacingNotFollowed" : "lengthNotAllowed";
     const repairs = result.lengthProblem ? [...result.repairs, { kind: soft, note: true }] : result.repairs;
     logPlanRepairs(kind.role, story, repairs, log);
@@ -675,21 +677,24 @@ async function checkedPlan<P>(
 
 /**
  * A switch plan call, checked: the repaired plan, one retry told the problem,
- * else an UnusableResultError. `pacing`: a pacing rule to read a usable plan
- * against (an eval variant's, the pacing-clues stage's fix-and-retest), whose
- * problem is worth the one retry but, like a chapter length, never fails the
- * turn; production passes none.
+ * else an UnusableResultError. A usable plan is read against PACING's
+ * arithmetic (`pacing`; production's switchPacingProblem since the
+ * pacing-clues stage of 2026-10-01: a complete outcome offered to a player
+ * with no thread to spare, or a spare thread that leaves the story's last
+ * thread nothing to settle), whose problem is worth the one retry but, like a
+ * chapter length, never fails the turn; an eval variant can pass its own rule,
+ * or one that reads nothing.
  */
 export function checkedSwitchPlan(
   story: Story,
   prompt: string,
   invoke: (prompt: string) => Promise<SwitchAnalysis>,
   log?: (line: string) => void,
-  pacing?: (story: Story, plan: SwitchAnalysis) => string | undefined
+  pacing: (story: Story, plan: SwitchAnalysis) => string | undefined = switchPacingProblem
 ): Promise<SwitchAnalysis> {
   const check = (checked: Story, reply: SwitchAnalysis): PlanCheck<SwitchAnalysis> => {
     const result = checkSwitchPlan(checked, reply);
-    const lengthProblem = pacing && !result.problem ? pacing(checked, result.plan) : undefined;
+    const lengthProblem = result.problem ? undefined : pacing(checked, result.plan);
     return lengthProblem ? { ...result, lengthProblem } : result;
   };
   return checkedPlan({ what: "switch plan", role: "switchAnalysis", check }, story, prompt, invoke, log);

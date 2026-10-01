@@ -7,7 +7,12 @@ import {
   isLastChapter,
   lastChapterAfterSwitch,
   mainOutcomeId,
+  mostThreads,
+  neededAfterChapter,
   outcomeNeeds,
+  PACED_LENGTHS_TEXT,
+  pacedLengths,
+  pacedLengthsFor,
   phaseOf,
   pickedOutcome,
   stageOf,
@@ -396,6 +401,68 @@ describe("threadPacingBlock", () => {
       phases: [flavorSwitch("shared_harbor", "q", 4, ["player1", "player2"])],
     });
     expect(threadPacingBlock(group)).toContain("- shared_harbor: 1 of 2 milestones; this thread's milestone is its last one; this thread settles stage 2 of 2, the last. (player1, player2)");
+  });
+});
+
+/*
+ * The paced lengths (adopted 2026-10-01 from the pacing-clues stage's
+ * fix-and-retest, pacingCluesB): where some allowed lengths leave a number of
+ * threads after the chapter that fits the milestones still needed better than
+ * others, PACING allows only those and says why, and the plan check reads the
+ * same lengths. Three of the second round's four 25-turn stories reached their
+ * last chapter with every outcome complete; in the stage's short playthroughs
+ * the last chapter kept a milestone to settle 2 of 8 -> 8 of 8.
+ */
+describe("the paced lengths (the pacing-clues stage, adopted 2026-10-01)", () => {
+  /** A single player's chapter plan after a switch on the guild (1 of 3 milestones), this many turns written of 25. */
+  const planning = (turns: number, guild = { intendedNumberOfMilestones: 3, milestones: ["a"] }) =>
+    roundStory({
+      turns,
+      maxTurns: 25,
+      playerOutcomes: { player1: [outcome(GUILD, guild)] },
+      phases: [endedChapter(GUILD, 3, turns - 4, "a"), topicSwitch([["Guild", GUILD]], turns - 1)],
+    });
+
+  it("mostThreads: switch-and-two-beat threads, the rest absorbed by longer chapters; none in 1 or 2 turns, never fewer than fewestThreads", () => {
+    expect([0, 3, 4, 5, 6, 7, 8, 9, 12, 13].map((n) => mostThreads(n))).toEqual([0, 1, 1, 1, 2, 2, 2, 3, 4, 4]);
+    expect(mostThreads(1)).toBeUndefined();
+    for (let n = 3; n <= 25; n++) expect(mostThreads(n)!).toBeGreaterThanOrEqual(fewestThreads(n)!);
+  });
+
+  it("pacedLengthsFor: as few threads after the chapter as must come no more than the milestones, as many as can come no fewer", () => {
+    // New Avalon and the food trucks at turn 17: 9 turns left, one milestone still needed after the chapter
+    expect(pacedLengthsFor(9, 1)).toEqual({ lengths: [4], narrowed: "longer" });
+    expect(pacedLengthsFor(13, 2)).toEqual({ lengths: [3, 4], narrowed: "longer" });
+    expect(pacedLengthsFor(9, 2)).toEqual({ lengths: [2, 3], narrowed: "shorter" });
+    expect(pacedLengthsFor(24, 5)).toEqual({ lengths: allowedLengths(24) });
+    for (let left = 2; left <= 25; left++) for (let need = 0; need <= 8; need++) expect(allowedLengths(left)).toEqual(expect.arrayContaining(pacedLengthsFor(left, need).lengths));
+  });
+
+  it("reads the milestones still needed once this chapter's pick is settled, and production's lengths at the story's last chapter", () => {
+    const story = planning(16);
+    expect(neededAfterChapter(story)).toBe(1);
+    expect(pacedLengths(story)).toEqual({ lengths: [4], narrowed: "longer" });
+    const last = planning(22);
+    expect(isLastChapter(25 - 22)).toBe(true);
+    expect(pacedLengths(last)).toEqual({ lengths: allowedLengths(3) });
+  });
+
+  it("prints the narrowed lengths and why in PACING, once, in place of the allowed lengths", () => {
+    const block = threadPacingBlock(planning(16));
+    expect(block).toContain(`Allowed lengths for this thread: 4 beats. ${PACED_LENGTHS_TEXT.longer}`);
+    expect(block.split("Allowed lengths for this thread:")).toHaveLength(2);
+    expect(PACED_LENGTHS_TEXT.longer).toBe("A shorter thread would leave more threads after this one than milestones still needed, and the story's last thread would have none left to settle.");
+    // Two still needed after the chapter, 9 turns left: a longer chapter would leave too few threads
+    const shorter = threadPacingBlock(planning(16, { intendedNumberOfMilestones: 4, milestones: ["a"] }));
+    expect(shorter).toContain(`Allowed lengths for this thread: 2 or 3 beats. ${PACED_LENGTHS_TEXT.shorter}`);
+    expect(PACED_LENGTHS_TEXT.shorter).toBe("A longer thread would leave fewer threads after this one than milestones still needed.");
+  });
+
+  it("prints production's allowed lengths where every one fits alike", () => {
+    const block = threadPacingBlock(planning(8, { intendedNumberOfMilestones: 6, milestones: ["a"] }));
+    expect(block).toContain(`Allowed lengths for this thread: ${[2, 3].join(", ")} or 4 beats.`);
+    expect(block).not.toContain(PACED_LENGTHS_TEXT.longer);
+    expect(block).not.toContain(PACED_LENGTHS_TEXT.shorter);
   });
 });
 

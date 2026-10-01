@@ -1,5 +1,5 @@
 import type { Story } from "core/models/Story.js";
-import type { Outcome, StoryPhase, Switch, ThreadAnalysis } from "core/types/index.js";
+import type { Outcome, StoryPhase, Switch, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { outcomeIdsNamed } from "./outcomeIds.js";
 
@@ -24,7 +24,13 @@ import { outcomeIdsNamed } from "./outcomeIds.js";
  * - the last chapter: 4 or fewer turns left after the switch, exactly that many;
  * - the phase: the first quarter of the turns, up to two thirds, then late;
  * - the stage a chapter settles (planner v2e, since 2026-09-30): the one after
- *   the pushed outcome's milestones so far.
+ *   the pushed outcome's milestones so far;
+ * - the paced lengths (since the pacing-clues stage of 2026-10-01): of the
+ *   allowed lengths, those whose threads after the chapter fit the milestones
+ *   still needed, with the reason, and the switch plan read against the same
+ *   arithmetic (switchPacingProblem). Measured as the eval's pacingCluesB, not
+ *   in the measured copy, so planner v2's requests stay as they ran
+ *   (adoptedPlanners.test.ts reads them as the adopted edits).
  * Model-facing text says "thread" and "beat" (turn doc Appendix A, vocabulary).
  */
 
@@ -55,6 +61,22 @@ export function fewestThreads(left: number): number | undefined {
 }
 
 /**
+ * The most threads, each a switch turn and a chapter of a length
+ * allowedLengths gives, that use up exactly this many turns; undefined when
+ * none can (1 or 2 turns left). fewestThreads' other end.
+ */
+export function mostThreads(left: number): number | undefined {
+  const most: (number | undefined)[] = [0];
+  for (let n = 1; n <= left; n++) {
+    const after = allowedLengths(n - 1)
+      .map((length) => most[n - 1 - length])
+      .filter((count): count is number => count !== undefined);
+    most[n] = after.length ? 1 + Math.max(...after) : undefined;
+  }
+  return most[Math.max(0, left)];
+}
+
+/**
  * Threads that fit: turns left ÷ 4, rounded down (a switch and a chapter of
  * about three turns), but never fewer than the threads that must still come
  * (fewestThreads). Near the end the length rule leaves few ways to finish, and
@@ -82,6 +104,11 @@ export function phaseOf(turn: number, maxTurns: number, lastChapter: boolean): P
   if (turn <= maxTurns / 4) return "opening";
   if (turn <= (2 * maxTurns) / 3) return "middle";
   return "late";
+}
+
+/** Whether the turn being written is in the story's late part: past two thirds of its turns (the late clue lines, lateClues.ts). */
+export function isLatePart(story: Story): boolean {
+  return phaseOf(story.getCurrentTurn() + 1, story.getMaxTurns(), false) === "late";
 }
 
 /** A shared outcome (a contested one first), else the one with the most intended milestones, the first listed on a tie. */
@@ -231,9 +258,154 @@ export function pickedOutcome(story: Story, slot: string): Pick | undefined {
   return { kind: "topic", choice, directions, optionText, ...set(outcomeId) };
 }
 
-// --- The PACING block ---
-
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// --- The paced lengths and a switch plan against the arithmetic (the pacing-clues stage, adopted 2026-10-01) ---
+
+/*
+ * Three of the second round's four 25-turn stories had every outcome complete
+ * before their last chapter, which then settled nothing: the chapter planner,
+ * told the allowed lengths and nothing about the milestones left, chose 3
+ * beats where only 4 leave as few threads as milestones; and the switch
+ * planner gave threads to a complete outcome where a stat threshold's or the
+ * final thread's instruction asked for one. Measured as the eval's
+ * pacingCluesB (storyTextRounds/latePacing.ts) in short whole-story
+ * playthroughs beside production: the last chapter kept a milestone to settle
+ * 2 of 8 -> 8 of 8, a spare thread kept the last thread's milestone 3 of 10 ->
+ * 4 of 4, no milestone left unfinished, waits and cost level.
+ */
+
+export type PacedLengths = { lengths: number[]; narrowed?: "longer" | "shorter" };
+
+/**
+ * The lengths allowedLengths gives whose threads after the chapter fit the
+ * milestones still needed best: as few as must come no more than the
+ * milestones (else a later thread settles nothing), as many as can come no
+ * fewer (else milestones go unsettled). The allowed lengths where every one
+ * fits alike; `narrowed` says which way the others were cut.
+ */
+export function pacedLengthsFor(left: number, need: number): PacedLengths {
+  const allowed = allowedLengths(left);
+  if (allowed.length < 2) return { lengths: allowed };
+  const scored = allowed.map((length) => {
+    const after = left - length;
+    const spare = Math.max(0, (fewestThreads(after) ?? 0) - need);
+    const short = Math.max(0, need - (mostThreads(after) ?? 0));
+    return { length, spare, short, cost: spare + short };
+  });
+  const best = Math.min(...scored.map((s) => s.cost));
+  const kept = scored.filter((s) => s.cost === best);
+  if (kept.length === scored.length) return { lengths: allowed };
+  const cut = scored.filter((s) => s.cost !== best);
+  return { lengths: kept.map((s) => s.length), narrowed: cut.some((s) => s.spare > 0) ? "longer" : "shorter" };
+}
+
+/**
+ * The milestones still needed once the chapter being planned has settled its
+ * stage: per player, their outcomes' still needed less one on each outcome a
+ * player's switch pick sets (a shared outcome one player picks counts for
+ * every player); the most any player still needs.
+ */
+export function neededAfterChapter(story: Story): number {
+  const picked = new Set(
+    story
+      .getPlayerSlots()
+      .map((slot) => pickedOutcome(story, slot)?.outcomeId)
+      .filter((id): id is string => id !== undefined)
+  );
+  const needs = story.getPlayerSlots().map((slot) => outcomeNeeds(story, slot, false).reduce((sum, need) => sum + Math.max(0, need.stillNeeded - (picked.has(need.id) ? 1 : 0)), 0));
+  return needs.length ? Math.max(...needs) : 0;
+}
+
+/** The lengths the chapter planner may write, and its plan check reads (planChecks.ts): the allowed lengths at the story's last chapter. */
+export function pacedLengths(story: Story): PacedLengths {
+  const left = turnsLeft(story);
+  if (isLastChapter(left)) return { lengths: allowedLengths(left) };
+  return pacedLengthsFor(left, neededAfterChapter(story));
+}
+
+/** Why PACING allows only the narrowed lengths, after them. */
+export const PACED_LENGTHS_TEXT = {
+  longer: "A shorter thread would leave more threads after this one than milestones still needed, and the story's last thread would have none left to settle.",
+  shorter: "A longer thread would leave fewer threads after this one than milestones still needed.",
+} as const;
+
+/** The outcomes a switch offers its players, by position: a flavor switch's one, a topic switch's directions'. */
+export function offeredOutcomes(story: Story, sw: Switch, slot: string): string[] {
+  if (sw.type === "flavor") return sw.outcomeId ? [sw.outcomeId] : [];
+  const structured = structuredDirections(sw);
+  if (structured?.length) return structured.map((d) => (typeof d?.outcomeId === "string" ? d.outcomeId : ""));
+  const known = outcomesFor(story, slot).map((o) => o.id);
+  return (sw.topicChoices ?? []).map((text) => outcomeIdsNamed(text, known).known[0] ?? "");
+}
+
+export type SwitchPacingReading = {
+  /** Threads that fit after the switch, the one it opens included (chaptersThatFit) */
+  fit: number;
+  /** Each player's milestones still needed, the chapter that just ended pending, and the outcomes offered */
+  players: { slot: string; needed: number; offered: string[]; offeredComplete: string[] }[];
+  /** A player with no thread to spare (as many milestones needed as threads, or more) offered a complete outcome: a thread a forced situation took */
+  completeWhileNeeded: boolean;
+  /** More threads than any player's milestones: one is to spare */
+  spare: boolean;
+  /** Where one is to spare and threads follow this one: some player still needs a milestone after this chapter, whichever direction they take */
+  keepsLast?: boolean;
+};
+
+const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
+
+/** A switch plan read against PACING's arithmetic: whether a complete outcome took a needed thread, and whether a spare thread kept the last thread's milestone. */
+export function switchPacingReading(story: Story, plan: SwitchAnalysis): SwitchPacingReading {
+  const fit = chaptersThatFit(turnsLeft(story));
+  const players = story.getPlayerSlots().map((slot) => {
+    const needs = outcomeNeeds(story, slot, true);
+    const needed = sum(needs.map((n) => n.stillNeeded));
+    const sw = plan.switches.find((s) => s.players.includes(slot));
+    const offered = sw ? offeredOutcomes(story, sw, slot) : [];
+    const complete = new Set(needs.filter((n) => n.complete).map((n) => n.id));
+    return { slot, needed, offered, offeredComplete: offered.filter((id) => complete.has(id)), needs };
+  });
+  const completeWhileNeeded = players.some((p) => p.needed >= fit && p.offeredComplete.length > 0);
+  const most = Math.max(0, ...players.map((p) => p.needed));
+  const spare = most < fit;
+  // Worst case: each player takes a direction on an outcome they still need, where one is offered
+  const after = players.map((p) => p.needed - (p.offered.some((id) => p.needs.some((n) => n.id === id && n.stillNeeded > 0)) ? 1 : 0));
+  return {
+    fit,
+    players: players.map(({ slot, needed, offered, offeredComplete }) => ({ slot, needed, offered, offeredComplete })),
+    completeWhileNeeded,
+    spare,
+    ...(spare && fit >= 2 ? { keepsLast: Math.max(0, ...after) >= 1 } : {}),
+  };
+}
+
+/** What the switch plan check tells the planner where a thread is to spare and the last milestone goes before the last thread. */
+export const SPARE_THREAD_PROBLEM =
+  "a thread is to spare before the story's last thread, but this switch lets every milestone still needed be settled before it, so the last thread would have none left to settle: keep one outcome's last milestone for the thread the last switch opens, and give this thread to another outcome (a complete one if no other is open)";
+
+/**
+ * What the switch plan check (planChecks.ts, checkedSwitchPlan) tells the
+ * planner where a usable plan breaks step b's pacing, read from PACING's
+ * arithmetic (switchPacingReading), or undefined: a player with no thread to
+ * spare offered a complete outcome (the setup's final-thread or threshold
+ * instruction taking a needed thread); a thread to spare whose plan lets every
+ * milestone still needed be settled before the story's last thread (only where
+ * some milestone is still needed). The check asks once more, told the problem,
+ * and never fails the turn on it.
+ */
+export function switchPacingProblem(story: Story, plan: SwitchAnalysis): string | undefined {
+  const reading = switchPacingReading(story, plan);
+  const problems = reading.players
+    .filter((p) => p.needed >= reading.fit && p.offeredComplete.length > 0)
+    .map(
+      (p) =>
+        `${p.slot} still needs ${plural(p.needed, "milestone")} with ${plural(reading.fit, "thread")} left, the one this switch opens included, but its switch offers ${p.offeredComplete.join(", ")}, already complete: offer ${p.slot} an outcome that still needs milestones, and let the story's instructions shape that thread instead`
+    );
+  if (reading.keepsLast === false && reading.players.some((p) => p.needed > 0)) problems.push(SPARE_THREAD_PROBLEM);
+  return problems.length ? problems.join("; ") : undefined;
+}
+
+// --- The PACING block ---
 
 const SWITCH_PHASE: Record<Phase, (players: string) => string> = {
   opening: () => "the opening of the story. What it asks of the next thread: meet the world and its people; the directions range over all outcomes.",
@@ -302,6 +474,14 @@ function lengthsText(lengths: number[]): string {
   return `${lengths.slice(0, -1).join(", ")} or ${lengths[lengths.length - 1]} beats`;
 }
 
+/** The chapter planner's lengths line: the paced lengths, and why where they narrow the allowed ones (pacedLengths). */
+function lengthsLine(story: Story): string {
+  const paced = pacedLengths(story);
+  const line = `Allowed lengths for this thread: ${lengthsText(paced.lengths)}.`;
+  if (!paced.narrowed) return line;
+  return `${line} ${paced.narrowed === "longer" ? PACED_LENGTHS_TEXT.longer : PACED_LENGTHS_TEXT.shorter}`;
+}
+
 /**
  * The stage a chapter settles (planner v2e, adopted 2026-09-30; the owner's
  * feedback of 2026-09-29 on a first chapter that reached into its outcome's
@@ -350,7 +530,7 @@ export function threadPacingBlock(story: Story): string {
   const turn = story.getCurrentTurn() + 1;
   const last = isLastChapter(left);
   const lines = ["======= PACING =======", `This thread starts at turn ${turn} of ${story.getMaxTurns()}; ${plural(left, "turn")} ${left === 1 ? "is" : "are"} left, this one included.`];
-  lines.push(last ? `This is the story's last thread: exactly ${left} beats. It is the story's climax.` : `Allowed lengths for this thread: ${lengthsText(allowedLengths(left))}.`);
+  lines.push(last ? `This is the story's last thread: exactly ${left} beats. It is the story's climax.` : lengthsLine(story));
   const picked = pickedNeeds(story);
   if (picked.length === 1 && !story.isMultiplayer()) lines.push(`The outcome this thread pushes: ${pushedLine(picked[0].need)}`);
   else if (picked.length > 0) lines.push("The outcomes the players' choices set:", ...picked.map((p) => `- ${pushedLine(p.need)} (${p.slots.join(", ")})`));

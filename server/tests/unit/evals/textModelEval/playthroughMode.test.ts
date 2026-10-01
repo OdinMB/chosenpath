@@ -180,14 +180,17 @@ describe("the judged checks after each story", () => {
     };
     const run = await playAndJudge(PLAYTHROUGHS[0], call, { sample: 1 });
     expect(run.complete).toBe(true);
+    // Three chapters with production's paced lengths (since the pacing-clues adoption, 2026-10-01): three results checks
     expect(run.judged?.map((j) => [j.kind, j.verdict])).toEqual([
       ["stage", true],
       ["results", undefined],
       ["results", undefined],
+      ["results", undefined],
       ["ending", true],
     ]);
-    expect(kinds.slice(-4)).toEqual(["judge", "judge", "judge", "judge"]);
-    expect(kinds.filter((k) => k === "play").length).toBe(16);
+    expect(kinds.slice(-5)).toEqual(["judge", "judge", "judge", "judge", "judge"]);
+    // A setup, three switch plans, three chapter plans and eleven turns
+    expect(kinds.filter((k) => k === "play").length).toBe(18);
   });
 });
 

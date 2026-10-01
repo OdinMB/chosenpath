@@ -6,10 +6,12 @@ import { beatSet, explorationOptions, outcome, stat, switchAnalysis, threadAnaly
 
 /*
  * A fake story for the playthrough tests: a setup reply as the game saves it,
- * flavor switches on the first player's main outcome (or the shared one),
- * chapters as long as PACING allows, and turns that offer a lever set on
- * chapter steps and exploration choices on switches, writing the ended
- * chapter's milestone where the turn may add one.
+ * flavor switches (a group's on the shared outcome, a single player's on the
+ * first outcome PACING lists as still needing milestones, as step b and
+ * production's plan check ask since 2026-10-01), chapters as long as PACING
+ * allows, and turns that offer a lever set on chapter steps and exploration
+ * choices on switches, writing the ended chapter's milestone on its outcome
+ * where the turn may add one.
  */
 
 export const slots = (players: number) => Array.from({ length: players }, (_, i) => `player${i + 1}`);
@@ -79,6 +81,17 @@ function pacedLength(prompt: string): number {
   return Math.max(...lengths);
 }
 
+/**
+ * The outcome a single player's switch takes, as a planner that keeps PACING
+ * does (step b; production's plan check since the pacing-clues adoption of
+ * 2026-10-01): the first the PACING block lists as still needing milestones,
+ * else the first listed (an aftermath, every outcome complete).
+ */
+function pacedOutcome(prompt: string, fallback: string): string {
+  const lines = [...prompt.matchAll(/^- (\w+)(?: \(the main outcome\))?: .* → (.+)$/gm)];
+  return (lines.find((m) => m[2].endsWith("still needed")) ?? lines[0])?.[1] ?? fallback;
+}
+
 /** An override's answer for "the fake's own reply" */
 export const DEFAULT = Symbol("default");
 
@@ -95,12 +108,19 @@ export type Overrides = {
   latencyMs?: number;
 };
 
-/** Replies by role in the stored shape: flavor switches on the first player's main outcome, chapters as PACING allows, turns with a lever set. */
+/**
+ * Replies by role in the stored shape: flavor switches (a group's on the shared outcome, a single player's on the first
+ * outcome PACING lists as still needing milestones), chapters as PACING allows on the switch's outcome, turns with a lever
+ * set that record the ended chapter's milestone on its outcome.
+ */
 export function fakeCall(players: number, overrides: Overrides = {}): { call: PlayCall; calls: PlayCallSpec[] } {
   const calls: PlayCallSpec[] = [];
   const seen: Record<string, number> = {};
   let phase: "switch" | "thread" = "switch";
-  const outcomeId = players > 1 ? "shared_harbour" : "player1_main";
+  const firstOutcome = players > 1 ? "shared_harbour" : "player1_main";
+  /** The outcome the latest switch took, and the one the latest chapter pushes (its milestone's, recorded on the switch turn after it) */
+  let switchOutcome = firstOutcome;
+  let chapterOutcome = firstOutcome;
   const group = players > 1 ? "shared" : "player1";
   const latencyMs = overrides.latencyMs ?? 1_000;
   const call: PlayCall = async (spec) => {
@@ -116,16 +136,18 @@ export function fakeCall(players: number, overrides: Overrides = {}): { call: Pl
     if (spec.role === "setup") return done(setupReply(players));
     if (spec.role === "switch") {
       const base = switchAnalysis(slots(players));
-      return done({ ...base, switches: [{ ...base.switches[0], type: "flavor", outcomeId, question: "Will the harbour hold?", topicChoices: [] }] });
+      switchOutcome = players > 1 ? firstOutcome : pacedOutcome(promptOf(spec), firstOutcome);
+      return done({ ...base, switches: [{ ...base.switches[0], type: "flavor", outcomeId: switchOutcome, question: "Will the harbour hold?", topicChoices: [] }] });
     }
     if (spec.role === "thread") {
       const length = overrides.length ?? pacedLength(promptOf(spec));
       const plan = threadAnalysis("challenge", length, 0, slots(players));
-      return done({ ...plan, threads: [{ ...plan.threads[0], outcomeId, title: "The Ferry Chase", typeOfMilestone: "who holds the ferry" }] });
+      chapterOutcome = switchOutcome;
+      return done({ ...plan, threads: [{ ...plan.threads[0], outcomeId: chapterOutcome, title: "The Ferry Chase", typeOfMilestone: "who holds the ferry" }] });
     }
     const options = phase === "switch" ? explorationOptions() : (overrides.chapterOptions?.(nth) ?? leverSet());
     const beats = Object.fromEntries(slots(players).map((slot) => [slot, { ...beatSet(1).player1, options, plan: { ...beatSet(1).player1.plan, forPlayer: slot } }]));
-    const milestones = addsMilestones(spec) ? [{ type: "newMilestone", outcomeGroup: group, outcome: outcomeId, newMilestone: "The ferry is ours." }] : "";
+    const milestones = addsMilestones(spec) ? [{ type: "newMilestone", outcomeGroup: group, outcome: chapterOutcome, newMilestone: "The ferry is ours." }] : "";
     return done(beatSet(players, { ...beats, newMilestones: milestones, ...(overrides.statChanges ? { statChanges: overrides.statChanges } : {}) } as never));
   };
   return { call, calls };

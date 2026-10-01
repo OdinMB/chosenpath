@@ -15,6 +15,8 @@ import {
 } from "../../../../src/evals/textModelEval/latePacingPlay.js";
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { fakeCall, input } from "./playFixtures.js";
+import { firstSwitchBeat } from "../../../helpers/promptStories.js";
+import { switchAnalysis } from "../../../helpers/textFixtures.js";
 
 /*
  * The late-pacing stage's short playthroughs (2026-10-01, fix 8 of the second
@@ -149,7 +151,14 @@ describe("the fix-and-retest's runs", () => {
   it("the pacing-clues stage's fix-and-retest (pacingCluesB): pacingClues's requests and lengths, its switch plans read against PACING's arithmetic", async () => {
     expect(planLengthsOf("pacingCluesB")).toBeDefined();
     expect(switchProblemOf("pacingCluesB")).toBe(switchPacingProblem);
-    for (const variant of ["adopted", "pacingClues", "latePacingB"] as const) expect(switchProblemOf(variant)).toBeUndefined();
+    // Production's own check reads the same since the stage's adoption (its default); the variants measured before ran without one
+    expect(switchProblemOf("adopted")).toBeUndefined();
+    for (const variant of ["pacingClues", "latePacingB", "latePacing"] as const) {
+      const rule = switchProblemOf(variant);
+      expect(rule).toBeDefined();
+      expect(rule).not.toBe(switchPacingProblem);
+      expect(rule?.(firstSwitchBeat(1), switchAnalysis(["player1"]))).toBeUndefined();
+    }
     const run = await storedRun();
     const at = run.turns.find((t) => t.turn > 2 && t.plan?.kind === "chapter plan")!;
     const { call, calls } = fakeCall(1);

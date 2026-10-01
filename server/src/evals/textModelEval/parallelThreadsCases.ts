@@ -4,6 +4,7 @@ import { choiceResultCases, productionSends, type ChoiceCaseSpec, type PromptHas
 import type { PlayRun } from "./playthroughs.js";
 import { requestFor, requestText } from "./variants.js";
 import { choiceResultRequest } from "../../game/services/storyTextRounds/choiceResult.js";
+import { LATE_PACING_TEXT } from "../../game/services/storyTextRounds/latePacing.js";
 
 /*
  * The parallel-threads stage's cases (2026-10-01, fix 4 of the second
@@ -69,7 +70,9 @@ const CATEGORY = "parallel-threads";
 /**
  * What production sent in the second round of playthroughs: today's request,
  * but for the switch planner's last-stage line, which the stage's run led
- * production to adopt (2026-10-01) and which no switch of that round carried;
+ * production to adopt (2026-10-01) and which no switch of that round carried,
+ * and its step b, which production prints as the pacing-clues stage's
+ * fix-and-retest measured it since that stage's adoption (later that day);
  * for the chapter planner, planner v2f as measured (production byte for
  * byte until the challenge-results stage's adoption of 2026-10-01, whose edits
  * no chapter plan of that round carried); and for a turn, production's turn
@@ -82,7 +85,7 @@ export const playthroughs2Sent: SentRequestText = (input) => {
   if (input.role === "thread") return requestText(requestFor("planV2f", input));
   if (input.role === "beat") return choiceResultRequest(input.story).prompt;
   const sent = productionSends(input);
-  return input.role === "switch" ? sent.split(CONTEST_LAST_STAGE_LINE).join("") : sent;
+  return input.role === "switch" ? sent.split(LATE_PACING_TEXT.stepBVariantB).join(LATE_PACING_TEXT.stepB).split(CONTEST_LAST_STAGE_LINE).join("") : sent;
 };
 
 /**

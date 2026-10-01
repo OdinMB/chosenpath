@@ -17,7 +17,10 @@ import {
   kidsAgesAsMeasured,
   withContestLastStage,
   withKidsBandImageSlots,
+  withLateClues,
   withLeverDirectionSchema,
+  withPacedLengths,
+  withPacingStepB,
   withResultsAsOutcomes,
   withResultsAsOutcomesSchema,
   withShortReplies,
@@ -52,7 +55,9 @@ import { optionsO2cBase } from "../../../../src/game/services/storyTextRounds/op
  * turn with the short-replies stage's two lines (shortReplies, 2026-10-01; a
  * kids turn's kidsAges carries them, built on production's live turn), a
  * single player's rolled chapter step with O2b's stat lines and the reward the
- * game places (turnO2c, the options-o2c stage of 2026-10-01), and AI
+ * game places (turnO2c, the options-o2c stage of 2026-10-01), a late turn
+ * with the late part's clue lines (pacingClues, the pacing-clues stage of
+ * 2026-10-01; withLateClues puts them on the forms measured before), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -118,7 +123,7 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
   // turn deltas and the short-replies lines, so the measured variant stands on the form measured before it
   if (variant === "turnO2c" && input.role === "beat") {
     const before = requestFor("turnB6", input);
-    const lined = withShortReplies({ prompt: adoptedTurn(requestText(before), input.story), schema: (before as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
+    const lined = withShortReplies({ prompt: withLateClues(adoptedTurn(requestText(before), input.story), input.story), schema: (before as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
     const base = optionsO2cBase(input.story);
     expect({ prompt: base.prompt === lined.prompt, schema: JSON.stringify(toJsonSchema(base.schema)) === lined.json }).toEqual({ prompt: true, schema: true });
     return { prompt, schema: json(measured) };
@@ -130,14 +135,18 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     case "iteration":
       return { prompt: adoptedSetupPrompt(prompt, input.iteration.playerCount, input.iteration.gameMode), schema: withLeverDirectionSchema(json(measured)) };
     case "thread":
-      // Since the challenge-results stage (2026-10-01): results and milestones that never restate the approach, as measured
-      return { prompt: withResultsAsOutcomes(prompt, input.story), schema: withResultsAsOutcomesSchema(json(measured), input.story) };
+      // Since the challenge-results stage (2026-10-01): results and milestones that never restate the approach, as measured;
+      // since the pacing-clues stage the same day, the paced lengths where they narrow, as pacingCluesB measured them
+      return { prompt: withPacedLengths(withResultsAsOutcomes(prompt, input.story), input.story), schema: withResultsAsOutcomesSchema(json(measured), input.story) };
     case "switch":
-      // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured
-      return { prompt: withContestLastStage(withThreadsThatFit(prompt, input.story), input.story), schema: json(measured) };
+      // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured;
+      // since the pacing-clues stage the same day, step b as pacingCluesB measured it
+      return { prompt: withPacingStepB(withContestLastStage(withThreadsThatFit(prompt, input.story), input.story)), schema: json(measured) };
     case "beat": {
-      // Since the short-replies stage (2026-10-01): every turn's text goes on after its first paragraph, as measured
-      const lined = withShortReplies({ prompt: adoptedTurn(prompt, input.story), schema: (measured as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
+      // Since the short-replies stage (2026-10-01): every turn's text goes on after its first paragraph, as measured; since
+      // the pacing-clues stage the same day, a late turn carries the late part's clue lines as pacingClues measured them
+      // (groupLeversB, built on production's live turn, carries them already)
+      const lined = withShortReplies({ prompt: withLateClues(adoptedTurn(prompt, input.story), input.story), schema: (measured as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
       return { prompt: lined.prompt, schema: lined.json };
     }
   }

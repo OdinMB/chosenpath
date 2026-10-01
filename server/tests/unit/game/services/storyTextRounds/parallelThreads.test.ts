@@ -20,7 +20,7 @@ import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { plannerV2SwitchRequest } from "../../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
-import { productionThen, withThreadsThatFit } from "../../../../helpers/adoptedDeltas.js";
+import { productionThen, withPacingStepB, withThreadsThatFit } from "../../../../helpers/adoptedDeltas.js";
 import { firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { createMockMultiplayerStory } from "../../../../helpers/testHelpers.js";
 import { beatGeneration, outcome, thread } from "../../../../helpers/textFixtures.js";
@@ -180,8 +180,9 @@ describe("the switch planner: a contested outcome's last stage offered only as a
     const [variant, production] = [parallelThreadsRequest(story, "switch"), switchStep.request(story)];
     expect(occurrences(variant.prompt, PARALLEL_THREADS_TEXT.lastStageLine)).toBe(1);
     expect(variant.prompt).toContain(`${PARALLEL_THREADS_TEXT.lastStageAnchor}${PARALLEL_THREADS_TEXT.lastStageLine}`);
-    // The switch planner as it was measured against: planner v2b with production's threads that fit
-    expect(withoutInsertions(variant.prompt)).toBe(withThreadsThatFit(plannerV2SwitchRequest(story, false).prompt, story));
+    // The switch planner as it was measured against: planner v2b with production's threads that fit (the variant builds on
+    // production's live planner, so since the pacing-clues adoption, later that day, with step b as adopted there)
+    expect(withoutInsertions(variant.prompt)).toBe(withPacingStepB(withThreadsThatFit(plannerV2SwitchRequest(story, false).prompt, story)));
     // Adopted as measured (2026-10-01): production's switch planner is the variant's byte for byte
     expect(variant.prompt).toBe(production.prompt);
     expect(json(variant.schema)).toBe(json(production.schema));

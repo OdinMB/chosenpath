@@ -22,6 +22,7 @@ import {
   withKidsBandImageSlots,
   withKidsImageSlots,
   withKidsImageSlotsSchema,
+  withLateClues,
   withOptionsO2c,
   withShortReplies,
 } from "../../../helpers/adoptedDeltas.js";
@@ -179,7 +180,8 @@ function expectSame(production: Request, measured: Request | Expected) {
 function kidsAdopted(story: Story): Expected {
   const measured = kidsTurnRequest(story);
   // Since the options-o2c stage, a rolled step carries O2c's lines too (withOptionsO2c, logged: unmeasured for kids)
-  const lined = withShortReplies({ prompt: withOptionsO2c(withEndingOnlyPlayed(withKidsImageSlots(measured.prompt, story), story), story), schema: measured.schema });
+  // Since the pacing-clues stage, a late turn carries the late part's clue lines too (withLateClues, unmeasured for kids)
+  const lined = withShortReplies({ prompt: withLateClues(withOptionsO2c(withEndingOnlyPlayed(withKidsImageSlots(measured.prompt, story), story), story), story), schema: measured.schema });
   return { prompt: lined.prompt, json: withKidsImageSlotsSchema(lined.json, story) };
 }
 
@@ -202,7 +204,7 @@ const kidsAgesAdopted = (story: Story): Expected => {
  * send for this story.
  */
 const asAdopted = (measured: Request, story: Story): Expected =>
-  takesKidsRules(story) ? kidsAgesAdopted(story) : withShortReplies({ prompt: adoptedTurn(measured.prompt, story), schema: measured.schema });
+  takesKidsRules(story) ? kidsAgesAdopted(story) : withShortReplies({ prompt: withLateClues(adoptedTurn(measured.prompt, story), story), schema: measured.schema });
 
 /**
  * A single player's turn as production must send it. Since the options-o2c stage of 2026-10-01 a rolled chapter step

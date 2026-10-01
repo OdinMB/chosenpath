@@ -13,7 +13,7 @@ import { playthroughsSent } from "../../../../src/evals/textModelEval/choiceResu
 import { playthroughs2Sent } from "../../../../src/evals/textModelEval/parallelThreadsCases.js";
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
-import { beforeEndingOnlyPlayed, beforeGroupLevers, beforeOptionsO2c, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
+import { beforeEndingOnlyPlayed, beforeGroupLevers, beforeLateClues, beforeOptionsO2c, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
 import { takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
@@ -206,11 +206,12 @@ describe("replayRun on the stored round 2 (skipped where the output folder is ab
         // read-with-kids turn takes since 2026-10-01 (the mouse story recorded its category), every ending's lines on
         // what was played (the owner's decision of 2026-10-01), and a group's rolled step's lever lines (the group-levers
         // adoption of the same day), and every turn's short-replies lines (that stage's adoption, later that day), and a
-        // single player's rolled step's O2c lines (the options-o2c adoption, later still)
+        // single player's rolled step's O2c lines (the options-o2c adoption, later still), and a late turn's clue lines (the
+        // pacing-clues adoption, later again)
         expect([run.spec.id, r.turn, sha256(playthroughs2Sent({ role: "beat", story: r.before }))]).toEqual([run.spec.id, r.turn, sentHash]);
         const withLines = requestText(requestFor("adopted", { role: "beat", story: r.before }));
         expect([run.spec.id, r.turn, sha256(withLines) === sentHash]).toEqual([run.spec.id, r.turn, false]);
-        const today = beforeShortReplies(beforeOptionsO2c(withLines, r.before));
+        const today = beforeShortReplies(beforeOptionsO2c(beforeLateClues(withLines, r.before), r.before));
         const ending = r.before.getCurrentBeatType() === "ending";
         const levers = takesGroupLevers(r.before);
         expect([run.spec.id, r.turn, sha256(today) === sentHash]).toEqual([run.spec.id, r.turn, !takesKidsRules(r.before) && !ending && !levers]);

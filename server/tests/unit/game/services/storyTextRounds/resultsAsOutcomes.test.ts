@@ -14,6 +14,7 @@ import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js
 import { plannerV2ThreadRequest } from "../../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
 import { threadAnalysisAfterSwitch, firstThreadAnalysis } from "../../../../helpers/promptStories.js";
 import { outcome } from "../../../../helpers/textFixtures.js";
+import { withPacedLengths } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * Challenge and contest results say how the attempt turns out, not the
@@ -80,11 +81,14 @@ const countOf = (story: Story) => (story.isMultiplayer() ? "group" : "single");
 /** Production's chapter planner as it stood before the adoption: planner v2f, byte for byte (adoptedPlanners.test.ts held it). */
 const measuredBase = (story: Story) => plannerV2ThreadRequest(story, false, { twoSided: true, nearerQuestion: true, stages: true, stepsOnce: true, outcomeResults: true });
 
-/** The measured base's prompt with the variant's two edits made by hand. */
+/**
+ * The measured base's prompt with the variant's two edits made by hand; the variant builds on production's live
+ * planner, so since the pacing-clues adoption (later on 2026-10-01) it carries the paced lengths where they narrow.
+ */
 function expectedPrompt(story: Story): string {
   const base = measuredBase(story).prompt;
   const which = countOf(story);
-  return base.replace(rule[which], `${rule[which]}${approachLine[which]}`).split(flavorAnchor).join(flavorLine);
+  return withPacedLengths(base.replace(rule[which], `${rule[which]}${approachLine[which]}`).split(flavorAnchor).join(flavorLine), story);
 }
 
 /** The measured base's JSON schema with the milestone descriptions reworded by hand. */

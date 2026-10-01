@@ -18,7 +18,8 @@ import {
   switchAnalysisAfterThread,
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
-import { endedChapter, roundStory } from "../../../helpers/roundStories.js";
+import { endedChapter, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
+import { pacedLengths, switchPacingProblem } from "../../../../src/game/services/pacing.js";
 import { outcome, switchAnalysis, thread, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
 
 beforeEach(() => {
@@ -1117,7 +1118,8 @@ describe("checked plan calls", () => {
    * The pacing-clues stage's fix-and-retest (2026-10-01, eval only): a switch
    * plan read against another pacing rule (the variant's), its problem worth
    * the one retry but never a reason to fail the turn, as a chapter length is.
-   * Production passes no rule, so its check is as before.
+   * A rule given replaces production's own (PACING's arithmetic since the
+   * stage's adoption, below).
    */
   describe("a switch plan read against another pacing rule (an eval variant's)", () => {
     const story = switchStory(1);
@@ -1144,10 +1146,75 @@ describe("checked plan calls", () => {
       await expect(checkedSwitchPlan(story, "THE PROMPT", invoke, () => undefined, rule)).resolves.toEqual(first());
     });
 
-    it("is production's check alone without a rule", async () => {
+    it("is production's check, PACING's arithmetic included, without a rule given: a plan that keeps it is applied after one call", async () => {
+      expect(switchPacingProblem(story, first())).toBeUndefined();
       const plain = planner(first());
       await expect(checkedSwitchPlan(story, "THE PROMPT", plain.invoke, () => undefined)).resolves.toEqual(first());
       expect(plain.invoke).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /*
+   * The pacing-clues stage's adoption (2026-10-01, its fix-and-retest
+   * pacingCluesB): production reads a usable switch plan against PACING's
+   * arithmetic (switchPacingProblem) and a chapter plan against the paced
+   * lengths, each worth the one retry told the problem, never a reason to fail
+   * the turn. Measured in short whole-story playthroughs: the last chapter kept
+   * a milestone to settle 2 of 8 -> 8 of 8, no milestone left unfinished.
+   */
+  describe("PACING's arithmetic, production's check since the pacing-clues adoption", () => {
+    const PENDING = "outcome_1";
+    /** A single player's switch after a chapter on outcome_1 (pending, its one milestone), the main outcome 1 of 2, at turn 4 of 7: one thread left. */
+    const lastSwitch = () =>
+      switchAnalysisAfterThread(1, {
+        maxTurns: 7,
+        sharedOutcomes: [outcome(PENDING, { intendedNumberOfMilestones: 1 }), outcome("main", { intendedNumberOfMilestones: 2, milestones: ["The first stage"] })],
+      });
+    const onComplete = (story: Story) => switchPlan(story, [flavor(["player1"], PENDING, "How does it end?")]);
+    const onMain = (story: Story) => switchPlan(story, [flavor(["player1"], "main", "How does it end?")]);
+
+    it("asks a switch plan once more where it offers a complete outcome to a player with no thread to spare, told why, and applies the reply that keeps it", async () => {
+      const story = lastSwitch();
+      const problem = switchPacingProblem(story, checkSwitchPlan(story, onComplete(story)).plan);
+      expect(problem).toContain("player1 still needs 1 milestone with 1 thread left");
+      const lines: string[] = [];
+      const { invoke, prompts } = planner(onComplete(story), onMain(story));
+      await expect(checkedSwitchPlan(story, "THE PROMPT", invoke, (line) => lines.push(line))).resolves.toEqual(onMain(story));
+      expect(prompts[1]).toBe(withPlanProblem("THE PROMPT", problem ?? ""));
+      expect(lines.join("\n")).toContain('"pacingNotFollowed":1');
+    });
+
+    it("keeps the second plan when it still misses: the rule never fails the turn; a rule of none reads nothing (the eval's variants measured before)", async () => {
+      const story = lastSwitch();
+      const again = planner(onComplete(story), onComplete(story));
+      await expect(checkedSwitchPlan(story, "THE PROMPT", again.invoke, () => undefined)).resolves.toEqual(onComplete(story));
+      expect(again.invoke).toHaveBeenCalledTimes(2);
+      const none = planner(onComplete(story));
+      await expect(checkedSwitchPlan(story, "THE PROMPT", none.invoke, () => undefined, () => undefined)).resolves.toEqual(onComplete(story));
+      expect(none.invoke).toHaveBeenCalledTimes(1);
+    });
+
+    /** A single player's chapter plan at turn 17 of 25 after a switch on shared_escape (1 of 3): one milestone still needed after it. */
+    const pacedChapter = () =>
+      roundStory({
+        turns: 16,
+        maxTurns: 25,
+        sharedOutcomes: [outcome("shared_escape", { intendedNumberOfMilestones: 3, milestones: ["Out of the cells"] })],
+        playerOutcomes: { player1: [] },
+        phases: [endedChapter("shared_escape", 3, 12, "Out of the cells"), topicSwitch([["Run for the gate", "shared_escape"]], 15)],
+        lastChoice: 0,
+      });
+
+    it("reads a chapter plan's length against the paced lengths, naming them", async () => {
+      const story = pacedChapter();
+      expect(pacedLengths(story)).toEqual({ lengths: [4], narrowed: "longer" });
+      const three = threadPlan([aThread("challenge", 3, ["player1"])]);
+      expect(checkThreadPlan(story, three, { lengths: true }).lengthProblem).toBe("the thread is 3 beats long, and with 9 turns left, this one included, PACING allows 4 beats");
+      expect(checkThreadPlan(story, threadPlan([aThread("challenge", 4, ["player1"])]), { lengths: true }).lengthProblem).toBeUndefined();
+      const { invoke, prompts } = planner(three, threadPlan([aThread("challenge", 4, ["player1"])]));
+      const plan = await checkedThreadPlan(story, "THE PROMPT", invoke, () => undefined);
+      expect(prompts[1]).toBe(withPlanProblem("THE PROMPT", "the thread is 3 beats long, and with 9 turns left, this one included, PACING allows 4 beats"));
+      expect(plan.duration).toBe(4);
     });
   });
 

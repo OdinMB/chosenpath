@@ -217,16 +217,17 @@ describe("playStory: a whole story as the game plays it", () => {
     const { run, judgeTargets } = await playStory(spec, input(1), call, { sample: 1 });
     expect(run.stopped).toBe("the ending");
     expect(run.complete).toBe(true);
+    // Production's paced lengths (since the pacing-clues adoption, 2026-10-01): three milestones need three chapters
     expect(run.turns.map((t) => [t.turn, t.kind])).toEqual([
       [1, "first turn"],
       [2, "chapter opening"],
       [3, "chapter step"],
       [4, "chapter step"],
-      [5, "chapter step"],
-      [6, "switch turn"],
-      [7, "chapter opening"],
-      [8, "chapter step"],
-      [9, "chapter step"],
+      [5, "switch turn"],
+      [6, "chapter opening"],
+      [7, "chapter step"],
+      [8, "switch turn"],
+      [9, "chapter opening"],
       [10, "chapter step"],
       [11, "ending"],
     ]);
@@ -240,8 +241,10 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(run.turns.filter((t) => t.plan).map((t) => [t.turn, t.plan?.kind])).toEqual([
       [1, "switch plan"],
       [2, "chapter plan"],
-      [6, "switch plan"],
-      [7, "chapter plan"],
+      [5, "switch plan"],
+      [6, "chapter plan"],
+      [8, "switch plan"],
+      [9, "chapter plan"],
     ]);
     // Each call has its own case id, and the story starts after character selection
     expect(new Set(calls.map((c) => c.caseId)).size).toBe(calls.length);
@@ -254,16 +257,20 @@ describe("playStory: a whole story as the game plays it", () => {
       expect(turn.picks[0].resolution).not.toBeNull();
     }
     expect(run.turns[10].picks).toEqual([]);
-    // The chapter's milestones land: one at the switch turn after the first chapter, one at the ending
-    expect(run.turns[5].milestones.player1_main).toBe(1);
-    expect(run.turns[10].milestones.player1_main).toBe(2);
+    // The chapters' milestones land: the main outcome's at the switch turns after the first two chapters, the side
+    // outcome's (the last chapter's, which the fake's switch took as PACING's first outcome still needing one) at the ending
+    expect(run.turns[4].milestones.player1_main).toBe(1);
+    expect(run.turns[7].milestones.player1_main).toBe(2);
+    expect(run.turns[10].milestones).toEqual({ player1_main: 2, player1_side: 1 });
     expect(run.end?.players.player1.outcomes.find((o) => o.id === "player1_main")?.milestones).toHaveLength(2);
-    // The first chapter's stage (1 of 2) is judged; the second is the outcome's last stage; every chapter plan's results
-    // are judged against their kind; the ending is judged per player. The fake's chapters are challenges: no option set to judge
+    // The first chapter's stage (1 of 2) is judged; the second and third settle their outcome's last stage; every chapter
+    // plan's results are judged against their kind; the ending is judged per player. The fake's chapters are challenges: no
+    // option set to judge
     expect(judgeTargets.map((t) => [t.kind, t.turn, t.label])).toEqual([
       ["stage", 2, "player1_main"],
       ["results", 2, "player1_main"],
-      ["results", 7, "player1_main"],
+      ["results", 6, "player1_main"],
+      ["results", 9, "player1_side"],
       ["ending", 11, "player1"],
     ]);
     // What each call cost and waited
@@ -309,7 +316,8 @@ describe("playStory: a whole story as the game plays it", () => {
     const { call, calls } = fakeCall(1, {
       reply: (role, nth) => {
         if (role !== "thread" || nth !== 0) return DEFAULT;
-        const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
+        // A length the paced lengths allow (2 or 3 beats here), so the outcome is the only problem
+        const plan = threadAnalysis("challenge", 3, 0, ["player1"]);
         return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
       },
     });
@@ -431,18 +439,20 @@ describe("playStory: a whole story as the game plays it", () => {
     });
     const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1, repickStuckSwitches: true });
     const stuck = run.turns.find((t) => t.repicks?.length);
-    expect(stuck?.turn).toBe(7);
+    // The chapter after the second switch (turn 5): turn 6, with production's paced lengths
+    expect(stuck?.turn).toBe(6);
     // player1 had taken their own outcome (Option 2); they now take the shared direction player2 took (Option 1)
     expect(stuck?.repicks).toEqual([{ slot: "player1", from: 1, to: 0, text: "Option 1", outcomeId: "shared_harbour" }]);
     // Only after production's own sends failed: the first and its resend
     expect(stuck?.failedSends?.map((s) => s.send)).toEqual(["first", "resend"]);
     expect(stuck?.sentBy).toBe("after repick");
     expect(stuck?.plan?.plan).toBeDefined();
-    const last = calls.filter((c) => c.role === "thread").at(-1);
+    // The plan the stuck turn kept (a third chapter follows it with production's paced lengths)
+    const last = calls.find((c) => c.caseId === stuck?.plan?.calls.at(-1)?.caseId);
     expect(last?.caseId).toMatch(/chapter-plan-after-repick$/);
     expect(requestText(last?.request as never)).toContain('player1 chose direction 1 of 3: "Option 1"');
     // The switch turn's recorded pick says it was changed
-    expect(run.turns[5].picks[0]).toMatchObject({ slot: "player1", option: 1, repickedTo: 0 });
+    expect(run.turns[4].picks[0]).toMatchObject({ slot: "player1", option: 1, repickedTo: 0 });
     expect(run.complete).toBe(true);
   });
 
@@ -489,25 +499,26 @@ describe("playStory: a whole story as the game plays it", () => {
   });
 
   it("hands the judged checks each chapter plan's results and, at each step of an exploration chapter, each player's options", async () => {
+    // Three beats: the paced lengths allow 2 or 3 for the first chapter (since the pacing-clues adoption, 2026-10-01)
     const exploring = () => {
-      const plan = threadAnalysis("exploration", 4, 0, ["player1"]);
+      const plan = threadAnalysis("exploration", 3, 0, ["player1"]);
       return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "player1_main" }] };
     };
     const { call } = fakeCall(1, { reply: (role, nth) => (role === "thread" && nth === 0 ? exploring() : DEFAULT), chapterOptions: () => explorationOptions() });
     const { judgeTargets } = await playStory(spec, input(1), call, { sample: 1 });
-    // The first chapter explores (turns 2-5); the second is a challenge, whose options are not judged
+    // The first chapter explores (turns 2-4); the others are challenges, whose options are not judged
     expect(judgeTargets.filter((t) => t.kind === "options").map((t) => [t.turn, t.label, t.key])).toEqual([
       [2, "player1", "play-lemonade-s1-t2-player1"],
       [3, "player1", "play-lemonade-s1-t3-player1"],
       [4, "player1", "play-lemonade-s1-t4-player1"],
-      [5, "player1", "play-lemonade-s1-t5-player1"],
     ]);
     const [first] = judgeTargets.filter((t) => t.kind === "options");
-    expect(first.request.prompt).toContain("This step (1 of 4)");
+    expect(first.request.prompt).toContain("This step (1 of 3)");
     expect(first.request.prompt).toContain("Option 1: Option 1");
     expect(judgeTargets.filter((t) => t.kind === "results").map((t) => [t.turn, t.key])).toEqual([
       [2, "play-lemonade-s1-t2"],
-      [7, "play-lemonade-s1-t7"],
+      [6, "play-lemonade-s1-t6"],
+      [9, "play-lemonade-s1-t9"],
     ]);
   });
 

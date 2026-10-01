@@ -66,9 +66,19 @@ const PACED_VARIANTS: VariantId[] = ["latePacing", "latePacingB", "pacingClues",
 /** The variant's length rule for its chapter plans, its retest's too (the plan check reads it as its PACING prints it); production's own otherwise. */
 export const planLengthsOf = (variant: VariantId) => (PACED_VARIANTS.includes(variant) ? (story: Story) => pacedLengths(story).lengths : undefined);
 
-/** The pacing-clues stage's fix-and-retest (pacingCluesB): its switch plans read against PACING's arithmetic in the plan check; none otherwise. */
+/** A rule that reads nothing: the switch plan check as the variants measured before the fix-and-retest ran it. */
+const NO_SWITCH_RULE = (): undefined => undefined;
+
+/**
+ * The switch plan check's pacing rule for an arm: the pacing-clues stage's
+ * fix-and-retest (pacingCluesB) reads switch plans against PACING's
+ * arithmetic, as production does since that stage's adoption (2026-10-01;
+ * undefined here: production's own default, checkedSwitchPlan); the variants
+ * measured before it (latePacing, latePacingB, pacingClues) ran without one,
+ * and play on so.
+ */
 export const switchProblemOf = (variant: VariantId): ((story: Story, plan: SwitchAnalysis) => string | undefined) | undefined =>
-  variant === "pacingCluesB" ? switchPacingProblem : undefined;
+  variant === "pacingCluesB" ? switchPacingProblem : PACED_VARIANTS.includes(variant) ? NO_SWITCH_RULE : undefined;
 
 /**
  * A stored story played on from a turn with an arm's requests, to the story's

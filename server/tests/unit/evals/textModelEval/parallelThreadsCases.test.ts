@@ -54,8 +54,12 @@ describe("parallelThreadsCases on a played fake story", () => {
     // The switch case is the story before the switch plan: its switch planner's request is the one the run sent
     expect(caseStory(cases[0], false).getCurrentTurn()).toBe(switchTurn?.turn ? switchTurn.turn - 1 : -1);
     expect(parallelThreadsCasesToFreeze(cases, [run], hashOf, false, specs, productionSends).skipped).toEqual(["round-parallel-switch-fake", "round-parallel-fake"]);
-    // Read as the second round sent it, today's chapter planner is not what that round's chapter plans sent (2026-10-01)
-    expect(parallelThreadsCases([run], hashOf, specs).problems).toEqual([expect.stringMatching(/^round-parallel-fake: its request is not the one the run sent/)]);
+    // Read as the second round sent it, today's planners are not what that round sent (2026-10-01): the chapter planner since
+    // the challenge-results stage's edits, the switch planner since the pacing-clues stage's step b
+    expect(parallelThreadsCases([run], hashOf, specs).problems).toEqual([
+      expect.stringMatching(/^round-parallel-switch-fake: its request is not the one the run sent/),
+      expect.stringMatching(/^round-parallel-fake: its request is not the one the run sent/),
+    ]);
   });
 
   it("builds no switch case at a turn that planned no switch", async () => {

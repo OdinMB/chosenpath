@@ -16,8 +16,10 @@ import {
   switchAnalysisAfterThread,
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
-import { withContestLastStage, withResultsAsOutcomes, withResultsAsOutcomesSchema, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
-import { CONTEST_LAST_STAGE_LINE } from "../../../../src/game/services/prompts/SwitchPromptService.js";
+import { withContestLastStage, withPacedLengths, withPacingStepB, withResultsAsOutcomes, withResultsAsOutcomesSchema, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
+import { CONTEST_LAST_STAGE_LINE, PRIORITY_STEP } from "../../../../src/game/services/prompts/SwitchPromptService.js";
+import { PACED_LENGTHS_TEXT, pacedLengths, threadPacingBlock } from "../../../../src/game/services/pacing.js";
+import { LATE_PACING_TEXT, pacingCluesBase, pacingCluesRequest } from "../../../../src/game/services/storyTextRounds/latePacing.js";
 import { FLAVOR_APPROACH_LINE, STEP_RESULTS_APPROACH } from "../../../../src/game/services/prompts/ThreadPromptService.js";
 import { RESULTS_AS_OUTCOMES_TEXT } from "../../../../src/game/services/storyTextRounds/resultsAsOutcomes.js";
 import { PARALLEL_THREADS_TEXT } from "../../../../src/game/services/storyTextRounds/parallelThreads.js";
@@ -156,7 +158,8 @@ const THREAD_STORIES: [string, () => Story][] = [
 function expectSwitchLikeMeasured(story: Story) {
   const production = switchStep.request(story);
   const measured = plannerV2SwitchRequest(story, false);
-  expect(production.prompt).toBe(withContestLastStage(withThreadsThatFit(measured.prompt, story), story));
+  // Since the pacing-clues adoption (2026-10-01): step b as pacingCluesB measured it
+  expect(production.prompt).toBe(withPacingStepB(withContestLastStage(withThreadsThatFit(measured.prompt, story), story)));
   expect(json(production.schema)).toBe(json(measured.schema));
 }
 
@@ -172,7 +175,8 @@ const planV2f = (story: Story) => plannerV2ThreadRequest(story, false, { twoSide
 function expectThreadLikeMeasured(story: Story) {
   const production = threadStep.request(story);
   const measured = planV2f(story);
-  expect(production.prompt).toBe(withResultsAsOutcomes(measured.prompt, story));
+  // Since the pacing-clues adoption (2026-10-01): the paced lengths where they narrow, as pacingCluesB measured them
+  expect(production.prompt).toBe(withPacedLengths(withResultsAsOutcomes(measured.prompt, story), story));
   expect(json(production.schema)).toBe(withResultsAsOutcomesSchema(json(measured.schema), story));
 }
 
@@ -189,9 +193,9 @@ describe("the switch planner: planner v2 as measured", () => {
     expect(production).toContain("still needed for about 1 thread.");
     expect(production).toContain("it has exactly 2 beats.");
     expect(production).not.toBe(measured);
-    // Everywhere the two counts agree, production is the measured request byte for byte
+    // Everywhere the two counts agree, production is the measured request byte for byte (with step b as adopted since)
     const middle = singlePlayerAfterChapters(25, 8);
-    expect(switchStep.request(middle).prompt).toBe(plannerV2SwitchRequest(middle, false).prompt);
+    expect(switchStep.request(middle).prompt).toBe(withPacingStepB(plannerV2SwitchRequest(middle, false).prompt));
   });
 
   it("offers a contested outcome's last stage only as a grouped thread, as the parallel-threads stage measured it (2026-10-01)", () => {
@@ -199,9 +203,9 @@ describe("the switch planner: planner v2 as measured", () => {
       const story = contestSwitchStory(players, 0);
       const production = switchStep.request(story).prompt;
       expect(production.split(CONTEST_LAST_STAGE_LINE).length - 1).toBe(1);
-      // The measured variant's switch planner, byte for byte, and planner v2b's around the line
-      expect(production).toBe(requestText(requestFor("parallelThreads", { role: "switch", story })));
-      expect(production.replace(CONTEST_LAST_STAGE_LINE, "")).toBe(withThreadsThatFit(plannerV2SwitchRequest(story, false).prompt, story));
+      // The measured variant's switch planner, byte for byte, and planner v2b's around the line (step b as adopted since)
+      expect(production).toBe(withPacingStepB(requestText(requestFor("parallelThreads", { role: "switch", story }))));
+      expect(production.replace(CONTEST_LAST_STAGE_LINE, "")).toBe(withPacingStepB(withThreadsThatFit(plannerV2SwitchRequest(story, false).prompt, story)));
     }
     // Only where a contested outcome's next thread settles its last stage, in a contest game after the opening
     for (const story of [contestSwitchStory(2, 1), contestSwitchStory(2, 0, GameModes.Cooperative), firstSwitchBeat(2), switchAnalysisAfterThread(2)]) {
@@ -322,6 +326,66 @@ describe("the chapter planner: planner v2f (two-sided contests, the nearer chapt
       const schema = json(threadStep.request(build()).schema);
       expect(schema).toContain("After a topic switch: the chosen direction, narrowed to a question about this thread's own situation, even where the direction restates its outcome.");
       expect(schema).not.toContain("asked as a question");
+    }
+  });
+});
+
+/*
+ * The pacing-clues stage's adoption (2026-10-01, fix 8's retest in whole short
+ * playthroughs, its fix-and-retest pacingCluesB): the planners are
+ * pacingCluesB's byte for byte, the switch planner's step b keeping a
+ * milestone for the story's last thread and ranking a forced situation and the
+ * story's instructions below a player's needed milestones, the chapter
+ * planner's PACING line with the paced lengths where they narrow; the plan
+ * checks read the same (planChecks.test.ts). The variant now builds on
+ * production with both taken out (pacingCluesBase), which is production as it
+ * stood when the stage measured it.
+ */
+describe("the planners since the pacing-clues adoption: pacingCluesB's byte for byte", () => {
+  it.each(SWITCH_STORIES)("the switch planner, %s", (_, build) => {
+    const story = build();
+    expect(switchStep.request(story).prompt).toBe(pacingCluesRequest(story, "switch").prompt);
+    expect(pacingCluesBase(story, "switch").prompt).toBe(withContestLastStage(withThreadsThatFit(plannerV2SwitchRequest(story, false).prompt, story), story));
+  });
+
+  it.each(THREAD_STORIES)("the chapter planner, %s", (_, build) => {
+    const story = build();
+    expect(threadStep.request(story).prompt).toBe(pacingCluesRequest(story, "thread").prompt);
+    expect(pacingCluesBase(story, "thread").prompt).toBe(withResultsAsOutcomes(planV2f(story).prompt, story));
+  });
+
+  it("prints step b and the lengths' reasons from production's own constants, the measured text", () => {
+    expect(PRIORITY_STEP).toBe(LATE_PACING_TEXT.stepBVariantB);
+    expect(PACED_LENGTHS_TEXT).toEqual({ longer: LATE_PACING_TEXT.longer, shorter: LATE_PACING_TEXT.shorter });
+    for (const [, build] of SWITCH_STORIES) {
+      const prompt = switchStep.request(build()).prompt;
+      if (prompt.includes("b) Priority.")) expect(prompt.split(PRIORITY_STEP)).toHaveLength(2);
+      expect(prompt).not.toContain(LATE_PACING_TEXT.stepB);
+    }
+  });
+
+  it("narrows a chapter's lengths where the milestones still needed fit some better: New Avalon's turn 17 (one still needed after it, 9 turns left)", () => {
+    const story = roundStory({
+      turns: 16,
+      maxTurns: 25,
+      playerOutcomes: { player1: [outcome(GUILD, { intendedNumberOfMilestones: 3, milestones: ["The Guild listens"] })] },
+      phases: [endedChapter(GUILD, 3, 12, "The Guild listens"), topicSwitch([["Press the Guild", GUILD]], 15)],
+      lastChoice: 0,
+    });
+    expect(pacedLengths(story)).toEqual({ lengths: [4], narrowed: "longer" });
+    const prompt = threadStep.request(story).prompt;
+    expect(prompt).toContain(`Allowed lengths for this thread: 4 beats. ${LATE_PACING_TEXT.longer}`);
+    expect(prompt).toContain(threadPacingBlock(story));
+    expect(prompt).toBe(withPacedLengths(withResultsAsOutcomes(planV2f(story).prompt, story), story));
+    expect(prompt).not.toBe(withResultsAsOutcomes(planV2f(story).prompt, story));
+  });
+
+  (frozen.length ? it : it.skip)("every frozen switch and chapter case", () => {
+    for (const c of frozen.filter((f) => f.role === "switch" || f.role === "thread")) {
+      const story = caseStory(c, false);
+      const role = c.role === "switch" ? "switch" : "thread";
+      const production = role === "switch" ? switchStep.request(story).prompt : threadStep.request(story).prompt;
+      expect([c.id, production === pacingCluesRequest(story, role).prompt]).toEqual([c.id, true]);
     }
   });
 });

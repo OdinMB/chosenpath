@@ -34,24 +34,30 @@ describe("readStory", () => {
   it("reads a well-paced story: it ends on its turn count, each chapter's length is allowed and its milestone lands stage by stage", async () => {
     const readings = readStory(await played());
     expect(readings.endsOnTurnCount).toEqual({ ok: true, turnsBeforeEnding: 10, maxTurns: 10, endingTurn: 11 });
+    // Production's paced lengths (since the pacing-clues adoption, 2026-10-01): three milestones, three chapters, the
+    // fake's switches on the first outcome PACING lists as still needing one
     expect(readings.chapters.map((c) => [c.index, c.firstTurn, c.lastTurn, c.duration, c.lengthAllowed, c.lastChapter])).toEqual([
-      [1, 2, 5, 4, true, false],
-      [2, 7, 10, 4, true, true],
+      [1, 2, 4, 3, true, false],
+      [2, 6, 7, 2, true, false],
+      [3, 9, 10, 2, true, true],
     ]);
-    expect(readings.chapters[0].threads[0]).toMatchObject({ outcomeId: "player1_main", stage: 1, of: 2, milestoneTurn: 6, milestoneText: "The ferry is ours.", milestoneLanded: true });
-    expect(readings.chapters[1].threads[0]).toMatchObject({ stage: 2, of: 2, lastStage: true, milestoneTurn: 11, milestoneLanded: true });
+    expect(readings.chapters[0].threads[0]).toMatchObject({ outcomeId: "player1_main", stage: 1, of: 2, milestoneTurn: 5, milestoneText: "The ferry is ours.", milestoneLanded: true });
+    expect(readings.chapters[1].threads[0]).toMatchObject({ stage: 2, of: 2, lastStage: true, milestoneTurn: 8, milestoneLanded: true });
+    expect(readings.chapters[2].threads[0]).toMatchObject({ outcomeId: "player1_side", stage: 1, of: 1, lastStage: true, milestoneTurn: 11, milestoneLanded: true });
     expect(readings.chapters[0].threads[0].resolution).toBeTruthy();
     const main = readings.outcomes.find((o) => o.id === "player1_main");
     expect(main).toMatchObject({ intended: 2, complete: true, problems: [] });
     expect(main?.milestones.map((m) => [m.turn, m.chapter])).toEqual([
-      [6, 1],
-      [11, 2],
+      [5, 1],
+      [8, 2],
     ]);
-    expect(readings.outcomes.find((o) => o.id === "player1_side")).toMatchObject({ intended: 1, complete: false, milestones: [] });
-    // The ending as production's ending reads the outcomes: the main one complete, the side one unfinished
+    const side = readings.outcomes.find((o) => o.id === "player1_side");
+    expect(side).toMatchObject({ intended: 1, complete: true, problems: [] });
+    expect(side?.milestones.map((m) => [m.turn, m.chapter])).toEqual([[11, 3]]);
+    // The ending as production's ending reads the outcomes: both complete
     expect(readings.ending?.states.map((s) => [s.id, s.complete, s.milestones, s.intended])).toEqual([
       ["player1_main", true, 2, 2],
-      ["player1_side", false, 0, 1],
+      ["player1_side", true, 1, 1],
     ]);
   });
 
@@ -66,16 +72,17 @@ describe("readStory", () => {
   it("counts sacrifices and rewards per chapter against the owner's rule, and every one the player took", async () => {
     const readings = readStory(await played());
     const [first] = readings.chapters;
-    expect(first.levers).toEqual([expect.objectContaining({ slot: "player1", sets: 4, sacrificeSets: 4, rewardSets: 0, sacrificeTurns: [2, 3, 4, 5], rewardTurns: [] })]);
+    // The first chapter is turns 2-4 (production's paced lengths)
+    expect(first.levers).toEqual([expect.objectContaining({ slot: "player1", sets: 3, sacrificeSets: 3, rewardSets: 0, sacrificeTurns: [2, 3, 4], rewardTurns: [] })]);
     // The player takes a lever whenever offered, never twice in a row: turns 2 and 4
     expect(first.levers[0].taken).toEqual([
       { turn: 2, kind: "sacrifice" },
       { turn: 4, kind: "sacrifice" },
     ]);
-    expect(readings.leverFlags).toContainEqual({ chapter: 1, slot: "player1", rule: "second sacrifice", turns: [3, 4, 5] });
+    expect(readings.leverFlags).toContainEqual({ chapter: 1, slot: "player1", rule: "second sacrifice", turns: [3, 4] });
     const reward: BeatOption = { optionType: "challenge", resourceType: "reward", riskType: "normal", text: "Take the harbour master's coin, gain 10 Supplies", basePoints: -30, modifiersToSuccessRate: [] };
     const rewards = readStory(await played(1, { chapterOptions: () => [leverSet()[0], leverSet()[1], reward] }));
-    expect(rewards.leverFlags).toContainEqual({ chapter: 1, slot: "player1", rule: "second reward", turns: [3, 4, 5] });
+    expect(rewards.leverFlags).toContainEqual({ chapter: 1, slot: "player1", rule: "second reward", turns: [3, 4] });
   });
 
   it("reads whether each sacrifice or reward the player took was paid, and the stat changes that don't fit their stat", async () => {
@@ -108,7 +115,8 @@ describe("readStory", () => {
   };
 
   it("lists the turns production sent again, and those where the players saw the failure notice and pressed Try again", async () => {
-    // Turn 2's chapter plan fails in its first send; turn 7's in the first send and its resend
+    // Turn 2's chapter plan fails in its first send; turn 6's (the second chapter's, with production's paced lengths) in the
+    // first send and its resend
     const { run } = await playStory(
       PLAYTHROUGHS[0],
       input(1),
@@ -119,15 +127,15 @@ describe("readStory", () => {
     const readings = readStory(run);
     expect(readings.repairs.resentTurns).toEqual([
       { turn: 2, kind: "chapter opening", failed: ["first"], sentBy: "resend", tryAgain: false, failures: [expect.stringMatching(/usable thread plan/)] },
-      { turn: 7, kind: "chapter opening", failed: ["first", "resend"], sentBy: "try again", tryAgain: true, failures: [expect.stringMatching(/usable thread plan/), expect.stringMatching(/usable thread plan/)] },
+      { turn: 6, kind: "chapter opening", failed: ["first", "resend"], sentBy: "try again", tryAgain: true, failures: [expect.stringMatching(/usable thread plan/), expect.stringMatching(/usable thread plan/)] },
     ]);
     // A turn the queue's resend saved counts in the waits, every send included; one the players had to send again does not
-    expect(readings.waitsLeftOut).toEqual([7]);
-    expect(readings.waits.find((w) => w.kind === "chapter opening")).toMatchObject({ turns: 1, maxS: 4 });
+    expect(readings.waitsLeftOut).toEqual([6]);
+    expect(readings.waits.find((w) => w.kind === "chapter opening")).toMatchObject({ turns: 2, maxS: 4 });
     const text = renderPlaythroughReadings([run], new Date(0));
     expect(text).toContain("- turns production sent again: turn 2 (the first send failed");
-    expect(text).toMatch(/turn 7 \(the first send and its resend failed[^)]*; the players saw the failure notice and pressed Try again/);
-    expect(text).toContain("Turns left out of the waits (the players were told the turn failed, or production could not get past it): turn 7.");
+    expect(text).toMatch(/turn 6 \(the first send and its resend failed[^)]*; the players saw the failure notice and pressed Try again/);
+    expect(text).toContain("Turns left out of the waits (the players were told the turn failed, or production could not get past it): turn 6.");
   });
 
   it("reads whether each player's own stats moved over the story", async () => {
@@ -193,9 +201,10 @@ describe("readStory", () => {
     set(5, 70, "mixed");
     set(6, 85, "sideAWins", true);
     set(7, 95);
-    // A step's win holds the scoreboard, as the setup's rule moves it only after a chapter; a switch turn after a won chapter should move it
-    set(8, 95, "sideBWins");
-    for (const t of [9, 10]) set(t, 95);
+    // A step's win holds the scoreboard, as the setup's rule moves it only after a chapter; a switch turn after a won chapter
+    // should move it. Turn 10 records the last chapter's first step (turns 9-10 with production's paced lengths)
+    for (const t of [8, 9]) set(t, 95);
+    set(10, 95, "sideBWins");
     set(11, 95, "sideAWins");
     const moves = readStory(run).scoreboard;
     expect(moves.map((m) => [m.turn, m.before, m.after, m.winner ?? null, m.reading, m.repaired])).toEqual([
@@ -204,7 +213,7 @@ describe("readStory", () => {
       [5, 70, 70, null, "held", false],
       [6, 70, 85, "sideA", "toward the winner", true],
       [7, 85, 95, null, "moved with no contest result", false],
-      [8, 95, 95, "sideB", "held after a step win", false],
+      [10, 95, 95, "sideB", "held after a step win", false],
       [11, 95, 95, "sideA", "held after a chapter win", false],
     ]);
     expect(renderPlaythroughReadings([run], new Date(0))).toMatch(
@@ -251,11 +260,12 @@ describe("readStory", () => {
   });
 
   it("lists the plan design checks that failed, with the turn of each plan", async () => {
-    // The last step twice, relabelled: production's plan check drops only an exact copy (PL-14), so this one stays
+    // The last step twice, relabelled: production's plan check drops only an exact copy (PL-14), so this one stays; three
+    // steps, a length the first chapter's paced lengths allow
     const doubled = () => {
-      const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
+      const plan = threadAnalysis("challenge", 3, 0, ["player1"]);
       const [first] = plan.threads;
-      const steps = [first.progression[0], first.progression[1], { ...first.progression[2], title: "The Last Push", question: "Push: Q" }, { ...first.progression[3], title: "The Last Push" }];
+      const steps = [first.progression[0], { ...first.progression[1], title: "The Last Push", question: "Push: Q" }, { ...first.progression[2], title: "The Last Push" }];
       return { ...plan, threads: [{ ...first, outcomeId: "player1_main", progression: steps }] };
     };
     const readings = readStory(await played(1, { reply: (role, nth) => (role === "thread" && nth === 0 ? doubled() : DEFAULT) }));
@@ -276,29 +286,34 @@ describe("readStory", () => {
   it("reads waits per turn kind against their allowances, and the story's cost", async () => {
     const readings = readStory(await played(1, { latencyMs: 20_000 }));
     const byKind = Object.fromEntries(readings.waits.map((w) => [w.kind, w]));
-    expect(byKind["chapter opening"]).toMatchObject({ turns: 2, maxS: 40, allowanceS: 60, over: [] });
-    expect(byKind["chapter step"]).toMatchObject({ turns: 6, p50S: 20, allowanceS: 45 });
-    expect(byKind["switch turn"]).toMatchObject({ turns: 1, maxS: 40, allowanceS: 45 });
+    // Three chapters with production's paced lengths: turns 2-4, 6-7 and 9-10, switch turns 5 and 8
+    expect(byKind["chapter opening"]).toMatchObject({ turns: 3, maxS: 40, allowanceS: 60, over: [] });
+    expect(byKind["chapter step"]).toMatchObject({ turns: 4, p50S: 20, allowanceS: 45 });
+    expect(byKind["switch turn"]).toMatchObject({ turns: 2, maxS: 40, allowanceS: 45 });
     expect(byKind["first turn"].over).toEqual([]);
     // Groups have 60 s everywhere
     const group = readStory(await played(2, { latencyMs: 50_000 }));
     expect(group.waits.find((w) => w.kind === "chapter step")).toMatchObject({ allowanceS: 60, over: [] });
     expect(group.waits.find((w) => w.kind === "first turn")?.over).toEqual([1]);
-    // 1 setup and 15 story calls at $0.001 each
-    expect(readings.cost.storyUsd).toBeCloseTo(0.016);
-    expect(readings.cost.calls).toBe(16);
+    // 1 setup and 17 story calls at $0.001 each (3 switch plans, 3 chapter plans, 11 turns)
+    expect(readings.cost.storyUsd).toBeCloseTo(0.018);
+    expect(readings.cost.calls).toBe(18);
   });
 
   it("reads each switch's late pacing: whether it binds, and whether its directions push outcomes that still need milestones", async () => {
-    // Ten turns fit two chapters and then one, against three and then two milestones still needed: both switches bind
+    // Ten turns fit two chapters, then two and then one, against three, two and one milestones still needed: only the
+    // opening switch binds (production's paced lengths leave as many threads as milestones)
     const readings = readStory(await played());
     expect(readings.latePacing.map((p) => [p.turn, p.threadsFit, p.stillNeeded, p.binding])).toEqual([
       [1, 2, 3, true],
-      [6, 1, 2, true],
+      [5, 2, 2, false],
+      [8, 1, 1, false],
     ]);
-    // The fake's switch pushes only the main outcome, so the untouched side outcome is never offered
+    // The fake's switches take the first outcome PACING lists as still needing milestones: the main one, then at the last
+    // switch the untouched side one
     expect(readings.latePacing[1]).toMatchObject({ nextOutcomes: ["player1_main"], nextNeeded: true });
-    expect(readings.latePacing[1].checks.lateOffersUntouched).toBe(false);
+    expect(readings.latePacing[2]).toMatchObject({ nextOutcomes: ["player1_side"], nextNeeded: true });
+    expect(readings.latePacing[2].checks.lateOffersUntouched).toBe(true);
     // A 25-turn story with room for every milestone never binds
     const long = readStory(await played(1, {}, 25));
     expect(long.latePacing.some((p) => p.binding)).toBe(false);
@@ -306,25 +321,27 @@ describe("readStory", () => {
 
   it("reads the threads that fit from the turns left with production's count, and says where the planner was told another", async () => {
     const run = await played();
-    // A run recorded before the count's fix: the switch at turn 6 of 10 (5 turns left) was told 1, the right count; say it was told 0
+    // A run recorded before the count's fix: the switch at turn 8 of 10 (3 turns left) was told 1, the right count, where
+    // turns left ÷ 4 alone said 0; say it was told 0
     const told = structuredClone(run);
-    const plan = told.turns.find((t) => t.turn === 6)?.plan;
-    if (!plan) throw new Error("no switch plan at turn 6");
+    const plan = told.turns.find((t) => t.turn === 8)?.plan;
+    if (!plan) throw new Error("no switch plan at turn 8");
     plan.pacing.threadsFit = 0;
-    const reading = readStory(told).latePacing.find((p) => p.turn === 6);
-    expect(reading).toMatchObject({ threadsFit: 1, toldFit: 0, stillNeeded: 2, binding: true });
-    expect(readStory(run).latePacing.find((p) => p.turn === 6)?.toldFit).toBeUndefined();
-    expect(renderPlaythroughReadings([told], new Date(0))).toMatch(/\| 6 \| 1 \(told 0\) \| 2 \| yes \|/);
+    const reading = readStory(told).latePacing.find((p) => p.turn === 8);
+    expect(reading).toMatchObject({ threadsFit: 1, toldFit: 0, stillNeeded: 1, binding: false });
+    expect(readStory(run).latePacing.find((p) => p.turn === 8)?.toldFit).toBeUndefined();
+    expect(renderPlaythroughReadings([told], new Date(0))).toMatch(/\| 8 \| 1 \(told 0\) \| 1 \| no \|/);
   });
 
   describe("group chapters: whose choice decided each step, and whether each player's switch pick was followed", () => {
-    // Both players in the second chapter, an exploration chapter on player2's own outcome (the first must be on a shared
-    // one); exploration choices rotate, each seat offset, so they choose differently
+    // Both players in the second chapter (turns 6-7, two beats, the only length the paced lengths allow there), an
+    // exploration chapter on player2's own outcome (the first must be on a shared one); exploration choices rotate, each
+    // seat offset, so they choose differently
     const onPlayer2 = () =>
       played(2, {
         reply: (role, nth) => {
           if (role !== "thread" || nth !== 1) return DEFAULT;
-          const plan = threadAnalysis("exploration", 4, 0, ["player1", "player2"]);
+          const plan = threadAnalysis("exploration", 2, 0, ["player1", "player2"]);
           return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "player2_main", title: "Luz's Promise" }] };
         },
       });
@@ -332,7 +349,7 @@ describe("readStory", () => {
     it("lists each step of a group exploration thread with every player's choice, the result the game used and the outcome's owner", async () => {
       const readings = readStory(await onPlayer2());
       const steps = readings.groupSteps.filter((s) => s.chapter === 2);
-      expect(steps.map((s) => s.turn)).toEqual([7, 8, 9, 10]);
+      expect(steps.map((s) => s.turn)).toEqual([6, 7]);
       const [first] = steps;
       expect(first.picks[0].resolution).not.toBe(first.picks[1].resolution);
       expect(first).toMatchObject({ kind: "exploration", outcomeId: "player2_main", owner: "player2", thread: "Luz's Promise" });
@@ -346,13 +363,13 @@ describe("readStory", () => {
     it("flags a step where the game used another player's choice on the owner's own outcome (production before 2026-09-30)", async () => {
       const run = await onPlayer2();
       const overridden = structuredClone(run);
-      const phase = overridden.end?.storyPhases.find((p) => "threads" in p && p.firstBeatIndex === 6);
+      const phase = overridden.end?.storyPhases.find((p) => "threads" in p && p.firstBeatIndex === 5);
       if (!phase || !("threads" in phase)) throw new Error("no second chapter");
-      const firstPick = run.turns.find((t) => t.turn === 7)?.picks.find((p) => p.slot === "player1")?.resolution;
+      const firstPick = run.turns.find((t) => t.turn === 6)?.picks.find((p) => p.slot === "player1")?.resolution;
       phase.threads[0].progression[0].resolution = firstPick as never;
       const readings = readStory(overridden);
-      expect(readings.groupSteps.find((s) => s.turn === 7)).toMatchObject({ result: firstPick, ownerOverridden: true });
-      expect(renderPlaythroughReadings([overridden], new Date(0))).toMatch(/### Group chapters: whose choice decided each step[\s\S]*\| 7 \| 2 \|[^\n]*player2_main \(player2\)[^\n]*\| yes \|/);
+      expect(readings.groupSteps.find((s) => s.turn === 6)).toMatchObject({ result: firstPick, ownerOverridden: true });
+      expect(renderPlaythroughReadings([overridden], new Date(0))).toMatch(/### Group chapters: whose choice decided each step[\s\S]*\| 6 \| 2 \|[^\n]*player2_main \(player2\)[^\n]*\| yes \|/);
     });
 
     it("lists each group player's switch pick against the thread they were planned into", async () => {
@@ -367,16 +384,16 @@ describe("readStory", () => {
         return { ...base, switches: [{ ...base.switches[0], topicChoices: directions.map((d) => `${d.direction} (${d.outcomeId})`), topicDirections: directions }] };
       };
       const readings = readStory(await played(2, { reply: (role, nth) => (role === "switch" && nth === 1 ? switchWithPicks() : DEFAULT) }));
-      // The first chapter groups every player by rule; the second follows switch turn 6, where the seats' rotations pick
+      // The first chapter groups every player by rule; the second follows switch turn 5, where the seats' rotations pick
       // directions 2 (player1, the shared outcome) and 3 (player2, their own), and the fake plans both on the shared one
-      const second = readings.switchPicks.filter((p) => p.turn === 7);
+      const second = readings.switchPicks.filter((p) => p.turn === 6);
       expect(second.map((p) => [p.slot, p.pickedOutcome, p.placedOn, p.kept])).toEqual([
         ["player1", "shared_harbour", "shared_harbour", true],
         ["player2", "player2_main", "shared_harbour", false],
       ]);
       expect(readings.switchPicks.some((p) => p.turn === 2)).toBe(false);
       expect(renderPlaythroughReadings([await played(2, { reply: (role, nth) => (role === "switch" && nth === 1 ? switchWithPicks() : DEFAULT) })], new Date(0))).toMatch(
-        /Switch picks not followed: turn 7, player2 picked player2_main, planned on shared_harbour/
+        /Switch picks not followed: turn 6, player2 picked player2_main, planned on shared_harbour/
       );
     });
   });

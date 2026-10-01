@@ -11,6 +11,7 @@ import {
   neededAfterChapter,
   pacedLengths,
   pacedLengthsFor,
+  pacingCluesBase,
   pacingCluesRequest,
   switchPacingProblem,
 } from "../../../../../src/game/services/storyTextRounds/latePacing.js";
@@ -23,6 +24,7 @@ import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, switchAnalysisAfterThread, threadAnalysisAfterSwitch, threadBeat } from "../../../../helpers/promptStories.js";
 import { outcome, switchAnalysis } from "../../../../helpers/textFixtures.js";
+import { beforeLateClues } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * Pacing so the story's last chapter still has a milestone to settle, story
@@ -112,7 +114,9 @@ describe("the chapter planner's PACING line", () => {
     const story = narrowed();
     expect(turnsLeft(story)).toBe(9);
     expect(pacedLengths(story)).toEqual({ lengths: [4], narrowed: "longer" });
-    const production = threadStep.request(story);
+    // Production as the stages measured it beside the variant (before the pacing-clues adoption, which took the variant's line)
+    const production = pacingCluesBase(story, "thread");
+    expect(threadStep.request(story).prompt).toBe(latePacingRequest(story, "thread").prompt);
     const variant = latePacingRequest(story, "thread");
     expect(production.prompt).toContain("Allowed lengths for this thread: 2, 3 or 4 beats.");
     expect(variant.prompt).toContain(`Allowed lengths for this thread: 4 beats. ${LATE_PACING_TEXT.longer}`);
@@ -142,7 +146,9 @@ describe("the switch planner's priority step", () => {
     ["one player's opening switch", () => firstSwitchBeat(1)],
   ] as const)("%s: production's step b with its last sentence replaced, once", (_, build) => {
     const story = build();
-    const production = switchStep.request(story);
+    // Production as the stages measured it beside the variant (before the pacing-clues adoption, which took B's step b)
+    const production = pacingCluesBase(story, "switch");
+    expect(switchStep.request(story).prompt).toBe(latePacingRequest(story, "switch", { b: true }).prompt);
     const variant = latePacingRequest(story, "switch");
     expect(occurrences(production.prompt, LATE_PACING_TEXT.stepB)).toBe(1);
     expect(occurrences(variant.prompt, LATE_PACING_TEXT.stepBVariant)).toBe(1);
@@ -209,13 +215,16 @@ describe("the turn: plant early, pay off late", () => {
 
   it.each([1, 3])("late (%i players): no new mystery, an earlier one explained; the interludes the same", (players) => {
     const story = late(players);
-    const production = beatStep.request(story);
+    // Production's late turn as it stood when the variant was measured beside it (before the pacing-clues adoption)
+    const production = beforeLateClues(beatStep.request(story).prompt, story);
     const variant = latePacingRequest(story, "beat");
     expect(occurrences(variant.prompt, LATE_PACING_TEXT.hintLate)).toBe(1);
     expect(occurrences(variant.prompt, LATE_PACING_TEXT.interludeLate)).toBe(1);
     expect(variant.prompt).toContain(`${LATE_PACING_TEXT.interludeAnchor}${LATE_PACING_TEXT.interludeLate}`);
     const back = variant.prompt.replace(LATE_PACING_TEXT.hintLate, LATE_PACING_TEXT.hint).replace(LATE_PACING_TEXT.interludeLate, "");
-    expect(back).toBe(production.prompt);
+    expect(back).toBe(production);
+    // Since the pacing-clues adoption (2026-10-01) production's late turn is the variant's, byte for byte
+    expect(beatStep.request(story).prompt).toBe(variant.prompt);
   });
 
   it.each([1, 2])("the ending (%i players): recurring unexplained details explained, never beyond an outcome's milestones", (players) => {
@@ -244,7 +253,8 @@ describe("the turn: plant early, pay off late", () => {
         [LATE_PACING_TEXT.interludeLate, ""],
         [LATE_PACING_TEXT.endingLine, ""],
       ].reduce((text, [from, to]) => text.split(from).join(to), variant);
-      expect([c.id, back === beatStep.request(story).prompt]).toEqual([c.id, true]);
+      // Production as it stood when the variant was measured: a late turn without the lines adopted since
+      expect([c.id, back === beforeLateClues(beatStep.request(story).prompt, story)]).toEqual([c.id, true]);
     }
   });
 });
@@ -302,7 +312,9 @@ describe("pacingClues: B's planners and the late part's clue lines only", () => 
       const variant = pacingCluesRequest(story, "beat").prompt;
       expect([c.id, variant.includes(LATE_PACING_TEXT.hintEarly) || variant.includes(LATE_PACING_TEXT.endingLine)]).toEqual([c.id, false]);
       const back = variant.split(LATE_PACING_TEXT.hintLate).join(LATE_PACING_TEXT.hint).split(LATE_PACING_TEXT.interludeLate).join("");
-      expect([c.id, back === beatStep.request(story).prompt]).toEqual([c.id, true]);
+      expect([c.id, back === beforeLateClues(beatStep.request(story).prompt, story)]).toEqual([c.id, true]);
+      // Since the adoption, production's turn is the variant's on every frozen case
+      expect([c.id, variant === beatStep.request(story).prompt]).toEqual([c.id, true]);
     }
   });
 

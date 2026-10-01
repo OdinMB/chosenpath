@@ -71,8 +71,20 @@ const STEP_A = `a) Continuity. Is the next thread's outcome forced? Only these t
 A forced situation makes this a flavor switch on the open outcome it bears on most. If no open outcome fits, keep the switch you would otherwise choose and let the situation shape the next thread. When an instruction says topic switches must offer something (an escape, a feeding thread), make it one of the three directions, on the outcome it bears on most.
 Something time-sensitive, a tempting opportunity or a partial failure does not force it: offer it as one of the directions.`;
 
-/** A4 step b, binding late (owner, decision 3 (b)). */
-const STEP_B = `b) Priority. Read PACING. When fewer threads are left than milestones still needed, every direction pushes an outcome that still needs milestones, those with no thread yet first; when only one outcome can still get its milestones, a flavor switch on it is right. A complete outcome is offered only when every outcome is complete. A situation step a found forced comes first.`;
+/**
+ * A4 step b, binding late (owner, decision 3 (b)); since the pacing-clues
+ * stage's adoption (2026-10-01, its fix-and-retest pacingCluesB, measured in
+ * short whole-story playthroughs: the last chapter kept a milestone to settle 2
+ * of 8 -> 8 of 8), with a thread to spare the story's last thread keeps a
+ * milestone, and neither a forced situation nor the story's SWITCH/THREAD
+ * INSTRUCTIONS take a thread from a player with none to spare. Three of the
+ * second round's four 25-turn stories had every outcome complete before their
+ * last chapter; in the space pirates' a stat threshold's instruction gave two
+ * chapters to the complete ship while the scout's own outcome waited. The plan
+ * check reads the same (switchPacingProblem in pacing.ts, one retry).
+ */
+export const PRIORITY_STEP =
+  "b) Priority. Read PACING. When fewer threads are left than milestones still needed, every direction pushes an outcome that still needs milestones, those with no thread yet first; when only one outcome can still get its milestones, a flavor switch on it is right. When more threads are left than milestones still needed, the story's last thread must still have a milestone to settle: keep one outcome's last milestone (the main outcome's where you can) for the thread the last switch opens, and give a thread before it to another outcome, a complete one if no other is open. Apart from such a spare thread, a complete outcome is offered only when every outcome is complete. A situation step a found forced comes first, but it never takes a thread from a player who has no thread to spare (as many milestones still needed as threads left, or more): let the situation shape that player's thread on an outcome that still needs milestones instead (the damage, the threat or the deadline becomes part of it). The story's SWITCH/THREAD INSTRUCTIONS rank below this too: an instruction for a stat threshold or for the final thread shapes a thread (its place, its trial, its stakes) but never puts a complete outcome in place of a milestone a player still needs.";
 
 const SWITCH_OUTPUT_1P = `The switch:
 1. Switch type (topic/flavor)
@@ -166,7 +178,7 @@ Follow these steps:
     } else {
       instructions += `\n${STEP_A}
 
-${STEP_B}
+${PRIORITY_STEP}
 
 Player agency in the form of a topic switch is valuable and should not be squandered.
 

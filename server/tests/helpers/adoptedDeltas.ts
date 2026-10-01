@@ -37,7 +37,10 @@
  * stage, later that day (O2b's stat lines and the lever line the game computes:
  * not a delta on a grown-up story; beforeOptionsO2c and productionThen take
  * them out for the variants measured earlier; on a single player's 6-8 kids
- * turn a logged delta, withOptionsO2c, unmeasured for kids).
+ * turn a logged delta, withOptionsO2c, unmeasured for kids). A turn in the
+ * story's late part carries the pacing-clues stage's clue lines since its
+ * adoption, later still (withLateClues, not a delta; beforeLateClues and
+ * productionThen take them out for the variants measured earlier).
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
@@ -60,6 +63,8 @@ import { SHORT_REPLIES_TEXT, shortRepliesBase, withShortRepliesLines } from "../
 import { REWARD_EXCEPTION, sacrificeRewardLine, takesOptionRules } from "../../src/game/services/optionRules.js";
 import { OPTIONS_O2C_TEXT, o2cLeverLine } from "../../src/game/services/storyTextRounds/optionsO2c.js";
 import { OPTIONS_CONTINUITY_TEXT } from "../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
+import { LATE_CLUES_TEXT, takesLateClues } from "../../src/game/services/lateClues.js";
+import { LATE_PACING_TEXT, pacedLengthsEdit } from "../../src/game/services/storyTextRounds/latePacing.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -197,6 +202,37 @@ export function withResultsAsOutcomes(measured: string, story: Story): string {
   const which = countOf(story);
   if (measured.split(rule[which]).length !== 2) throw new Error("The measured chapter planner no longer carries the results rule's challenge sentence once");
   return measured.replace(rule[which], `${rule[which]}${approachLine[which]}`).split(flavorAnchor).join(flavorLine);
+}
+
+/*
+ * The planners (2026-10-01, the pacing-clues stage's fix-and-retest
+ * pacingCluesB, fix 8 of the second playthroughs' review): the chapter
+ * planner's PACING line with the paced lengths where they narrow, the reason
+ * after them (pacedLengthsEdit), and the switch planner's step b keeping a
+ * milestone for the story's last thread and ranking a forced situation and the
+ * story's SWITCH/THREAD INSTRUCTIONS below a player's needed milestones; the
+ * plan checks read the same (production's checks, planChecks.test.ts). Not a
+ * delta: measured in short whole-story playthroughs (the last chapter keeps a
+ * milestone to settle 2 of 8 -> 8 of 8, moved) and adopted as measured;
+ * planner v2b and v2f, the measured bases the other planner tests read, never
+ * carried them.
+ */
+
+/** The measured switch planner's prompt with step b as pacingCluesB measured it (a group's opening switch prints none). */
+export function withPacingStepB(measured: string): string {
+  const { stepB, stepBVariantB } = LATE_PACING_TEXT;
+  const count = measured.split(stepB).length - 1;
+  if (count === 0) return measured;
+  if (count !== 1) throw new Error("The measured switch planner carries step b more than once");
+  return measured.replace(stepB, () => stepBVariantB);
+}
+
+/** The measured chapter planner's prompt with the paced lengths where they narrow. */
+export function withPacedLengths(measured: string, story: Story): string {
+  const edit = pacedLengthsEdit(story);
+  if (!edit) return measured;
+  if (measured.split(edit.from).length !== 2) throw new Error(`The measured chapter planner no longer says "${edit.from}" once`);
+  return measured.replace(edit.from, () => edit.to);
 }
 
 /** The measured chapter planner's JSON schema text with the milestone fields reworded. */
@@ -349,15 +385,52 @@ export function beforeOptionsO2c(production: string, story: Story): string {
   }, production);
 }
 
+/*
+ * The pacing-clues stage's adoption (2026-10-01): a turn past two thirds of the
+ * story's turns, after the first and before the ending (takesLateClues), carries
+ * the late part's clue lines, the measured pacingClues turn's: the late hint in
+ * the hint line's place and the interludes' late line after their examples. Not
+ * a delta: every turn form measured before it carries neither (withLateClues
+ * puts them on one; beforeLateClues and productionThen take them out of
+ * production for the variants measured earlier). Measured on grown-up stories;
+ * a read-with-kids turn carries them too, unmeasured there.
+ */
+const LATE_CLUE_EDITS: [string, string][] = [
+  [LATE_CLUES_TEXT.hint, LATE_CLUES_TEXT.hintLate],
+  [LATE_CLUES_TEXT.interludeAnchor, `${LATE_CLUES_TEXT.interludeAnchor}${LATE_CLUES_TEXT.interludeLate}`],
+];
+
+/**
+ * A measured turn's prompt with the late part's clue lines where the turn takes them (any other turn as it is, and a
+ * variant built on production's live turn, groupLeversB or kidsAges, which carries them already).
+ */
+export function withLateClues(measured: string, story: Story): string {
+  if (!takesLateClues(story) || measured.includes(LATE_CLUES_TEXT.hintLate)) return measured;
+  return LATE_CLUE_EDITS.reduce((text, [from, to]) => {
+    if (text.split(from).length !== 2) throw new Error(`The measured turn no longer carries "${from.slice(0, 60)}" once`);
+    return text.replace(from, () => to);
+  }, measured);
+}
+
+/** Production's prompt as it stood before the pacing-clues adoption: a late turn without the clue lines (any other turn, and a prompt already without them, as it is). */
+export function beforeLateClues(production: string, story: Story): string {
+  if (!takesLateClues(story) || !production.includes(LATE_CLUES_TEXT.hintLate)) return production;
+  return LATE_CLUE_EDITS.reduce((text, [from, to]) => {
+    if (text.split(to).length !== 2) throw new Error(`Production's late turn no longer carries "${to.slice(0, 60)}" once`);
+    return text.replace(to, () => from);
+  }, production);
+}
+
 /**
  * A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones
  * (beforeEndingOnlyPlayed), before the group-levers adoption of the same day (beforeGroupLevers; a group's rolled
  * step's schema as it was built then, groupLeversBase) and before the short-replies adoption later that day
- * (beforeShortReplies; the schema as shortRepliesBase builds it), and before the options-o2c adoption after it
- * (beforeOptionsO2c; a single player's rolled step, prompt only). The variants measured before compare with it.
+ * (beforeShortReplies; the schema as shortRepliesBase builds it), before the options-o2c adoption after it
+ * (beforeOptionsO2c; a single player's rolled step, prompt only), and before the pacing-clues adoption after that
+ * (beforeLateClues; a late turn, prompt only). The variants measured before compare with it.
  */
 export function productionThen<R extends { prompt: string }>(request: R, story: Story): R {
-  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(beforeShortReplies(beforeOptionsO2c(request.prompt, story)), story), story);
+  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(beforeShortReplies(beforeOptionsO2c(beforeLateClues(request.prompt, story), story)), story), story);
   const schema = "schema" in request ? { schema: takesGroupLevers(story) ? groupLeversBase(story).schema : shortRepliesBase(story).schema } : {};
   return { ...request, prompt, ...schema };
 }
@@ -493,9 +566,10 @@ export function withKidsBandImageSlots(measured: RequestText, story: Story): Req
 /** Production's turn as it stood before the kids-ages adoption: its prompt and its JSON schema's text. */
 export function productionBeforeKidsAges(story: Story): { prompt: string; json: string } {
   // Without the short-replies stage's lines, which came later that day (groupLeversBase builds on shortRepliesBase)
-  // ... and without the options-o2c stage's lines on a single player's rolled step, which came later still
+  // ... and without the options-o2c stage's lines on a single player's rolled step, which came later still, nor the
+  // pacing-clues stage's late lines, later again
   const asText = (request: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) => ({
-    prompt: beforeShortReplies(beforeOptionsO2c(request.prompt, story)),
+    prompt: beforeShortReplies(beforeOptionsO2c(beforeLateClues(request.prompt, story), story)),
     json: beforeShortRepliesJson(JSON.stringify(toJsonSchema(request.schema))),
   });
   // A group's rolled step as it stood before the group-levers adoption too (groupLeversBase), which came later that day

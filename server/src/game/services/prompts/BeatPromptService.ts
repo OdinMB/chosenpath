@@ -18,6 +18,7 @@ import {
 import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { outcomeStateLines } from "../endingStates.js";
 import { kidsListener, kidsTurnText, takesKidsRules } from "../kidsTurnRules.js";
+import { LATE_CLUES_TEXT, takesLateClues } from "../lateClues.js";
 import { TEXT_GOES_ON } from "../textParagraphs.js";
 
 /**
@@ -519,7 +520,7 @@ Create a total of exactly 3 interludes.
 Use interludes to make players curious about the world. Imply interesting details instead of spelling them out. Examples:
 - "The Guild Hall is right behind the dry canal." (Why is the canal dry?)
 - "The dream distillery is surrounded by scaffolding." (What's a dream distillery?)
-${
+${takesLateClues(story) ? LATE_CLUES_TEXT.interludeLate : ""}${
   story.includesImages()
     ? "Only use images that are available in the image library (or no image at all)."
     : "This story does not include images, so focus on creating vivid text descriptions for your interludes."
@@ -632,7 +633,10 @@ Find a good balance between introducing the overall setup of the story, introduc
 --- Try to link new facts to story elements (using their id). Only use 'world' if the fact doesn't fit anywhere else.
 --- Aim for adding 3 or more new facts per switch and per step in a thread. These are the details that make the world come to life. By recording them, we ensure consistency in future beats.
 --- Example categories for new facts: appearance (NPCs, items), history (NPCs, locations), quirks (NPCs), functionality (items), interactions (NPCs, locations), mood (locations), etc.
-- Plan a hint about a detail in the world that makes the player curious without spelling out what's going on. (Similar to the interlude, see below.)
+${
+  // Past two thirds of the story: no new mystery, an earlier one explained where it fits (the pacing-clues stage, 2026-10-01)
+  takesLateClues(story) ? LATE_CLUES_TEXT.hintLate : LATE_CLUES_TEXT.hint
+}
 ${
   story.isMultiplayer()
     ? "--- If several players are in the same switch or thread, you only need to add new facts to the story state once. (You can add new facts to the story state once per switch or thread.)\n"
