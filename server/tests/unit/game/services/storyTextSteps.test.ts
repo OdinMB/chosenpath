@@ -268,6 +268,51 @@ describe("beatStep.apply records the lever a turn paid on its new beat (for the 
       expect(paidOn(story, [change("player1", AGENCY.id, "addNumber", 10)])).toBeUndefined();
     });
   });
+
+  /*
+   * A ladder stat (a string stat whose possible values are its steps, lowest first) pays a lever by a step: the step is the
+   * steps it moved (the review of the third playthroughs, 2026-10-01: the space pirates' Oren, Pirate Reputation Unproven →
+   * Known Hand for his reward at turn 16, then Known Hand → Feared Name at 17, a second charge the repair could not see).
+   */
+  describe("on a ladder stat", () => {
+    const REPUTATION = stat("player_reputation", {
+      type: "string",
+      name: "Pirate Reputation",
+      possibleValues: "Unproven, Known Hand, Feared Name",
+      optionsToSacrifice: "Risk your standing by making a public promise you may not be able to keep.",
+      optionsToGainAsReward: "Improve one step by taking time to honor a public commitment instead of pressing on.",
+      canBeChangedInBeatResolutions: false,
+    });
+    function choseLadder(text: string, resourceType: "sacrifice" | "reward", value: string): Story {
+      const base = threadBeat(1);
+      const players = Object.fromEntries(
+        Object.entries(base.getPlayers()).map(([slot, player]) => {
+          const beats = [...player.beatHistory];
+          const lever: ChallengeOption = { ...option(text), resourceType, basePoints: resourceType === "sacrifice" ? POINTS_FOR_SACRIFICE : POINTS_FOR_REWARD };
+          beats[beats.length - 1] = { ...beats[beats.length - 1], options: [...challengeOptions().slice(0, 2), lever], choice: 2 };
+          return [slot, { ...player, beatHistory: beats, statValues: [{ statId: REPUTATION.id, value }] }];
+        })
+      );
+      return base.clone({ playerStats: [REPUTATION], players });
+    }
+    const set = (value: string): Change => ({ type: "statChange", group: "player1", stat: REPUTATION.id, change: "setString", value });
+
+    it("records a reward's step up and a sacrifice's step down", () => {
+      const rewarded = choseLadder("Let the guild inspect the claim openly, improving Pirate Reputation one step.", "reward", "Unproven");
+      expect(paidOn(rewarded, [set("Known Hand")])).toEqual({ kind: "reward", group: "player1", stat: REPUTATION.id, step: 1 });
+      const risked = choseLadder("Promise the guild a correction you may not be able to deliver, risking your Pirate Reputation.", "sacrifice", "Feared Name");
+      expect(paidOn(risked, [set("Known Hand")])).toEqual({ kind: "sacrifice", group: "player1", stat: REPUTATION.id, step: -1 });
+    });
+
+    it("records nothing for a step the other way, a value off the ladder, or a string stat without steps", () => {
+      const rewarded = choseLadder("Let the guild inspect the claim openly, improving Pirate Reputation one step.", "reward", "Known Hand");
+      expect(paidOn(rewarded, [set("Unproven")])).toBeUndefined();
+      expect(paidOn(rewarded, [set("Notorious")])).toBeUndefined();
+      const plain = { ...REPUTATION, possibleValues: "" };
+      const unstepped = choseLadder("Let the guild inspect the claim openly, improving Pirate Reputation one step.", "reward", "Unproven").clone({ playerStats: [plain] });
+      expect(paidOn(unstepped, [set("Known Hand")])).toBeUndefined();
+    });
+  });
 });
 
 describe("analysis steps", () => {

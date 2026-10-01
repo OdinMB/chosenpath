@@ -65,6 +65,21 @@ describe("storyPage", () => {
     expect(html).toContain("Ends on its turn count");
   });
 
+  // The review of the third round (2026-10-01): the pages printed the older allowed lengths where the .md printed the paced
+  // ones production's PACING showed (New Avalon chapter 5: "allowed: 2, 3, 4" against "3 (3, 4)")
+  it("prints each chapter's lengths as its PACING printed them: the paced ones where the run recorded them", async () => {
+    const run = structuredClone(await played());
+    const opening = run.turns.find((t) => t.plan?.kind === "chapter plan");
+    if (!opening?.plan) throw new Error("no chapter plan");
+    opening.plan.pacing = { ...opening.plan.pacing, allowedLengths: [2, 3, 4], pacedLengths: [3, 4] };
+    expect(storyPage(run)).toContain(`Chapter 1 · turns ${opening.turn}-`);
+    expect(storyPage(run)).toMatch(/Chapter 1 · turns \d+-\d+ · \d+ turns \(allowed: 3, 4\)/);
+    const older = structuredClone(run);
+    const plan = older.turns.find((t) => t.turn === opening.turn)?.plan;
+    if (plan) delete plan.pacing.pacedLengths;
+    expect(storyPage(older)).toMatch(/Chapter 1 · turns \d+-\d+ · \d+ turns \(allowed: 2, 3, 4\)/);
+  });
+
   it("escapes the story's own words", async () => {
     const run = await played({ endingText: `${SIX_PARAGRAPHS}\n\nThe <script>alert(1)</script> gull & the "tide".` });
     const html = storyPage(run);

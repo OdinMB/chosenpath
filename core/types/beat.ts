@@ -387,8 +387,10 @@ export interface ResolutionDetails {
 /**
  * The sacrifice or reward the player chose on the beat before, as this beat's
  * turn paid it: its kind, the stat's group ("shared" or the player's slot) and
- * id, and the change that paid it (-15 for 60 → 45). The next turn's beat
- * repairs read it, so a lever is not charged twice.
+ * id, and the change that paid it (-15 for 60 → 45; on a ladder stat the steps
+ * it moved, +1 for Unproven → Known Hand). The later turns' beat repairs read
+ * it (the next turn, and the later steps of the same chapter), so a lever is
+ * not charged twice.
  */
 export type PaidLever = {
   kind: "sacrifice" | "reward";

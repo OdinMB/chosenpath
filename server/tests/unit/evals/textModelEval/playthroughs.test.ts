@@ -604,4 +604,16 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(run.setup?.calls[0].problem).toMatch(/no outcomes/);
     expect(run.turns).toHaveLength(1);
   });
+
+  it("asks for the setup once more where a seat's identities share a name, as production does since 2026-10-01, and keeps the reply its story starts from", async () => {
+    const seat = (setupReply(1) as unknown as Record<string, Record<string, unknown>>).player1;
+    const ari = ["Ari", "Ari", "Ari"].map((name) => ({ name, pronouns: { personal: "they", object: "them", possessive: "their", reflexive: "themselves" }, appearance: "tall" }));
+    const { call, calls } = fakeCall(1, { reply: (role, nth) => (role === "setup" && nth === 0 ? { ...setupReply(1), player1: { ...seat, possibleCharacterIdentities: ari } } : DEFAULT) });
+    const { run } = await playStory(spec, input(1), call, { sample: 1, turnLimit: 1 });
+    expect(calls.filter((c) => c.role === "setup")).toHaveLength(2);
+    expect(run.setup?.calls[0].problem).toMatch(/share a name/);
+    const kept = (run.setup?.output as Record<string, { possibleCharacterIdentities: { name: string }[] }>).player1.possibleCharacterIdentities.map((i) => i.name);
+    expect(kept).toEqual(["Ada player1", "Bram player1", "Cato player1"]);
+    expect(run.start?.characterSelectionOptions.player1?.possibleCharacterIdentities.map((i) => i.name)).toEqual(kept);
+  });
 });

@@ -489,6 +489,26 @@ describe("checkSetupDesign: setup round 3's checks (owner notes of 2026-09-28)",
     expect(checkSetupDesign(four, { ...solo, kids: true, kidAges: { min: 10, max: 10 } }).checks.kidsStatBudget).toBe(false);
   });
 
+  /*
+   * The review of the third playthroughs (2026-10-01): the lemonade setup typed its money as a percentage ("Stand Cash …
+   * each player, percentage, 50%", "Spend 10% of Stand Cash"), so no sale or cost in coins had anywhere to land and the
+   * story never named a sum; round 2's setup for the same premise had a number ("Stand Cashbox … 10"). Production's own
+   * setup rule says money is a number stat.
+   */
+  it("wants a stat that counts money to be a number, and reports it only where a stat names money", () => {
+    const cash = (type: string) => soloSetup({ playerStats: [stat("Stand Cash", { id: "player_stand_cash", type })] });
+    expect(checkSetupDesign(cash("number"), solo)).toMatchObject({ checks: { moneyIsNumber: true }, counts: { moneyStats: 1 } });
+    expect(checkSetupDesign(cash("percentage"), solo)).toMatchObject({ checks: { moneyIsNumber: false }, counts: { moneyStats: 1 } });
+    for (const name of ["Gold Coins", "Crew Budget", "Savings", "Euros Available", "Stand Cashbox"]) {
+      const named = soloSetup({ sharedStats: [stat(name)] });
+      expect({ name, passes: checkSetupDesign(named, solo).checks.moneyIsNumber }).toEqual({ name, passes: false });
+    }
+    // A share of money is no amount of it, and a scoreboard is an opposites stat whatever its name
+    expect(checkSetupDesign(soloSetup({ sharedStats: [stat("Profit Margin")] }), solo).checks).not.toHaveProperty("moneyIsNumber");
+    expect(checkSetupDesign(soloSetup({ sharedStats: [stat("Gold Claim|Silver Claim", { type: "opposites" })] }), solo).checks).not.toHaveProperty("moneyIsNumber");
+    expect(checkSetupDesign(soloSetup(), solo).checks).not.toHaveProperty("moneyIsNumber");
+  });
+
   it("wants two-sided contests between two camps where three players compete, each with an opposites scoreboard", () => {
     const third = { player3: player(["Gus Pell", "Hana Voss", "Ivo Kett"], [outcome("player3_home", "Will the archivist find a home?", 2)]) };
     const camps = duelSetup(third);

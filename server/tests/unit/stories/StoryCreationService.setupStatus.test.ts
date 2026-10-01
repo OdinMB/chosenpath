@@ -316,6 +316,39 @@ describe("StoryCreationService setup status", () => {
     expect(createInitialState).not.toHaveBeenCalled();
   });
 
+  // The review of the third playthroughs (2026-10-01): New Avalon's setup offered "Ari" three times
+  it("asks for the setup once more where a seat's three identities share a name the premise doesn't give, and stores the second", async () => {
+    const named = (names: string[]) =>
+      startableState({
+        characterSelectionOptions: {
+          player1: {
+            outcomes: [],
+            possibleCharacterIdentities: names.map((name) => ({ name, pronouns: { personal: "they", object: "them", possessive: "their", reflexive: "themselves" }, appearance: "tall" })),
+            possibleCharacterBackgrounds: [],
+          },
+        },
+      });
+    createInitialState.mockResolvedValueOnce(named(["Ari", "Ari", "Ari"])).mockResolvedValueOnce(named(["Ari Vale", "Nia Calder", "Tavi Sen"]));
+    const service = new StoryCreationService();
+
+    const { storyId } = await create(service);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(createInitialState).toHaveBeenCalledTimes(2);
+    const stored = storeStory.mock.calls[0]?.[1] as { getState(): StoryState } | undefined;
+    expect(stored?.getState().characterSelectionOptions.player1?.possibleCharacterIdentities.map((i) => i.name)).toEqual(["Ari Vale", "Nia Calder", "Tavi Sen"]);
+    const nameLines = logs.filter((line) => line.includes("share a name"));
+    expect(nameLines.length).toBeGreaterThan(0);
+    expect(nameLines.every((line) => line.includes(storyId))).toBe(true);
+    expect(logs.some((line) => line.includes("Ari") || line.includes("Nia"))).toBe(false);
+
+    // The premise names its keeper, so three Ottolines are her and nothing is asked again
+    jest.clearAllMocks();
+    createInitialState.mockResolvedValue(named(["Ottoline Brandvik", "Ottoline Brandvik", "Ottoline Brandvik"]));
+    await create(new StoryCreationService());
+    expect(createInitialState).toHaveBeenCalledTimes(1);
+  });
+
   it("stores a generated setup with each background value read by its stat's type", async () => {
     createInitialState.mockResolvedValue(
       startableState({

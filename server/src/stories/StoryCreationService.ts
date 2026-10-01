@@ -29,6 +29,7 @@ import {
 import type { StoryStatusInfo } from "core/types/api.js";
 import { createStoryStateFromTemplate } from "../game/services/StoryStateFactory.js";
 import { withOneRetry } from "../game/services/retryOnce.js";
+import { withDistinctIdentityNames } from "./setupIdentities.js";
 import { storyRepository } from "./StoryRepository.js";
 import { setupStatusTracker } from "./setupStatus.js";
 import {
@@ -237,20 +238,22 @@ export class StoryCreationService {
 
       // Create initial state. A setup the story can't start from (no
       // outcomes, or multiplayer without a shared one) is generated once more,
-      // a fresh sample of the same request.
-      const generatedState = await withOneRetry(
-        () =>
-          this.aiStoryGenerator.createInitialState(
-            storyId,
-            prompt,
-            generateImages,
-            playerCount,
-            maxTurns,
-            gameMode,
-            difficultyLevel,
-            // A story read with a child gets the smaller stat budget with plain names, a third player stat from age 9
-            { kids, ...(kidAges ? { kidAges } : {}) }
-          ),
+      // a fresh sample of the same request; so is one whose seat offers three
+      // identities with one name (since 2026-10-01), which never fails the story.
+      const generate = () =>
+        this.aiStoryGenerator.createInitialState(
+          storyId,
+          prompt,
+          generateImages,
+          playerCount,
+          maxTurns,
+          gameMode,
+          difficultyLevel,
+          // A story read with a child gets the smaller stat budget with plain names, a third player stat from age 9
+          { kids, ...(kidAges ? { kidAges } : {}) }
+        );
+      const startable = await withOneRetry(
+        generate,
         (state) => {
           const problem = storyStateStartProblem(state, playerCount);
           if (problem) {
@@ -261,6 +264,13 @@ export class StoryCreationService {
           return problem;
         },
         "story setup"
+      );
+      const generatedState = await withDistinctIdentityNames(
+        startable,
+        generate,
+        prompt,
+        playerCount,
+        (line) => Logger.Route.warn(`Setup for story ${storyId}: ${line}`)
       );
       Logger.Route.log(`Generated initial state for story: ${storyId}`);
 

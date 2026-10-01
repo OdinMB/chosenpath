@@ -2,6 +2,7 @@ import type { Outcome, Stat, StatValueEntry, StoryState, Switch, SwitchAnalysis,
 import { playerParagraphs } from "./playerText.js";
 import {
   chargedAgainLine,
+  chargedOnOfferLine,
   choiceLine,
   fixesLine,
   kidsLine,
@@ -11,7 +12,9 @@ import {
   pacingLine,
   readStory,
   resentLine,
+  resultWordsLine,
   scoreboardLine,
+  undoneLine,
   type ChapterReading,
   type GroupStepReading,
   type StoryReadings,
@@ -278,7 +281,9 @@ function chapterBlock(run: PlayRun, turn: PlayTurn, chapter: ChapterReading | un
   if (!plan || plan.kind !== "chapter plan") return "";
   const outcomes = outcomesById(run.start);
   const threads = asArray<ThreadAnalysis["threads"][number]>(asObject(plan.plan as ThreadAnalysis | undefined).threads);
-  const lengths = plan.pacing.allowedLengths ?? [];
+  // The lengths the plan's PACING printed and its check read: production's paced ones where the run recorded them (since
+  // 2026-10-01; the .md's chapter table reads the same), else the allowed ones
+  const lengths = plan.pacing.pacedLengths ?? plan.pacing.allowedLengths ?? [];
   const head = `<p class="kicker">Chapter ${chapter?.index ?? "?"} · turns ${chapter ? `${chapter.firstTurn}-${chapter.lastTurn}` : turn.turn} · ${asObject(plan.plan).duration ?? "?"} turns${lengths.length ? ` (allowed: ${lengths.join(", ")})` : ""}${plan.pacing.lastChapter ? " · the story's last chapter" : ""}</p>`;
   const body = threads
     .map((thread, i) => {
@@ -501,6 +506,10 @@ function readingsSection(run: PlayRun, readings: StoryReadings): string {
       r.leversPaid.counts.sharedOnce ? `; ${r.leversPaid.counts.sharedOnce} more rode on one change of a shared stat that paid another player's (${r.leversPaid.sharedOnce.map((s) => `turn ${s.turn}, ${s.stat}`).join("; ")})` : ""
     }.`,
     chargedAgainLine(r),
+    chargedOnOfferLine(r),
+    undoneLine(r),
+    resultWordsLine(r),
+    `Setup design checks that failed (read afresh): ${r.setupChecksFailed.length ? r.setupChecksFailed.join(", ") : "none"}.`,
     `Stat changes that don't fit their stat: ${r.unfit.length}.`,
     ...(r.players > 1
       ? [

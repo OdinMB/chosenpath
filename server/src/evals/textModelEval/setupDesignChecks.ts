@@ -192,6 +192,9 @@ const IMPLICATION_VALUE = /\d|\b(at|reaches|below|above|under|over)\b/i;
 const IMPLICATION_THREAD = /\b(thread|switch|chapter)s?\b/i;
 const IMPLICATION_STEER = /\b(force[sd]?|offers?|offered|must|next|triggers?|opens?|unlocks?)\b/i;
 const THREAD_TYPE_SHAPE = /\((challenge|exploration|contest),\s*[234]\)/i;
+/** A stat's name that counts money ("Stand Cash", "Gold Coins", "Crew Budget"), and one that names a share of it instead ("Profit Margin"). */
+const MONEY = /\b(cash(box)?|money|coins?|budget|funds?|dollars?|euros?|pennies|cents|savings|wallet|purse|treasury|credits|gold|profits?)\b/i;
+const MONEY_SHARE = /\b(margin|rate|share|ratio|percent(age)?)\b/i;
 
 /** The name part of a thread type ("Harbour chase (challenge, 3): ..." -> "harbour chase"). */
 const threadTypeName = (type: string) => type.split(/[(:]/)[0].trim().toLowerCase();
@@ -422,6 +425,13 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
     checks.kidsStatBudget = visibleShared <= 2 && visiblePlayer.length <= playerBudget && stats.every((s) => s.visible);
     counts.kidsLongStatNames = stats.filter((s) => longestSideWords(s.name) > 2).length;
     checks.kidsPlainStatNames = counts.kidsLongStatNames === 0;
+  }
+  // The review of the third playthroughs (2026-10-01): money is a number stat (production's own setup rule), or no sale or
+  // cost in coins has anywhere to land (the lemonade's "Stand Cash" as a percentage, which never moved)
+  const money = stats.filter((s) => s.type !== "opposites" && statNames(s).some((name) => MONEY.test(name) && !MONEY_SHARE.test(name)));
+  if (money.length > 0) {
+    counts.moneyStats = money.length;
+    checks.moneyIsNumber = money.every((s) => s.type === "number");
   }
   counts.spendablePlayerStats = visiblePlayer.filter((s) => !isNone(s.sacrifice) || !isNone(s.reward)).length;
   const progressLike = stats.filter((s) => !scoreboard(s) && [s.name, s.tooltip, ...s.implications].some((text) => PROGRESS.test(text))).length;

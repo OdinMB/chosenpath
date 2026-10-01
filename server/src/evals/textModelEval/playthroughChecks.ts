@@ -1,13 +1,29 @@
 import { Story } from "core/models/Story.js";
-import { kidAgesFrom, kidAgesFromPremise, kidsBandOf, type KidAges, type KidsBand, type SetOfBeatGenerationSchema, type Stat, type StoryState, type Switch, type SwitchAnalysis, type Thread, type ThreadAnalysis } from "core/types/index.js";
+import {
+  kidAgesFrom,
+  kidAgesFromPremise,
+  kidsBandOf,
+  type BeatGeneration,
+  type KidAges,
+  type KidsBand,
+  type SetOfBeatGenerationSchema,
+  type Stat,
+  type StoryState,
+  type Switch,
+  type SwitchAnalysis,
+  type Thread,
+  type ThreadAnalysis,
+} from "core/types/index.js";
 import { getThreadType, type ThreadType } from "core/types/thread.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import type { OutcomeState } from "../../game/services/endingStates.js";
+import { ladderOf } from "../../game/services/leverPayments.js";
 import { outcomeIdsNamed } from "../../game/services/outcomeIds.js";
 import { chaptersThatFit } from "../../game/services/pacing.js";
 import { scoreboardOf } from "../../game/services/scoreboards.js";
-import { repairBeatReply } from "../../game/services/beatRepairs.js";
+import { repairBeatReply, resultWordsOfBeat } from "../../game/services/beatRepairs.js";
 import { percentile } from "./armStats.js";
+import { checkSetupDesign } from "./setupDesignChecks.js";
 import { KIDS_BAND_LIMITS, readabilityOf, readsForBand } from "./kidsReadability.js";
 import { readLatePacing } from "./latePacingPlay.js";
 import type { LeverReading, LeverStatus } from "./ratingMechanics.js";
@@ -44,6 +60,13 @@ import { allowanceFor, type TurnKind } from "./turnWaits.js";
  * and rewards in consecutive chapters (O2c's placement), the story's pacing as
  * the pacing-clues stage read it (readLatePacing), and a story read with a
  * child against its age band's limits, turn by turn (kidsReadability.ts).
+ * Since the review of round 3 (the same day): a lever charged again on a later
+ * step of the chapter that paid it or as a ladder's step, and a lever's stat
+ * moved in the reply that offers it (production's repair and note, replayed);
+ * a lever whose stat a turn or two later moved back; an own stat's changes the
+ * other way from the one before; result words told as story text (production's
+ * note); a scoreboard its outcome names by the stat's id, which production's
+ * repair can't find; and the setup's design checks read afresh.
  */
 
 export type ThreadReading = {
@@ -195,16 +218,35 @@ export type SwitchPickReading = {
 /** Levers one shared stat's single change paid for several players: the first counts as paid, the rest as riding on it. */
 export type SharedLeverReading = { turn: number; stat: string; slots: string[] };
 
-/** A lever charged again on the turn after the one that paid it: the turn, and production's repair line ("player1/player_personal_reserve: -15, the sacrifice the previous turn paid"). */
+/**
+ * A lever charged again after the turn that paid it, the turn after or a later step of the same chapter: the turn, and
+ * production's repair line ("player1/player_personal_reserve: -15, the sacrifice the previous turn paid"). Also a lever's
+ * stat moved in the reply that offers that lever, production's note ("player2/player_nerve: -10, in the reply that offers
+ * that sacrifice").
+ */
 export type ChargedAgain = { turn: number; detail: string };
+
+/**
+ * A lever paid on its turn whose stat a turn or two later moved back (the review of round 3, 2026-10-01: the mouse's Cat
+ * Attention sacrifice, 45 → 55, back to 45 at the chapter's close): the paying turn, the stat's value before and after the
+ * payment, and the turn and value it moved back to; a lever that player took on that stat in between is a payment, not read.
+ */
+export type UndoneLever = { turn: number; slot: string; kind: "sacrifice" | "reward"; stat: string; before: unknown; after: unknown; backAt: number; back: unknown };
+
+/** Result words a player read as story text on a turn (production's note resultWordsInText, since 2026-10-01). */
+export type ResultWordsReading = { turn: number; slot: string; words: string[] };
 
 export type LeverCount = LeverStatus | "sharedOnce";
 
 /** A turn production sent again (since 2026-09-30): the sends that failed, the one that wrote it (none: the story stopped there), and whether the players had to press Try again. */
 export type ResentTurn = { turn: number; kind: TurnKind; failed: string[]; sentBy?: string; tryAgain: boolean; failures: string[] };
 
-/** A player's own stat over the story: its value at the start and the end, and the turns that changed it. */
-export type OwnStatReading = { slot: string; stat: string; name: string; start: unknown; end: unknown; changedAt: number[] };
+/**
+ * A player's own stat over the story: its value at the start and the end, the turns that changed it, and (a number's or a
+ * ladder's, where any) how many changes went the other way from the change before (the review of round 3: the food trucks'
+ * Omar, Service Stamina 45 → 35 → 45 → 35 → 45 → 35, four).
+ */
+export type OwnStatReading = { slot: string; stat: string; name: string; start: unknown; end: unknown; changedAt: number[]; reversals?: number };
 
 /**
  * A scoreboard's move on a turn. The setup's rule moves a scoreboard after a
@@ -238,6 +280,8 @@ export type ScoreboardMove = {
   winner?: "sideA" | "sideB";
   reading: ScoreboardReadingKind;
   repaired: boolean;
+  /** The outcome names the board by the stat's id, not its name, so production's scoreboard repair can't find it (the food trucks of round 3) */
+  byId?: true;
 };
 
 /** Production's fixes that show in its repairs (those of 2026-09-30, and since round 3 those of 2026-10-01), by kind: the turns each fired at. */
@@ -294,9 +338,17 @@ export type StoryReadings = {
     counts: Record<LeverCount, number>;
     missed: { turn: number; slot: string; kind: string; stat?: string; status: LeverStatus }[];
     sharedOnce: SharedLeverReading[];
-    /** Levers charged again on the turn after the one that paid them, where production's current repairs drop a change from the reply the run kept (none read: the replay failed) */
+    /** Levers charged again after the turn that paid them, where production's current repairs drop a change from the reply the run kept (none read: the replay failed) */
     chargedAgain?: ChargedAgain[];
+    /** A lever's stat moved in the reply that offers that lever, production's current note on the reply the run kept (none read: the replay failed) */
+    chargedOnOffer?: ChargedAgain[];
+    /** Levers whose stat a turn or two later moved back */
+    undone: UndoneLever[];
   };
+  /** Result words told as story text, per turn and player */
+  resultWords: ResultWordsReading[];
+  /** The setup's design checks (checkSetupDesign) that fail, read afresh from the stored setup reply */
+  setupChecksFailed: string[];
   unfit: { turn: number; group: string; name: string; kinds: string[] }[];
   /** Each player's own stats, start to end */
   ownStats: OwnStatReading[];
@@ -654,31 +706,111 @@ function leverReadings(run: PlayRun): StoryReadings["leversPaid"] {
       if (levers.length > paid) sharedOnce.push({ turn: turn.turn, stat: levers[0].stat?.name ?? "", slots: levers.map((l) => l.slot) });
     }
   }
-  const chargedAgain = chargedAgainReadings(run);
-  return { counts, missed, sharedOnce, ...(chargedAgain ? { chargedAgain } : {}) };
+  const replayed = chargedAgainReadings(run);
+  return { counts, missed, sharedOnce, ...(replayed ?? {}), undone: undoneLevers(run) };
 }
 
 /**
- * Levers charged again on the turn after the one that paid it (production's
- * `leverChargedAgain`, since the review of round 2): each turn's kept reply
+ * Levers charged again after the turn that paid them (production's
+ * `leverChargedAgain`: the turn after since the review of round 2, a later
+ * step of the same chapter and a ladder's step since the review of round 3),
+ * and a lever's stat moved in the reply that offers that lever (its note
+ * `leverChargedOnOffer`, since the review of round 3): each turn's kept reply
  * replayed through production's current beat repairs on the state the turn
- * saw (playthroughReplay.ts), where they now drop a change. A run played
- * with the repair shows none here (its kept replies lack the change) and
- * lists the turns it fired in the fixes. Undefined where the run can't be
- * replayed. A round 1 group story replays differently from the step the
- * owner rule now decides, so its later turns read that state, not the played one.
+ * saw (playthroughReplay.ts), where they now drop a change or note one. A run
+ * played with the repair shows none of what it dropped here (its kept replies
+ * lack the change) and lists the turns it fired in the fixes. Undefined where
+ * the run can't be replayed. A round 1 group story replays differently from
+ * the step the owner rule now decides, so its later turns read that state,
+ * not the played one.
  */
-function chargedAgainReadings(run: PlayRun): ChargedAgain[] | undefined {
+function chargedAgainReadings(run: PlayRun): { chargedAgain: ChargedAgain[]; chargedOnOffer: ChargedAgain[] } | undefined {
   try {
-    return replayRun(run).flatMap((r) =>
-      r.played.reply
-        ? repairBeatReply(r.before, r.played.reply)
-            .repairs.filter((repair) => repair.kind === "leverChargedAgain")
-            .map((repair) => ({ turn: r.turn, detail: repair.detail ?? "" }))
-        : []
-    );
+    const repairs = replayRun(run).flatMap((r) => (r.played.reply ? repairBeatReply(r.before, r.played.reply).repairs.map((repair) => ({ turn: r.turn, repair })) : []));
+    const of = (kind: string) => repairs.filter(({ repair }) => repair.kind === kind).map(({ turn, repair }) => ({ turn, detail: repair.detail ?? "" }));
+    return { chargedAgain: of("leverChargedAgain"), chargedOnOffer: of("leverChargedOnOffer") };
   } catch {
     return undefined;
+  }
+}
+
+/** A value's rung on its stat's ladder, else undefined. */
+function rungOf(stat: Stat | undefined, value: unknown): number | undefined {
+  const ladder = stat ? ladderOf(stat) : undefined;
+  if (!ladder || typeof value !== "string") return undefined;
+  const at = ladder.indexOf(value.trim().toLowerCase());
+  return at < 0 ? undefined : at;
+}
+
+/**
+ * Whether `later` moved a stat back from a lever's payment (`before` → `after`): a number or a ladder the other way, a list
+ * holding again an item the payment removed or missing one it added, another value back to `before`.
+ */
+function movedBack(stat: Stat | undefined, before: unknown, after: unknown, later: unknown): boolean {
+  if (typeof before === "number" && typeof after === "number" && typeof later === "number") return (after - before) * (later - after) < 0;
+  const [from, to, now] = [rungOf(stat, before), rungOf(stat, after), rungOf(stat, later)];
+  if (from !== undefined && to !== undefined && now !== undefined) return (to - from) * (now - to) < 0;
+  if (Array.isArray(before) && Array.isArray(after) && Array.isArray(later)) {
+    const removed = before.filter((item) => !after.includes(item));
+    const added = after.filter((item) => !before.includes(item));
+    return removed.some((item) => later.includes(item)) || added.some((item) => !later.includes(item));
+  }
+  return JSON.stringify(later) === JSON.stringify(before) && JSON.stringify(after) !== JSON.stringify(before);
+}
+
+/** How many turns after a lever's payment the reading looks for its stat moving back. */
+const UNDONE_WITHIN = 2;
+
+/**
+ * Levers paid on their turn whose stat a turn or two later moved back (the review of round 3, 2026-10-01: the mouse's Cat
+ * Attention sacrifice 45 → 55 back to 45 at the chapter's close, New Avalon's District Trust 50 → 40 → 50, the space
+ * pirates' Oren Feared Name → Known Hand → Feared Name at the ending), read on the stat values each turn left. A lever the
+ * same player took on that stat in between is its own payment, so the reading stops there.
+ */
+function undoneLevers(run: PlayRun): UndoneLever[] {
+  const shared = new Set((run.start?.sharedStats ?? []).map((s) => s.id));
+  const byTurn = new Map(run.turns.map((t) => [t.turn, t]));
+  return run.turns.flatMap((turn) =>
+    turn.levers.flatMap((lever): UndoneLever[] => {
+      const stat = lever.stat;
+      if (lever.status !== "applied" || !stat) return [];
+      const valueAt = (t: PlayTurn) => (shared.has(stat.id) ? t.statValues.shared : t.statValues.players[lever.slot])?.find((v) => v.statId === stat.id)?.value;
+      for (let k = 1; k <= UNDONE_WITHIN; k++) {
+        const later = byTurn.get(turn.turn + k);
+        if (!later || later.levers.some((l) => l.slot === lever.slot && l.status === "applied" && l.stat?.id === stat.id)) break;
+        const back = valueAt(later);
+        if (movedBack(stat, lever.before, lever.after, back)) return [{ turn: turn.turn, slot: lever.slot, kind: lever.kind, stat: stat.name, before: lever.before, after: lever.after, backAt: later.turn, back }];
+      }
+      return [];
+    })
+  );
+}
+
+/** Result words a player read as story text, turn by turn (production's resultWordsOfBeat, as its note reads them). */
+function resultWordsReadings(run: PlayRun): ResultWordsReading[] {
+  const slots = Object.keys(run.start?.players ?? {});
+  return run.turns.flatMap((turn) =>
+    slots.flatMap((slot): ResultWordsReading[] => {
+      const words = resultWordsOfBeat(asObject(turn.reply)[slot] as BeatGeneration | undefined);
+      return words.length ? [{ turn: turn.turn, slot, words }] : [];
+    })
+  );
+}
+
+/**
+ * The setup design checks (checkSetupDesign, the setup document's B13 and the checks added since) that fail on the stored
+ * setup reply, read afresh, so a check added after the run reads it too (the review of round 3: moneyIsNumber; and
+ * distinctIdentities, which the run stored but no reading printed); none without a setup. checkSetup's list counts are
+ * production's older form's (3-4 stats, 3 effects) and setup round 3 changed them, so they are left out.
+ */
+function setupChecksFailed(run: PlayRun): string[] {
+  if (run.setup?.output === undefined) return [];
+  try {
+    return Object.entries(checkSetupDesign(run.setup.output, run.input).checks)
+      .filter(([, ok]) => !ok)
+      .map(([name]) => name);
+  } catch {
+    return [];
   }
 }
 
@@ -780,7 +912,7 @@ function waitReadings(run: PlayRun): WaitReading[] {
   });
 }
 
-/** Each player's own stats from the start to the end, and the turns that changed each. */
+/** Each player's own stats from the start to the end, the turns that changed each, and how often a change went the other way. */
 function ownStatReadings(run: PlayRun): OwnStatReading[] {
   const start = run.start;
   if (!start) return [];
@@ -788,30 +920,65 @@ function ownStatReadings(run: PlayRun): OwnStatReading[] {
   return Object.keys(start.players).flatMap((slot) =>
     start.playerStats.map((stat): OwnStatReading => {
       const valueIn = (values: { statId: string; value: unknown }[] | undefined) => values?.find((v) => v.statId === stat.id)?.value;
+      /** A number's or a ladder's value as a position, else undefined */
+      const position = (value: unknown) => (typeof value === "number" ? value : rungOf(stat, value));
       let before = valueIn(start.players[slot]?.statValues);
       const first = before;
       const changedAt: number[] = [];
+      let reversals = 0;
+      let lastDirection = 0;
       for (const turn of run.turns) {
         const after = valueIn(turn.statValues.players[slot]);
-        if (!same(before, after)) changedAt.push(turn.turn);
+        if (!same(before, after)) {
+          changedAt.push(turn.turn);
+          const [from, to] = [position(before), position(after)];
+          const direction = from !== undefined && to !== undefined ? Math.sign(to - from) : 0;
+          if (direction !== 0 && lastDirection !== 0 && direction !== lastDirection) reversals++;
+          if (direction !== 0) lastDirection = direction;
+        }
         before = after;
       }
-      return { slot, stat: stat.id, name: stat.name, start: first, end: before, changedAt };
+      return { slot, stat: stat.id, name: stat.name, start: first, end: before, changedAt, ...(reversals ? { reversals } : {}) };
     })
   );
 }
 
-/** The contest scoreboards the story's contested shared outcomes name (production's scoreboardOf). */
-function scoreboardsOf(state: StoryState | undefined): Stat[] {
-  if (!state) return [];
+/** The words of a stat's id, as an outcome's "Scored by …" may name it: shared_contract_race is "contract race". */
+const idWords = (id: string) => id.replace(/^shared_/, "").replace(/_+/g, " ").trim().toLowerCase();
+
+const SCORED_BY = /Scored by ([^.]+)\.?\s*$/i;
+
+/**
+ * The scoreboard a contested shared outcome names: production's scoreboardOf (the stat's name), else, since the review of
+ * round 3 (2026-10-01), the one shared opposites stat whose id's words the outcome names (the food trucks' "Scored by
+ * Contract Race" for shared_contract_race, named "Innovator's Lead|Circuit Caterer's Lead"), which production's repair can't
+ * find (`byId`).
+ */
+function boardOf(story: Story, outcomeId: string): { board: Stat; byId: boolean } | undefined {
+  const named = scoreboardOf(story, outcomeId);
+  if (named) return { board: named, byId: false };
+  const outcome = story.getSharedOutcomes().find((o) => o.id === outcomeId);
+  const words = outcome && isContestedOutcome(outcome) ? SCORED_BY.exec(outcome.resonance ?? "")?.[1]?.trim().toLowerCase() : undefined;
+  if (!words) return undefined;
+  const byId = story.getSharedStats().filter((stat) => stat.type === "opposites" && idWords(stat.id) === words);
+  return byId.length === 1 ? { board: byId[0], byId: true } : undefined;
+}
+
+/** The contest scoreboards the story's contested shared outcomes name (boardOf), and by which outcome. */
+function scoreboardsOf(state: StoryState | undefined): { boards: (Stat & { byId: boolean })[]; byOutcome: Map<string, string> } {
+  if (!state) return { boards: [], byOutcome: new Map() };
   const story = Story.create(state);
-  const boards = (state.sharedOutcomes ?? []).filter(isContestedOutcome).map((o) => scoreboardOf(story, o.id)).filter((s): s is Stat => s !== undefined);
-  return [...new Map(boards.map((b) => [b.id, b])).values()];
+  const found = (state.sharedOutcomes ?? []).filter(isContestedOutcome).flatMap((o) => {
+    const named = boardOf(story, o.id);
+    return named ? [{ outcomeId: o.id, ...named }] : [];
+  });
+  const boards = [...new Map(found.map(({ board, byId }) => [board.id, { ...board, byId }])).values()];
+  return { boards, byOutcome: new Map(found.map(({ outcomeId, board }) => [outcomeId, board.id])) };
 }
 
 /** Each scoreboard on each turn that follows a contest result on it or moves it, against the side that won. */
 function scoreboardReadings(run: PlayRun): ScoreboardMove[] {
-  const boards = scoreboardsOf(run.start);
+  const { boards, byOutcome } = scoreboardsOf(run.start);
   const numberIn = (values: { statId: string; value: unknown }[] | undefined, id: string) => {
     const value = values?.find((v) => v.statId === id)?.value;
     return typeof value === "number" ? value : undefined;
@@ -823,7 +990,8 @@ function scoreboardReadings(run: PlayRun): ScoreboardMove[] {
     for (const board of boards) {
       const before = numberIn(previous, board.id);
       const after = numberIn(now, board.id);
-      const followed = (turn.contestResults ?? []).filter((c) => c.board === board.id);
+      // The board play recorded, else the one its outcome names (a board named by its id: play recorded none)
+      const followed = (turn.contestResults ?? []).filter((c) => (c.board ?? byOutcome.get(c.outcomeId)) === board.id);
       const moved = before !== after;
       if (!followed.length && !moved) continue;
       const winners = followed.map((c) => (!c.oriented ? undefined : c.result === "sideAWins" ? "sideA" : c.result === "sideBWins" ? "sideB" : undefined));
@@ -852,6 +1020,7 @@ function scoreboardReadings(run: PlayRun): ScoreboardMove[] {
         ...(winner ? { winner } : {}),
         reading,
         repaired: turn.repairs.some((r) => r.startsWith(`scoreboardDirection: ${board.id}:`)),
+        ...(board.byId ? { byId: true as const } : {}),
       });
     }
     previous = now;
@@ -976,6 +1145,8 @@ export function readStory(run: PlayRun): StoryReadings {
     unfit: run.turns.flatMap((t) => t.unfit.map((u) => ({ turn: t.turn, ...u }))),
     ownStats: ownStatReadings(run),
     scoreboard: scoreboardReadings(run),
+    resultWords: resultWordsReadings(run),
+    setupChecksFailed: setupChecksFailed(run),
     fixes: fixReadings(run),
     ...(pacing ? { pacing } : {}),
     ...(kids ? { kids } : {}),
@@ -1017,18 +1188,42 @@ export function ownStatsLine(r: StoryReadings): string {
   const seats = new Set(r.ownStats.map((s) => s.slot)).size;
   const of = `of ${stats} stat${stats === 1 ? "" : "s"} per player, ${seats} player${seats === 1 ? "" : "s"}`;
   const shown = (value: unknown) => (Array.isArray(value) ? `[${value.join(", ")}]` : String(value));
+  // Back and forth (the review of round 3): two or more changes the other way from the change before
+  const turnedBack = (s: OwnStatReading) => ((s.reversals ?? 0) >= 2 ? `, ${s.reversals} of them the other way from the change before` : "");
   const listed = (readings: OwnStatReading[]) =>
-    readings.map((s) => `${s.name} (${s.slot}: ${shown(s.start)} → ${shown(s.end)}, ${s.changedAt.length} turn${s.changedAt.length === 1 ? "" : "s"})`).join("; ");
+    readings.map((s) => `${s.name} (${s.slot}: ${shown(s.start)} → ${shown(s.end)}, ${s.changedAt.length} turn${s.changedAt.length === 1 ? "" : "s"}${turnedBack(s)})`).join("; ");
   const cameBack = back.length ? `; moved and back where they started: ${listed(back)}` : "";
   return `Players' own stats that moved: ${moved.length ? listed(moved) : "none"} (${of})${cameBack}.`;
 }
 
-/** The levers charged again on the turn after the one that paid them, one line. */
+/** The levers charged again after the turn that paid them, one line. */
 export function chargedAgainLine(r: StoryReadings): string {
   const found = r.leversPaid.chargedAgain;
-  const label = "Levers charged again on the turn after the one that paid them (each kept reply through production's current repairs, leverChargedAgain)";
+  const label =
+    "Levers charged again after the turn that paid them, on the next turn or a later step of the same chapter (each kept reply through production's current repairs, leverChargedAgain)";
   if (found === undefined) return `${label}: not read (the run could not be replayed).`;
   return `${label}: ${found.length ? found.map((c) => `turn ${c.turn} (${c.detail})`).join("; ") : "none"}.`;
+}
+
+/** The levers whose stat the reply that offers them moved already, one line. */
+export function chargedOnOfferLine(r: StoryReadings): string {
+  const found = r.leversPaid.chargedOnOffer;
+  const label = "Levers' stats moved in the reply that offers that lever, before anyone chose it (production's note leverChargedOnOffer, the change kept)";
+  if (found === undefined) return `${label}: not read (the run could not be replayed).`;
+  return `${label}: ${found.length ? found.map((c) => `turn ${c.turn} (${c.detail})`).join("; ") : "none"}.`;
+}
+
+/** The levers whose stat a turn or two later moved back, one line. */
+export function undoneLine(r: StoryReadings): string {
+  const shown = (value: unknown) => (Array.isArray(value) ? `[${value.join(", ")}]` : String(value));
+  const found = r.leversPaid.undone.map((u) => `turn ${u.turn}, ${u.slot}'s ${u.kind} of ${u.stat} (${shown(u.before)} → ${shown(u.after)}), back to ${shown(u.back)} at turn ${u.backAt}`);
+  return `Levers whose stat a turn or two later moved back: ${found.length ? found.join("; ") : "none"}.`;
+}
+
+/** Result words told as story text, one line. */
+export function resultWordsLine(r: StoryReadings): string {
+  const found = r.resultWords.map((w) => `turn ${w.turn} ${w.slot} (${w.words.join(", ")})`);
+  return `Result words told as story text (production's note resultWordsInText): ${found.length ? found.join("; ") : "none"}.`;
 }
 
 const SCOREBOARD_ORDER: { reading: ScoreboardReadingKind; label: string; problem: boolean }[] = [
@@ -1054,7 +1249,8 @@ export function scoreboardLine(r: StoryReadings): string {
     });
     const repaired = moves.filter((m) => m.repaired).map((m) => m.turn);
     const turned = repaired.length ? `production turned ${repaired.length} move${repaired.length === 1 ? "" : "s"} around (turn ${repaired.join(", ")})` : "production turned no move around";
-    return `${name}: ${moves.length} turn${moves.length === 1 ? "" : "s"} after a contest result or with a move: ${readings.join(", ")}; ${turned}`;
+    const byId = moves.some((m) => m.byId) ? " (its outcome names it by the stat's id, which production's scoreboard repair doesn't read)" : "";
+    return `${name}${byId}: ${moves.length} turn${moves.length === 1 ? "" : "s"} after a contest result or with a move: ${readings.join(", ")}; ${turned}`;
   });
   return `Scoreboard moves: ${parts.join(". ")}.`;
 }
@@ -1220,6 +1416,10 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     "",
     chargedAgainLine(r),
     "",
+    chargedOnOfferLine(r),
+    "",
+    undoneLine(r),
+    "",
     `Stat changes that don't fit their stat: ${r.unfit.length ? "" : "none"}`,
     ...r.unfit.map((u) => `- turn ${u.turn}, ${u.group}: ${u.name}: ${u.kinds.join("; ")}`),
     "",
@@ -1230,7 +1430,7 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     "",
     "### Repairs and retries",
     "",
-    `- setup asked again (the story couldn't start): ${r.repairs.setupRetries}${r.repairs.backgroundFixes ? `; background values fixed: ${r.repairs.backgroundFixes}` : ""}`,
+    `- setup asked again (the story couldn't start, or since 2026-10-01 a seat's identities shared a name): ${r.repairs.setupRetries}${r.repairs.backgroundFixes ? `; background values fixed: ${r.repairs.backgroundFixes}` : ""}`,
     `- plans retried: ${r.repairs.planRetries.length ? r.repairs.planRetries.map((p) => `turn ${p.turn} ${p.kind} (${[p.problem, p.lengthProblem].filter(Boolean).join("; ")})`).join("; ") : "none"}`,
     `- plan repairs: ${counted(r.repairs.planRepairs)}`,
     `- beat repairs: ${counted(r.repairs.beatRepairs)}`,
@@ -1251,6 +1451,10 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     "### Turn design checks that failed",
     "",
     ...(Object.keys(r.checkFailures).length ? Object.entries(r.checkFailures).map(([name, turns]) => `- ${name}: turns ${turns.join(", ")}`) : ["none"]),
+    "",
+    resultWordsLine(r),
+    "",
+    `Setup design checks that failed (read afresh): ${r.setupChecksFailed.length ? r.setupChecksFailed.join(", ") : "none"}.`,
     "",
     "### Plan design checks that failed",
     "",

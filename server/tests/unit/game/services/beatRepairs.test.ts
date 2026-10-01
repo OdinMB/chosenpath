@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import type { Story } from "core/models/Story.js";
 import type {
+  Beat,
   BeatGeneration,
   BeatOption,
   ChallengeOption,
@@ -34,6 +35,7 @@ import {
   challengeOptions,
   explorationOptions,
   outcome,
+  SIX_PARAGRAPHS,
   stat,
   switchAnalysis,
   threadAnalysis,
@@ -1105,6 +1107,155 @@ describe("repairBeatReply: a sacrifice or reward charged again on the turn after
     expect(repaired(paidOnce, [charge]).statChanges).toEqual([]);
     const spentAgain = afterPayment(threadBeat(2), { player1: { tookLever: lever(WEDGE), paidLever: crumbPaid }, player2: { lastChoice: lever(WEDGE) } });
     expect(repaired(spentAgain, [charge])).toEqual({ statChanges: [charge], repairs: [] });
+  });
+
+  /*
+   * The review of the third playthroughs (2026-10-01): a repeat two turns after the payment got through (the estate agents'
+   * Composure: Tamsin's sacrifice taken at turn 22, paid at 23 (55 → 45), charged again at 24 (dropped) and once more at 25,
+   * 45 → 35, "your fingers tighten briefly"), since the repair read only the last beat.
+   */
+  describe("later in the same chapter", () => {
+    /** Step 4 of a four-step chapter that began at history index 2: the lever taken on its first step (beat 2), paid on its second (beat 3), nothing on its third (beat 4). */
+    function laterInChapter(players = 1): Story {
+      const chapter = threadAnalysis("challenge", 4, 2, slotsOf(players));
+      chapter.threads[0].progression.slice(0, 3).forEach((step) => (step.resolution = "favorable"));
+      const base = threadBeat(players);
+      const seated = Object.fromEntries(
+        Object.entries(base.getPlayers()).map(([slot, player]) => {
+          const beats: Beat[] = [...player.beatHistory, player.beatHistory[0], player.beatHistory[0]].map((beat) => ({ ...beat, options: challengeOptions(), choice: 0 }));
+          if (slot === "player1") {
+            beats[2] = { ...beats[2], options: withLever(lever(BRACE)), choice: 2 };
+            beats[3] = { ...beats[3], paidLever: reservePaid() };
+          }
+          return [slot, { ...player, beatHistory: beats, statValues: [{ statId: RESERVE.id, value: 30 }] }];
+        })
+      );
+      return base.clone({ storyPhases: [switchAnalysis(slotsOf(players), 1), chapter], playerStats: [RESERVE], sharedStats: [CRUMBS], sharedStatValues: [{ statId: CRUMBS.id, value: 2 }], players: seated });
+    }
+
+    it("drops the same charge on a later step of the chapter that paid it", () => {
+      const story = laterInChapter();
+      expect(story.getCurrentBeatType()).toBe("thread");
+      const result = repaired(story, [statChange("player1", RESERVE.id, "subtractNumber", 15)]);
+      expect(result.statChanges).toEqual([]);
+      expect(result.repairs).toEqual([{ kind: "leverChargedAgain", detail: "player1/player_personal_reserve: -15, the sacrifice turn 4 paid, earlier in this chapter" }]);
+    });
+
+    it("keeps it where a lever chosen on the last beat owes it, and on the switch turn after the chapter (its stats' adjustments after threads)", () => {
+      const owed = laterInChapter();
+      const players = Object.fromEntries(
+        Object.entries(owed.getPlayers()).map(([slot, player]) => {
+          const beats = [...player.beatHistory];
+          beats[4] = { ...beats[4], options: withLever(lever("Run the full sweep, spending 15% of your Personal Reserve.")), choice: 2 };
+          return [slot, { ...player, beatHistory: beats }];
+        })
+      );
+      const charge = [statChange("player1", RESERVE.id, "subtractNumber", 15)];
+      expect(repaired(owed.clone({ players }), charge)).toEqual({ statChanges: charge, repairs: [] });
+      // The chapter's four steps played: the turn after is the switch turn
+      const ended = laterInChapter();
+      const playersAtSwitch = Object.fromEntries(
+        Object.entries(ended.getPlayers()).map(([slot, player]) => [slot, { ...player, beatHistory: [...player.beatHistory, { ...player.beatHistory[4] }] }])
+      );
+      const chapter = ended.getCurrentThreadAnalysis() as ThreadAnalysis;
+      const resolved = { ...chapter, threads: chapter.threads.map((t) => ({ ...t, progression: t.progression.map((s) => ({ ...s, resolution: "favorable" as const })), resolution: "favorable" as const })) };
+      const atSwitch = ended.clone({ players: playersAtSwitch, storyPhases: [switchAnalysis(["player1"], 1), resolved, switchAnalysis(["player1"], 6)] });
+      expect(atSwitch.getCurrentBeatType()).toBe("switch");
+      expect(repaired(atSwitch, charge)).toEqual({ statChanges: charge, repairs: [] });
+    });
+  });
+
+  /*
+   * A ladder stat's payment is a step up or down its possible values: the space pirates' Oren took a Pirate Reputation
+   * reward at turn 15, turn 16 paid it (Unproven → Known Hand) and turn 17 moved him again (Known Hand → Feared Name: "Your
+   * reputation now precedes you"), which the repair, reading percentage and number stats only, never saw.
+   */
+  it("drops a ladder step taken again on the turn after the one that paid it", () => {
+    const REPUTATION = stat("player_reputation", {
+      type: "string",
+      name: "Pirate Reputation",
+      possibleValues: "Unproven, Known Hand, Feared Name",
+      optionsToGainAsReward: "Improve one step by taking time to honor a public commitment instead of pressing on.",
+      canBeChangedInBeatResolutions: false,
+    });
+    const story = avalon({ tookLever: lever("Let the guild inspect the claim openly, improving Pirate Reputation one step.", "reward"), paidLever: { kind: "reward", group: "player1", stat: REPUTATION.id, step: 1 } });
+    const players = Object.fromEntries(Object.entries(story.getPlayers()).map(([slot, player]) => [slot, { ...player, statValues: [{ statId: REPUTATION.id, value: "Known Hand" }] }]));
+    const onLadder = story.clone({ playerStats: [REPUTATION], players });
+    const result = repaired(onLadder, [statChange("player1", REPUTATION.id, "setString", "Feared Name")]);
+    expect(result.statChanges).toEqual([]);
+    expect(result.repairs).toEqual([{ kind: "leverChargedAgain", detail: "player1/player_reputation: +1, the reward the previous turn paid" }]);
+    // A step the other way, or a value off the ladder, is no repeat
+    const back = [statChange("player1", REPUTATION.id, "setString", "Unproven")];
+    expect(repaired(onLadder, back)).toEqual({ statChanges: back, repairs: [] });
+  });
+});
+
+/*
+ * The review of the third playthroughs (2026-10-01): the space pirates' Davi lost 10% Nerve (50 → 40) in turn 19's own reply,
+ * the reply that offered "Spend 10% Nerve to hold your ground", after an exploration pick with no lever; he took the
+ * sacrifice and turn 20 charged it (40 → 30). A charge in the reply that offers the lever can't be told from a story event
+ * the stat's rules allow, so it is noted and kept.
+ */
+describe("repairBeatReply: a lever's stat moved its way in the reply that offers that lever (a note)", () => {
+  const NERVE = stat("player_nerve", { name: "Nerve", optionsToSacrifice: "Spend 10% Nerve to hold steady through an immediate danger." });
+  const HOLD = "Spend 10% Nerve to hold your ground while the crew argues.";
+  const sacrifice = (text: string): ChallengeOption => ({ optionType: "challenge", resourceType: "sacrifice", riskType: "normal", text, basePoints: POINTS_FOR_SACRIFICE, modifiersToSuccessRate: [] });
+
+  function story(lastChoice?: BeatOption): Story {
+    const base = threadBeat(1);
+    const players = Object.fromEntries(
+      Object.entries(base.getPlayers()).map(([slot, player]) => {
+        const beats = [...player.beatHistory];
+        beats[beats.length - 1] = { ...beats[beats.length - 1], ...(lastChoice ? { options: [...challengeOptions().slice(0, 2), lastChoice], choice: 2 } : { options: challengeOptions(), choice: 0 }) };
+        return [slot, { ...player, beatHistory: beats, statValues: [{ statId: NERVE.id, value: 50 }] }];
+      })
+    );
+    return base.clone({ playerStats: [NERVE], players });
+  }
+  const offering = (statChanges: Change[]) => beatSet(1, { statChanges, player1: beatGeneration({ options: [...challengeOptions().slice(0, 2), sacrifice(HOLD)] }) });
+  const notes = (s: Story, reply: SetOfBeatGenerationSchema) => {
+    const { reply: kept, repairs } = repairBeatReply(s, reply);
+    return { statChanges: kept.statChanges, notes: repairs.filter((r) => r.kind === "leverChargedOnOffer") };
+  };
+
+  it("notes the change and keeps it", () => {
+    const charge = statChange("player1", NERVE.id, "subtractNumber", 10);
+    expect(notes(story(), offering([charge]))).toEqual({
+      statChanges: [charge],
+      notes: [{ kind: "leverChargedOnOffer", note: true, detail: "player1/player_nerve: -10, in the reply that offers that sacrifice" }],
+    });
+  });
+
+  it("notes nothing where the last choice owes the change, where it goes the other way or by another size than the option names, or where no lever is offered", () => {
+    const charge = statChange("player1", NERVE.id, "subtractNumber", 10);
+    expect(notes(story(sacrifice("Steady your Nerve, spending 10% of it, and climb.")), offering([charge])).notes).toEqual([]);
+    expect(notes(story(), offering([statChange("player1", NERVE.id, "addNumber", 10)])).notes).toEqual([]);
+    expect(notes(story(), offering([statChange("player1", NERVE.id, "subtractNumber", 5)])).notes).toEqual([]);
+    expect(notes(story(), beatSet(1, { statChanges: [charge], player1: beatGeneration({ options: challengeOptions() }) })).notes).toEqual([]);
+  });
+});
+
+/*
+ * The review of the third playthroughs (2026-10-01): group turns told the game's result kind as story text ("The mixed
+ * result remains plain in the room", "The unfavorable outcome hangs between you"), in both rounds. Removing them would be
+ * a measured turn line; the game notes them, kept as written, so the log and the eval see how often.
+ */
+describe("repairBeatReply: result words in a player's text (a note)", () => {
+  const withText = (text: string, options = challengeOptions()) => beatSet(2, { player2: beatGeneration({ text, options }) });
+  const notes = (reply: SetOfBeatGenerationSchema) => repairBeatReply(threadBeat(2), reply).repairs.filter((r) => r.kind === "resultWordsInText");
+
+  it("notes a result kind told in the text, the options or the interludes, per player, and keeps the text as written", () => {
+    const text = `${SIX_PARAGRAPHS}\n\nThe mixed result remains plain in the room: your dates can be checked.`;
+    const reply = withText(text);
+    const { reply: kept, repairs } = repairBeatReply(threadBeat(2), reply);
+    expect(repairs.filter((r) => r.kind === "resultWordsInText")).toEqual([{ kind: "resultWordsInText", note: true, detail: "player2: mixed result" }]);
+    expect(kept.player2.text).toBe(text);
+    expect(notes(withText("The unfavorable outcome hangs between you. The favorable attention your procedure earned remains.")).map((n) => n.detail)).toEqual(["player2: unfavorable, favorable"]);
+    expect(notes(withText(SIX_PARAGRAPHS, [...challengeOptions().slice(0, 2), { ...challengeOptions()[2], text: "Press for a favourable ruling" }])).map((n) => n.detail)).toEqual(["player2: favourable"]);
+  });
+
+  it("notes nothing on ordinary words", () => {
+    expect(notes(withText(`${SIX_PARAGRAPHS}\n\nYou have mixed feelings about the mixed crowd, and the result of the vote surprises you.`))).toEqual([]);
   });
 });
 

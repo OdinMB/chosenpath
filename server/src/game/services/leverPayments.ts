@@ -1,5 +1,5 @@
 import type { Story } from "core/models/Story.js";
-import type { Beat, Change, PaidLever, PlayerSlot, Stat } from "core/types/index.js";
+import type { Beat, BeatGeneration, Change, PaidLever, PlayerSlot, SetOfBeatGenerationSchema, Stat } from "core/types/index.js";
 import type { Repair } from "./textRepairs.js";
 
 /*
@@ -12,7 +12,10 @@ import type { Repair } from "./textRepairs.js";
  * the cost, and the next reply read it as still owed ("Jun spent 15% of his
  * reserve bracing the control ring", New Avalon turn 4, 45 → 30, a turn after
  * 60 → 45; "Bran used a Pantry Crumb as a wedge in the previous beat", the
- * mouse story's ending, 2 → 1).
+ * mouse story's ending, 2 → 1). The third (2026-10-01) showed three more the
+ * repair missed: a repeat two turns after the payment, a ladder stat's step,
+ * and a charge in the reply that offers the lever, before it was chosen; the
+ * first two are dropped since, the third noted.
  */
 
 export type Lever = "sacrifice" | "reward";
@@ -189,8 +192,25 @@ function chosenLever(story: Story, slot: string, beat: Beat | null, stats: Lever
   return lever ? { kind, stat: lever.stat, group: lever.shared ? "shared" : slot, direction: leverDirection(lever.stat, kind, text) } : undefined;
 }
 
-/** A lever of these stat types is read; a list's or a ladder's payment isn't a size a second charge could repeat. */
+/** A lever of these stat types is read, and a ladder's (ladderOf); a list's payment isn't a size a second charge could repeat. */
 const PAID_TYPES: Stat["type"][] = ["percentage", "number"];
+
+/**
+ * A string stat's steps, lowest first, where its possible values list two or
+ * more ("Unproven, Known Hand, Feared Name"; "Novice → Amateur → Professional",
+ * the setup examples' form), lower-cased; undefined for any other stat.
+ */
+export function ladderOf(stat: Stat): string[] | undefined {
+  if (stat.type !== "string") return undefined;
+  const steps = (stat.possibleValues ?? "")
+    .split(/\s*(?:→|->|,|;)\s*/)
+    .map((step) => step.trim().toLowerCase())
+    .filter((step) => step.length > 0);
+  return new Set(steps).size >= 2 ? steps : undefined;
+}
+
+/** Whether a lever on this stat has a payment the repair can read: a percentage or number stat's change, or a ladder's step (since the review of the third playthroughs, 2026-10-01). */
+const readsPayment = (stat: Stat) => PAID_TYPES.includes(stat.type) || ladderOf(stat) !== undefined;
 
 /** The values the stat changes move, each as the changes before it leave it (ChangeService's clamp included). */
 class WorkingValues {
@@ -209,23 +229,38 @@ class WorkingValues {
     return entries.find((entry) => entry.statId === change.stat)?.value;
   }
 
-  /** By how much the change moves a percentage or number stat: an addition or subtraction by its value, a value set by the difference; undefined for anything else. */
+  /**
+   * By how much the change moves a percentage or number stat: an addition or subtraction by its value, a value set by the
+   * difference; a ladder's value set, by the steps between its values (both on the ladder); undefined for anything else.
+   */
   step(change: StatChange): number | undefined {
-    const type = this.definition(change)?.type;
+    const definition = this.definition(change);
     const before = this.current(change);
-    if (!type || !PAID_TYPES.includes(type) || typeof before !== "number" || typeof change.value !== "number") return undefined;
+    const ladder = definition ? ladderOf(definition) : undefined;
+    if (ladder) {
+      if (change.change !== "setString" || typeof before !== "string" || typeof change.value !== "string") return undefined;
+      const [from, to] = [ladder.indexOf(before.trim().toLowerCase()), ladder.indexOf(change.value.trim().toLowerCase())];
+      return from < 0 || to < 0 ? undefined : to - from;
+    }
+    if (!definition || !PAID_TYPES.includes(definition.type) || typeof before !== "number" || typeof change.value !== "number") return undefined;
     if (change.change === "addNumber") return change.value;
     if (change.change === "subtractNumber") return -change.value;
     if (change.change === "setNumber") return change.value - before;
     return undefined;
   }
 
-  /** Applies a numeric change's step; a percentage stays within 0 to 100. */
+  /** Applies a change's step: a number by its step (a percentage stays within 0 to 100), a ladder's value as set. */
   apply(change: StatChange, step: number | undefined): void {
     const before = this.current(change);
-    if (step === undefined || typeof before !== "number") return;
+    const key = `${change.group}|${change.stat}`;
+    if (step === undefined) return;
+    if (typeof before === "string") {
+      this.values.set(key, change.value);
+      return;
+    }
+    if (typeof before !== "number") return;
     const after = before + step;
-    this.values.set(`${change.group}|${change.stat}`, this.definition(change)?.type === "percentage" ? Math.max(0, Math.min(100, after)) : after);
+    this.values.set(key, this.definition(change)?.type === "percentage" ? Math.max(0, Math.min(100, after)) : after);
   }
 }
 
@@ -236,14 +271,16 @@ const isStatChange = (change: Change): change is StatChange => change.type === "
  * story's current beat: the first change in order that moves the lever's stat
  * the lever's way (leverDirection: a sacrifice down and a reward up unless its
  * words about the stat say otherwise, as on a stat where more is worse), with the step it
- * made. Percentage and number stats only.
+ * made. Percentage and number stats, and since the review of the third playthroughs
+ * (2026-10-01) a ladder's step (ladderOf: up its possible values for a reward unless its
+ * words say otherwise, +1 for Unproven → Known Hand).
  */
 export function paidLevers(story: Story, changes: Change[]): Record<string, PaidLever> {
   const stats = leverStatsOf(story);
   const paid: Record<string, PaidLever> = {};
   for (const slot of story.getPlayerSlots()) {
     const lever = chosenLever(story, slot, story.getCurrentBeat(slot as PlayerSlot), stats);
-    if (!lever || !PAID_TYPES.includes(lever.stat.type)) continue;
+    if (!lever || !readsPayment(lever.stat)) continue;
     const working = new WorkingValues(story, stats);
     for (const change of changes.filter(isStatChange)) {
       const step = working.step(change);
@@ -261,39 +298,127 @@ export function paidLevers(story: Story, changes: Change[]): Record<string, Paid
 const leverKey = (lever: { kind: Lever; group: string; stat: string }) => `${lever.kind}|${lever.group}|${lever.stat}`;
 const signed = (value: number) => (value > 0 ? `+${value}` : String(value));
 
+/** A payment a repeat this turn would charge again, and the turn that paid it; `last` where that turn is the one just played. */
+type Payment = { paid: PaidLever; turn: number; last: boolean };
+
 /**
- * A lever charged again on the turn after the one that paid it: where a
- * player's last beat recorded that its turn paid a lever (Beat.paidLever),
- * the first change this turn that moves the same stat by the same step is
- * dropped (`leverChargedAgain`), one per payment. Kept: a charge that a
- * lever chosen on the last beat now owes (any player's, of the same kind on
- * the same stat), a change of another size or the other way, a late payment
- * (a last beat that recorded none), and every turn after. A change of the
- * same size the stat's own rules happen to ask for on that turn is dropped
- * too; the playthroughs saw none. Called after the stat changes are placed.
+ * The payments the players' beats recorded that a repeat this turn would
+ * charge again: the last beat's, on any turn, and, where this turn is a later
+ * step of a chapter, those of the chapter's earlier steps (its first beat up to
+ * the one before last).
+ */
+function paymentsBefore(story: Story): Payment[] {
+  const written = story.getCurrentTurn();
+  const chapter = story.getCurrentBeatType() === "thread" ? story.getCurrentThreadAnalysis() : null;
+  const from = chapter ? Math.min(chapter.firstBeatIndex, written - 1) : written - 1;
+  return story.getPlayerSlots().flatMap((slot) => {
+    const beats = story.getPlayer(slot)?.beatHistory ?? [];
+    return beats.flatMap((beat, index): Payment[] =>
+      index >= Math.max(0, from) && index < written && beat.paidLever ? [{ paid: beat.paidLever, turn: index + 1, last: index === written - 1 }] : []
+    );
+  });
+}
+
+/**
+ * A lever charged again after the turn that paid it: where a player's beat
+ * recorded that its turn paid a lever (Beat.paidLever), the first change this
+ * turn that moves the same stat by the same step is dropped
+ * (`leverChargedAgain`), one per payment and turn. The payments read are the
+ * last beat's, on any turn (the review of the second playthroughs,
+ * 2026-09-30), and since the review of the third (2026-10-01) those of the
+ * chapter's earlier steps on a later step of the same chapter: the estate
+ * agents' Composure, paid at turn 23, its repeat dropped at 24, was charged
+ * once more at 25, 45 → 35 ("your fingers tighten briefly"). A ladder's step
+ * counts as a percentage's does (ladderOf: the space pirates' Pirate
+ * Reputation, Known Hand → Feared Name a turn after the reward's Unproven →
+ * Known Hand). Kept: a charge that a lever chosen on the last beat now owes
+ * (any player's, of the same kind on the same stat), a change of another size
+ * or the other way, a late payment (a last beat that recorded none), a switch
+ * turn or ending's change on an earlier step's payment (it applies the stats'
+ * adjustments after threads), and every turn after the chapter. A change of
+ * the same size the stat's own rules happen to ask for on such a turn is
+ * dropped too; the stored playthroughs show none (`playthroughReplay.test.ts`).
+ * Called after the stat changes are placed.
  */
 export function dropLeversChargedAgain(story: Story, changes: Change[], repairs: Repair[]): Change[] {
   const stats = leverStatsOf(story);
-  const beats = story.getPlayerSlots().map((slot) => ({ slot, beat: story.getCurrentBeat(slot as PlayerSlot) }));
-  const owed = new Set(beats.flatMap(({ slot, beat }) => {
-    const lever = chosenLever(story, slot, beat, stats);
-    return lever ? [leverKey({ kind: lever.kind, group: lever.group, stat: lever.stat.id })] : [];
-  }));
-  const records = beats.flatMap(({ beat }) => (beat?.paidLever ? [beat.paidLever] : []));
-  const pending = [...new Map(records.map((paid) => [`${leverKey(paid)}|${paid.step}`, paid])).values()].filter((paid) => !owed.has(leverKey(paid)));
+  const owed = owedLevers(story, stats);
+  const records = paymentsBefore(story).filter(({ paid }) => !owed.has(leverKey(paid)));
+  const pending = [...new Map(records.map((payment) => [`${leverKey(payment.paid)}|${payment.paid.step}|${payment.turn}`, payment])).values()];
   if (pending.length === 0) return changes;
 
   const working = new WorkingValues(story, stats);
   return changes.filter((change) => {
     if (!isStatChange(change)) return true;
     const step = working.step(change);
-    const at = step === undefined ? -1 : pending.findIndex((paid) => paid.group === change.group && paid.stat === change.stat && paid.step === step);
+    const at = step === undefined ? -1 : pending.findIndex(({ paid }) => paid.group === change.group && paid.stat === change.stat && paid.step === step);
     if (at < 0) {
       working.apply(change, step);
       return true;
     }
-    const [paid] = pending.splice(at, 1);
-    repairs.push({ kind: "leverChargedAgain", detail: `${paid.group}/${paid.stat}: ${signed(paid.step)}, the ${paid.kind} the previous turn paid` });
+    const [{ paid, turn, last }] = pending.splice(at, 1);
+    const when = last ? "the previous turn paid" : `turn ${turn} paid, earlier in this chapter`;
+    repairs.push({ kind: "leverChargedAgain", detail: `${paid.group}/${paid.stat}: ${signed(paid.step)}, the ${paid.kind} ${when}` });
     return false;
   });
+}
+
+/** The levers chosen on the last beat, by kind, group and stat: their payment is due this turn. */
+function owedLevers(story: Story, stats: LeverStats): Set<string> {
+  return new Set(
+    story.getPlayerSlots().flatMap((slot) => {
+      const lever = chosenLever(story, slot, story.getCurrentBeat(slot as PlayerSlot), stats);
+      return lever ? [leverKey({ kind: lever.kind, group: lever.group, stat: lever.stat.id })] : [];
+    })
+  );
+}
+
+/** The amount a lever's text names ("Spend 10% Nerve" is 10), where it names one number. */
+function amountNamed(text: string): number | undefined {
+  const amounts = [...text.matchAll(/\d+(?:\.\d+)?/g)].map((match) => Number(match[0]));
+  return amounts.length === 1 ? amounts[0] : undefined;
+}
+
+/**
+ * A lever's stat moved its way in the very reply that offers that lever
+ * (`leverChargedOnOffer`, a note; the change is kept), since the review of
+ * the third playthroughs (2026-10-01): the space pirates' Davi lost 10% Nerve
+ * (50 → 40) in turn 19's own reply, which offered "Spend 10% Nerve to hold
+ * your ground" after an exploration pick with no lever; he took it, and turn
+ * 20 charged it (40 → 30), so one sacrifice cost him twice. Such a change
+ * can't be told apart from a story event the stat's rules allow, so it is
+ * only noted, for the log and the eval. Read on the levers offered (a stat the
+ * payment repair reads, its stat as leverStatOf reads it) where the change
+ * goes the lever's way (leverDirection), by the amount the option's text names
+ * where it names one, and no lever chosen on the last beat owes it. One note
+ * per player and stat. Called on the repaired reply, after the repeats are dropped.
+ */
+export function noteLeversChargedOnOffer(story: Story, reply: SetOfBeatGenerationSchema, changes: Change[], repairs: Repair[]): void {
+  const stats = leverStatsOf(story);
+  const owed = owedLevers(story, stats);
+  const working = new WorkingValues(story, stats);
+  const moves = changes.filter(isStatChange).map((change) => {
+    const step = working.step(change);
+    working.apply(change, step);
+    return { change, step };
+  });
+  for (const slot of story.getPlayerSlots()) {
+    const beat = reply[slot as `player${number}`] as BeatGeneration | undefined;
+    const noted = new Set<string>();
+    for (const option of Array.isArray(beat?.options) ? beat.options : []) {
+      const kind = option?.resourceType;
+      if (kind !== "sacrifice" && kind !== "reward") continue;
+      const text = typeof option.text === "string" ? option.text : "";
+      const lever = leverStatOf(story, slot, kind, text, stats);
+      if (!lever || !readsPayment(lever.stat)) continue;
+      const group = lever.shared ? "shared" : slot;
+      if (owed.has(leverKey({ kind, group, stat: lever.stat.id })) || noted.has(lever.stat.id)) continue;
+      const direction = leverDirection(lever.stat, kind, text);
+      const amount = ladderOf(lever.stat) ? undefined : amountNamed(text);
+      const move = moves.find(({ change, step }) => change.group === group && change.stat === lever.stat.id && step !== undefined && Math.sign(step) === direction && (amount === undefined || Math.abs(step) === amount));
+      if (!move?.step) continue;
+      noted.add(lever.stat.id);
+      repairs.push({ kind: "leverChargedOnOffer", note: true, detail: `${group}/${lever.stat.id}: ${signed(move.step)}, in the reply that offers that ${kind}` });
+    }
+  }
 }

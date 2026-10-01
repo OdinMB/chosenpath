@@ -178,6 +178,18 @@ describe("readStory", () => {
     expect(ownStatsLine(readings)).toBe(`Players' own stats that moved: none (of 1 stat per player, 1 player); moved and back where they started: Courage (player1: ${start} → ${start}, 2 turns).`);
   });
 
+  it("says where an own stat went back and forth (the review of round 3: the food trucks' Omar, Service Stamina 45 → 35 → 45 → 35 → 45 → 35)", async () => {
+    const run = structuredClone(await played());
+    const start = run.start?.players.player1?.statValues.find((v) => v.statId === "player_courage")?.value as number;
+    run.turns.forEach((t) => {
+      const value = t.turn >= 9 ? start - 10 : t.turn >= 7 ? start : t.turn >= 5 ? start - 10 : t.turn >= 3 ? start : start - 10;
+      t.statValues = { ...t.statValues, players: { ...t.statValues.players, player1: [{ statId: "player_courage", value }] } };
+    });
+    const readings = readStory(run);
+    expect(readings.ownStats[0]).toMatchObject({ start, end: start - 10, changedAt: [1, 3, 5, 7, 9], reversals: 4 });
+    expect(ownStatsLine(readings)).toBe(`Players' own stats that moved: Courage (player1: ${start} → ${start - 10}, 5 turns, 4 of them the other way from the change before) (of 1 stat per player, 1 player).`);
+  });
+
   it("reads a lever charged again on the turn after its payment: production drops it since 2026-09-30, and a run stored before shows where", async () => {
     // Every turn lowers Courage by 2: the turn after a lever pays it by 2, and the turn after that would charge it again
     const courage = { type: "statChange", group: "player1", stat: "player_courage", change: "subtractNumber", value: 2 };
@@ -193,9 +205,66 @@ describe("readStory", () => {
     const readings = readStory(stored);
     expect(readings.leversPaid.chargedAgain).toEqual([{ turn: fired.turn, detail: "player1/player_courage: -2, the sacrifice the previous turn paid" }]);
     expect(renderPlaythroughReadings([stored], new Date(0))).toContain(
-      `Levers charged again on the turn after the one that paid them (each kept reply through production's current repairs, leverChargedAgain): turn ${fired.turn} (player1/player_courage: -2, the sacrifice the previous turn paid).`
+      `Levers charged again after the turn that paid them, on the next turn or a later step of the same chapter (each kept reply through production's current repairs, leverChargedAgain): turn ${fired.turn} (player1/player_courage: -2, the sacrifice the previous turn paid).`
     );
-    expect(renderPlaythroughReadings([await played()], new Date(0))).toContain("Levers charged again on the turn after the one that paid them (each kept reply through production's current repairs, leverChargedAgain): none.");
+    expect(renderPlaythroughReadings([await played()], new Date(0))).toContain(
+      "Levers charged again after the turn that paid them, on the next turn or a later step of the same chapter (each kept reply through production's current repairs, leverChargedAgain): none."
+    );
+  });
+
+  it("reads a lever's stat moved in the reply that offers that lever (production's note since 2026-10-01: the space pirates' Davi, Nerve 50 → 40 beside 'Spend 10% Nerve')", async () => {
+    // The player takes the sacrifice at turn 2 and a normal option at 3; turn 4's reply offers the sacrifice again
+    const run = structuredClone(await played());
+    const turn = run.turns.find((t) => t.turn === 4);
+    if (!turn?.reply) throw new Error("no turn 4");
+    turn.reply = { ...turn.reply, statChanges: [{ type: "statChange", group: "player1", stat: "player_courage", change: "subtractNumber", value: 10 }] };
+    const readings = readStory(run);
+    expect(readings.leversPaid.chargedOnOffer).toEqual([{ turn: 4, detail: "player1/player_courage: -10, in the reply that offers that sacrifice" }]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain(
+      "Levers' stats moved in the reply that offers that lever, before anyone chose it (production's note leverChargedOnOffer, the change kept): turn 4 (player1/player_courage: -10, in the reply that offers that sacrifice)."
+    );
+    expect(readStory(await played()).leversPaid.chargedOnOffer).toEqual([]);
+  });
+
+  it("reads a lever whose stat a turn or two later moved back (the mouse's Cat Attention sacrifice, 45 → 55, back to 45 at the chapter's close)", async () => {
+    const run = structuredClone(await played());
+    const courage = run.start?.playerStats.find((s) => s.id === "player_courage");
+    if (!courage) throw new Error("no Courage");
+    const values: Record<number, number> = { 3: 40, 4: 50, 5: 50 };
+    run.turns.forEach((t) => {
+      t.statValues = { ...t.statValues, players: { ...t.statValues.players, player1: [{ statId: "player_courage", value: values[t.turn] ?? 50 }] } };
+      t.levers = t.turn === 3 ? [{ slot: "player1", kind: "sacrifice", text: "Spend 10 Courage to charge", stat: courage, status: "applied", before: 50, after: 40 }] : [];
+    });
+    const readings = readStory(run);
+    expect(readings.leversPaid.undone).toEqual([{ turn: 3, slot: "player1", kind: "sacrifice", stat: "Courage", before: 50, after: 40, backAt: 4, back: 50 }]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain("Levers whose stat a turn or two later moved back: turn 3, player1's sacrifice of Courage (50 → 40), back to 50 at turn 4.");
+    // A lever the player took on that stat at the next turn is a payment, not a move back
+    const paidBack = structuredClone(run);
+    const next = paidBack.turns.find((t) => t.turn === 4);
+    if (next) next.levers = [{ slot: "player1", kind: "reward", text: "Regain 10 Courage", stat: courage, status: "applied", before: 40, after: 50 }];
+    expect(readStory(paidBack).leversPaid.undone).toEqual([]);
+  });
+
+  it("reads result words told as story text (production's note since 2026-10-01: 'The mixed result remains plain in the room')", async () => {
+    const run = structuredClone(await played());
+    const turn = run.turns.find((t) => t.turn === 3);
+    if (!turn?.reply) throw new Error("no turn 3");
+    turn.reply = { ...turn.reply, player1: { ...turn.reply.player1, text: `${turn.reply.player1.text}\n\nThe mixed result remains plain in the room. The unfavorable outcome hangs between you.` } };
+    const readings = readStory(run);
+    expect(readings.resultWords).toEqual([{ turn: 3, slot: "player1", words: ["mixed result", "unfavorable"] }]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain("Result words told as story text (production's note resultWordsInText): turn 3 player1 (mixed result, unfavorable).");
+    expect(renderPlaythroughReadings([await played()], new Date(0))).toContain("Result words told as story text (production's note resultWordsInText): none.");
+  });
+
+  it("reads the setup's design checks afresh, the money stat's type and the identities' names among them", async () => {
+    const run = structuredClone(await played());
+    const output = run.setup?.output as Record<string, Record<string, unknown>>;
+    output.player1 = { ...output.player1, possibleCharacterIdentities: ["Ari", "Ari", "Ari"].map((name) => ({ name, pronouns: {}, appearance: "tall" })) };
+    output.playerStats = [{ ...(output.playerStats as unknown as Record<string, unknown>[])[0] }, { ...(output.playerStats as unknown as Record<string, unknown>[])[0], id: "player_cash", name: "Stand Cash" }] as never;
+    const readings = readStory(run);
+    expect(readings.setupChecksFailed).toEqual(expect.arrayContaining(["distinctIdentities", "moneyIsNumber"]));
+    expect(renderPlaythroughReadings([run], new Date(0))).toMatch(/Setup design checks that failed \(read afresh\): [^\n]*distinctIdentities[^\n]*moneyIsNumber/);
+    expect(readStory(await played()).setupChecksFailed).not.toContain("distinctIdentities");
   });
 
   it("reads each scoreboard move against the contest result it follows", async () => {
@@ -238,6 +307,30 @@ describe("readStory", () => {
     expect(renderPlaythroughReadings([run], new Date(0))).toMatch(
       /Scoreboard moves: Harbour Race: 7 turns[^\n]*the wrong way at turn 4[^\n]*held after a step win 1[^\n]*held after a chapter win at turn 11[^\n]*moved with no contest result at turn 7[^\n]*production turned 1 move around \(turn 6\)/
     );
+  });
+
+  /*
+   * The review of the third round (2026-10-01): the food trucks' outcome reads "Scored by Contract Race" and its scoreboard
+   * is named "Innovator's Lead|Circuit Caterer's Lead" (id shared_contract_race). Production's scoreboardOf matches names
+   * only, so the reading saw no board and printed "none" where the board moved four times.
+   */
+  it("reads a scoreboard its outcome names by the stat's id, which production's repair can't find", async () => {
+    const run = structuredClone(await played(2));
+    const start = run.start;
+    if (!start) throw new Error("no start");
+    start.sharedOutcomes = [{ ...start.sharedOutcomes[0], possibleResolutions: { sideAWins: "A.", mixed: "Split.", sideBWins: "B." }, resonance: "The harbour. Scored by Harbour Race." } as never];
+    start.sharedStats = [...start.sharedStats, { ...start.sharedStats[0], id: "shared_harbour_race", name: "Pilot's Lead|Guild's Lead", type: "opposites" } as never];
+    const others = [...(start.sharedStatValues ?? [])];
+    const race = (value: number) => [...others, { statId: "shared_harbour_race", value }];
+    start.sharedStatValues = race(50);
+    run.turns.forEach((t) => {
+      t.statValues = { ...t.statValues, shared: race(t.turn >= 5 ? 35 : 50) };
+      // The board as play recorded it: none, since production could not name it
+      t.contestResults = t.turn === 5 ? [{ outcomeId: start.sharedOutcomes[0].id, result: "sideAWins", oriented: true }] : undefined;
+    });
+    const moves = readStory(run).scoreboard;
+    expect(moves.map((m) => [m.turn, m.stat, m.before, m.after, m.reading, m.byId])).toEqual([[5, "shared_harbour_race", 50, 35, "the wrong way", true]]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain("Pilot's Lead|Guild's Lead (its outcome names it by the stat's id, which production's scoreboard repair doesn't read): 1 turn after a contest result or with a move: the wrong way at turn 5");
   });
 
   it("lists which of production's fixes fired, by turn", async () => {

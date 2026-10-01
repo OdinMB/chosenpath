@@ -43,6 +43,7 @@ import { TURN_RESENDS, UnusableResultError, withOneRetry } from "../../game/serv
 import { resultsFollowed, scoreboardOf } from "../../game/services/scoreboards.js";
 import { analysisBefore, beatStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import type { Repair } from "../../game/services/textRepairs.js";
+import { withDistinctIdentityNames } from "../../stories/setupIdentities.js";
 import { getThreadType } from "core/types/thread.js";
 import { makeArm, productionRole, type Arm, type EvalRole } from "./arms.js";
 import { selectCharacters } from "./caseBuilder.js";
@@ -782,12 +783,17 @@ export async function playStory(
     const invokeSetup = invoker("setup", "setup", setupRequest, setupLogs);
     let setupReply: unknown;
     let made: StoryState;
+    // Each setup's reply by the state made from it, so the reply kept is the one whose state the story starts from
+    const replies = new Map<StoryState, unknown>();
+    const generate = async () => {
+      const reply = await invokeSetup(promptOf(setupRequest));
+      const state = storyFromSetup(reply, input, id);
+      replies.set(state, reply);
+      return state;
+    };
     try {
-      made = await withOneRetry(
-        async () => {
-          setupReply = await invokeSetup(promptOf(setupRequest));
-          return storyFromSetup(setupReply, input, id);
-        },
+      const startable = await withOneRetry(
+        generate,
         (state) => {
           const problem = storyStateStartProblem(state, players);
           if (problem) setupLogs[setupLogs.length - 1].problem = problem;
@@ -795,6 +801,12 @@ export async function playStory(
         },
         "story setup"
       );
+      // As production since 2026-10-01: a seat whose identities share a name asks for the setup once more, never failing it
+      made = await withDistinctIdentityNames(startable, generate, input.premise, players, (line) => {
+        // The line asking once more is logged right after the setup whose names clash
+        if (line.includes("once more")) setupLogs[setupLogs.length - 1].problem = line;
+      });
+      setupReply = replies.get(made);
     } catch (error) {
       run.setup = { calls: setupLogs };
       run.stopped = `the setup: ${describe(error)}`;

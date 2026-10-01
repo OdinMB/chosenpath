@@ -257,7 +257,7 @@ describe("replayRun on the stored round 2 (skipped where the output folder is ab
     expect(notPlayed(stored, (run) => firstChanged[run.spec.id] ?? Number.POSITIVE_INFINITY)).toEqual([]);
   });
 
-  (stored2.length ? it : it.skip)("production now drops the two levers round 2 charged twice, and nothing else in either round", () => {
+  (stored2.length ? it : it.skip)("production now drops the two levers round 2 charged twice, and nothing else in either round (the chapter's earlier steps and ladders read since 2026-10-01)", () => {
     expect(chargedAgain(stored2)).toEqual([
       // New Avalon: the bracing (-15%) turn 2 took, turn 3 paid (60 → 45); turn 4 charged it again (45 → 30)
       ["play-avalon", 4, "player1/player_personal_reserve: -15, the sacrifice the previous turn paid"],
@@ -267,5 +267,44 @@ describe("replayRun on the stored round 2 (skipped where the output folder is ab
     // Round 1: the group stories up to the step the owner rule now decides differently
     const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 19 };
     expect(chargedAgain(stored, (run) => firstChanged[run.spec.id] ?? Number.POSITIVE_INFINITY)).toEqual([]);
+  });
+});
+
+const stored3: PlayRun[] = fs.existsSync(path.join(DIR, "playthroughs-3.json")) ? playthroughRunsFrom(JSON.parse(fs.readFileSync(path.join(DIR, "playthroughs-3.json"), "utf-8"))) : [];
+
+/** The notes production's beat repairs now write on a lever's stat moved in the reply that offers that lever (leverChargedOnOffer). */
+function chargedOnOffer(runs: PlayRun[], before: (run: PlayRun) => number = () => Number.POSITIVE_INFINITY) {
+  return runs.flatMap((run) =>
+    replayRun(run)
+      .filter((r) => r.turn < before(run) && r.played.reply)
+      .flatMap((r) => repairBeatReply(r.before, r.played.reply as SetOfBeatGenerationSchema).repairs.filter((k) => k.kind === "leverChargedOnOffer").map((k) => [run.spec.id, r.turn, k.detail]))
+  );
+}
+
+/*
+ * The review of the third round (2026-10-01): three double charges the repair, reading the last beat's percentage and
+ * number payments only, let through (the stored pages, stories/round3/). Played with the repair, the kept replies lack the
+ * seven it dropped then; production now drops two more and notes the third.
+ */
+describe("replayRun on the stored round 3 (skipped where the output folder is absent)", () => {
+  (stored3.length ? it : it.skip)("production now drops round 3's repeat two turns after its payment and its ladder step taken twice, and nothing else", () => {
+    expect(chargedAgain(stored3)).toEqual([
+      // The space pirates: Oren's Pirate Reputation reward taken at turn 15, paid at 16 (Unproven → Known Hand), stepped
+      // again at 17 (Known Hand → Feared Name: "Your reputation now precedes you")
+      ["play-space-pirates", 17, "player3/player_reputation: +1, the reward the previous turn paid"],
+      // The estate agents: Tamsin's Composure sacrifice taken at turn 22, paid at 23 (55 → 45), its repeat dropped at 24,
+      // charged once more at 25 (45 → 35, "your fingers tighten briefly")
+      ["play-estate-agents", 25, "player2/player_composure: -10, the sacrifice turn 23 paid, earlier in this chapter"],
+    ]);
+  });
+
+  (stored3.length ? it : it.skip)("production now notes a lever's stat moved in the reply that offers it: Davi's Nerve at the space pirates' turn 19", () => {
+    expect(chargedOnOffer(stored3)).toEqual([["play-space-pirates", 19, "player2/player_nerve: -10, in the reply that offers that sacrifice"]]);
+  });
+
+  (stored3.length ? it : it.skip)("the earlier rounds hold no other charge in the reply that offers the lever", () => {
+    const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 19 };
+    expect(chargedOnOffer(stored, (run) => firstChanged[run.spec.id] ?? Number.POSITIVE_INFINITY)).toEqual([]);
+    expect(chargedOnOffer(stored2, (run) => (run.spec.id === "play-estate-agents" ? 22 : Number.POSITIVE_INFINITY))).toEqual([]);
   });
 });

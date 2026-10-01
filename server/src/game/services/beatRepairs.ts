@@ -13,7 +13,7 @@ import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { checkStatValue, statValueFit } from "core/utils/statValueCheck.js";
 import { canAddMilestones, isPlayerBeat } from "./storyTextSteps.js";
 import { scoreboardWinners } from "./scoreboards.js";
-import { dropLeversChargedAgain, leverStatOf } from "./leverPayments.js";
+import { dropLeversChargedAgain, leverStatOf, noteLeversChargedOnOffer } from "./leverPayments.js";
 import type { Repair } from "./textRepairs.js";
 
 /*
@@ -21,10 +21,12 @@ import type { Repair } from "./textRepairs.js";
  * wrote in a form the game would drop or not resolve (a stat in seat form, a
  * stat bonus in doubled seat form, a fact filed under a stat, a milestone in
  * the wrong group, an option of the wrong type) is put where the game reads
- * it, and what cannot be placed is dropped; so is a lever charged again on
- * the turn after its payment (leverPayments.ts), and a milestone on an outcome
- * the chapter that just ended didn't push (only what was played). Every change is recorded as
- * a Repair; ChangeService keeps applying exact ids.
+ * it, and what cannot be placed is dropped; so is a lever charged again after
+ * its payment (leverPayments.ts), and a milestone on an outcome the chapter
+ * that just ended didn't push (only what was played). Every change is recorded
+ * as a Repair; ChangeService keeps applying exact ids. Some things are only
+ * noted, kept as written: a lever's stat moved in the reply that offers it, and
+ * result words in a player's text (since 2026-10-01).
  */
 
 type StatChange = Extract<Change, { type: "statChange" }>;
@@ -77,7 +79,50 @@ export function repairBeatReply(
     repaired[key] = repairBeat(story, key.toLowerCase(), reply[key], known, repairs);
   }
   repairSharedLevers(story, repaired, beatKeys, known, repairs);
+  if (Array.isArray(repaired.statChanges)) noteLeversChargedOnOffer(story, repaired, repaired.statChanges, repairs);
+  for (const key of beatKeys) noteResultWords(key.toLowerCase(), repaired[key], repairs);
   return { reply: repaired, repairs };
+}
+
+// --- Result words in the text (a note) ---
+
+/**
+ * The game's result kinds where a player reads story text: favorable or
+ * unfavorable (either spelling), and "mixed" before a word for a result
+ * ("The mixed result remains plain in the room", "the mixed reading").
+ */
+const RESULT_WORDS = /\b(?:un)?favou?rable\b|\bmixed (?:results?|outcomes?|readings?|judge?ments?|findings?|verdicts?)\b/gi;
+
+/** The result words a text holds, lower-cased, each once, in order. */
+export function resultWordsIn(text: string): string[] {
+  return [...new Set([...text.matchAll(RESULT_WORDS)].map((match) => match[0].toLowerCase()))];
+}
+
+/**
+ * A player's text, options or interludes that tell the game's result kind as
+ * story text (`resultWordsInText`, a note; kept as written), since the review
+ * of the third playthroughs (2026-10-01): its group turns wrote "The mixed
+ * result remains plain in the room", "The unfavorable outcome hangs between
+ * you", as round 2's had ("The mixed result is plain in the readings"). The
+ * turn's request names the kinds ("resolved to end in a favorable/mixed/
+ * unfavorable result") and bans none of them; removing them would be a
+ * measured turn line, so the game notes them for the log and the eval.
+ */
+function noteResultWords(slot: string, beat: BeatGeneration | undefined, repairs: Repair[]): void {
+  const words = resultWordsOfBeat(beat);
+  if (words.length > 0) repairs.push({ kind: "resultWordsInText", note: true, detail: `${slot}: ${words.join(", ")}` });
+}
+
+/** The result words in what a player reads of a beat: its title, text, options and interludes (the eval's playthrough readings read the same). */
+export function resultWordsOfBeat(beat: BeatGeneration | undefined): string[] {
+  if (!beat || typeof beat !== "object") return [];
+  const texts = [
+    typeof beat.title === "string" ? beat.title : "",
+    typeof beat.text === "string" ? beat.text : "",
+    ...(Array.isArray(beat.options) ? beat.options : []).map((option) => (typeof option?.text === "string" ? option.text : "")),
+    ...(Array.isArray(beat.interludes) ? beat.interludes : []).map((interlude) => (typeof interlude?.text === "string" ? interlude.text : "")),
+  ];
+  return resultWordsIn(texts.join("\n"));
 }
 
 /** Which option type the story's current phase calls for, if it constrains one. */
