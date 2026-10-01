@@ -52,6 +52,13 @@ import { replaceOnce, splitAtState } from "./roundEdits.js";
  *   what was played), and newMilestones as "" (the engine then records the
  *   chapter's planned milestone, its existing fallback).
  * Neither is a form to adopt: each tells which block the loop needs.
+ *
+ * Run of 2026-10-01 (stage runaway-2, sixteen each on Novi Reg's switch turn):
+ * production ran away 1 time in 16, each diagnostic 0 in 16, which can tell
+ * nothing apart (4 in 7 on 30 September). The answered replies' reasoning:
+ * production's mean 1,767 tokens, noThreadAudit 1,758 (the model audits from
+ * the stat definitions anyway), noNewMilestones 1,417 (moved lower). Nothing
+ * adopted; the milestone block is the lead for a later attempt.
  */
 
 const LABEL = "Closing turn";

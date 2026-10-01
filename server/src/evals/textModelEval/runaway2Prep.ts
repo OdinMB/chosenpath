@@ -241,14 +241,14 @@ export function renderRunaway2(report: Runaway2Report): string {
       .filter((t) => t.kind === "runaway")
       .map(
         (t) =>
-          `- ${t.caseId} s${t.sample} (${t.armKey}), ${clock(t.startedAt)} UTC:${t.cut === "timeout" ? "cut by the timeout" : `cut at the output cap (${thousands(t.reasoningTokens)} reasoning tokens)`}, ${secs(t.latencyMs)}; ${
+          `- ${t.caseId} s${t.sample} (${t.armKey}), ${clock(t.startedAt)} UTC: ${t.cut === "timeout" ? "cut by the timeout" : `cut at the output cap (${thousands(t.reasoningTokens)} reasoning tokens)`}, ${secs(t.latencyMs)}; ${
             t.retries === 0 ? "no retry" : t.retryAnswered ? `its retry answered (${t.retries} ${t.retries === 1 ? "retry" : "retries"})` : "no retry answered"
           }`
       ),
     "",
     "## The answered replies' stat changes and milestones (for the hand read)",
     "",
-    ...report.replies.flatMap((r) => [`- ${r.caseId} s${r.sample} (${r.armKey}):${r.statChanges.length ? r.statChanges.join("; ") : "no stat change"}`, ...r.milestones.map((m) => `  - milestone ${m}`)]),
+    ...report.replies.flatMap((r) => [`- ${r.caseId} s${r.sample} (${r.armKey}): ${r.statChanges.length ? r.statChanges.join("; ") : "no stat change"}`, ...r.milestones.map((m) => `  - milestone ${m}`)]),
     "",
   ];
   return lines.join("\n");
