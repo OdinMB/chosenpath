@@ -16,6 +16,8 @@ import { CHAPTER_RULES_HEADING, adoptedTurn } from "../../../helpers/adoptedDelt
 import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../../../src/game/services/storyTextRounds/endingState.js";
 import { SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
 import { CHOICE_RESULT_TEXT, choiceResultRequest, takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
+import { KIDS_TURN_TEXT, kidsTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsTurn.js";
+import { KIDS_CONTEXT, KIDS_TEXT_COUNT, kidsFieldCount, kidsRepeat, kidsRules, takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -34,7 +36,9 @@ import { CHOICE_RESULT_TEXT, choiceResultRequest, takesExplorationOrder } from "
  * explores is the measured variant choiceResult byte for byte (the
  * exploration-order line after the option types); since the choice-line-sp
  * stage of the same day, a single player's exploration step is too (measured
- * with production's one retry of a short reply in the loop).
+ * with production's one retry of a short reply in the loop). Since the
+ * kids-turns stage of 2026-10-01, a single player's turn in a story read with
+ * a child is the measured variant kidsTurn byte for byte, every turn kind.
  */
 
 /**
@@ -126,8 +130,13 @@ function expectSame(production: { prompt: string; schema: Parameters<typeof toJs
   expect(json(production.schema)).toBe(json(measured.schema));
 }
 
-/** The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. */
-const asAdopted = <T extends { prompt: string }>(measured: T, story: Story): T => ({ ...measured, prompt: adoptedTurn(measured.prompt, story) });
+/**
+ * The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. A
+ * single player's read-with-kids turn is the measured kidsTurn byte for byte (the kids-turns stage of 2026-10-01; built on
+ * production's turn as measured, so no delta applies on top).
+ */
+const asAdopted = <T extends { prompt: string }>(measured: T, story: Story): T | ReturnType<typeof kidsTurnRequest> =>
+  takesKidsRules(story) ? kidsTurnRequest(story) : { ...measured, prompt: adoptedTurn(measured.prompt, story) };
 
 describe("single-player turns: today's form with B6 as measured, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(SINGLE_PLAYER)("%s", (_, build) => {
@@ -147,6 +156,43 @@ describe("single-player turns: today's form with B6 as measured, an exploration 
       const story = caseStory(c);
       expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
     }
+  });
+});
+
+/*
+ * A single player's read-with-kids turn (the kids-turns stage of 2026-10-01,
+ * fix 6 of the second playthroughs' review): the measured kidsTurn byte for
+ * byte, every turn kind, prompt and JSON schema; the child's age the story
+ * recorded, or a young child where it recorded none (a template tagged Kids).
+ * A group's read-with-kids turn is unchanged: the stage measured one player.
+ */
+describe("a single player's read-with-kids turns: kidsTurn as measured", () => {
+  const KIDS = { category: "read-with-kids" as const, readingAge: "5" };
+
+  it.each(SINGLE_PLAYER)("%s, read with a child aged 5", (_, build) => {
+    const story = build().clone(KIDS);
+    expectSame(beatStep.request(story), kidsTurnRequest(story));
+    expect(beatStep.request(story).prompt).not.toContain("5-6 paragraphs");
+  });
+
+  it("names a young child where the story recorded no age", () => {
+    const story = threadBeat(1, { category: "read-with-kids" });
+    expectSame(beatStep.request(story), kidsTurnRequest(story));
+    expect(beatStep.request(story).prompt).toContain(KIDS_TURN_TEXT.rules("a young child"));
+  });
+
+  it.each(GROUPS)("leaves a group's turn as it was: %s", (_, build) => {
+    const story = build().clone(KIDS);
+    expectSame(beatStep.request(story), beatStep.request(build()));
+  });
+
+  it("prints the measured text from production's own constants", () => {
+    const who = "a child aged 5";
+    expect(KIDS_CONTEXT).toBe(KIDS_TURN_TEXT.context);
+    expect(kidsRules(who)).toBe(KIDS_TURN_TEXT.rules(who));
+    expect(kidsRepeat(who)).toBe(KIDS_TURN_TEXT.repeat(who));
+    expect(kidsFieldCount(who)).toBe(KIDS_TURN_TEXT.fieldCount(who));
+    expect(KIDS_TEXT_COUNT).toBe(KIDS_TURN_TEXT.shortTextCount);
   });
 });
 

@@ -1,6 +1,7 @@
 import { Story } from "core/models/Story.js";
 import {
   PLAYER_SLOTS,
+  readingAgeFromPremise,
   type DifficultyLevel,
   type PlayerOptionsGeneration,
   type SetOfBeatGenerationSchema,
@@ -92,7 +93,8 @@ const ALLOWED_MODIFIERS = new Set([-20, -10, 0, 10, 20]);
  * state, from the reply as the game saves it (COPY of that method's state
  * building, which is private to production's generator). A setup without a
  * shared list (one player on the new form) starts with none (setup doc B1.8).
- * No images and no pregeneration; a kids premise is a read-with-kids story.
+ * No images and no pregeneration; a kids premise is a read-with-kids story,
+ * with the child's age its premise states, as StoryCreationService records them.
  */
 export function storyFromSetup(setup: unknown, input: SetupInput, id: string): StoryState {
   const reply = asObject(setup);
@@ -125,6 +127,9 @@ export function storyFromSetup(setup: unknown, input: SetupInput, id: string): S
     images: [],
     playerCodes: {},
     ...(input.kids ? { category: "read-with-kids" as const } : {}),
+    // The child's age as the game records it (StoryCreationService, since the kids-turns stage of 2026-10-01); the second
+    // round's stored runs predate it and recorded none
+    ...(input.kids && readingAgeFromPremise(input.premise) ? { readingAge: readingAgeFromPremise(input.premise) } : {}),
   };
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import type { SetOfBeatGenerationSchema } from "core/types/index.js";
 import {
+  FULL_TEXT_COUNT,
   beatReplyProblem,
   checkedBeatReply,
   missingOptionsProblem,
@@ -69,6 +70,16 @@ describe("shortTextProblem", () => {
 
   it("counts an empty text as short", () => {
     expect(shortTextProblem(beatSet(1, { player1: beatGeneration({ text: "" }) }))).toContain("player1");
+  });
+
+  it("asks for the length the turn's own request asks for, where it names one (the kids-turns stage's variant)", () => {
+    const count = "three or four short paragraphs of two or three short sentences each";
+    expect(shortTextProblem(oneParagraph(), count)).toBe(`the text for player1 is a single paragraph; write every player's text as ${count}`);
+    expect(beatReplyProblem(oneParagraph(), { textCount: count })).toBe(shortTextProblem(oneParagraph(), count));
+    // Production's own count otherwise
+    expect(FULL_TEXT_COUNT).toBe("five or six paragraphs of three to five sentences each");
+    expect(shortTextProblem(oneParagraph(), undefined)).toBe(shortTextProblem(oneParagraph()));
+    expect(beatReplyProblem(oneParagraph(), { ending: true })).toBe(shortTextProblem(oneParagraph()));
   });
 });
 

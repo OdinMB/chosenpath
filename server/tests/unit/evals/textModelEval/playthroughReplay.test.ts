@@ -10,6 +10,8 @@ import { outputIdOf } from "../../../../src/evals/textModelEval/judgedChecks.js"
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { playthroughsSent } from "../../../../src/evals/textModelEval/choiceResultCases.js";
+import { playthroughs2Sent } from "../../../../src/evals/textModelEval/parallelThreadsCases.js";
+import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
@@ -176,15 +178,22 @@ function chargedAgain(runs: PlayRun[], before: (run: PlayRun) => number = () => 
 describe("replayRun on the stored round 2 (skipped where the output folder is absent)", () => {
   (stored2.length ? it : it.skip)("rebuilds every turn's request byte for byte, as production sent it on 30 September", () => {
     let turns = 0;
+    let kids = 0;
     for (const run of stored2) {
       for (const r of replayRun(run)) {
         const sentHash = promptHashes.get(outputIdOf(r.played.calls[0]?.outputFile ?? ""));
-        expect([run.spec.id, r.turn, sha256(requestText(requestFor("adopted", { role: "beat", story: r.before })))]).toEqual([run.spec.id, r.turn, sentHash]);
+        // The turn as production sent it then (playthroughs2Sent): today's but for the kids rules, which a single player's
+        // read-with-kids turn takes since 2026-10-01 (the mouse story recorded its category)
+        expect([run.spec.id, r.turn, sha256(playthroughs2Sent({ role: "beat", story: r.before }))]).toEqual([run.spec.id, r.turn, sentHash]);
+        const today = sha256(requestText(requestFor("adopted", { role: "beat", story: r.before })));
+        expect([run.spec.id, r.turn, today === sentHash]).toEqual([run.spec.id, r.turn, !takesKidsRules(r.before)]);
+        if (takesKidsRules(r.before)) kids++;
         turns++;
       }
     }
-    // Six stories: 11 + 26 + 26 + 26 + 26 + 11 turns
+    // Six stories: 11 + 26 + 26 + 26 + 26 + 11 turns, the mouse story's 11 read with a child
     expect(turns).toBe(126);
+    expect(kids).toBe(11);
   });
 
   (stored2.length ? it : it.skip)("production now drops the two levers round 2 charged twice, and nothing else in either round", () => {

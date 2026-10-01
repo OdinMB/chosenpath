@@ -19,6 +19,7 @@ import { StorySetupPromptService, type SetupPromptOptions } from "./prompts/Stor
 import { assembleSetupReply, iterationSchema, setupGenerationSchema } from "./setupSchema.js";
 import { assembleSwitchPlan, assembleThreadPlan, switchReplySchema, threadReplySchema } from "./plannerReplies.js";
 import { beatSchemaWithOptionRules, takesOptionRules } from "./optionRules.js";
+import { beatSchemaForKids, kidsListener, takesKidsRules } from "./kidsTurnRules.js";
 import { paidLevers } from "./leverPayments.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
@@ -118,7 +119,10 @@ function mergeChanges(response: SetOfBeatGenerationSchema): Change[] {
 }
 
 export const beatStep = {
-  /** A turn for every player; a single player's rolled chapter step takes the option rules (B6) in its fields too. */
+  /**
+   * A turn for every player; a single player's rolled chapter step takes the option rules (B6) in its fields too, and a
+   * single player's turn read with a child the short count in its text field (the kids-turns stage).
+   */
   request(story: Story): TextRequest<z.AnyZodObject> {
     const schema = createSetOfBeatGenerationSchema(
       story.getNumberOfPlayers(),
@@ -128,9 +132,10 @@ export const beatStep = {
       story.generatesImages(),
       story.hasImages()
     );
+    const withRules = takesOptionRules(story) ? beatSchemaWithOptionRules(schema) : schema;
     return {
       prompt: BeatPromptService.createBeatPrompt(story),
-      schema: takesOptionRules(story) ? beatSchemaWithOptionRules(schema) : schema,
+      schema: takesKidsRules(story) ? beatSchemaForKids(withRules, kidsListener(story)) : withRules,
     };
   },
 

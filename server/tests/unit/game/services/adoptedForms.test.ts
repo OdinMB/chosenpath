@@ -13,6 +13,7 @@ import { setupRound2Request } from "../../../../src/game/services/storyTextRound
 import { ENDING_STATE_TEXT } from "../../../../src/game/services/storyTextRounds/endingState.js";
 import { adoptedSetupPrompt, adoptedTurn, withContestLastStage, withResultsAsOutcomes, withResultsAsOutcomesSchema, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
 import { takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
+import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 
 /*
  * The adoption's free final test (rounds status note, section 9, step 3):
@@ -27,7 +28,8 @@ import { takesExplorationOrder } from "../../../../src/game/services/storyTextRo
  * (prod) for groups, an exploration step with the exploration-order line
  * (choiceResult; a group's and, since the choice-line-sp stage, a single
  * player's, 2026-09-30), every ending as the ending told as its
- * milestones leave it (endingStateB, 2026-09-30), and AI
+ * milestones leave it (endingStateB, 2026-09-30), a single player's turn
+ * read with a child as the kids turn (kidsTurn, 2026-10-01), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -56,6 +58,9 @@ function measuredVariant(input: RequestInput): VariantId {
       // (planner v2c with the outcome's stages and each step once) before, earlier that day, and planner v2c until then
       return "planV2f";
     case "beat":
+      // A single player's turn read with a child since the kids-turns stage (2026-10-01): short and plain for the child's
+      // age, every turn kind, as measured
+      if (takesKidsRules(input.story)) return "kidsTurn";
       // Every ending since 2026-09-30: the ending told as its milestones leave it
       if (input.story.getCurrentBeatType() === "ending") return "endingStateB";
       // An exploration step: the exploration-order line (choiceResult as measured), a group's since the choice-result stage,
@@ -81,7 +86,8 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
       // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured
       return { prompt: withContestLastStage(withThreadsThatFit(prompt, input.story), input.story), schema: json(measured) };
     case "beat":
-      return { prompt: adoptedTurn(prompt, input.story), schema: json(measured) };
+      // kidsTurn is built on production's turn as measured: no delta on top
+      return { prompt: takesKidsRules(input.story) ? prompt : adoptedTurn(prompt, input.story), schema: json(measured) };
   }
 }
 

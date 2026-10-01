@@ -52,6 +52,7 @@ import { buildLeverCasesMode } from "./leverDirectionCases.js";
 import { judgeLeversMode } from "./leverDirectionPrep.js";
 import { buildParallelCasesMode, judgeParallelMode } from "./parallelThreadsPrep.js";
 import { buildChallengeCasesMode, judgeChallengeResultsMode } from "./challengeResultsPrep.js";
+import { buildKidsCasesMode, kidsTurnsMode } from "./kidsTurnPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
@@ -91,7 +92,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     setup and leverDirection on six premises, interleaved; parallel-threads under adopted11: --role switch, production's
  *     group switch planner and parallelThreads', and --role thread --mode pipeline, each side's chapter planner into its
  *     own group turn, interleaved; challenge-results --role thread under adopted12: production's chapter planner and
- *     resultsAsOutcomes on the second playthroughs' chapter plans, interleaved)
+ *     resultsAsOutcomes on the second playthroughs' chapter plans, interleaved; kids-turns --role beat under adopted13:
+ *     production's turn and kidsTurn on the mouse story's turns and a template tagged Kids, interleaved, each turn with
+ *     production's one checked retry)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -191,6 +194,14 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-challenge-results [--max-spend 0.05]  the choice-result stage's calibrated resultsFitKind on every chapter
  *     plan of the stage's arms, one call per plan, one sample each, and the second round's stored readings against the
  *     hand (no calls), then judged-challenge-results.md and .json; --cases <case ids> sends only those (a smoke)
+ *   Read-with-kids turns, shorter and simpler (kidsTurnPrep.ts, 2026-10-01), in the kids-turns stage:
+ *   --build-kids-cases [--rebuild-cases]  turns of the second round's mouse story (kidsTurnCases.ts, replayed), each only
+ *     where its request is the one production sent, recorded as a read-with-kids story with the child's age; no calls;
+ *     they then run with --run --stage kids-turns --role beat --prompt-state adopted13 (production's turn and kidsTurn,
+ *     each with production's one checked retry)
+ *   --kids-turns  the stage's report, no calls: each turn read whole (checkedTurns.ts), the reply kept read for its
+ *     length and plainness (kidsReadability.ts), per arm and the variant against production, the retries, the
+ *     automatic checks, the waits including the retry and cost; kids-turns.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -249,6 +260,8 @@ type Mode =
   | "judge-parallel"
   | "build-challenge-cases"
   | "judge-challenge-results"
+  | "build-kids-cases"
+  | "kids-turns"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -385,6 +398,8 @@ function parseArgs(argv: string[]): Args {
       case "--judge-parallel":
       case "--build-challenge-cases":
       case "--judge-challenge-results":
+      case "--build-kids-cases":
+      case "--kids-turns":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1101,6 +1116,11 @@ async function main() {
     case "judge-challenge-results":
       // The stage's judged check books to its own stage
       return judgeChallengeResultsMode(prepContext(args, files, "challenge-results"), { caseIds: args.caseIds });
+    case "build-kids-cases":
+      return buildKidsCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "kids-turns":
+      // A deterministic check: no calls, so no key and no caps
+      return kidsTurnsMode({ files, log: (line) => console.log(line) });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

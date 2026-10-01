@@ -80,6 +80,11 @@ export class Story {
     return this.state.category === "read-with-kids";
   }
 
+  /** The child's age a read-with-kids story recorded from its premise; undefined for a template or an older story. */
+  getReadingAge(): string | undefined {
+    return this.state.readingAge;
+  }
+
   getTitle(): string {
     return this.state.title;
   }

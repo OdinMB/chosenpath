@@ -6,6 +6,7 @@ import type { Story } from "core/models/Story.js";
 import { beatStep, threadStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { SWITCH_REMINDER, noSwitchReminderRequest } from "../../../../../src/game/services/storyTextRounds/switchReminder.js";
 import { EXPLORATION_ORDER, takesExplorationOrder } from "../../../../../src/game/services/optionRules.js";
+import { takesKidsRules } from "../../../../../src/game/services/kidsTurnRules.js";
 import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
 import { RUNAWAY_CASES } from "../../../../../src/evals/textModelEval/arms.js";
 import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
@@ -125,7 +126,10 @@ describe("noSwitchReminderRequest: production's single-player turn without the r
     let switchTurns = 0;
     for (const c of cases) {
       const story = caseStory(c);
-      const [ours, production] = [noSwitchReminderRequest(story), beatStep.request(story)];
+      // A single player's read-with-kids turn takes the kids rules since 2026-10-01, which the fix, measured before them,
+      // doesn't: production as it stood then read no category
+      const then = takesKidsRules(story) ? story.clone({ category: undefined, readingAge: undefined }) : story;
+      const [ours, production] = [noSwitchReminderRequest(story), beatStep.request(then)];
       // Since the choice-line-sp adoption (2026-09-30) a single player's exploration step carries the exploration-order
       // line, which the fix, measured before it, doesn't
       const sent = takesExplorationOrder(story) ? production.prompt.replace(EXPLORATION_ORDER, "") : production.prompt;

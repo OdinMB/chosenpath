@@ -54,6 +54,8 @@ import { recordedResultRequest } from "../../game/services/storyTextRounds/recor
 import { leverDirectionRequest } from "../../game/services/storyTextRounds/leverDirection.js";
 import { parallelThreadsRequest } from "../../game/services/storyTextRounds/parallelThreads.js";
 import { resultsAsOutcomesRequest } from "../../game/services/storyTextRounds/resultsAsOutcomes.js";
+import { kidsShortTextCount, kidsTurnRequest } from "../../game/services/storyTextRounds/kidsTurn.js";
+import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -274,6 +276,16 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * milestone fields' "naming who did what" narrowed to what was won or lost,
  * never how the players went about it; production's request byte for byte
  * elsewhere, with production's planner limits; the chapter planner only.
+ * "kidsTurn" is the kids-turns stage's turn (2026-10-01, fix 6 of the second
+ * playthroughs' review, storyTextRounds/kidsTurn.ts): production's turn, every
+ * player count, with, on a read-with-kids story, the "5-6 paragraphs of 3-5
+ * sentences" count and its shouted repeat (prompt and text field) made "3-4
+ * short paragraphs of 2-3 short sentences", and one block of rules for a
+ * child of the story's recorded age (short plain sentences, the child's
+ * everyday words, options and interludes too); its request names the count a
+ * retry of a one-paragraph reply asks for (shortTextCount), which the eval's
+ * checked retry sends; production's request byte for byte elsewhere, with
+ * production's turn limits for the player count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -338,7 +350,8 @@ export type VariantId =
   | "recordedResult"
   | "leverDirection"
   | "parallelThreads"
-  | "resultsAsOutcomes";
+  | "resultsAsOutcomes"
+  | "kidsTurn";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -400,6 +413,7 @@ export const VARIANTS: VariantId[] = [
   "leverDirection",
   "parallelThreads",
   "resultsAsOutcomes",
+  "kidsTurn",
 ];
 
 /**
@@ -407,7 +421,19 @@ export const VARIANTS: VariantId[] = [
  * then a per-call message. A one-message request may carry `assemble`: its
  * reply is written in another field order and reshaped into the saved fields.
  */
-export type EvalRequest = TextRequest | Round2Request | SplitTextRequest | TurnRound3Request;
+export type EvalRequest = TextRequest | Round2Request | SplitTextRequest | TurnRound3Request | CheckedTextRequest;
+
+/**
+ * A one-message turn that names the count a retry of a one-paragraph reply
+ * asks for (the kids-turns stage), in place of production's five or six
+ * paragraphs; production's checked retry in the eval sends it.
+ */
+export type CheckedTextRequest = TextRequest & { limits?: CallLimits; shortTextCount?: string };
+
+/** The count a checked retry of a one-paragraph reply asks for: the request's own, or production's (undefined). */
+export function shortTextCountOf(request: EvalRequest): string | undefined {
+  return "shortTextCount" in request ? request.shortTextCount : undefined;
+}
 
 export function isSplitRequest(request: EvalRequest): request is SplitTextRequest {
   return "fixed" in request;
@@ -516,11 +542,14 @@ function prodRequest(input: RequestInput): TextRequest {
  * What production sends since the adoption (storyTextSteps.ts;
  * TemplateService.iterateTemplate for AI Iteration), with production's
  * timeout and output cap for the role and player count (productionCallLimits),
- * as production sends it.
+ * as production sends it; on a turn whose retry of a one-paragraph reply asks
+ * for another length than five or six paragraphs (a single player's kids turn,
+ * beatCheckOptions), that length, which the eval's checked retry sends.
  */
 function adoptedRequest(input: RequestInput): EvalRequest {
   const players = input.role === "setup" ? input.setup.playerCount : input.role === "iteration" ? input.iteration.playerCount : input.story.getNumberOfPlayers();
-  return { ...adoptedWords(input), limits: productionCallLimits(productionRole(input.role), players) };
+  const count = input.role === "beat" ? beatCheckOptions(input.story).textCount : undefined;
+  return { ...adoptedWords(input), limits: productionCallLimits(productionRole(input.role), players), ...(count ? { shortTextCount: count } : {}) };
 }
 
 function adoptedWords(input: RequestInput): EvalRequest {
@@ -821,6 +850,13 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   resultsAsOutcomes: (input) => {
     if (input.role !== "thread") throw new Error(`Variant resultsAsOutcomes does not cover role ${input.role}`);
     return { ...resultsAsOutcomesRequest(input.story), limits: productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers()) };
+  },
+  // The kids-turns stage's turn: a read-with-kids story's turns short and plain for the child's age, and a retry of a
+  // one-paragraph reply asking for that short count; production's turn limits
+  kidsTurn: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant kidsTurn does not cover role ${input.role}`);
+    const count = kidsShortTextCount(input.story);
+    return { ...kidsTurnRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
   },
 };
 

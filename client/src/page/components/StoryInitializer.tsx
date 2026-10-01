@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { PlayerCount, GameMode, GameModes, DifficultyLevel } from "core/types";
+import { PlayerCount, GameMode, GameModes, DifficultyLevel, KID_AGE_LABEL } from "core/types";
 import {
   PrimaryButton,
   Icons,
@@ -280,7 +280,8 @@ export const StoryInitializer = ({
         fields: [
           {
             key: "kidAge",
-            label: "How old is the child?",
+            // The server reads the child's age back from this line of the merged premise (readingAgeFromPremise)
+            label: KID_AGE_LABEL,
             placeholder: "5, 8-10",
             type: "number",
           },

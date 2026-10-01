@@ -20,6 +20,7 @@ import {
   type PlayCall,
 } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
+import { storyFromSetup } from "../../../../src/evals/textModelEval/setupChain.js";
 import { beatSet, explorationOptions, outcome, PARAGRAPH, stat, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input, leverSet, setupReply } from "./playFixtures.js";
 
@@ -91,6 +92,12 @@ describe("the four playthroughs", () => {
     expect(mouse.premise).toMatch(/^Create an age-appropriate story[\s\S]*How old is the child\?: 5[\s\S]*Additional context: I'm a field mouse/);
     // Neither new premise was played or set up in the eval before
     for (const p of SETUP_PREMISES) expect([agents.premise, mouse.premise]).not.toContain(p.premise);
+    // A story read with a child records its category and, as the game does since the kids-turns stage (2026-10-01), the
+    // age its premise states; the second round's stored runs predate the age
+    const started = storyFromSetup({}, mouse, "mouse-story");
+    expect([started.category, started.readingAge]).toEqual(["read-with-kids", "5"]);
+    const lemonade = storyFromSetup({}, playthroughSetupInput(PLAYTHROUGHS[0]), "lemonade-story");
+    expect([lemonade.category, lemonade.readingAge]).toEqual([undefined, undefined]);
   });
 
   it("plays every call on production's own code (adopted) and production's settings for the role and player count", () => {

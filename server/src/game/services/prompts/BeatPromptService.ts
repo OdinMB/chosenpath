@@ -15,6 +15,7 @@ import {
 } from "../optionRules.js";
 import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { outcomeStateLines } from "../endingStates.js";
+import { KIDS_CONTEXT, kidsListener, kidsRepeat, kidsRules, takesKidsRules } from "../kidsTurnRules.js";
 
 /**
  * The scoreboard ending rule (the setup document's decision 3, question 1,
@@ -127,7 +128,10 @@ export class BeatPromptService {
     return `CONTEXT
 
 Beats
-are a narrative structure of 5-6 paragraphs of 3-5 sentences each followed by a decision that the player must make.
+${
+  // A single player's story read with a child: short beats (the kids-turns stage, 2026-10-01)
+  takesKidsRules(story) ? KIDS_CONTEXT : "are a narrative structure of 5-6 paragraphs of 3-5 sentences each followed by a decision that the player must make."
+}
 Beats are the smallest narrative unit that in the game.${
       story.getCurrentBeatType() === "thread"
         ? "\nBeats in threads that have a favorable/unfavorable or sideA/sideB wins format are resolved to end in a favorable/mixed/unfavorable result." +
@@ -169,6 +173,7 @@ How beats work mechanically:
 
   private static createInstructionsSection(story: Story): string {
     const gameWorldInstructions = this.createGameWorldInstructions(story);
+    const kids = takesKidsRules(story);
 
     return `\n\n======= YOUR JOB: IDENTIFY CHANGES TO THE STORY STATE AND GENERATE THE NEXT SET OF STORY BEATS TO IMPLEMENT THE ${story
       .getCurrentBeatType()
@@ -425,9 +430,16 @@ Example: If the player decided to organize a vote, describe what they do, how th
 - The last paragraph
 --- Never mention or even refer to the player's options and choices.
 --- Players will see the options below the beat text. Talking about them in the beat text is redundant.
---- Avoid these kinds of formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'
+--- Avoid these kinds of formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'${
+      // A single player's story read with a child: short and plain for the child's age (the kids-turns stage, 2026-10-01)
+      kids ? `\n${kidsRules(kidsListener(story))}` : ""
+    }
 
-These are a lot of instructions, so let me repeat the most important one: You MUST write 5-6 paragraphs with 3-5 sentences each! Otherwise, there simply isn't enough text to move the story forward with enough depth and detail. So again: 5-6 paragraphs, 3-5 sentences each!
+${
+  kids
+    ? kidsRepeat(kidsListener(story))
+    : "These are a lot of instructions, so let me repeat the most important one: You MUST write 5-6 paragraphs with 3-5 sentences each! Otherwise, there simply isn't enough text to move the story forward with enough depth and detail. So again: 5-6 paragraphs, 3-5 sentences each!"
+}
 
 Image tags
 ${

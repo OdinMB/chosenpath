@@ -58,7 +58,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * group turn beside production's chains on the chapter openings), then
  * challenge and contest results that tell how the attempt turns out, not the
  * player's approach (challenge-results: the variant's chapter planner beside
- * production's on chapter plans of the second round's stored runs).
+ * production's on chapter plans of the second round's stored runs), then
+ * read-with-kids turns shorter and simpler for the child's age (kids-turns:
+ * the variant beside production's turn on the mouse story's turns and a
+ * template tagged Kids, each turn with production's one checked retry).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -83,6 +86,7 @@ export const FEEDBACK_STAGES = [
   "lever-direction",
   "parallel-threads",
   "challenge-results",
+  "kids-turns",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -260,6 +264,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // The challenge-results stage (2026-10-01, fix 5 of the review): the chapter planner whose results and milestones say
   // what comes of an approach, never the approach, against production's chapter planner, which runs beside it
   resultsAsOutcomes: "adopted",
+  // The kids-turns stage (2026-10-01, fix 6 of the review): a read-with-kids story's turns short and plain for the
+  // child's age, against production's turn, which runs beside it
+  kidsTurn: "adopted",
 };
 
 /**
@@ -591,9 +598,48 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return parallelThreadsArms(role);
     case "challenge-results":
       return challengeResultsArms(role);
+    case "kids-turns":
+      return kidsTurnsArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the kids-turns stage (2026-10-01, fix 6 of the second
+ * playthroughs' review): production's own code since the challenge-results
+ * stage's adoption (the chapter planner's edits; every turn request is
+ * adopted7's byte for byte), under a tag of its own so production's turn runs
+ * beside the variant in the same minutes, each with its one checked retry.
+ */
+export const KIDS_TURNS_PROMPT_STATE = "adopted13";
+
+/**
+ * The stage's cases: the second round's mouse story, read with a five-year-old
+ * (kidsTurnCases.ts, no calls: its first turn, a challenge chapter's opening
+ * and step, a switch turn after it, an exploration step and the ending, each
+ * recorded as the game records a read-with-kids story, its category and the
+ * child's age), where every turn ran about 300 words of grown-up prose; and a
+ * template tagged Kids, which records no age (its frozen first turn, with
+ * images), beside them.
+ */
+export const KIDS_TURNS_CASES = {
+  mouse: ["round-kids-mouse-t1", "round-kids-mouse-t2", "round-kids-mouse-t3", "round-kids-mouse-t5", "round-kids-mouse-t7", "round-kids-mouse-t11"],
+  template: ["first-tpl-54a4e23b-p1"],
+} as const;
+
+/**
+ * The kids-turns stage (the coordinator's fix 6 after the second playthroughs'
+ * review): production's turn (adopted) and the variant (kidsTurn) on the
+ * single-player turn model (Luna medium), twice on the stage's cases,
+ * interleaved, under adopted13, each turn with production's one checked retry
+ * of a one-paragraph or option-less first reply (the variant's retry asks for
+ * its short count).
+ */
+function kidsTurnsArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  const caseIds = [...KIDS_TURNS_CASES.mouse, ...KIDS_TURNS_CASES.template];
+  return (["adopted", "kidsTurn"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds }));
 }
 
 /**
@@ -859,7 +905,7 @@ function choiceLineSpArms(role: EvalRole): ArmPlan[] {
 export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
-const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp"];
+const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns"];
 
 export function stageChecksTurns(stage: Stage): boolean {
   return CHECKED_TURN_STAGES.includes(stage);
@@ -1174,6 +1220,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "lever-direction",
   "parallel-threads",
   "challenge-results",
+  "kids-turns",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1224,6 +1271,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The challenge-results stage's chapter plans from the second playthroughs (2026-10-01), frozen after every earlier stage
   // had closed
   ...[...CHALLENGE_RESULTS_CASES.single, ...CHALLENGE_RESULTS_CASES.groups].map((id): [string, Stage] => [id, "challenge-results"]),
+  // The kids-turns stage's mouse turns from the second playthroughs (2026-10-01), frozen after every earlier stage had
+  // closed; the template's first turn it runs beside was frozen long before and stays plannable
+  ...KIDS_TURNS_CASES.mouse.map((id): [string, Stage] => [id, "kids-turns"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

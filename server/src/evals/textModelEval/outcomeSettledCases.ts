@@ -1,5 +1,6 @@
 import type { EvalCase } from "./cases.js";
-import { choiceResultCases, productionSends, type ChoiceCaseSpec, type PromptHashOf } from "./choiceResultCases.js";
+import { choiceResultCases, type ChoiceCaseSpec, type PromptHashOf, type SentRequestText } from "./choiceResultCases.js";
+import { playthroughs2Sent } from "./parallelThreadsCases.js";
 import type { PlayRun } from "./playthroughs.js";
 
 /*
@@ -10,7 +11,9 @@ import type { PlayRun } from "./playthroughs.js";
  * its start (playthroughReplay.ts) and built only where its request is the one
  * production sent there, byte for byte: production's turn is unchanged since
  * that run (the review's fix, leverChargedAgain, changed a repair, not a
- * request), so what it sends today is what it sent (productionSends). A switch
+ * request), so what it sends today is what it sent, but for the kids rules a
+ * single player's read-with-kids turn takes since 2026-10-01, which the mouse
+ * story's turns did not carry (playthroughs2Sent). A switch
  * turn is its input with the switch plan as its fixed analysis, as the frozen
  * switch turns read; an ending is its input.
  *
@@ -55,9 +58,18 @@ export const OUTCOME_SETTLED_CASE_SPECS: ChoiceCaseSpec[] = [
 
 const CATEGORY = "outcome-settled";
 
-/** The stage's cases from the second round's stored runs, each only where its request is the one the run sent; and what could not be built. */
-export function outcomeSettledCases(runs: PlayRun[], promptHashOf: PromptHashOf, specs: ChoiceCaseSpec[] = OUTCOME_SETTLED_CASE_SPECS): { cases: EvalCase[]; problems: string[] } {
-  return choiceResultCases(runs, promptHashOf, specs, productionSends, CATEGORY);
+/**
+ * The stage's cases from the second round's stored runs, each only where its request is the one the run sent; and what
+ * could not be built. Since the kids-turns stage's adoption (2026-10-01) the mouse story's turn takes the kids rules, which
+ * that round's turns did not carry, so the request the run sent is playthroughs2Sent's.
+ */
+export function outcomeSettledCases(
+  runs: PlayRun[],
+  promptHashOf: PromptHashOf,
+  specs: ChoiceCaseSpec[] = OUTCOME_SETTLED_CASE_SPECS,
+  sent: SentRequestText = playthroughs2Sent
+): { cases: EvalCase[]; problems: string[] } {
+  return choiceResultCases(runs, promptHashOf, specs, sent, CATEGORY);
 }
 
 /** What --build-settled-cases freezes: every built case not frozen yet (all of them when rebuilding), and what was left as frozen. */

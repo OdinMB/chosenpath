@@ -5,6 +5,7 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { Story } from "core/models/Story.js";
 import type { Beat, StoryPhase, ThreadAnalysis } from "core/types/index.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
+import { takesKidsRules } from "../../../../../src/game/services/kidsTurnRules.js";
 import { CHOICE_RESULT_TEXT, choiceResultRequest, productionTurnToday, takesExplorationOrder } from "../../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
 import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
@@ -109,7 +110,8 @@ describe("productionTurnToday: production's turn as the eval measured it before 
   });
 
   (frozen.length ? it : it.skip)("is production's request byte for byte on every frozen turn case, the variant's on an exploration step", () => {
-    const turns = frozen.filter((c) => c.role === "beat" && c.state);
+    // A single player's read-with-kids turn is the kids turn since 2026-10-01 (adoptedTurns and adoptedForms hold it)
+    const turns = frozen.filter((c) => c.role === "beat" && c.state && !takesKidsRules(caseStory(c)));
     expect(turns.length).toBeGreaterThan(50);
     for (const c of turns) {
       const story = caseStory(c);

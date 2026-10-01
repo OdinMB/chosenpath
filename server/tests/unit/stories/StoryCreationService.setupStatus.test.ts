@@ -223,6 +223,24 @@ describe("StoryCreationService setup status", () => {
     expect(args[7]).toEqual({ kids });
   });
 
+  it.each([
+    ["read-with-kids", "How old is the child?: 5", "5"],
+    ["read-with-kids", "A mouse story with no age", undefined],
+    ["enjoy-fiction", "How old is the child?: 5", undefined],
+  ] as const)("records the story's category and, read with a child, the age its premise states (%s, %s)", async (category, premise, age) => {
+    createInitialState.mockResolvedValue(startableState());
+    const service = new StoryCreationService();
+    const { res } = fakeResponse();
+
+    await service.createStory(`Create an age-appropriate story.\n\n${premise}`, false, false, 1, 10, GameModes.Cooperative, undefined, res, undefined, category);
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const stored = storeStory.mock.calls[0]?.[1] as { getState(): StoryState } | undefined;
+    expect(stored?.getState().category).toBe(category);
+    expect(stored?.getState().readingAge).toBe(age);
+  });
+
   it("answers a content-filter refusal with its moderation response and starts no setup", async () => {
     isAppropriatePrompt.mockResolvedValue({ isAppropriate: false, reason: "Violence" });
     const service = new StoryCreationService();

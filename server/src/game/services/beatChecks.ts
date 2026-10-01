@@ -21,8 +21,16 @@ import { isPlayerBeat } from "./storyTextSteps.js";
  * once more), unless the first reply had options and was only short.
  */
 
-/** Which turn a reply is checked for: at the `ending` the game shows no options. */
-export type BeatCheckOptions = { ending?: boolean };
+/**
+ * Which turn a reply is checked for: at the `ending` the game shows no
+ * options. `textCount` is the length a retry of a one-paragraph text asks
+ * for, where the turn's own request asks for another than production's
+ * (FULL_TEXT_COUNT; the eval's kids-turns stage).
+ */
+export type BeatCheckOptions = { ending?: boolean; textCount?: string };
+
+/** The length every turn's request asks for, as a retry of a one-paragraph text asks for it again. */
+export const FULL_TEXT_COUNT = "five or six paragraphs of three to five sentences each";
 
 const playerBeats = (reply: SetOfBeatGenerationSchema): [string, BeatGeneration][] =>
   Object.entries(reply)
@@ -48,14 +56,14 @@ export function paragraphsOf(text: string): string[] {
     .filter((paragraph) => paragraph.length > 0);
 }
 
-/** Why a reply's texts can't be used as they are, phrased to follow a colon: a player's text of one paragraph or none. */
-export function shortTextProblem(reply: SetOfBeatGenerationSchema): string | undefined {
+/** Why a reply's texts can't be used as they are, phrased to follow a colon: a player's text of one paragraph or none, and the length to write instead. */
+export function shortTextProblem(reply: SetOfBeatGenerationSchema, count: string = FULL_TEXT_COUNT): string | undefined {
   const short = playerBeats(reply)
     .filter(([, beat]) => paragraphsOf(beat.text ?? "").length < 2)
     .map(([slot]) => slot);
   if (short.length === 0) return undefined;
   const texts = short.map((slot) => `the text for ${slot}`).join(" and ");
-  return `${texts} ${short.length === 1 ? "is" : "are"} a single paragraph; write every player's text as five or six paragraphs of three to five sentences each`;
+  return `${texts} ${short.length === 1 ? "is" : "are"} a single paragraph; write every player's text as ${count}`;
 }
 
 /** Why a reply can't be played, phrased to follow a colon: a player's beat without options (none is asked of the ending). */
@@ -71,7 +79,7 @@ export function missingOptionsProblem(reply: SetOfBeatGenerationSchema, options:
 
 /** Every problem the one retry is told, the short text first; undefined when the reply is fine. */
 export function beatReplyProblem(reply: SetOfBeatGenerationSchema, options: BeatCheckOptions = {}): string | undefined {
-  const problems = [shortTextProblem(reply), missingOptionsProblem(reply, options)].filter((p): p is string => p !== undefined);
+  const problems = [shortTextProblem(reply, options.textCount), missingOptionsProblem(reply, options)].filter((p): p is string => p !== undefined);
   return problems.length > 0 ? problems.join("; ") : undefined;
 }
 

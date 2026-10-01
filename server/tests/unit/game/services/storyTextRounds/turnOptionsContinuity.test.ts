@@ -22,7 +22,8 @@ import {
   productionTurnForm,
 } from "../../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
-import { OPTIONS_O2_CASES } from "../../../../../src/evals/textModelEval/arms.js";
+import { OPTIONS_O2_CASES, stagePlansCase } from "../../../../../src/evals/textModelEval/arms.js";
+import { takesKidsRules } from "../../../../../src/game/services/kidsTurnRules.js";
 import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
@@ -47,7 +48,9 @@ const json = (schema: Parameters<typeof toJsonSchema>[0]) => JSON.stringify(toJs
 const occurrences = (text: string, passage: string) => text.split(passage).length - 1;
 
 const CASES_DIR = path.resolve("..", "DOCS", "2026-09-26_gpt6-text-eval");
-const frozen = fs.existsSync(path.join(CASES_DIR, "cases", "cases.json")) ? evalFiles(CASES_DIR).readCases() : [];
+// The cases the options stages could plan: none frozen for a later stage (the kids-turns stage's mouse turns among them,
+// two of them rolled steps)
+const frozen = (fs.existsSync(path.join(CASES_DIR, "cases", "cases.json")) ? evalFiles(CASES_DIR).readCases() : []).filter((c) => stagePlansCase("options-o2", c.id));
 
 const GUILD = "player1_guild_reform";
 const ENCLAVE = "player1_enclave_trust";
@@ -126,11 +129,12 @@ const SINGLE_PLAYER: [string, () => Story][] = [
  * milestones leave it since the ending's adoption later that day (endingStateB),
  * and an exploration step, which carries the exploration-order line since the
  * choice-line-sp adoption of the same day; the arms' base keeps the turns they
- * ran beside.
+ * ran beside. Nor did any turn then read a story's category: a single
+ * player's read-with-kids turn takes the kids rules since 2026-10-01.
  */
 function productionThen(story: Story) {
   if (story.getCurrentBeatType() === "ending") return productionEndingForm(story);
-  const today = beatStep.request(story);
+  const today = beatStep.request(takesKidsRules(story) ? story.clone({ category: undefined, readingAge: undefined }) : story);
   return takesExplorationOrder(story) ? { ...today, prompt: today.prompt.replace(EXPLORATION_ORDER, "") } : today;
 }
 

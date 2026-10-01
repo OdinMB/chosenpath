@@ -58,6 +58,28 @@ export function categoryFromTemplateTags(
     : undefined;
 }
 
+/**
+ * The read-with-kids form's one field (client/src/page/components/
+ * StoryInitializer.tsx, categoryConfigs): the client merges it into the
+ * premise as a line "How old is the child?: 5".
+ */
+export const KID_AGE_LABEL = "How old is the child?";
+
+const KID_AGE_VALUE = /^(\d{1,2})(?:\s*[-–]\s*(\d{1,2}))?$/;
+
+/**
+ * The child's age as a read-with-kids premise states it ("5", or a range such
+ * as "8-10"): the value of the form's line, and only an age, since it goes
+ * into every turn's instructions. Undefined where the premise has no such
+ * line or its value is anything else.
+ */
+export function readingAgeFromPremise(premise: string): string | undefined {
+  const line = premise.split("\n").find((l) => l.startsWith(`${KID_AGE_LABEL}:`));
+  const match = line ? KID_AGE_VALUE.exec(line.slice(KID_AGE_LABEL.length + 1).trim()) : null;
+  if (!match) return undefined;
+  return match[2] ? `${match[1]}-${match[2]}` : match[1];
+}
+
 // GENERATION WITH LLM
 
 export enum GameModes {
@@ -345,6 +367,8 @@ export type StoryState = {
   failedImageIds?: string[];
   /** Absent on stories created before categories were recorded. */
   category?: StoryCategory;
+  /** A read-with-kids custom story: the child's age its premise states ("5", "8-10"; readingAgeFromPremise). */
+  readingAge?: string;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
 };
 

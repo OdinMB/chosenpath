@@ -22,6 +22,7 @@ import { BeatResolutionService } from "../../game/services/BeatResolutionService
 import { ChangeService } from "../../game/services/ChangeService.js";
 import { ThreadResolutionService } from "../../game/services/ThreadResolutionService.js";
 import { beatReplyProblem, checkedBeatReply } from "../../game/services/beatChecks.js";
+import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { outcomeStatesAtEnding, type OutcomeState } from "../../game/services/endingStates.js";
 import { allowedLengths, chaptersThatFit, isLastChapter, lastChapterAfterSwitch, outcomeNeeds, pickedOutcome, stageOf, turnsLeft } from "../../game/services/pacing.js";
@@ -796,8 +797,9 @@ export async function playStory(
       before = planned;
     }
     const request = requestFor("adopted", { role: "beat", story: before });
-    // As AIStoryGenerator checks a beat reply: the ending shows no options
-    const beatCheck = { ending: before.getCurrentBeatType() === "ending" };
+    // As AIStoryGenerator checks a beat reply: the ending shows no options, and a single player's kids turn's retry asks for
+    // its short count
+    const beatCheck = beatCheckOptions(before);
     const invoke = invoker(`${turn.kind}${suffix}`, "beat", request, turn.calls, (log, parsed) => {
       const problem = beatReplyProblem(parsed as SetOfBeatGenerationSchema, beatCheck);
       if (problem) log.problem = problem;

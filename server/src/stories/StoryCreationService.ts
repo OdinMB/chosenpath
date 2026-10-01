@@ -6,6 +6,7 @@ import {
   ImageRequest,
   IMAGE_SIZES,
   StoryCategory,
+  readingAgeFromPremise,
 } from "core/types/index.js";
 import { connectionManager } from "server/game/ConnectionManager.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
@@ -281,11 +282,14 @@ export class StoryCreationService {
 
       const story = Story.create(storyState);
 
-      // Add player codes, pregeneration setting and category to state
+      // Add player codes, pregeneration setting and category to state; a story read with a child records the child's age
+      // its premise states, which a single player's turns are written for
+      const readingAge = category === "read-with-kids" ? readingAgeFromPremise(prompt) : undefined;
       const storyWithCodes = story.clone({
         playerCodes,
         pregenerateBeats,
         ...(category ? { category } : {}),
+        ...(readingAge ? { readingAge } : {}),
       });
 
       console.log(

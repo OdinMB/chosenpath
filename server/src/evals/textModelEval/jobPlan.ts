@@ -24,7 +24,7 @@ import { caseStory, hashOrder, type EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import { estimateCall, MIN_MEASURED_RECORDS } from "./pricing.js";
 import { keyOf, usable, type CallRecord, type CheckedRetry, type Job, type PlannedCall } from "./runner.js";
-import { isSplitRequest, requestFor, requestText, VARIANTS, type EvalRequest, type RequestInput, type SetupInput, type VariantId } from "./variants.js";
+import { isSplitRequest, requestFor, requestText, shortTextCountOf, VARIANTS, type EvalRequest, type RequestInput, type SetupInput, type VariantId } from "./variants.js";
 
 /*
  * Turns frozen cases and the stage's arm matrix into runner jobs: every
@@ -327,13 +327,17 @@ function callJob(options: PlanOptions, evalCase: EvalCase, arm: Arm, sample: num
  * reply as parsed (beatReplyProblem, with the ending's flag: an ending shows
  * no options), and the retry as production sends it, the first request told
  * the problem (withBeatProblem), on the same arm, schema and limits. Only a
- * one-message request (production's shape) can be retried so.
+ * one-message request (production's shape) can be retried so. A request that
+ * asks for another length than production's (the kids-turns stage's variant,
+ * shortTextCountOf) has its retry ask for that length.
  */
 function checkedRetry(evalCase: EvalCase, first: PlannedCall): CheckedRetry {
-  const checks = { ending: caseStory(evalCase).getCurrentBeatType() === "ending" };
+  const ending = caseStory(evalCase).getCurrentBeatType() === "ending";
   return {
     problemOf: (parsed) => {
       const reply = parsed as SetOfBeatGenerationSchema;
+      const textCount = shortTextCountOf(first.request());
+      const checks = { ending, ...(textCount ? { textCount } : {}) };
       const text = beatReplyProblem(reply, checks);
       if (text === undefined) return undefined;
       const short = shortTextProblem(reply) !== undefined;

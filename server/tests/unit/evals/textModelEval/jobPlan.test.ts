@@ -28,6 +28,7 @@ import {
   ENDING_STATE_STORED_CASES,
   FINAL_CHECK_SETUP_PREMISES,
   FINAL_CHECK_TEMPLATE_PREMISES,
+  KIDS_TURNS_CASES,
   OPTIONS_O2_CASES,
   PARALLEL_THREADS_CASES,
   ROUND2_SWITCH_CHAIN_CASES,
@@ -42,6 +43,7 @@ import {
 import { productionCallLimits } from "../../../../src/shared/llm/chatModel.js";
 import { SWITCH_REMINDER } from "../../../../src/game/services/storyTextRounds/switchReminder.js";
 import { CHOICE_RESULT_TEXT, productionTurnToday } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
+import { KIDS_TURN_TEXT } from "../../../../src/game/services/storyTextRounds/kidsTurn.js";
 import { beatReplyProblem, missingOptionsProblem, shortTextProblem, withBeatProblem } from "../../../../src/game/services/beatChecks.js";
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import { setupStep } from "../../../../src/game/services/storyTextSteps.js";
@@ -747,6 +749,38 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(planJobs(cases, { ...options, roles: ["thread"], mode: "pipeline" })).toEqual([]);
     expect(planJobs(cases, { ...options, roles: ["beat", "switch", "setup"], mode: "isolated" })).toEqual([]);
     expect(planJobs(cases, { ...options, stage: "parallel-threads", roles: ["thread"], mode: "isolated" })).toEqual([]);
+  });
+
+  it("plans the kids-turns stage (2026-10-01): production's turn and the kids turn twice on its turns, interleaved, each with production's checked retry, the variant's asking for its short count", () => {
+    const [mouse] = KIDS_TURNS_CASES.mouse;
+    const [template] = KIDS_TURNS_CASES.template;
+    const kids = { category: "read-with-kids" as const };
+    const cases = [
+      evalCase(mouse, "beat", { state: threadBeat(1, { id: "story-a", ...kids, readingAge: "5" }).getState(), tags: tags({ source: "round", kids: true }) }),
+      evalCase(template, "beat", { state: threadBeat(1, { id: "story-b", ...kids }).getState(), tags: tags({ kids: true }) }),
+      evalCase("sp-other-turn", "beat", { state: threadBeat(1, { id: "story-c" }).getState() }),
+    ];
+    const options = { stage: "kids-turns" as const, promptState: "adopted13", subset15: false, records: [] };
+    const turns = planJobs(cases, { ...options, roles: ["beat"], mode: "isolated" });
+    // Sample by sample, both arms on a case before the next case
+    expect(turns.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`)).toEqual(
+      [1, 2].flatMap((s) => [mouse, template].flatMap((id) => ["adopted", "kidsTurn"].map((v) => `${id} s${s} gpt-6-luna@medium/${v}`)))
+    );
+    const reply = (paragraphs: number) => ({ player1: { text: Array.from({ length: paragraphs }, (_, i) => `Paragraph ${i + 1}. It goes on.`).join("\n\n"), options: [{ text: "Go" }] } });
+    for (const job of turns) {
+      expect(callLimitsOf(job.first.request())).toEqual(productionCallLimits("beat", 1));
+      const retry = job.retry as NonNullable<Job["retry"]>;
+      expect(retry).toBeDefined();
+      expect(retry.problemOf(reply(3))).toBeUndefined();
+      // The variant's retry asks for its short count, and so does production's since the stage's adoption (a single
+      // player's kids turn, beatCheckOptions)
+      const problem = retry.problemOf(reply(1)) as { text: string; kind: "short" };
+      expect(problem).toEqual({ text: shortTextProblem(reply(1) as never, KIDS_TURN_TEXT.shortTextCount), kind: "short" });
+      expect((retry.build(problem).request() as { prompt: string }).prompt).toBe(withBeatProblem((job.first.request() as { prompt: string }).prompt, problem.text));
+    }
+    // No other role, and no earlier stage plans the mouse turns
+    expect(planJobs(cases, { ...options, roles: ["switch", "thread"], mode: "pipeline" })).toEqual([]);
+    expect(planJobs(cases, { ...options, stage: "challenge-results", roles: ["beat"], mode: "isolated" }).map((j) => j.caseId)).not.toContain(mouse);
   });
 
   it("plans the group round (B10): the sharpened note twice on the stored group turns, today's group form's sample 2 beside it", () => {
