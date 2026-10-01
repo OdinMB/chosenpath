@@ -1,5 +1,6 @@
 import type { Story } from "core/models/Story.js";
 import type { Outcome, StoryPhase, Switch, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
+import { GameModes } from "core/types/index.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { outcomeIdsNamed } from "./outcomeIds.js";
 
@@ -403,6 +404,68 @@ export function switchPacingProblem(story: Story, plan: SwitchAnalysis): string 
     );
   if (reading.keepsLast === false && reading.players.some((p) => p.needed > 0)) problems.push(SPARE_THREAD_PROBLEM);
   return problems.length ? problems.join("; ") : undefined;
+}
+
+// --- A contest's deciding stage offered to both sides (decision A's fix 3, 2026-10-01) ---
+
+/**
+ * The contested shared outcomes whose next thread settles their last stage: one
+ * milestone still needed, the chapter that just ended counted as pending, in a
+ * group that plays contests (competitive or cooperative-competitive), after the
+ * opening switch. The switch planner prints CONTEST_LAST_STAGE_LINE where any
+ * is (SwitchPromptService.ts, contestAtLastStage), and its plan check reads the
+ * plan against the line (contestLastStageProblem).
+ */
+export function contestsAtLastStage(story: Story): string[] {
+  const mode = story.getGameMode();
+  if (!story.isMultiplayer() || (mode !== GameModes.Competitive && mode !== GameModes.CooperativeCompetitive) || story.getCurrentTurn() === 0) return [];
+  const contested = new Set(story.getSharedOutcomes().filter(isContestedOutcome).map((o) => o.id));
+  const [slot] = story.getPlayerSlots();
+  return outcomeNeeds(story, slot, true)
+    .filter((need) => contested.has(need.id) && need.stillNeeded === 1)
+    .map((need) => need.id);
+}
+
+/**
+ * What the switch plan check (planChecks.ts, checkedSwitchPlan) tells the
+ * planner where a usable plan offers a contest's deciding stage
+ * (contestsAtLastStage) as a topic direction, or as a flavor switch without
+ * every player, so one side could take it alone while the other is elsewhere:
+ * CONTEST_LAST_STAGE_LINE asks for one flavor switch on it with every player,
+ * or none this switch. Since decision A (2026-10-01): the line, adopted from
+ * the parallel-threads stage, broke in round 3's one switch where it mattered
+ * (the food trucks' turn 16 offered the contract's deciding stage to Omar alone,
+ * as three directions on it), and in the estate agents' turns 5 and 8, where no
+ * one took the direction alone. Worth the one retry, never a reason to fail
+ * the turn, as PACING's arithmetic.
+ */
+export function contestLastStageProblem(story: Story, plan: SwitchAnalysis): string | undefined {
+  const slots = story.getPlayerSlots();
+  const problems = contestsAtLastStage(story).flatMap((id) => {
+    const offering = plan.switches.filter((sw) => sw.players.length > 0 && offeredOutcomes(story, sw, sw.players[0]).includes(id));
+    if (offering.length === 0) return [];
+    const [only] = offering;
+    const grouped = offering.length === 1 && only.type === "flavor" && slots.every((slot) => only.players.includes(slot));
+    if (grouped) return [];
+    return [
+      `the contested shared outcome ${id} has 1 milestone still needed, so its next thread decides the contest and needs both sides in it: offer ${id} only as one flavor switch on it with every player (${slots.join(", ")}) in that switch, never as a topic direction or a switch one side can take alone; if it is not yet time to decide it, offer it to no one in this switch`,
+    ];
+  });
+  return problems.length ? problems.join("; ") : undefined;
+}
+
+/** Production's soft problems with a usable switch plan, each with the note its retry logs: PACING's arithmetic, then a contest's deciding stage. */
+export function switchPlanProblems(story: Story, plan: SwitchAnalysis): { note: string; problem: string }[] {
+  return [
+    { note: "pacingNotFollowed", problem: switchPacingProblem(story, plan) },
+    { note: "contestLastStageNotFollowed", problem: contestLastStageProblem(story, plan) },
+  ].filter((found): found is { note: string; problem: string } => found.problem !== undefined);
+}
+
+/** Production's soft problems with a usable switch plan, as one text (what its retry is told; the eval's playthroughs record it). */
+export function switchPlanProblem(story: Story, plan: SwitchAnalysis): string | undefined {
+  const found = switchPlanProblems(story, plan);
+  return found.length ? found.map((f) => f.problem).join("; ") : undefined;
 }
 
 // --- The PACING block ---

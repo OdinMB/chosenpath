@@ -19,7 +19,7 @@ import {
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
 import { endedChapter, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
-import { pacedLengths, switchPacingProblem } from "../../../../src/game/services/pacing.js";
+import { contestLastStageProblem, contestsAtLastStage, pacedLengths, switchPacingProblem, switchPlanProblem } from "../../../../src/game/services/pacing.js";
 import { outcome, switchAnalysis, thread, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
 
 beforeEach(() => {
@@ -1249,6 +1249,103 @@ describe("checked plan calls", () => {
       const plan = await checkedThreadPlan(story, "THE PROMPT", invoke, () => undefined);
       expect(prompts[1]).toBe(withPlanProblem("THE PROMPT", "the thread is 3 beats long, and with 9 turns left, this one included, PACING allows 4 beats"));
       expect(plan.duration).toBe(4);
+    });
+  });
+
+  /*
+   * Decision A's fix 3 (2026-10-01): the switch planner is told, since the parallel-threads stage, to offer a contested
+   * outcome's last stage only as a grouped thread (CONTEST_LAST_STAGE_LINE), and broke it in round 3: the food trucks' turn
+   * 16 offered the contract's deciding stage to Omar alone, as three directions on it, and Amara's switch none, so the
+   * contest was settled in a thread she wasn't in. The check now reads the plan against the line: one retry told the
+   * problem, never failing the turn, as PACING's arithmetic does.
+   */
+  describe("a contest's deciding stage offered to both sides (production's check since decision A)", () => {
+    const CONTEST = outcome("shared_crown", {
+      possibleResolutions: { sideAWins: "Side A takes the crown.", mixed: "They share it.", sideBWins: "Side B takes the crown." },
+      intendedNumberOfMilestones: 2,
+    });
+    /** Two rivals at the switch after a chapter on the crown (its first stage pending): its next thread decides it. */
+    const atLastStage = (gameMode: GameMode = GameModes.Competitive, crown: Outcome = CONTEST) =>
+      roundStory({
+        players: 2,
+        turns: 5,
+        maxTurns: 20,
+        gameMode,
+        sharedOutcomes: [ESCAPE, crown],
+        playerOutcomes: { player1: [TRUST], player2: [DEBT] },
+        phases: [switchAnalysis(["player1", "player2"], 0), endedChapter("shared_crown", 3, 1, "Side A leads the crown", ["player1", "player2"])],
+        lastChoice: 0,
+      });
+    const own = (slot: string) => (slot === "player1" ? "player1_trust" : "player2_debt");
+    /** The food trucks' turn 16: player2's three directions all on the crown, player1's on their own outcome. */
+    const oneSided = (story: Story) =>
+      switchPlan(story, [
+        topic(["player1"], [`Settle the old debt with the harbourmaster (${own("player1")})`, `Ask the guild for its ledger (${own("player1")})`, `Walk the quay at dusk (${own("player1")})`], "p1"),
+        topic(["player2"], ["Walk the crossing with Jo (shared_crown)", "Meet Mara at the permit office (shared_crown)", "Prepare for the rematch (shared_crown)"], "p2"),
+      ]);
+    const asOneDirection = (story: Story) =>
+      switchPlan(story, [
+        topic(["player1"], ["Enter the tasting for the crown (shared_crown)", `Ask the guild for its ledger (${own("player1")})`, "Search the archive (shared_escape)"], "p1"),
+        topic(["player2"], ["Enter the tasting for the crown (shared_crown)", `Count the debts (${own("player2")})`, "Search the archive (shared_escape)"], "p2"),
+      ]);
+    const grouped = (story: Story) => switchPlan(story, [flavor(["player1", "player2"], "shared_crown", "Who takes the crown?", "both")]);
+    const heldBack = (story: Story) =>
+      switchPlan(story, [
+        topic(["player1"], [`Ask the guild for its ledger (${own("player1")})`, "Search the archive (shared_escape)"], "p1"),
+        topic(["player2"], [`Count the debts (${own("player2")})`, "Search the archive (shared_escape)"], "p2"),
+      ]);
+
+    it("finds a contest's deciding stage offered as a direction one side can take alone, or a flavor switch without every player", () => {
+      const story = atLastStage();
+      expect(contestsAtLastStage(story)).toEqual(["shared_crown"]);
+      const problem = contestLastStageProblem(story, checkSwitchPlan(story, oneSided(story)).plan);
+      expect(problem).toBe(
+        "the contested shared outcome shared_crown has 1 milestone still needed, so its next thread decides the contest and needs both sides in it: offer shared_crown only as one flavor switch on it with every player (player1, player2) in that switch, never as a topic direction or a switch one side can take alone; if it is not yet time to decide it, offer it to no one in this switch"
+      );
+      expect(contestLastStageProblem(story, checkSwitchPlan(story, asOneDirection(story)).plan)).toBe(problem);
+      const alone = switchPlan(story, [flavor(["player1"], "shared_crown", "Who takes the crown?", "p1"), topic(["player2"], [`Count the debts (${own("player2")})`, "Search the archive (shared_escape)"], "p2")]);
+      expect(contestLastStageProblem(story, checkSwitchPlan(story, alone).plan)).toBe(problem);
+    });
+
+    it("finds nothing where the stage is offered to every player in one flavor switch, or to no one; nor before its last stage, nor in a game without contests", () => {
+      const story = atLastStage();
+      expect(contestLastStageProblem(story, checkSwitchPlan(story, grouped(story)).plan)).toBeUndefined();
+      expect(contestLastStageProblem(story, checkSwitchPlan(story, heldBack(story)).plan)).toBeUndefined();
+      const early = atLastStage(GameModes.Competitive, { ...CONTEST, intendedNumberOfMilestones: 3 });
+      expect(contestsAtLastStage(early)).toEqual([]);
+      expect(contestLastStageProblem(early, checkSwitchPlan(early, oneSided(early)).plan)).toBeUndefined();
+      const cooperative = atLastStage(GameModes.Cooperative);
+      expect(contestLastStageProblem(cooperative, checkSwitchPlan(cooperative, oneSided(cooperative)).plan)).toBeUndefined();
+    });
+
+    it("asks once more told the problem, logs it, and applies the grouped reply", async () => {
+      const story = atLastStage();
+      const lines: string[] = [];
+      const { invoke, prompts } = planner(oneSided(story), grouped(story));
+      await expect(checkedSwitchPlan(story, "THE PROMPT", invoke, (line) => lines.push(line))).resolves.toEqual(grouped(story));
+      expect(prompts[1]).toBe(withPlanProblem("THE PROMPT", contestLastStageProblem(story, checkSwitchPlan(story, oneSided(story)).plan) ?? ""));
+      expect(lines.join("\n")).toContain('"contestLastStageNotFollowed":1');
+      expect(lines.join("\n")).not.toContain("pacingNotFollowed");
+    });
+
+    it("never fails the turn: a second reply that still breaks it is used, and the first where the retry's call fails", async () => {
+      const story = atLastStage();
+      const again = planner(oneSided(story), asOneDirection(story));
+      await expect(checkedSwitchPlan(story, "THE PROMPT", again.invoke, () => undefined)).resolves.toEqual(asOneDirection(story));
+      const invoke = jest.fn(async (prompt: string) => {
+        if (prompt === "THE PROMPT") return oneSided(story);
+        throw new Error("Request timed out.");
+      });
+      await expect(checkedSwitchPlan(story, "THE PROMPT", invoke, () => undefined)).resolves.toEqual(oneSided(story));
+    });
+
+    it("is production's switch check beside PACING's arithmetic (switchPlanProblem); a rule given in its place (an eval variant's) reads neither", async () => {
+      const story = atLastStage();
+      const plan = checkSwitchPlan(story, oneSided(story)).plan;
+      expect(switchPlanProblem(story, plan)).toBe([switchPacingProblem(story, plan), contestLastStageProblem(story, plan)].filter(Boolean).join("; "));
+      const none = planner(oneSided(story));
+      await expect(checkedSwitchPlan(story, "THE PROMPT", none.invoke, () => undefined, () => undefined)).resolves.toEqual(oneSided(story));
+      expect(none.invoke).toHaveBeenCalledTimes(1);
     });
   });
 

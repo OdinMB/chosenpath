@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { Story } from "core/models/Story.js";
-import type { SetOfBeatGenerationSchema, ThreadAnalysis } from "core/types/index.js";
+import type { SetOfBeatGenerationSchema, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
+import { contestLastStageProblem, contestsAtLastStage } from "../../../../src/game/services/pacing.js";
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
 import { checkThreadPlan } from "../../../../src/game/services/planChecks.js";
 import { scoreboardWinners } from "../../../../src/game/services/scoreboards.js";
@@ -407,6 +408,44 @@ describe("replayRun on the stored round 3 (skipped where the output folder is ab
       });
     });
     expect(repaired).toEqual([["play-space-pirates", 10, "shared_division_score: 50 -> 65 after side B won; 50 -> 35"]]);
+  });
+
+  /*
+   * Decision A's fix 3 (2026-10-01): the switch plan check reads a plan against CONTEST_LAST_STAGE_LINE. Rounds 1 and 2
+   * were played before the line (adopted on 2026-10-01 from the parallel-threads stage), round 3 with it.
+   */
+  (stored3.length ? it : it.skip)("the switch plans production now asks once more because a contest's deciding stage could be taken by one side alone", () => {
+    const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 19 };
+    const reading = (runs: PlayRun[], round: number, before: (run: PlayRun) => number = () => Number.POSITIVE_INFINITY) =>
+      runs.flatMap((run) =>
+        replayRun(run)
+          .filter((r) => r.turn < before(run) && r.played.plan?.kind === "switch plan" && r.played.plan.plan && contestsAtLastStage(r.beforePlan).length > 0)
+          .map((r) => [round, run.spec.id, r.turn, contestLastStageProblem(r.beforePlan, r.played.plan?.plan as SwitchAnalysis) ? "asked again" : "kept"])
+      );
+    expect([
+      ...reading(stored, 1, (run) => firstChanged[run.spec.id] ?? Number.POSITIVE_INFINITY),
+      ...reading(stored2, 2, (run) => (run.spec.id === "play-estate-agents" ? 22 : Number.POSITIVE_INFINITY)),
+      ...reading(stored3, 3),
+    ]).toEqual([
+      // Before the line: every such switch offered the deciding stage as a direction
+      [1, "play-food-trucks", 5, "asked again"],
+      [1, "play-space-pirates", 9, "asked again"],
+      [2, "play-food-trucks", 12, "asked again"],
+      [2, "play-food-trucks", 16, "asked again"],
+      [2, "play-space-pirates", 9, "asked again"],
+      [2, "play-estate-agents", 12, "asked again"],
+      // With the line: the food trucks' turn 16 (Omar's three directions on the contract, Amara's none: the stage he then
+      // played alone) and the estate agents' turns 5 and 8 (the commission a direction one side could take, which no one
+      // took alone); the space pirates' grouped flavor switch, and the estate agents' 12 and 16, which held it back, and 21,
+      // which grouped it, stand
+      [3, "play-food-trucks", 16, "asked again"],
+      [3, "play-space-pirates", 10, "kept"],
+      [3, "play-estate-agents", 5, "asked again"],
+      [3, "play-estate-agents", 8, "asked again"],
+      [3, "play-estate-agents", 12, "kept"],
+      [3, "play-estate-agents", 16, "kept"],
+      [3, "play-estate-agents", 21, "kept"],
+    ]);
   });
 
   (stored3.length ? it : it.skip)("the earlier rounds hold no other charge in the reply that offers the lever", () => {

@@ -35,7 +35,7 @@ import {
   pacedLengths,
   pickedOutcome,
   stageOf,
-  switchPacingProblem,
+  switchPlanProblem,
   turnsLeft,
 } from "../../game/services/pacing.js";
 import { checkSwitchPlan, checkThreadPlan, checkedSwitchPlan, checkedThreadPlan } from "../../game/services/planChecks.js";
@@ -855,9 +855,10 @@ export async function playStory(
           : checkThreadPlan(before, parsed as ThreadAnalysis, { lengths: true, ...(options.planLengths ? { allowedLengths: options.planLengths } : {}) });
       if (result.problem) log.problem = result.problem;
       if (result.lengthProblem) log.lengthProblem = result.lengthProblem;
-      // A switch plan the pacing rule finds wanting (a variant's, else production's own, checkedSwitchPlan's default since
+      // A switch plan the soft rules find wanting (a variant's, else production's own, checkedSwitchPlan's default: PACING's
+      // arithmetic since the pacing-clues adoption, a contest's deciding stage offered to both sides since decision A, both of
       // 2026-10-01): the soft problem, as the checked call reads it
-      const pacing = kind === "switch" && !result.problem ? (options.switchProblem ?? switchPacingProblem)(before, result.plan as SwitchAnalysis) : undefined;
+      const pacing = kind === "switch" && !result.problem ? (options.switchProblem ?? switchPlanProblem)(before, result.plan as SwitchAnalysis) : undefined;
       if (pacing) log.lengthProblem = pacing;
       log.repairs = result.repairs.map(repairLine);
     };

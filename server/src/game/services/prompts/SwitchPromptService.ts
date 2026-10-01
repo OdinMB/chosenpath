@@ -4,8 +4,7 @@ import {
   type SectionConfig,
 } from "./StoryStatePromptService.js";
 import { GameModes } from "core/types/story.js";
-import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
-import { outcomeNeeds } from "../pacing.js";
+import { contestsAtLastStage } from "../pacing.js";
 
 /*
  * The switch planner (planner v2, adopted on 2026-09-28; turn doc A2, A4,
@@ -54,13 +53,13 @@ Don't make ANY assessment as to what the player should do to achieve their goals
 export const CONTEST_LAST_STAGE_LINE =
   "A contested shared outcome (Side A / Side B resolutions) that PACING shows with 1 milestone still needed is settled by its next thread, a contest that needs both sides in it. Offer it only as a grouped thread, a flavor switch on it for every player, never as one direction among others: one side could take that direction alone while the other side is elsewhere, and the contest would be settled without them.\n";
 
-/** Whether the switch planner takes CONTEST_LAST_STAGE_LINE: a contest game after the opening, a contested shared outcome's next thread settling its last stage. */
+/**
+ * Whether the switch planner takes CONTEST_LAST_STAGE_LINE: a contest game after the opening, a contested shared outcome's
+ * next thread settling its last stage (pacing.ts, contestsAtLastStage, which the plan check reads the plan against since
+ * decision A of 2026-10-01: contestLastStageProblem, one retry, never failing the turn).
+ */
 export function contestAtLastStage(story: Story): boolean {
-  const mode = story.getGameMode();
-  if (!story.isMultiplayer() || (mode !== GameModes.Competitive && mode !== GameModes.CooperativeCompetitive) || story.getCurrentTurn() === 0) return false;
-  const contested = new Set(story.getSharedOutcomes().filter(isContestedOutcome).map((o) => o.id));
-  const [slot] = story.getPlayerSlots();
-  return outcomeNeeds(story, slot, true).some((need) => contested.has(need.id) && need.stillNeeded === 1);
+  return contestsAtLastStage(story).length > 0;
 }
 
 /** A4 step a: continuity in its narrow form. */

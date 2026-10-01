@@ -12,7 +12,7 @@ import { THREAD_TYPE } from "core/types/thread.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { Logger } from "shared/logger.js";
 import { outcomeIdsNamed } from "./outcomeIds.js";
-import { allowedLengths, fallbackOutcomeId, pacedLengths, pickedOutcome, switchPacingProblem, turnsLeft } from "./pacing.js";
+import { allowedLengths, fallbackOutcomeId, pacedLengths, pickedOutcome, switchPlanProblems, turnsLeft } from "./pacing.js";
 import { UnusableResultError, errorClass } from "./retryOnce.js";
 import { logRepairs, type Repair } from "./textRepairs.js";
 
@@ -42,6 +42,8 @@ export type PlanCheck<P> = {
    * plan with only this problem is still used.
    */
   lengthProblem?: string;
+  /** The notes the soft problem logs (checkedPlan): a thread plan's lengthNotAllowed, a switch plan's pacingNotFollowed, unless the check names its own */
+  softNotes?: string[];
 };
 
 /**
@@ -664,9 +666,9 @@ async function checkedPlan<P>(
   const attempt = async (previousProblem?: string): Promise<PlanCheck<P>> => {
     const reply = await invoke(previousProblem ? withPlanProblem(prompt, previousProblem) : prompt);
     const result = kind.check(story, reply);
-    // A thread plan's soft problem is its length; a switch plan's, PACING's arithmetic
-    const soft = kind.what === "switch plan" ? "pacingNotFollowed" : "lengthNotAllowed";
-    const repairs = result.lengthProblem ? [...result.repairs, { kind: soft, note: true }] : result.repairs;
+    // A thread plan's soft problem is its length; a switch plan's, PACING's arithmetic or a contest's deciding stage
+    const soft = result.softNotes ?? [kind.what === "switch plan" ? "pacingNotFollowed" : "lengthNotAllowed"];
+    const repairs = result.lengthProblem ? [...result.repairs, ...soft.map((note) => ({ kind: note, note: true }))] : result.repairs;
     logPlanRepairs(kind.role, story, repairs, log);
     // The problem stays out of the log: it names model-written ids
     if (result.problem) {
@@ -697,25 +699,30 @@ async function checkedPlan<P>(
 
 /**
  * A switch plan call, checked: the repaired plan, one retry told the problem,
- * else an UnusableResultError. A usable plan is read against PACING's
- * arithmetic (`pacing`; production's switchPacingProblem since the
- * pacing-clues stage of 2026-10-01: a complete outcome offered to a player
+ * else an UnusableResultError. A usable plan is read against production's soft
+ * rules (switchPlanProblems): PACING's arithmetic (switchPacingProblem, since
+ * the pacing-clues stage of 2026-10-01: a complete outcome offered to a player
  * with no thread to spare, or a spare thread that leaves the story's last
- * thread nothing to settle), whose problem is worth the one retry but, like a
- * chapter length, never fails the turn; an eval variant can pass its own rule,
- * or one that reads nothing.
+ * thread nothing to settle; note `pacingNotFollowed`) and, since decision A of
+ * the same day, a contest's deciding stage offered to both sides
+ * (contestLastStageProblem; note `contestLastStageNotFollowed`). Their problems
+ * are worth the one retry, told together, but, like a chapter length, never
+ * fail the turn. An eval variant can pass its own rule (`pacing`) in their
+ * place, or one that reads nothing.
  */
 export function checkedSwitchPlan(
   story: Story,
   prompt: string,
   invoke: (prompt: string) => Promise<SwitchAnalysis>,
   log?: (line: string) => void,
-  pacing: (story: Story, plan: SwitchAnalysis) => string | undefined = switchPacingProblem
+  pacing?: (story: Story, plan: SwitchAnalysis) => string | undefined
 ): Promise<SwitchAnalysis> {
   const check = (checked: Story, reply: SwitchAnalysis): PlanCheck<SwitchAnalysis> => {
     const result = checkSwitchPlan(checked, reply);
-    const lengthProblem = result.problem ? undefined : pacing(checked, result.plan);
-    return lengthProblem ? { ...result, lengthProblem } : result;
+    if (result.problem) return result;
+    const found = pacing ? [{ note: "pacingNotFollowed", problem: pacing(checked, result.plan) }] : switchPlanProblems(checked, result.plan);
+    const soft = found.filter((f): f is { note: string; problem: string } => typeof f.problem === "string" && f.problem !== "");
+    return soft.length ? { ...result, lengthProblem: soft.map((f) => f.problem).join("; "), softNotes: soft.map((f) => f.note) } : result;
   };
   return checkedPlan({ what: "switch plan", role: "switchAnalysis", check }, story, prompt, invoke, log);
 }
