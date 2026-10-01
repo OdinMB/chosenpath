@@ -692,6 +692,33 @@ function onlyRiskApart(a: BeatOption, b: BeatOption): boolean {
 /** Words that give a sacrifice's text a reason in the scene (a heuristic for the hand read): urgency, a condition, no other way. */
 const STATED_REASON = /\b(because|since|now that|before|or else|otherwise|so that|only way|last chance|no other|in time|while|until|unless|if)\b/i;
 
+/** Whether a sacrifice's text states a reason in the scene (STATED_REASON, a heuristic for the hand read). */
+export function statesReason(text: string): boolean {
+  return STATED_REASON.test(text);
+}
+
+/** The owner's variety readings on one player's set (feedbackChecks, which checkBeatDesign pools over a reply's players). */
+export type SetVariety = { statsDistinct: boolean; leverApart: boolean; onlyRisk: boolean };
+
+/**
+ * One player's set of three challenge options read for the owner's variety: each option's main stat distinct and at
+ * most one without (primaryStatsDistinct), the same with a sacrifice or reward option left out of the "without" count
+ * (O2's mainStatsDistinctLeverApart), and two normal options only their risk tells apart (sameStatsOnlyRiskSets).
+ * Undefined for anything but three challenge options. The group-options stage reads a group's rolled sets one by one.
+ */
+export function optionSetVariety(options: BeatOption[]): SetVariety | undefined {
+  if (options.length !== 3 || !options.every((o) => o && o.optionType === "challenge")) return undefined;
+  const mains = options.map(mainStat);
+  const named = mains.filter((m): m is string => m !== undefined);
+  const distinct = new Set(named).size === named.length;
+  const bareNormal = options.filter((o, i) => o.resourceType === "normal" && mains[i] === undefined).length;
+  return {
+    statsDistinct: distinct && mains.length - named.length <= 1,
+    leverApart: distinct && bareNormal <= 1,
+    onlyRisk: options.some((a, i) => options.some((b, j) => i < j && onlyRiskApart(a, b))),
+  };
+}
+
 const MIN_SENTENCE_WORDS = 5;
 const SHARED_RUN_WORDS = 8;
 const SHARED_WORDS_SHARE = 0.75;
@@ -785,15 +812,13 @@ function feedbackChecks(story: Story, reply: SetOfBeatGenerationSchema): CheckRe
     const beat = asObject((reply as unknown as Loose)[slot]);
     if (Object.keys(beat).length === 0) continue;
     const options = asArray<BeatOption>(beat.options).filter((o) => o && typeof o === "object");
-    if (options.length === 3 && options.every((o) => o.optionType === "challenge")) {
-      const mains = options.map(mainStat);
-      const named = mains.filter((m): m is string => m !== undefined);
-      add("distinctPrimaryStats", new Set(named).size);
-      and("primaryStatsDistinct", new Set(named).size === named.length && mains.length - named.length <= 1);
+    const variety = optionSetVariety(options);
+    if (variety) {
+      add("distinctPrimaryStats", new Set(options.map(mainStat).filter((m): m is string => m !== undefined)).size);
+      and("primaryStatsDistinct", variety.statsDistinct);
       // Version O2's rule: a sacrifice or reward option is left out of the "at most one without a bonus" count
-      const bareNormal = options.filter((o, i) => o.resourceType === "normal" && mains[i] === undefined).length;
-      and("mainStatsDistinctLeverApart", new Set(named).size === named.length && bareNormal <= 1);
-      if (options.some((a, i) => options.some((b, j) => i < j && onlyRiskApart(a, b)))) add("sameStatsOnlyRiskSets", 1);
+      and("mainStatsDistinctLeverApart", variety.leverApart);
+      if (variety.onlyRisk) add("sameStatsOnlyRiskSets", 1);
     }
     if (rolled && expectedOptionType(story, slot) === "challenge") {
       const levers = chapterLevers(story, slot);
@@ -823,7 +848,7 @@ function feedbackChecks(story: Story, reply: SetOfBeatGenerationSchema): CheckRe
       }
       if (levers.sacrifices > 0 && sacrifices.length > 0) {
         add("secondSacrificeSets", 1);
-        add("unreasonedSecondSacrifices", sacrifices.filter((o) => !STATED_REASON.test(asString(o.text))).length);
+        add("unreasonedSecondSacrifices", sacrifices.filter((o) => !statesReason(asString(o.text))).length);
       }
     }
     if ((story.getPlayer(slot)?.beatHistory ?? []).length > 0) {

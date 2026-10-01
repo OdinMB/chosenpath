@@ -121,6 +121,8 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "pacing-clues":
     "Fix 8's retest in whole short playthroughs (pacingClues beside production under adopted21: no --run arms; --pacing-clues-play, listed below, then --pacing-clues-blind and --judge-pacing-clues)",
   "playthroughs-3": "Whole-story playthroughs, round 3, on production's code after the fixes of 2026-10-01 (no --run jobs: --playthroughs --round 3 plays them, listed below)",
+  "group-options":
+    "The owner's option rules for group turns (groupOptions beside production's group turn under adopted23, --role beat, each with production's checked retry, on group steps of the third playthroughs)",
 };
 
 /** Jobs by arm key, in plan order. */

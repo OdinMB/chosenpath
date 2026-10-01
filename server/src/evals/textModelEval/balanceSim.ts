@@ -1,5 +1,5 @@
 import type { Story } from "core/models/Story.js";
-import type { Beat, ChallengeOption, SetOfBeatGenerationSchema } from "core/types/index.js";
+import type { Beat, ChallengeOption, PlayerSlot, SetOfBeatGenerationSchema } from "core/types/index.js";
 import { BeatResolutionService } from "../../game/services/BeatResolutionService.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { caseStory, type EvalCase } from "./cases.js";
@@ -36,9 +36,9 @@ export function b6Scale(options: ChallengeOption[]): ChallengeOption[] {
   });
 }
 
-/** Each option's favorable chance (0-100), as the game would roll it for this player on this step. */
-export function favorableChances(story: Story, options: ChallengeOption[]): number[] {
-  const momentum = story.getCurrentThreadLastStepResolution("player1");
+/** Each option's favorable chance (0-100), as the game would roll it for this player (player1 unless named) on this step. */
+export function favorableChances(story: Story, options: ChallengeOption[], slot = "player1"): number[] {
+  const momentum = story.getCurrentThreadLastStepResolution(slot as PlayerSlot);
   const difficulty = story.getState().difficultyLevel ?? { title: "Balanced", modifier: 0 };
   return options.map((option, choice) => {
     const beat = { options, choice } as unknown as Beat;

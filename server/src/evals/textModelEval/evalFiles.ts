@@ -44,6 +44,7 @@ import type { CallRecord } from "./runner.js";
  *   kids-turns.md|json     the kids-turns stage's report, each turn read whole with production's retry in the loop, its length and plainness (--kids-turns)
  *   kids-ages.md|json      the kids-ages stage's report, turns per age band and player count against each band's limits, and the setups' stats (--kids-ages)
  *   group-levers.md|json   the group-levers stage's report, each group turn read whole, its players' sacrifices and rewards against their computed lines, own stats and shared ones (--group-levers)
+ *   group-options.md|json  the group-options stage's report, each group turn read whole, each rolled player's set against the owner's rules and B6's rate, its variety and odds (--group-options)
  *   short-replies.md|json  the short-replies stage's report, each turn read whole, each player's paragraphs in the first reply and the reply kept (--short-replies)
  *   runaway-2.md|json      the second runaway replay's report, each job's first try answered or run away, each arm against production (--runaway-2)
  *   pacing-clues.md|json   the pacing-clues stage's short playthroughs, their pacing readings and the late turns' clue readings (--pacing-clues-play, --judge-pacing-clues)
@@ -208,6 +209,11 @@ export function evalFiles(outDir: string) {
     writeGroupLevers: (markdown: string, json: unknown) => {
       writeJson(at("group-levers.json"), json);
       fs.writeFileSync(at("group-levers.md"), markdown);
+    },
+    /** The group-options stage's report: each rolled player's set against the owner's rules, its variety and odds (--group-options, groupOptionsPrep.ts) */
+    writeGroupOptions: (markdown: string, json: unknown) => {
+      writeJson(at("group-options.json"), json);
+      fs.writeFileSync(at("group-options.md"), markdown);
     },
     /** The short-replies stage's report: each turn read whole, each player's paragraphs before and after production's retry (--short-replies, shortRepliesPrep.ts) */
     writeShortReplies: (markdown: string, json: unknown) => {

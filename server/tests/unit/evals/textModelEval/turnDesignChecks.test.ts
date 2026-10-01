@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
 import { Story } from "core/models/Story.js";
-import { GameModes, type Beat, type SetOfBeatGenerationSchema, type StoryState, type SwitchAnalysis, type ThreadAnalysis } from "core/types/index.js";
+import { GameModes, type Beat, type BeatOption, type SetOfBeatGenerationSchema, type StoryState, type SwitchAnalysis, type ThreadAnalysis } from "core/types/index.js";
 import {
   allowedLengths,
   checkBeatDesign,
@@ -8,7 +8,9 @@ import {
   checkThreadDesign,
   genericMilestoneKind,
   nearDuplicateOfOutcome,
+  optionSetVariety,
   reusedFromPrevious,
+  statesReason,
   statReadouts,
 } from "../../../../src/evals/textModelEval/turnDesignChecks.js";
 import {
@@ -884,5 +886,44 @@ describe("checkBeatDesign", () => {
     expect(() => checkBeatDesign(laterSwitchBeat(1), junk, junk)).not.toThrow();
     expect(() => checkSwitchDesign(switchAnalysisAfterThread(1), { switches: "x" } as unknown as SwitchAnalysis)).not.toThrow();
     expect(() => checkThreadDesign(threadAnalysisAfterSwitch(1), { threads: [null] } as unknown as ThreadAnalysis)).not.toThrow();
+  });
+});
+
+/*
+ * The owner's variety readings on one player's set (the group-options stage, 2026-10-01): checkBeatDesign pools them over
+ * a reply's players, so a group's rolled sets are read one by one through optionSetVariety, the same rules.
+ */
+describe("optionSetVariety and statesReason: one player's set", () => {
+  const set = (bonuses: [string, number][][], base: number[] = [0, 0, 0], kinds: ("normal" | "sacrifice" | "reward")[] = ["normal", "normal", "normal"]): BeatOption[] =>
+    challengeOptions().map((o, i) => ({ ...o, basePoints: base[i], resourceType: kinds[i], modifiersToSuccessRate: bonuses[i].map(([statId, effect]) => ({ statId, reason: "fits", effect })) }));
+
+  it("reads main stats distinct, O2's rule with a lever left out, and two options only risk tells apart, as checkBeatDesign does", () => {
+    expect(optionSetVariety(set([[["a", 10]], [["b", 10]], [["c", 5]]]))).toEqual({ statsDistinct: true, leverApart: true, onlyRisk: false });
+    // The same bonus on every option at the same base: only risk tells them apart
+    expect(optionSetVariety(set([[["a", 10]], [["a", 10]], [["a", 10]]]))).toEqual({ statsDistinct: false, leverApart: false, onlyRisk: true });
+    // Two bare options at the same base: only risk; two without a main stat fail the owner's variety
+    expect(optionSetVariety(set([[], [], [["a", 10]]]))).toEqual({ statsDistinct: false, leverApart: false, onlyRisk: true });
+    // A bare sacrifice beside a bare normal option: O2's rule leaves the lever out of the count
+    expect(optionSetVariety(set([[], [["a", 10]], []], [0, 0, 30], ["normal", "normal", "sacrifice"]))).toEqual({ statsDistinct: false, leverApart: true, onlyRisk: false });
+    // Different base points tell two bare options apart
+    expect(optionSetVariety(set([[], [], [["a", 10]]], [0, -10, 0]))?.onlyRisk).toBe(false);
+  });
+
+  it("reads no set but three challenge options", () => {
+    expect(optionSetVariety(set([[["a", 10]], [["b", 10]], []]).slice(0, 2))).toBeUndefined();
+    expect(optionSetVariety([{ optionType: "exploration", resourceType: "normal", text: "x" }, ...set([[], [], []]).slice(0, 2)])).toBeUndefined();
+  });
+
+  it("matches checkBeatDesign's pooled readings on a single player's reply", () => {
+    const options = set([[["player1_a", 10]], [["player1_a", 10]], []]);
+    const reply = beatSet(1, { player1: { ...beatGeneration(), options } });
+    const { checks, counts } = checkBeatDesign(threadBeat(1), reply, reply);
+    const one = optionSetVariety(options);
+    expect([checks.primaryStatsDistinct, checks.mainStatsDistinctLeverApart, (counts.sameStatsOnlyRiskSets ?? 0) > 0]).toEqual([one?.statsDistinct, one?.leverApart, one?.onlyRisk]);
+  });
+
+  it("statesReason: the heuristic for a reason in a sacrifice's text", () => {
+    expect(statesReason("Spend 10% Nerve because the gate closes in a minute")).toBe(true);
+    expect(statesReason("Spend 10% Nerve to push through")).toBe(false);
   });
 });

@@ -462,6 +462,8 @@ describe("budget caps", () => {
       "pacing-clues": 1.5,
       // The coordinator's brief of 2026-10-01: the final whole-story playthroughs on production's code after that day's fixes
       "playthroughs-3": 1,
+      // Decision A of 2026-10-01 (evening): the owner's option rules for group turns, the status note's estimate's cap
+      "group-options": 0.35,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -495,6 +497,7 @@ describe("budget caps", () => {
       "options-o2c",
       "pacing-clues",
       "playthroughs-3",
+      "group-options",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -506,8 +509,9 @@ describe("budget caps", () => {
     // the second playthroughs still fit (the hard cap $42 since the second round of playthroughs)
     const decisions = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("late-pacing") + 1, FEEDBACK_STAGES.indexOf("options-o2c") + 1);
     const review = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("outcome-settled"), FEEDBACK_STAGES.indexOf("late-pacing") + 1);
-    const after = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("options-o2c") + 1);
-    const before = FEEDBACK_STAGES.filter((stage) => !review.includes(stage) && !decisions.includes(stage) && !after.includes(stage));
+    const after = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("options-o2c") + 1, FEEDBACK_STAGES.indexOf("playthroughs-3") + 1);
+    const decisionA = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("playthroughs-3") + 1);
+    const before = FEEDBACK_STAGES.filter((stage) => !review.includes(stage) && !decisions.includes(stage) && !after.includes(stage) && !decisionA.includes(stage));
     const capsOf = (stages: readonly (typeof FEEDBACK_STAGES)[number][]) => stages.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
     expect(capsOf(before)).toBeCloseTo(7.58);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + capsOf(before)).toBeLessThanOrEqual(HARD_CEILING);
@@ -528,6 +532,10 @@ describe("budget caps", () => {
     // The third round of playthroughs opened with everything before it closed at what it spent (the ledger at $42.87): its
     // cap fits the $45 on the recorded ledger; with the $1.3 on top it would reach about $45.17 at the cap (the report says so)
     expect(42.87 + DEFAULT_STAGE_CAPS["playthroughs-3"]).toBeLessThanOrEqual(HARD_CEILING);
+    // Decision A (the evening of 2026-10-01) opened its measurements with the ledger at $43.61 of the $48 hard cap: their
+    // caps fit with the $1.3 on top
+    expect(decisionA).toEqual(["group-options"]);
+    expect(LEDGER_WHEN_DECISION_A_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisionA)).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
     const { caps: defaults } = resolveCaps({});
@@ -862,8 +870,10 @@ describe("budget caps", () => {
     expect(stageInterleavesArms("choice-line-sp")).toBe(true);
     // Its turns carry production's one retry of a short or option-less reply; no earlier stage's do
     expect(stageChecksTurns("choice-line-sp")).toBe(true);
-    // The kids-turns, kids-ages, group-levers and short-replies stages (2026-10-01) carry it too
-    for (const stage of STAGES.filter((s) => s !== "choice-line-sp" && s !== "kids-turns" && s !== "kids-ages" && s !== "group-levers" && s !== "short-replies")) expect(stageChecksTurns(stage)).toBe(false);
+    // The kids-turns, kids-ages, group-levers, short-replies and group-options stages (2026-10-01) carry it too
+    for (const stage of STAGES.filter((s) => s !== "choice-line-sp" && s !== "kids-turns" && s !== "kids-ages" && s !== "group-levers" && s !== "short-replies" && s !== "group-options")) {
+      expect(stageChecksTurns(stage)).toBe(false);
+    }
     // Production beside the variant under a tag of its own
     expect(CHOICE_LINE_SP_PROMPT_STATE).toBe("adopted6");
     expect([OPTIONS_CONTINUITY_PROMPT_STATE, OPTIONS_O2_PROMPT_STATE, ENDING_STATE_PROMPT_STATE, RUNAWAY_PROMPT_STATE, CHOICE_RESULT_PROMPT_STATE]).not.toContain(CHOICE_LINE_SP_PROMPT_STATE);

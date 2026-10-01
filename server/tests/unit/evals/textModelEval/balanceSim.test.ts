@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import type { ChallengeOption } from "core/types/index.js";
+import type { ChallengeOption, ThreadAnalysis } from "core/types/index.js";
+import { Story } from "core/models/Story.js";
 import { b6Scale, balanceSimulation, favorableChances, renderBalanceSim, type BalanceSet } from "../../../../src/evals/textModelEval/balanceSim.js";
 import { threadBeat } from "../../../helpers/promptStories.js";
 import { challengeOptions } from "../../../helpers/textFixtures.js";
@@ -46,6 +47,25 @@ describe("favorableChances: the game's own resolution code", () => {
     const chances = favorableChances(story, [plain, { ...plain, basePoints: -30 }, { ...plain, basePoints: 30 }]);
     expect(chances[1]).toBeLessThan(chances[0]);
     expect(chances[2]).toBeGreaterThan(chances[0]);
+  });
+
+  it("reads a group player's own momentum (the group-options stage reads each rolled player's set)", () => {
+    // Step 2 of two parallel threads: player1's step 1 went favorable, player2's unfavorable
+    const story = threadBeat(2);
+    const state = structuredClone(story.getState());
+    const analysis = state.storyPhases[1] as ThreadAnalysis;
+    const [shared] = analysis.threads;
+    analysis.threads = [
+      { ...shared, id: "one", playersSideA: ["player1"] },
+      { ...shared, id: "two", playersSideA: ["player2"], progression: shared.progression.map((s, i) => ({ ...s, resolution: i === 0 ? ("unfavorable" as const) : null })) },
+    ];
+    const edited = Story.create(state);
+    const [plain] = challengeOptions();
+    expect(edited.getCurrentThreadLastStepResolution("player2")).not.toBe(edited.getCurrentThreadLastStepResolution("player1"));
+    const [forPlayer1] = favorableChances(edited, [plain]);
+    const [forPlayer2] = favorableChances(edited, [plain], "player2");
+    expect(forPlayer1).toBe(favorableChances(edited, [plain], "player1")[0]);
+    expect(forPlayer2).not.toBe(forPlayer1);
   });
 });
 

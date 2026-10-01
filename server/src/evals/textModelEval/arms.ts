@@ -91,7 +91,9 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * judge's v2 on the late turns both played), then a third round of whole-story
  * playthroughs on production's code after the fixes of 2026-10-01
  * (playthroughs-3: no --run arms, the --playthroughs --round 3 mode's prep
- * calls).
+ * calls), then the owner's option rules for group turns (group-options: the
+ * variant beside production's group turn on group chapter steps of the third
+ * round's stored runs, each turn with production's one checked retry).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -126,6 +128,7 @@ export const FEEDBACK_STAGES = [
   "options-o2c",
   "pacing-clues",
   "playthroughs-3",
+  "group-options",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -342,6 +345,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   pacingClues: "adopted",
   // Its fix-and-retest (the switch plan check reading step b's pacing), against production's code
   pacingCluesB: "adopted",
+  // The owner's option rules for group turns (decision A, 2026-10-01 evening): per player and chapter lines, O2b's stat
+  // lines, against production's group turn, which runs beside it
+  groupOptions: "adopted",
 };
 
 /**
@@ -366,6 +372,8 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   groupLeversB: "groupLevers",
   turnO2c: "turnO2b",
   pacingCluesB: "pacingClues",
+  // Priced from the group levers' measured form, whose group turns it edits
+  groupOptions: "groupLeversB",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -696,9 +704,54 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return runaway2Arms(role);
     case "options-o2c":
       return optionsO2cArms(role);
+    case "group-options":
+      return groupOptionsArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the group-options stage (decision A, the evening of
+ * 2026-10-01): production's own code after decision A's no-call fixes (repairs
+ * and checks; no turn request changed since the third playthroughs), under a
+ * tag no earlier stage used, so production runs beside the variant in the
+ * same minutes.
+ */
+export const GROUP_OPTIONS_PROMPT_STATE = "adopted23";
+
+/**
+ * The stage's cases (groupOptionsCases.ts, no calls): group chapter steps of
+ * the third round's stored runs where earlier sacrifices and rewards make the
+ * owner's rules read differently from B6's rate line: reward turns, sacrifice
+ * steps where B6's rate invites a reward, the round's one second-sacrifice
+ * state, a player whose roll the step discards.
+ */
+export const GROUP_OPTIONS_CASES = [
+  "round-options-food-trucks-t12",
+  "round-options-food-trucks-t15",
+  "round-options-food-trucks-t19",
+  "round-options-food-trucks-t22",
+  "round-options-food-trucks-t24",
+  "round-options-space-pirates-t6",
+  "round-options-space-pirates-t7",
+  "round-options-space-pirates-t11",
+  "round-options-space-pirates-t19",
+  "round-options-estate-agents-t18",
+  "round-options-estate-agents-t22",
+  "round-options-estate-agents-t25",
+] as const;
+
+/**
+ * The owner's option rules for group turns (decision A, the coordinator's
+ * brief of the evening of 2026-10-01): production's group turn (adopted) and
+ * the variant (groupOptions) on the group turn model (Luna low), twice on the
+ * stage's group chapter steps, interleaved, under adopted23, each turn with
+ * production's one checked retry, as the group-levers stage ran.
+ */
+function groupOptionsArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return (["adopted", "groupOptions"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: [...GROUP_OPTIONS_CASES] }));
 }
 
 /**
@@ -1402,7 +1455,7 @@ export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
 export const PLAYTHROUGHS_3_PROMPT_STATE = "adopted22";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
-const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies"];
+const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies", "group-options"];
 
 export function stageChecksTurns(stage: Stage): boolean {
   return CHECKED_TURN_STAGES.includes(stage);
@@ -1725,6 +1778,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "short-replies",
   "runaway-2",
   "options-o2c",
+  "group-options",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1793,6 +1847,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The short-replies stage's short turns from the second playthroughs (2026-10-01), frozen after every earlier stage had
   // closed; the frozen turns it runs beside were planned by earlier stages and stay plannable
   ...SHORT_REPLIES_BUILT_CASES.map((id): [string, Stage] => [id, "short-replies"]),
+  // The group-options stage's group chapter steps from the third playthroughs (2026-10-01, decision A), frozen after every
+  // earlier stage had closed
+  ...GROUP_OPTIONS_CASES.map((id): [string, Stage] => [id, "group-options"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

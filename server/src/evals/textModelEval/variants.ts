@@ -63,6 +63,7 @@ import { groupLeversRequest } from "../../game/services/storyTextRounds/groupLev
 import { shortRepliesRequest } from "../../game/services/storyTextRounds/shortReplies.js";
 import { noNewMilestonesRequest, noThreadAuditRequest } from "../../game/services/storyTextRounds/closingTurn.js";
 import { optionsO2cRequest } from "../../game/services/storyTextRounds/optionsO2c.js";
+import { groupOptionsRequest } from "../../game/services/storyTextRounds/groupOptions.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -392,6 +393,16 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * no complete outcome for a player with no thread to spare; where a thread is to
  * spare, a milestone kept for the story's last thread), one retry told the
  * problem, never failing the turn.
+ * "groupOptions" is the owner's option rules for group turns (2026-10-01
+ * evening, decision A; storyTextRounds/groupOptions.ts): production's group
+ * turn with, on a group's rolled step, each rolled player's line computed per
+ * player and chapter as O2c computes a single player's (a reward only on the
+ * chapter's first step where that player's previous chapter offered none and a
+ * stat allows one, elsewhere a sacrifice on B6's rate, a second in the chapter
+ * only for a strong reason; none where the owner's roll discards the player's),
+ * O2b's stat lines and risk-only weak example for each player's options, and the
+ * plan's lever question asked from those lines; production's request byte for
+ * byte elsewhere, with production's turn limits and retry count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -470,7 +481,8 @@ export type VariantId =
   | "noNewMilestones"
   | "turnO2c"
   | "pacingClues"
-  | "pacingCluesB";
+  | "pacingCluesB"
+  | "groupOptions";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -546,6 +558,7 @@ export const VARIANTS: VariantId[] = [
   "turnO2c",
   "pacingClues",
   "pacingCluesB",
+  "groupOptions",
 ];
 
 /**
@@ -1089,6 +1102,13 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   // Its fix-and-retest: the same requests, the switch plan check reading them against PACING's arithmetic (the play's,
   // latePacingPlay.ts's switchProblemOf)
   pacingCluesB: (input) => pacingCluesBuild(input, "pacingCluesB"),
+  // The owner's option rules for group turns: per player and chapter lines, O2b's stat lines, the plan question from them;
+  // production's turn limits and production's retry count where it has its own
+  groupOptions: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant groupOptions does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...groupOptionsRequest(input.story), limits: beatCallLimits(input.story), ...(count ? { shortTextCount: count } : {}) };
+  },
 };
 
 /** The pacing-clues stage's requests (its variant's and its fix-and-retest's): B's planners and the late part's clue lines; production's limits and retry count. */

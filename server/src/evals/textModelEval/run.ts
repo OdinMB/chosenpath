@@ -56,6 +56,7 @@ import { buildKidsCasesMode, kidsTurnsMode } from "./kidsTurnPrep.js";
 import { buildKidsAgesCasesMode } from "./kidsAgesCases.js";
 import { kidsAgesMode } from "./kidsAgesPrep.js";
 import { buildGroupLeverCasesMode, groupLeversMode } from "./groupLeversPrep.js";
+import { buildGroupOptionsCasesMode, groupOptionsMode } from "./groupOptionsPrep.js";
 import { buildShortReplyCasesMode, shortRepliesMode } from "./shortRepliesPrep.js";
 import { runaway2Mode } from "./runaway2Prep.js";
 import { optionsO2cMode } from "./optionsO2cPrep.js";
@@ -84,7 +85,7 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --dry-run (default) [--prompt-state <tag>, default round0]  cases, open jobs, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e|ending-state|runaway|…|short-replies|runaway-2|options-o2c --prompt-state <tag> [filters]
+ *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e|ending-state|runaway|…|short-replies|runaway-2|options-o2c|group-options --prompt-state <tag> [filters]
  *     (options-continuity runs under adopted2: production's form beside the three arms, interleaved;
  *     options-o2 under adopted3: production's form beside version O2 on the stored rolled chapter steps, interleaved,
  *     then O2's retest turnO2b once on the same steps; planner-v2e under round0, beside planner v2c's and v2d's
@@ -114,7 +115,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     one checked retry; runaway-2 --role beat under adopted19: production's closing turn, noThreadAudit and
  *     noNewMilestones sixteen times each on the switch turn that ran away most, interleaved, first tries only;
  *     options-o2c --role beat under adopted20: production's single-player turn and turnO2c twice on the stored
- *     rolled chapter steps, interleaved, first tries only)
+ *     rolled chapter steps, interleaved, first tries only; group-options --role beat under adopted23: production's group
+ *     turn and groupOptions twice on group chapter steps of the third playthroughs, interleaved, each with production's
+ *     one checked retry)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -278,6 +281,16 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     sacrifice or reward, the variety checks and the odds (which kind of option leads), O2c against production and
  *     against O2b's stored replies under the stop rule, every lever's text, the automatic checks, waits and cost;
  *     options-o2c.md and .json
+ *   The owner's option rules for group turns (groupOptionsPrep.ts, 2026-10-01 evening, decision A), in the group-options
+ *   stage:
+ *   --build-group-options-cases [--rebuild-cases]  group chapter steps of the third playthroughs where earlier sacrifices
+ *     and rewards make the owner's rules read differently from B6's rate (groupOptionsCases.ts); no calls; they then run
+ *     with --run --stage group-options --prompt-state adopted23 --role beat (production's group turn and groupOptions,
+ *     each with production's checked retry)
+ *   --group-options  the stage's report, no calls: each turn read whole (checkedTurns.ts), each rolled player's kept set
+ *     against the owner's rules and B6's rate for that player, its sacrifice or reward and that lever's stat, a second
+ *     sacrifice in the chapter, the variety and the odds for that player, the variant against production under the stop
+ *     rule, every lever's text, the retries, the automatic checks, the waits and cost; group-options.md and .json
  *   Fix 8's retest in whole short playthroughs (pacingCluesPrep.ts, 2026-10-01), in the pacing-clues stage:
  *   --pacing-clues-play [--cases <story ids>] [--samples N] [--turns N] [--arms pacingCluesB] [--max-spend 0.50]
  *     [--report-only]  production's code and pacingClues (the late-pacing fix-and-retest's planners and the late part's
@@ -363,6 +376,8 @@ type Mode =
   | "short-replies"
   | "runaway-2"
   | "options-o2c"
+  | "build-group-options-cases"
+  | "group-options"
   | "pacing-clues-play"
   | "pacing-clues-blind"
   | "judge-pacing-clues"
@@ -517,6 +532,8 @@ function parseArgs(argv: string[]): Args {
       case "--short-replies":
       case "--runaway-2":
       case "--options-o2c":
+      case "--build-group-options-cases":
+      case "--group-options":
       case "--pacing-clues-play":
       case "--pacing-clues-blind":
       case "--judge-pacing-clues":
@@ -1284,6 +1301,11 @@ async function main() {
     case "options-o2c":
       // A deterministic reading: no calls, so no key and no caps
       return optionsO2cMode({ files, log: (line) => console.log(line) });
+    case "build-group-options-cases":
+      return buildGroupOptionsCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "group-options":
+      // A deterministic reading: no calls, so no key and no caps
+      return groupOptionsMode({ files, log: (line) => console.log(line) });
     case "pacing-clues-play":
       // The short playthroughs book to the stage, one invocation at most the stage's cap unless --max-spend says less
       return pacingCluesPlayMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "pacing-clues", DEFAULT_STAGE_CAPS["pacing-clues"]), {
