@@ -44,6 +44,7 @@ import { productionCallLimits } from "../../../../src/shared/llm/chatModel.js";
 import { SWITCH_REMINDER } from "../../../../src/game/services/storyTextRounds/switchReminder.js";
 import { CHOICE_RESULT_TEXT, productionTurnToday } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { KIDS_TURN_TEXT } from "../../../../src/game/services/storyTextRounds/kidsTurn.js";
+import { KIDS_BAND_TURNS, beatCheckOptions } from "../../../../src/game/services/kidsTurnRules.js";
 import { beatReplyProblem, missingOptionsProblem, shortTextProblem, withBeatProblem } from "../../../../src/game/services/beatChecks.js";
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import { setupStep } from "../../../../src/game/services/storyTextSteps.js";
@@ -773,9 +774,12 @@ describe("planJobs: the round stages and the migration check", () => {
       expect(retry).toBeDefined();
       expect(retry.problemOf(reply(3))).toBeUndefined();
       // The variant's retry asks for its short count, and so does production's since the stage's adoption (a single
-      // player's kids turn, beatCheckOptions)
+      // player's kids turn, beatCheckOptions); since the kids-ages adoption later that day production's asks for its
+      // age band's (the mouse case's five-year-old: 3-5's very short paragraphs; the template, with no age: 6-8's)
+      const count = job.armKey.endsWith("/adopted") ? beatCheckOptions(caseStory(cases.find((c) => c.id === job.caseId) as EvalCase)).textCount : KIDS_TURN_TEXT.shortTextCount;
+      if (job.armKey.endsWith("/adopted")) expect(count).toBe(job.caseId === mouse ? KIDS_BAND_TURNS["3-5"].textCount : KIDS_TURN_TEXT.shortTextCount);
       const problem = retry.problemOf(reply(1)) as { text: string; kind: "short" };
-      expect(problem).toEqual({ text: shortTextProblem(reply(1) as never, KIDS_TURN_TEXT.shortTextCount), kind: "short" });
+      expect(problem).toEqual({ text: shortTextProblem(reply(1) as never, count ?? ""), kind: "short" });
       expect((retry.build(problem).request() as { prompt: string }).prompt).toBe(withBeatProblem((job.first.request() as { prompt: string }).prompt, problem.text));
     }
     // No other role, and no earlier stage plans the mouse turns

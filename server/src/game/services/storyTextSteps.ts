@@ -121,7 +121,7 @@ function mergeChanges(response: SetOfBeatGenerationSchema): Change[] {
 export const beatStep = {
   /**
    * A turn for every player; a single player's rolled chapter step takes the option rules (B6) in its fields too, and a
-   * single player's turn read with a child the short count in its text field (the kids-turns stage).
+   * turn read with a child, every player count, its age band's count in its text field (the kids-turns and kids-ages stages).
    */
   request(story: Story): TextRequest<z.AnyZodObject> {
     const schema = createSetOfBeatGenerationSchema(

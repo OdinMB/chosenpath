@@ -1,4 +1,4 @@
-import type { GameMode } from "core/types/index.js";
+import type { GameMode, KidAges } from "core/types/index.js";
 import type { PlayerCount } from "core/types/index.js";
 import { TemplateIterationSections } from "core/types/admin.js";
 import { templateIterationSections } from "core/utils/templateIterationSections.js";
@@ -18,6 +18,7 @@ import {
   outcomesSection,
   statTypes,
   statsThatAct,
+  takesOlderKidsBudget,
   thisSetupBlock,
 } from "./setupPromptText.js";
 
@@ -33,8 +34,11 @@ import {
 /** A new custom story or template from a premise, or an iteration on an existing template. */
 type SetupMode = "story" | "template" | "iteration";
 
-/** What a setup call knows beyond its premise: a child reads along (a read-with-kids story) */
-export type SetupPromptOptions = { kids?: boolean };
+/**
+ * What a setup call knows beyond its premise: a child reads along (a read-with-kids story), and the children's ages,
+ * where a youngest child of 9 or older gets a third visible player stat (the kids-ages stage, 2026-10-01)
+ */
+export type SetupPromptOptions = { kids?: boolean; kidAges?: KidAges };
 
 type SetupCall = {
   players: PlayerCount;
@@ -44,6 +48,8 @@ type SetupCall = {
   maxTurns: number;
   /** A child reads along: the smaller stat budget with plain names. AI Iteration never has it (iteration knows no category). */
   kids: boolean;
+  /** A child reads along and the youngest is 9 or older: a third visible player stat */
+  olderKids: boolean;
 };
 
 /** Template fields that identify its creator; they never go to the model. */
@@ -78,7 +84,9 @@ export class StorySetupPromptService {
     kind: "story" | "template",
     options: SetupPromptOptions = {}
   ): string {
-    const call: SetupCall = { players: playerCount, mode: gameMode, kind, sections: ALL_SECTIONS, maxTurns, kids: options.kids ?? false };
+    const kids = options.kids ?? false;
+    const olderKids = kids && takesOlderKidsBudget(options.kidAges);
+    const call: SetupCall = { players: playerCount, mode: gameMode, kind, sections: ALL_SECTIONS, maxTurns, kids, olderKids };
     return this.buildPrompt(call, premise, "");
   }
 
@@ -92,7 +100,7 @@ export class StorySetupPromptService {
     template: object
   ): string {
     const templateJson = JSON.stringify(Object.fromEntries(Object.entries(template).filter(([key]) => !CREATOR_FIELDS.has(key))));
-    const call: SetupCall = { players: playerCount, mode: gameMode, kind: "iteration", sections, maxTurns, kids: false };
+    const call: SetupCall = { players: playerCount, mode: gameMode, kind: "iteration", sections, maxTurns, kids: false, olderKids: false };
     return this.buildPrompt(call, feedback, templateJson);
   }
 
@@ -168,7 +176,7 @@ That said: don't overdo it.
       ? `\n- ${kids ? "Two" : "3-4"} visible shared stats for things that are not directly linked to one player
 --- Things that are shared between players (e.g. variables about a group/organization that several players belong to, a spaceship that players use together, a flat that players share, etc.)
 --- Stats about the world (e.g. tension between factions, environment conditions, etc.)${scoreboard}${kids ? "" : "\n--- Any invisible shared stats that you think are important"}
-- ${kids ? "Two" : "3-4"} visible stats that are directly linked to the player (traits, skills, dispositions, health, personal relationships, personal resources, personal reputation, personal inventory, etc.)${
+- ${kids ? (call.olderKids ? "Three" : "Two") : "3-4"} visible stats that are directly linked to the player (traits, skills, dispositions, health, personal relationships, personal resources, personal reputation, personal inventory, etc.)${
           kids ? "" : "\n--- Any invisible stats that are linked to that player that you think are important"
         }`
       : "";
@@ -294,6 +302,7 @@ ${isStory ? "Examples of the levels in each range (pick the one level that fits 
       pointsAtScoreboardRule: asks(call, "stats"),
       writesBothLists: writesBothLists(call),
       kids: call.kids && asksStatRules(call),
+      olderKids: call.olderKids,
     });
     if (call.kind === "iteration") {
       const setupBlock = asksSlate(call) ? `\n${slate}\n` : "";

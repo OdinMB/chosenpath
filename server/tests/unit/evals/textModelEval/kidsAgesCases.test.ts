@@ -144,7 +144,8 @@ describe("kidsAgesCases on the frozen cases and the stored setup chain (skipped 
       expect(kidAgeAnswer(c?.setup?.premise ?? "")).toBe("10");
       const input = requestInputFor(c!);
       expect(requestText(requestFor("kidsAges", input))).toContain(KIDS_AGES_SETUP_TEXT.budget.to);
-      expect(requestText(requestFor("adopted", input))).toContain(KIDS_AGES_SETUP_TEXT.budget.from);
+      // As run, production's setup had the small budget at every age; since the stage's adoption it is the variant's
+      expect(requestText(requestFor("adopted", input))).toBe(requestText(requestFor("kidsAges", input)));
       // Below 9 the variant's setup is production's byte for byte, so the stage builds none there
       for (const age of [4, 7]) {
         const younger = { ...c!, setup: { ...c!.setup!, kidAges: { min: age, max: age } } };

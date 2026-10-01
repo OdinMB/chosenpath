@@ -1,5 +1,5 @@
 import type { Story } from "core/models/Story.js";
-import type { GameMode, KidAges, PlayerCount } from "core/types/index.js";
+import { kidAgesFrom, kidAgesFromPremise, type GameMode, type KidAges, type PlayerCount } from "core/types/index.js";
 import type { TemplateIterationSections } from "core/types/admin.js";
 import { beatStep, iterationStep, setupStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import {
@@ -600,8 +600,10 @@ function prodRequest(input: RequestInput): TextRequest {
  * TemplateService.iterateTemplate for AI Iteration), with production's
  * timeout and output cap for the role and player count (productionCallLimits),
  * as production sends it; on a turn whose retry of a one-paragraph reply asks
- * for another length than five or six paragraphs (a single player's kids turn,
- * beatCheckOptions), that length, which the eval's checked retry sends.
+ * for another length than five or six paragraphs (a kids turn of every player
+ * count, its age band's, beatCheckOptions), that length, which the eval's
+ * checked retry sends. A kids setup gets the children's ages, as production's
+ * story creation passes them (a third visible player stat from age 9).
  */
 function adoptedRequest(input: RequestInput): EvalRequest {
   const players = input.role === "setup" ? input.setup.playerCount : input.role === "iteration" ? input.iteration.playerCount : input.story.getNumberOfPlayers();
@@ -612,8 +614,10 @@ function adoptedRequest(input: RequestInput): EvalRequest {
 function adoptedWords(input: RequestInput): EvalRequest {
   switch (input.role) {
     case "setup": {
-      const { premise, playerCount, gameMode, maxTurns, kids } = input.setup;
-      return setupStep.request(premise, playerCount, gameMode, maxTurns, "story", { kids });
+      const { premise, playerCount, gameMode, maxTurns, kids, kidAges } = input.setup;
+      // As StoryCreationService passes them: the read-with-kids setting, else the premise's age line
+      const ages = kids ? kidAgesFrom(kidAges) ?? kidAgesFromPremise(premise) : undefined;
+      return setupStep.request(premise, playerCount, gameMode, maxTurns, "story", { kids, ...(ages ? { kidAges: ages } : {}) });
     }
     case "beat":
       return beatStep.request(input.story);

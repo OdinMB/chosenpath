@@ -42,8 +42,10 @@ import { replaceOnce, splitAtState } from "./roundEdits.js";
  * Adopted for a single player after the run of 2026-10-01 (production's copy
  * is kidsTurnRules.ts; the kept tests hold production to this variant byte for
  * byte, prompt and JSON schema). Its base is built from the frozen measured
- * forms, so it still builds as measured. A group's read-with-kids turn keeps
- * production's count: the stage measured one player.
+ * forms, so it still builds as measured. A group's read-with-kids turn kept
+ * production's count: the stage measured one player. Since the kids-ages
+ * stage of the same day every read-with-kids turn takes its children's age
+ * band (kidsAges.ts); this variant's text is the 6-8 band's.
  */
 
 const LABEL = "Kids turn";

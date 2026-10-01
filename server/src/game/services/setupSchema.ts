@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { createStorySetupSchema, GameModes, PLAYER_SLOTS, type GameMode, type PlayerCount } from "core/types/index.js";
+import { createStorySetupSchema, GameModes, PLAYER_SLOTS, type GameMode, type KidAges, type PlayerCount } from "core/types/index.js";
 import { templateIterationSections } from "core/utils/templateIterationSections.js";
+import { takesOlderKidsBudget } from "./prompts/setupPromptText.js";
 
 /*
  * The setup's field descriptions and field order, adopted on 2026-09-28 from
@@ -18,11 +19,12 @@ import { templateIterationSections } from "core/utils/templateIterationSections.
  * seats. adoptedSetup.test.ts holds the schemas equal to the measured ones.
  */
 
-export type SetupSchemaOptions = { kids?: boolean };
+/** A child reads along, and the children's ages: a youngest child of 9 or older gets a third visible player stat (the kids-ages stage). */
+export type SetupSchemaOptions = { kids?: boolean; kidAges?: KidAges };
 
 type Kind = "story" | "template" | "iteration";
 
-type Call = { players: PlayerCount; mode: GameMode; kind: Kind; sections: string[]; kids: boolean };
+type Call = { players: PlayerCount; mode: GameMode; kind: Kind; sections: string[]; kids: boolean; olderKids?: boolean };
 
 const ALL_SECTIONS = Object.keys(templateIterationSections);
 
@@ -204,7 +206,9 @@ const sharedStatsDescription = (call: Call) =>
       }`;
 const playerStatsDescription = (call: Call) =>
   `Stats that are tied specifically to individual players, including traits, skills, dispositions, health, personal relationships, personal resources, personal reputation, personal inventory, etc. In multiplayer games, each player has different values for these stats. ${
-    call.kids ? "Generate two visible player stats and no hidden ones: a child reads this story." : "Generate 3-4 visible player stats, plus any invisible ones the story needs."
+    call.kids
+      ? `Generate ${call.olderKids ? "three" : "two"} visible player stats and no hidden ones: a child reads this story.`
+      : "Generate 3-4 visible player stats, plus any invisible ones the story needs."
   }`;
 
 // ---------------------------------------------------------------- guidelines and story elements (A7, A11)
@@ -408,7 +412,8 @@ export function setupGenerationSchema(
   kind: "story" | "template",
   options: SetupSchemaOptions = {}
 ): z.AnyZodObject {
-  const call: Call = { players: playerCount, mode: gameMode, kind, sections: ALL_SECTIONS, kids: options.kids ?? false };
+  const kids = options.kids ?? false;
+  const call: Call = { players: playerCount, mode: gameMode, kind, sections: ALL_SECTIONS, kids, olderKids: kids && takesOlderKidsBudget(options.kidAges) };
   return generationOrderSchema(fieldOrderSchema(call, false), call);
 }
 

@@ -13,7 +13,7 @@ import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js
 import { takesKidsRules } from "../../../../../src/game/services/kidsTurnRules.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { stat } from "../../../../helpers/textFixtures.js";
-import { productionThen, withKidsImageSlots } from "../../../../helpers/adoptedDeltas.js";
+import { beforeEndingOnlyPlayed, productionBeforeKidsAges, productionThen, withKidsImageSlots } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * Money and counts that add up in a learning story (eval only; fix 7 of the
@@ -117,18 +117,20 @@ describe("production's request byte for byte everywhere else", () => {
   ] as const)("%s", (_, build) => {
     const story = build();
     expect(takesMoneyRule(story)).toBe(false);
-    const production = productionThen(beatStep.request(story), story);
-    expect(moneyAddsUpRequest(story).prompt).toBe(production.prompt);
-    expect(json(moneyAddsUpRequest(story).schema)).toBe(json(production.schema));
+    // A kids turn as production sent it before the kids-ages adoption, later that day (productionBeforeKidsAges)
+    const production = productionBeforeKidsAges(story);
+    expect(moneyAddsUpRequest(story).prompt).toBe(beforeEndingOnlyPlayed(production.prompt, story));
+    expect(json(moneyAddsUpRequest(story).schema)).toBe(production.json);
   });
 
   /*
    * The stage's base is production's turn as it stood then. Since the review of fix 6 (2026-10-01) a single player's
    * kids turn that shows images names other image places (withKidsImageSlots, the kept tests' logged delta), so the
    * frozen template case with images compares with that delta on the variant's base. An ending compares with
-   * production as it stood before the owner's decision of 2026-10-01 on ending milestones (productionThen).
+   * production as it stood before the owner's decision of 2026-10-01 on ending milestones (productionThen), and a kids
+   * turn with production before the kids-ages adoption of the same day (productionBeforeKidsAges).
    */
-  const asProductionNow = (prompt: string, story: Story) => (takesKidsRules(story) ? withKidsImageSlots(prompt, story) : prompt);
+  const asProductionNow = (prompt: string, story: Story) => (takesKidsRules(story) && !story.isMultiplayer() ? withKidsImageSlots(prompt, story) : prompt);
 
   (frozen.length ? it : it.skip)("every frozen turn case: production's request around the block, which only a learning story's turn carries", () => {
     const turns = frozen.filter((c) => c.role === "beat" && c.state);
@@ -136,7 +138,7 @@ describe("production's request byte for byte everywhere else", () => {
     for (const c of turns) {
       const story = caseStory(c);
       const variant = asProductionNow(moneyAddsUpRequest(story).prompt, story);
-      const production = productionThen(beatStep.request(story), story).prompt;
+      const production = beforeEndingOnlyPlayed(productionBeforeKidsAges(story).prompt, story);
       expect([c.id, withoutBlock(variant) === production, variant === production]).toEqual([c.id, true, !takesMoneyRule(story)]);
     }
   });

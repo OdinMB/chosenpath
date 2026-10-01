@@ -12,7 +12,7 @@ import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
-import { productionThen } from "../../../../helpers/adoptedDeltas.js";
+import { productionBeforeKidsAges, productionThen } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * Read-with-kids turns, shorter and simpler for the reading age the setup
@@ -120,14 +120,15 @@ describe("production's request byte for byte on every other story", () => {
     expect(json(request.schema)).toBe(json(beatStep.request(story).schema));
   });
 
-  it("and since the stage's adoption (2026-10-01) production is the variant on a single player's kids turn, a group's kids turn unchanged", () => {
+  // Until the kids-ages stage's adoption later that day, which gave every kids turn its age band's text (productionBeforeKidsAges)
+  it("and since the stage's adoption (2026-10-01) production was the variant on a single player's kids turn, a group's kids turn unchanged", () => {
     for (const [, build] of TURNS) {
       const story = build(KIDS);
-      const production = beatStep.request(story);
+      const production = productionBeforeKidsAges(story);
       if (story.isMultiplayer()) expect(production.prompt).toBe(beatStep.request(build({})).prompt);
       else {
         expect(productionThen(production, story).prompt).toBe(kidsTurnRequest(story).prompt);
-        expect(json(production.schema)).toBe(json(kidsTurnRequest(story).schema));
+        expect(production.json).toBe(json(kidsTurnRequest(story).schema));
       }
     }
   });

@@ -11,16 +11,8 @@ import {
   kidsAgesShortTextCount,
   kidsAgesTurnRequest,
 } from "../../../../../src/game/services/storyTextRounds/kidsAges.js";
-import {
-  KIDS_CONTEXT,
-  KIDS_FIELD_IMAGE_DISTRIBUTION,
-  KIDS_FIELD_IMAGE_LATE,
-  KIDS_IMAGE_DISTRIBUTION,
-  KIDS_TEXT_COUNT,
-  kidsFieldCount,
-  kidsRepeat,
-  kidsRules,
-} from "../../../../../src/game/services/kidsTurnRules.js";
+import { KIDS_BAND_TURNS } from "../../../../../src/game/services/kidsTurnRules.js";
+import { KIDS_TURN_TEXT } from "../../../../../src/game/services/storyTextRounds/kidsTurn.js";
 import { beatStep, setupStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
@@ -92,19 +84,22 @@ describe("the band a story's turns are written for", () => {
   });
 });
 
-describe("the 6-8 band is production's kids turn word for word", () => {
-  it("in production's own constants", () => {
+/*
+ * As built, the 6-8 band was production's kids turn of the time (the kids-turns stage's measured kidsTurn with the
+ * review's image places). Since the stage's adoption production's bands are this variant's (adoptedTurns.test.ts).
+ */
+describe("the 6-8 band is the kids-turns stage's measured turn word for word", () => {
+  it("in the measured variant's and production's own constants", () => {
     const text = KIDS_AGES_TEXT["6-8"];
     for (const who of ["a child aged 7", "a young child"]) {
-      expect(text.rules(who)).toBe(kidsRules(who));
-      expect(text.repeat(who)).toBe(kidsRepeat(who));
-      expect(text.fieldCount(who)).toBe(kidsFieldCount(who));
+      expect(text.rules(who)).toBe(KIDS_TURN_TEXT.rules(who));
+      expect(text.repeat(who)).toBe(KIDS_TURN_TEXT.repeat(who));
+      expect(text.fieldCount(who)).toBe(KIDS_TURN_TEXT.fieldCount(who));
     }
-    expect(text.context).toBe(KIDS_CONTEXT);
-    expect(text.shortTextCount).toBe(KIDS_TEXT_COUNT);
-    expect(text.image.prompt).toBe(KIDS_IMAGE_DISTRIBUTION);
-    expect(text.image.field).toBe(KIDS_FIELD_IMAGE_DISTRIBUTION);
-    expect(text.image.late).toBe(KIDS_FIELD_IMAGE_LATE);
+    expect(text.context).toBe(KIDS_TURN_TEXT.context);
+    expect(text.shortTextCount).toBe(KIDS_TURN_TEXT.shortTextCount);
+    const production = KIDS_BAND_TURNS["6-8"];
+    expect(text.image).toEqual({ prompt: production.image.distribution, field: production.image.fieldDistribution, late: production.image.fieldLate });
   });
 
   it.each(SINGLE)("so a single player's %s at 6-8, or with no age, is production's request byte for byte, with and without images", (_, build) => {
@@ -168,7 +163,7 @@ describe("the variant on a read-with-kids story", () => {
 
   it("asks a retry for the band's count, every player count; nothing on another story", () => {
     expect(kidsAgesShortTextCount(threadBeat(1, kids(4)))).toBe(KIDS_AGES_TEXT["3-5"].shortTextCount);
-    expect(kidsAgesShortTextCount(threadBeat(2, kids(7)))).toBe(KIDS_TEXT_COUNT);
+    expect(kidsAgesShortTextCount(threadBeat(2, kids(7)))).toBe(KIDS_TURN_TEXT.shortTextCount);
     expect(kidsAgesShortTextCount(threadBeat(3, kids(10)))).toBe("four or five paragraphs of two to four sentences each");
     expect(kidsAgesShortTextCount(threadBeat(1))).toBeUndefined();
   });
@@ -234,7 +229,18 @@ describe("the setup's kids budget by band", () => {
     const request = requestFor("kidsAges", { role: "setup", setup: { ...withoutAges, kidAges: { min: 10, max: 10 } } });
     expect(requestText(request)).toBe(kidsAgesSetupRequest(MOUSE, 1, GameModes.SinglePlayer, 10, "story", { kids: true, kidAges: { min: 10, max: 10 } }).prompt);
     expect(callLimitsOf(request)).toEqual(productionCallLimits("setup", 1));
-    expect(requestText(requestFor("kidsAges", { role: "setup", setup: withoutAges }))).toBe(requestText(requestFor("adopted", { role: "setup", setup: withoutAges })));
+    // Without the setting the variant reads no age (production, since the adoption, reads the premise's line: above)
+    expect(requestText(requestFor("kidsAges", { role: "setup", setup: withoutAges }))).toBe(setupStep.request(MOUSE, 1, GameModes.SinglePlayer, 10, "story", { kids: true }).prompt);
+  });
+
+  it("since the adoption, the eval's production arm passes the children's ages as story creation does: the setting, else the premise's age line", () => {
+    const base = { premise: MOUSE, playerCount: 1 as const, gameMode: GameModes.SinglePlayer, maxTurns: 10 };
+    const fromPremise = requestText(requestFor("adopted", { role: "setup", setup: { ...base, kids: true } }));
+    expect(fromPremise).toBe(setupStep.request(MOUSE, 1, GameModes.SinglePlayer, 10, "story", { kids: true, kidAges: { min: 10, max: 10 } }).prompt);
+    expect(fromPremise).toContain(KIDS_AGES_SETUP_TEXT.budget.to);
+    const fromSetting = requestText(requestFor("adopted", { role: "setup", setup: { ...base, kids: true, kidAges: { min: 6, max: 9 } } }));
+    expect(fromSetting).toContain(KIDS_AGES_SETUP_TEXT.budget.from);
+    expect(requestText(requestFor("adopted", { role: "setup", setup: base }))).toBe(setupStep.request(MOUSE, 1, GameModes.SinglePlayer, 10, "story").prompt);
   });
 
   it("is production's kids setup byte for byte below 9-12 and without an age, and production's setup on any other story", () => {

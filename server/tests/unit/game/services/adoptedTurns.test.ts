@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
-import { GameModes, type GameMode, type ThreadAnalysis } from "core/types/index.js";
+import { GameModes, type GameMode, type StoryState, type ThreadAnalysis } from "core/types/index.js";
 import { beatStep, switchStep, threadStep } from "../../../../src/game/services/storyTextSteps.js";
 import { todaysFormWithB6Request } from "../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { round0BeatStep } from "../../../../src/game/services/storyTextRound0/round0Steps.js";
@@ -17,7 +17,8 @@ import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../.
 import { ENDING_MILESTONES_PLAYED, ENDING_OUTCOME_KINDS, SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
 import { CHOICE_RESULT_TEXT, choiceResultRequest, takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { KIDS_TURN_TEXT, kidsTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsTurn.js";
-import { KIDS_CONTEXT, KIDS_TEXT_COUNT, kidsFieldCount, kidsRepeat, kidsRules, takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
+import { KIDS_AGES_TEXT, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsAges.js";
+import { KIDS_BAND_TURNS, beatCheckOptions, takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -39,7 +40,9 @@ import { KIDS_CONTEXT, KIDS_TEXT_COUNT, kidsFieldCount, kidsRepeat, kidsRules, t
  * with production's one retry of a short reply in the loop). Since the
  * kids-turns stage of 2026-10-01, a single player's turn in a story read with
  * a child is the measured variant kidsTurn byte for byte, every turn kind,
- * apart from the logged image places where it shows images. Since the owner's
+ * apart from the logged image places where it shows images; since the
+ * kids-ages stage of the same day, a read-with-kids turn of every player count
+ * is the measured kidsAges, by the children's age band. Since the owner's
  * decision of 2026-10-01 every ending carries one logged delta: only what was
  * played gets a milestone, and an unfinished outcome is told as unfinished
  * (withEndingOnlyPlayed).
@@ -140,9 +143,9 @@ function expectSame(production: Request, measured: Request | Expected) {
 }
 
 /**
- * A single player's read-with-kids turn: the measured kidsTurn (the kids-turns stage of 2026-10-01; built on production's
- * turn as measured) with, where it shows images, the logged image places (withKidsImageSlots, adoptedDeltas.ts), and at
- * the ending the lines on what was played (withEndingOnlyPlayed).
+ * A single player's read-with-kids turn at 6-8, or with no age: the measured kidsTurn (the kids-turns stage of
+ * 2026-10-01; built on production's turn as measured) with, where it shows images, the logged image places
+ * (withKidsImageSlots, adoptedDeltas.ts), and at the ending the lines on what was played (withEndingOnlyPlayed).
  */
 function kidsAdopted(story: Story): Expected {
   const measured = kidsTurnRequest(story);
@@ -152,9 +155,19 @@ function kidsAdopted(story: Story): Expected {
   };
 }
 
+/**
+ * A read-with-kids turn of every player count and band (the kids-ages stage of 2026-10-01): the measured kidsAges, the
+ * grown-up turn (the same story without its category, which the other tests hold to its measured form) with the
+ * band's kids lines.
+ */
+const kidsAgesAdopted = (story: Story): Expected => {
+  const measured = kidsAgesTurnRequest(story);
+  return { prompt: measured.prompt, json: json(measured.schema) };
+};
+
 /** The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. */
 const asAdopted = (measured: Request, story: Story): Expected =>
-  takesKidsRules(story) ? kidsAdopted(story) : { prompt: adoptedTurn(measured.prompt, story), json: json(measured.schema) };
+  takesKidsRules(story) ? kidsAgesAdopted(story) : { prompt: adoptedTurn(measured.prompt, story), json: json(measured.schema) };
 
 describe("single-player turns: today's form with B6 as measured, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(SINGLE_PLAYER)("%s", (_, build) => {
@@ -178,53 +191,83 @@ describe("single-player turns: today's form with B6 as measured, an exploration 
 });
 
 /*
- * A single player's read-with-kids turn (the kids-turns stage of 2026-10-01,
- * fix 6 of the second playthroughs' review): the measured kidsTurn byte for
- * byte, every turn kind, prompt and JSON schema; the child's age the story
- * recorded, or a young child where it recorded none (a template tagged Kids).
- * Where the turn shows images, its image places are the one logged delta
- * (withKidsImageSlots: the second paragraph, or the third of four, in place of
- * the third or fourth). A group's read-with-kids turn is unchanged: the stage
- * measured one player.
+ * A read-with-kids turn by the children's age band (the kids-ages stage of
+ * 2026-10-01, the owner's decision of the same day: "this should depend on the
+ * age range that should be part of kids stories settings"): the measured
+ * kidsAges byte for byte, every turn kind and player count, prompt and JSON
+ * schema; the youngest child's band (3-5, 6-8, 9-12), 6-8 where the story
+ * recorded no age (a template tagged Kids without one). The 6-8 band is the
+ * kids-turns stage's measured turn: a single player's turn there is still
+ * kidsTurn as measured, with its logged image places (withKidsImageSlots: the
+ * second paragraph, or the third of four, in place of the third or fourth).
+ * Until this stage a group's read-with-kids turn kept the grown-up count.
  */
-describe("a single player's read-with-kids turns: kidsTurn as measured", () => {
-  const KIDS = { category: "read-with-kids" as const, readingAge: "5" };
-
-  it.each(SINGLE_PLAYER)("%s, read with a child aged 5", (_, build) => {
-    const story = build().clone(KIDS);
-    expectSame(beatStep.request(story), kidsAdopted(story));
-    expect(beatStep.request(story).prompt).not.toContain("5-6 paragraphs");
-  });
-
-  it("names a young child where the story recorded no age", () => {
-    const story = threadBeat(1, { category: "read-with-kids" });
-    expectSame(beatStep.request(story), kidsTurnRequest(story));
-    expect(beatStep.request(story).prompt).toContain(KIDS_TURN_TEXT.rules("a young child"));
-  });
-
-  it.each([
+describe("read-with-kids turns: kidsAges as measured, every band and player count", () => {
+  const AGES: [string, Partial<StoryState>][] = [
+    ["a child aged 4", { category: "read-with-kids", kidAges: { min: 4, max: 4 } }],
+    ["children aged 5-9", { category: "read-with-kids", kidAges: { min: 5, max: 9 } }],
+    ["a child aged 7", { category: "read-with-kids", kidAges: { min: 7, max: 7 } }],
+    ["a child aged 10", { category: "read-with-kids", kidAges: { min: 10, max: 10 } }],
+    ["no recorded age", { category: "read-with-kids" }],
+    ["a premise's age 5, saved before the setting", { category: "read-with-kids", readingAge: "5" }],
+  ];
+  const IMAGES: [string, Partial<StoryState>][] = [
+    ["no images", {}],
     ["generated images", { generateImages: true }],
     ["a template's image library", { templateId: "tpl-kids" }],
-  ])("with %s: kidsTurn with the logged image places, where the measured lines named the third or fourth paragraph", (_, images) => {
-    for (const build of SINGLE_PLAYER.map(([, b]) => b)) {
-      const story = build().clone({ ...KIDS, ...images });
-      expect(kidsTurnRequest(story).prompt).toContain("one for the third or fourth paragraph");
-      expectSame(beatStep.request(story), kidsAdopted(story));
+  ];
+
+  it.each([...SINGLE_PLAYER, ...GROUPS])("%s, at every age, with and without images", (_, build) => {
+    for (const [, ages] of AGES) {
+      for (const [, images] of IMAGES) {
+        const story = build().clone({ ...ages, ...images });
+        expectSame(beatStep.request(story), kidsAgesAdopted(story));
+        expect(beatStep.request(story).prompt).not.toContain("5-6 paragraphs");
+      }
     }
   });
 
-  it.each(GROUPS)("leaves a group's turn as it was: %s", (_, build) => {
-    const story = build().clone(KIDS);
-    expectSame(beatStep.request(story), beatStep.request(build()));
+  it.each(SINGLE_PLAYER)("%s, a single player's at 6-8 or with no age: still kidsTurn as measured, with the logged image places", (_, build) => {
+    for (const ages of [{ category: "read-with-kids" as const, kidAges: { min: 7, max: 7 } }, { category: "read-with-kids" as const }]) {
+      for (const [, images] of IMAGES) {
+        const story = build().clone({ ...ages, ...images });
+        if (images.generateImages || images.templateId) expect(kidsTurnRequest(story).prompt).toContain("one for the third or fourth paragraph");
+        expectSame(beatStep.request(story), kidsAdopted(story));
+      }
+    }
+    const young = threadBeat(1, { category: "read-with-kids" });
+    expect(beatStep.request(young).prompt).toContain(KIDS_TURN_TEXT.rules("a young child"));
   });
 
-  it("prints the measured text from production's own constants", () => {
-    const who = "a child aged 5";
-    expect(KIDS_CONTEXT).toBe(KIDS_TURN_TEXT.context);
-    expect(kidsRules(who)).toBe(KIDS_TURN_TEXT.rules(who));
-    expect(kidsRepeat(who)).toBe(KIDS_TURN_TEXT.repeat(who));
-    expect(kidsFieldCount(who)).toBe(KIDS_TURN_TEXT.fieldCount(who));
-    expect(KIDS_TEXT_COUNT).toBe(KIDS_TURN_TEXT.shortTextCount);
+  it("prints each band's measured text from production's own constants", () => {
+    for (const band of ["3-5", "6-8", "9-12"] as const) {
+      const production = KIDS_BAND_TURNS[band];
+      const measured = KIDS_AGES_TEXT[band];
+      for (const who of ["a child aged 5", "a young child"]) {
+        expect(production.rules(who)).toBe(measured.rules(who));
+        expect(production.repeat(who)).toBe(measured.repeat(who));
+        expect(production.fieldCount(who)).toBe(measured.fieldCount(who));
+      }
+      expect(production.context).toBe(measured.context);
+      expect(production.textCount).toBe(measured.shortTextCount);
+      expect(production.image).toEqual({ distribution: measured.image.prompt, fieldDistribution: measured.image.field, fieldLate: measured.image.late });
+    }
+    // The 6-8 band is the kids-turns stage's measured text
+    const who = "a child aged 7";
+    expect(KIDS_BAND_TURNS["6-8"].context).toBe(KIDS_TURN_TEXT.context);
+    expect(KIDS_BAND_TURNS["6-8"].rules(who)).toBe(KIDS_TURN_TEXT.rules(who));
+    expect(KIDS_BAND_TURNS["6-8"].repeat(who)).toBe(KIDS_TURN_TEXT.repeat(who));
+    expect(KIDS_BAND_TURNS["6-8"].fieldCount(who)).toBe(KIDS_TURN_TEXT.fieldCount(who));
+    expect(KIDS_BAND_TURNS["6-8"].textCount).toBe(KIDS_TURN_TEXT.shortTextCount);
+  });
+
+  it("asks a retry for the band's count as the measured variant did, every player count", () => {
+    for (const [, ages] of AGES) {
+      for (const players of [1, 2, 3]) {
+        const story = threadBeat(players, ages);
+        expect(beatCheckOptions(story).textCount).toBe(kidsAgesShortTextCount(story));
+      }
+    }
   });
 });
 

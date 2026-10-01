@@ -853,8 +853,8 @@ export async function playStory(
       if (analysis === "thread" && options.stopAfterLastChapterPlan && isLastChapter(turnsLeft(resolved))) return { story: before, targets, planOnly: true };
     }
     const request = requestFor(variant, { role: "beat", story: before });
-    // As AIStoryGenerator checks a beat reply: the ending shows no options, and a single player's kids turn's retry asks for
-    // its short count
+    // As AIStoryGenerator checks a beat reply: the ending shows no options, and a kids turn's retry asks for its age band's
+    // count
     const beatCheck = beatCheckOptions(before);
     const invoke = invoker(`${turn.kind}${suffix}`, "beat", request, turn.calls, (log, parsed) => {
       const problem = beatReplyProblem(parsed as SetOfBeatGenerationSchema, beatCheck);

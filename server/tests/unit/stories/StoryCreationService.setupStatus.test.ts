@@ -255,6 +255,21 @@ describe("StoryCreationService setup status", () => {
     expect(state?.readingAge).toBeUndefined();
   });
 
+  // The kids-ages stage of 2026-10-01: a setup for a child of 9 or older gets a third visible player stat
+  it.each([
+    ["the setting", "A mouse story", { min: 9, max: 11 }, { kids: true, kidAges: { min: 9, max: 11 } }],
+    ["the premise's age line", "How old is the child?: 10", undefined, { kids: true, kidAges: { min: 10, max: 10 } }],
+    ["no age", "A mouse story with no age", undefined, { kids: true }],
+  ] as const)("tells the setup the children's ages from %s, which size its stat budget", async (_, premise, kidAges, options) => {
+    await createWith(premise, "read-with-kids", kidAges ? { ...kidAges } : undefined);
+    expect(createInitialState.mock.calls[0][7]).toEqual(options);
+  });
+
+  it("tells a setup of another category no ages, whatever the request carries", async () => {
+    await createWith("How old is the child?: 10", "enjoy-fiction", { min: 10, max: 10 });
+    expect(createInitialState.mock.calls[0][7]).toEqual({ kids: false });
+  });
+
   it("records the read-with-kids setting the request carries, over the premise's line", async () => {
     const { state } = await createWith("How old is the child?: 5", "read-with-kids", { min: 8, max: 10 });
     expect(state?.kidAges).toEqual({ min: 8, max: 10 });

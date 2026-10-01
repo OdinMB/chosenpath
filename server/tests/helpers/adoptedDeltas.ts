@@ -16,15 +16,21 @@
  * near the end; since 2026-10-01 it also carries a measured line planner v2b
  * never had (a contest's last stage offered only as a grouped thread:
  * withContestLastStage, the parallel-threads stage's variant, not a delta).
- * A single player's read-with-kids turn is kidsTurn (2026-10-01) with one
- * delta where it shows images: the image places (withKidsImageSlots). Every
+ * A single player's read-with-kids turn was kidsTurn (2026-10-01) with one
+ * delta where it shows images: the image places (withKidsImageSlots); since
+ * the kids-ages stage of the same day every read-with-kids turn is the
+ * measured kidsAges, by age band (productionBeforeKidsAges gives production
+ * as it stood before, for the variants measured earlier). Every
  * ending, a kids ending too, carries one delta since the owner's decision of
  * 2026-10-01: only what was played gets a milestone (withEndingOnlyPlayed).
  */
 
+import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
 import type { GameMode } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
+import { beatStep } from "../../src/game/services/storyTextSteps.js";
+import { KIDS_BAND_TURNS, kidsListener, kidsTurnText, takesKidsRules } from "../../src/game/services/kidsTurnRules.js";
 import { chaptersThatFit, turnsLeft } from "../../src/game/services/pacing.js";
 import { StoryStatePromptService } from "../../src/game/services/prompts/StoryStatePromptService.js";
 import { chaptersThatFit as measuredChaptersThatFit } from "../../src/game/services/storyTextRounds/pacing.js";
@@ -294,4 +300,39 @@ export function withKidsImageSlotsSchema(measuredJson: string, story: Story): st
   if (!showsImages(story)) return measuredJson;
   const placed = swapOnce(measuredJson, inJson(KIDS_IMAGE_SLOTS.field), "the text field's image distribution");
   return story.generatesImages() ? swapOnce(placed, inJson(KIDS_IMAGE_SLOTS.late), "the generated image's place") : placed;
+}
+
+/*
+ * The kids-ages stage's adoption (2026-10-01): a read-with-kids turn of every
+ * player count takes the band of its youngest child (the measured kidsAges;
+ * adoptedTurns.test.ts). Variants measured before it, built on production as
+ * it stood, compare with production before it: a single player's kids turn
+ * with the 6-8 band's text (the kids-turns stage's, the only one there was) for
+ * the same listener, and a group's kids turn as a grown-up story's (a group's
+ * turn read no category then).
+ */
+/** Production's turn as it stood before the kids-ages adoption: its prompt and its JSON schema's text. */
+export function productionBeforeKidsAges(story: Story): { prompt: string; json: string } {
+  const asText = (request: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) => ({ prompt: request.prompt, json: JSON.stringify(toJsonSchema(request.schema)) });
+  if (!takesKidsRules(story)) return asText(beatStep.request(story));
+  if (story.isMultiplayer()) return asText(beatStep.request(story.clone({ category: undefined })));
+  const now = asText(beatStep.request(story));
+  const [band, then] = [kidsTurnText(story), KIDS_BAND_TURNS["6-8"]];
+  const who = kidsListener(story);
+  const inJson = (text: string) => JSON.stringify(text).slice(1, -1);
+  const swap = (text: string, pairs: [string, string][]) => pairs.reduce((out, [from, to]) => out.split(from).join(to), text);
+  return {
+    prompt: swap(now.prompt, [
+      [band.context, then.context],
+      [band.rules(who), then.rules(who)],
+      [band.repeat(who), then.repeat(who)],
+      [band.image.distribution, then.image.distribution],
+    ]),
+    json: swap(now.json, [
+      [inJson(band.fieldCount(who)), inJson(then.fieldCount(who))],
+      [inJson(band.repeat(who)), inJson(then.repeat(who))],
+      [inJson(band.image.fieldDistribution), inJson(then.image.fieldDistribution)],
+      [inJson(band.image.fieldLate), inJson(then.image.fieldLate)],
+    ]),
+  };
 }

@@ -13,6 +13,8 @@ import { buildMergedPrompt } from "../../../../src/evals/textModelEval/setupPrem
 import { requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { beatStep } from "../../../../src/game/services/storyTextSteps.js";
 import { kidsTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsTurn.js";
+import { kidsAgesTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsAges.js";
+import { productionBeforeKidsAges } from "../../../helpers/adoptedDeltas.js";
 import { choiceResultRequest } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { fakeCall, input } from "./playFixtures.js";
 
@@ -52,10 +54,12 @@ describe("kidsTurnCases on a played fake story", () => {
       ["round-kids-fake", "beat", "round", "kids-turns", true, "read-with-kids", "5"],
     ]);
     // A run played through today's code records the category and the age as the game does, so it sent production's kids
-    // turn, the variant since the stage's adoption; the second round's stored runs sent the turn before (choiceResultRequest)
+    // turn: the variant since the stage's adoption, and since the kids-ages adoption later that day its age band's (a
+    // five-year-old's: 3-5); the second round's stored runs sent the turn before (choiceResultRequest)
     const story = caseStory(cases[0]);
     expect(sha256(beatStep.request(story).prompt)).toBe(hashOf(step?.calls[0]?.outputFile ?? ""));
-    expect(beatStep.request(story).prompt).toBe(kidsTurnRequest(story).prompt);
+    expect(beatStep.request(story).prompt).toBe(kidsAgesTurnRequest(story).prompt);
+    expect(productionBeforeKidsAges(story).prompt).toBe(kidsTurnRequest(story).prompt);
     expect(kidsTurnRequest(story).prompt).toContain("a child aged 5");
     expect(choiceResultRequest(story).prompt).not.toBe(kidsTurnRequest(story).prompt);
     expect(kidsTurnCasesToFreeze(cases, [run], hashOf, false, specs, productionSends).skipped).toEqual(["round-kids-fake"]);

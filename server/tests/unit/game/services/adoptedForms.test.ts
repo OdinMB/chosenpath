@@ -15,14 +15,12 @@ import {
   adoptedSetupPrompt,
   adoptedTurn,
   withContestLastStage,
-  withEndingOnlyPlayed,
-  withKidsImageSlots,
-  withKidsImageSlotsSchema,
   withLeverDirectionSchema,
   withResultsAsOutcomes,
   withResultsAsOutcomesSchema,
   withThreadsThatFit,
 } from "../../../helpers/adoptedDeltas.js";
+import { kidsBandOf } from "core/types/index.js";
 import { takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 
@@ -39,8 +37,10 @@ import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
  * (prod) for groups, an exploration step with the exploration-order line
  * (choiceResult; a group's and, since the choice-line-sp stage, a single
  * player's, 2026-09-30), every ending as the ending told as its
- * milestones leave it (endingStateB, 2026-09-30), a single player's turn
- * read with a child as the kids turn (kidsTurn, 2026-10-01), and AI
+ * milestones leave it (endingStateB, 2026-09-30), a turn read with a child,
+ * every player count, and a kids setup for a child of 9 or older by the
+ * children's age band (kidsAges, 2026-10-01; a single player's 6-8 turn is
+ * the kids-turns stage's kidsTurn, which adoptedTurns.test.ts holds), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -60,6 +60,8 @@ const json = (request: EvalRequest) => JSON.stringify(toJsonSchema(request.schem
 function measuredVariant(input: RequestInput): VariantId {
   switch (input.role) {
     case "setup":
+      // A kids setup whose youngest child is 9 or older since the kids-ages stage (2026-10-01): a third visible player stat
+      return input.setup.kids && input.setup.kidAges && kidsBandOf(input.setup.kidAges) === "9-12" ? "kidsAges" : "setupR3";
     case "iteration":
       return "setupR3";
     case "switch":
@@ -69,9 +71,10 @@ function measuredVariant(input: RequestInput): VariantId {
       // (planner v2c with the outcome's stages and each step once) before, earlier that day, and planner v2c until then
       return "planV2f";
     case "beat":
-      // A single player's turn read with a child since the kids-turns stage (2026-10-01): short and plain for the child's
-      // age, every turn kind, as measured
-      if (takesKidsRules(input.story)) return "kidsTurn";
+      // A turn read with a child, every player count, since the kids-ages stage (2026-10-01): as long and as plain as
+      // the children's age band reads, every turn kind, as measured (a single player's 6-8 turn is the kids-turns
+      // stage's kidsTurn, which adoptedTurns.test.ts holds)
+      if (takesKidsRules(input.story)) return "kidsAges";
       // Every ending since 2026-09-30: the ending told as its milestones leave it
       if (input.story.getCurrentBeatType() === "ending") return "endingStateB";
       // An exploration step: the exploration-order line (choiceResult as measured), a group's since the choice-result stage,
@@ -83,8 +86,11 @@ function measuredVariant(input: RequestInput): VariantId {
 
 /** The measured request with the logged adoption deltas applied: what production must send. */
 function expected(input: RequestInput): { prompt: string; schema: string } {
-  const measured = requestFor(measuredVariant(input), input);
+  const variant = measuredVariant(input);
+  const measured = requestFor(variant, input);
   const prompt = requestText(measured);
+  // kidsAges is built on production's grown-up turn and production's kids setup, which the other cases hold to theirs
+  if (variant === "kidsAges") return { prompt, schema: json(measured) };
   switch (input.role) {
     // Since the lever-direction adoption (2026-10-01): the measured line and lever fields, wherever the setup carries them
     case "setup":
@@ -98,11 +104,7 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
       // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured
       return { prompt: withContestLastStage(withThreadsThatFit(prompt, input.story), input.story), schema: json(measured) };
     case "beat":
-      // kidsTurn is built on production's turn as measured: its deltas are the image places where the turn shows images,
-      // and at the ending the lines on what was played, as on every ending (the owner's decision of 2026-10-01)
-      return takesKidsRules(input.story)
-        ? { prompt: withEndingOnlyPlayed(withKidsImageSlots(prompt, input.story), input.story), schema: withKidsImageSlotsSchema(json(measured), input.story) }
-        : { prompt: adoptedTurn(prompt, input.story), schema: json(measured) };
+      return { prompt: adoptedTurn(prompt, input.story), schema: json(measured) };
   }
 }
 

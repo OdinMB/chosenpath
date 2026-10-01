@@ -1,4 +1,4 @@
-import { GameModes, type GameMode } from "core/types/index.js";
+import { GameModes, kidsBandOf, type GameMode, type KidAges } from "core/types/index.js";
 
 /*
  * The text of the setup form adopted on 2026-09-28: setup round 3 of
@@ -300,6 +300,19 @@ function storyLengthLine(maxTurns: number, multiplayer: boolean): string {
 export const KIDS_STATS =
   "- A child reads this story along with an adult, so keep the stats few and plain: two visible shared stats and two visible player stats, and no hidden ones. Name each in one or two everyday words a young reader knows, taken from this story's own world (a picnic story might count Snacks, a pirate story Gold Coins), and give it a tooltip of one short, simple sentence.";
 
+/**
+ * The kids budget line where the youngest child is 9 or older (the kids-ages
+ * stage of 2026-10-01, the owner's decision: small up to about 10, "a little
+ * more for older children"): a third visible player stat. Measured on two
+ * setups at age 10: two shared and three player stats each, plain names,
+ * every lever the right way.
+ */
+export const OLDER_KIDS_STATS =
+  "- A child reads this story along with an adult, so keep the stats few and plain: two visible shared stats and three visible player stats, and no hidden ones. Name each in one or two everyday words a young reader knows, taken from this story's own world (a picnic story might count Snacks, a pirate story Gold Coins), and give it a tooltip of one short, simple sentence.";
+
+/** Whether a kids setup takes the older children's budget: its youngest child is 9 or older. */
+export const takesOlderKidsBudget = (kidAges: KidAges | undefined): boolean => kidAges !== undefined && kidsBandOf(kidAges) === "9-12";
+
 const CAMPS =
   "Contests have two sides, so the three players form two camps: side A is player1's camp and side B the other, and one camp holds two players. The seat roles say which seat is in which camp.";
 
@@ -313,13 +326,15 @@ export type SlateCall = {
   writesBothLists: boolean;
   /** A child reads along and the stat rules print */
   kids: boolean;
+  /** The youngest child is 9 or older: a third visible player stat */
+  olderKids?: boolean;
 };
 
 /** The "This setup" block: the story's length, then this mode's outcomes sized to its milestone budget. */
 export function thisSetupBlock(call: SlateCall): string {
   const M = milestoneBudgetFor(call.maxTurns);
   const length = storyLengthLine(call.maxTurns, call.players > 1);
-  const kids = call.kids ? [KIDS_STATS] : [];
+  const kids = call.kids ? [call.olderKids ? OLDER_KIDS_STATS : KIDS_STATS] : [];
   const pointer = call.pointsAtScoreboardRule ? " (see the scoreboard rule in the list of elements to include)" : "";
   const opposites = `- Keep the contested outcome's score in exactly one shared opposites stat${pointer}.`;
   let lines: string[];

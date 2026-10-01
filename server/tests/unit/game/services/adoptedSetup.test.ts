@@ -10,6 +10,7 @@ import { KIDS_EXAMPLES, SCOREBOARD_SENTENCES, adoptedSetupPrompt, isContestSetup
 import { LEVER_DIRECTION_TEXT, leverDirectionRequest } from "../../../../src/game/services/storyTextRounds/leverDirection.js";
 import { LEVER_DIRECTION_LINE } from "../../../../src/game/services/prompts/setupPromptText.js";
 import { REWARD_FIRST_SENTENCE, SACRIFICE_FIRST_SENTENCE } from "../../../../src/game/services/setupSchema.js";
+import { KIDS_AGES_SETUP_TEXT, kidsAgesSetupRequest } from "../../../../src/game/services/storyTextRounds/kidsAges.js";
 
 /*
  * Production's setup form is setup round 3's as the eval measured it
@@ -109,6 +110,38 @@ describe("custom-story and template setup: the measured form", () => {
   it("prints the kids budget only when a child reads along", () => {
     expect(setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story", { kids: true }).prompt).toContain("A child reads this story along with an adult");
     expect(setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story").prompt).not.toContain("A child reads this story");
+  });
+
+  /*
+   * The kids-ages stage of 2026-10-01 (the owner's decision: "small up to
+   * about 10 ... a little more for older children"): a kids setup whose
+   * youngest child is 9 or older gets a third visible player stat, the
+   * measured kidsAges setup byte for byte, prompt and schema; younger children
+   * and a story without an age keep the small budget.
+   */
+  it.each(INPUTS)("%i players, %s: the measured kids-ages setup byte for byte at every age", (players, mode) => {
+    for (const kind of ["story", "template"] as const) {
+      for (const kidAges of [{ min: 9, max: 9 }, { min: 10, max: 12 }, { min: 4, max: 4 }, { min: 7, max: 10 }, undefined]) {
+        const options = { kids: true, ...(kidAges ? { kidAges } : {}) };
+        const production = setupStep.request(PREMISE, players, mode, 25, kind, options);
+        const variant = kidsAgesSetupRequest(PREMISE, players, mode, 25, kind, options);
+        expect(production.prompt).toBe(variant.prompt);
+        expect(json(production.schema)).toBe(json(variant.schema));
+      }
+    }
+  });
+
+  it("asks a kids setup for three visible player stats where the youngest child is 9 or older, two below, and a grown-up setup for 3-4 whatever ages it carries", () => {
+    const { budget, inventory, field } = KIDS_AGES_SETUP_TEXT;
+    const older = setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story", { kids: true, kidAges: { min: 10, max: 11 } });
+    expect(older.prompt).toContain(budget.to);
+    expect(older.prompt).toContain(inventory.to);
+    expect(json(older.schema)).toContain(JSON.stringify(field.to).slice(1, -1));
+    const younger = setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story", { kids: true, kidAges: { min: 8, max: 11 } });
+    expect(younger.prompt).toContain(budget.from);
+    expect(younger.prompt).not.toContain(budget.to);
+    const grownUp = setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story", { kidAges: { min: 10, max: 10 } });
+    expect(grownUp.prompt).toBe(setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story").prompt);
   });
 
   it("names the kids stat examples as the setup retests measured them (setupR3b), and keeps the identity clause as round 3 measured it", () => {

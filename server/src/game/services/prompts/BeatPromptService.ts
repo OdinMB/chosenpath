@@ -15,7 +15,7 @@ import {
 } from "../optionRules.js";
 import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { outcomeStateLines } from "../endingStates.js";
-import { KIDS_CONTEXT, KIDS_IMAGE_DISTRIBUTION, kidsListener, kidsRepeat, kidsRules, takesKidsRules } from "../kidsTurnRules.js";
+import { kidsListener, kidsTurnText, takesKidsRules } from "../kidsTurnRules.js";
 
 /**
  * The scoreboard ending rule (the setup document's decision 3, question 1,
@@ -141,8 +141,10 @@ export class BeatPromptService {
 
 Beats
 ${
-  // A single player's story read with a child: short beats (the kids-turns stage, 2026-10-01)
-  takesKidsRules(story) ? KIDS_CONTEXT : "are a narrative structure of 5-6 paragraphs of 3-5 sentences each followed by a decision that the player must make."
+  // A story read with a child: beats as long as the children's age band reads (the kids-turns and kids-ages stages, 2026-10-01)
+  takesKidsRules(story)
+    ? kidsTurnText(story).context
+    : "are a narrative structure of 5-6 paragraphs of 3-5 sentences each followed by a decision that the player must make."
 }
 Beats are the smallest narrative unit that in the game.${
       story.getCurrentBeatType() === "thread"
@@ -185,7 +187,8 @@ How beats work mechanically:
 
   private static createInstructionsSection(story: Story): string {
     const gameWorldInstructions = this.createGameWorldInstructions(story);
-    const kids = takesKidsRules(story);
+    // A story read with a child, every player count: its age band's text (the kids-ages stage, 2026-10-01)
+    const kids = takesKidsRules(story) ? kidsTurnText(story) : undefined;
 
     return `\n\n======= YOUR JOB: IDENTIFY CHANGES TO THE STORY STATE AND GENERATE THE NEXT SET OF STORY BEATS TO IMPLEMENT THE ${story
       .getCurrentBeatType()
@@ -445,13 +448,13 @@ Example: If the player decided to organize a vote, describe what they do, how th
 --- Never mention or even refer to the player's options and choices.
 --- Players will see the options below the beat text. Talking about them in the beat text is redundant.
 --- Avoid these kinds of formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'${
-      // A single player's story read with a child: short and plain for the child's age (the kids-turns stage, 2026-10-01)
-      kids ? `\n${kidsRules(kidsListener(story))}` : ""
+      // A story read with a child: as long and as plain as the children's age band reads (the kids-ages stage, 2026-10-01)
+      kids ? `\n${kids.rules(kidsListener(story))}` : ""
     }
 
 ${
   kids
-    ? kidsRepeat(kidsListener(story))
+    ? kids.repeat(kidsListener(story))
     : "These are a lot of instructions, so let me repeat the most important one: You MUST write 5-6 paragraphs with 3-5 sentences each! Otherwise, there simply isn't enough text to move the story forward with enough depth and detail. So again: 5-6 paragraphs, 3-5 sentences each!"
 }
 
@@ -460,9 +463,9 @@ ${
   story.hasImages() || story.generatesImages()
     ? "You can include image tags in the beat text to show images from the story's image library:\n" +
       "- Add an '[image]' tag at the beginning of the paragraph that you want to show the image in.\n" +
-      // A kids turn's 3-4 paragraphs have no fourth before the last (the review of fix 6, 2026-10-01)
+      // A kids turn names places its band's paragraphs have before the last (the review of fix 6 and the kids-ages stage, 2026-10-01)
       (kids
-        ? KIDS_IMAGE_DISTRIBUTION
+        ? kids.image.distribution
         : "--- A good distribution is an image tag for the first paragraph and one for the third or fourth paragraph.\n") +
       "--- No image tags for the last paragraph, and no image tags after the last paragraph.\n" +
       "- Parameters:\n" +

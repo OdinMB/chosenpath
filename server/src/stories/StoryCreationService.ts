@@ -230,6 +230,11 @@ export class StoryCreationService {
     try {
       Logger.Route.log(`Starting story generation for ${storyId}`);
 
+      // A story read with a child records the children's ages, which its setup and turns are written for: the form's
+      // read-with-kids setting, else (a premise sent without it, from an older client) the age line of its premise
+      const kids = category === "read-with-kids";
+      const kidAges = kids ? requestedKidAges ?? kidAgesFromPremise(prompt) : undefined;
+
       // Create initial state. A setup the story can't start from (no
       // outcomes, or multiplayer without a shared one) is generated once more,
       // a fresh sample of the same request.
@@ -243,8 +248,8 @@ export class StoryCreationService {
             maxTurns,
             gameMode,
             difficultyLevel,
-            // A story read with a child gets the smaller stat budget with plain names
-            { kids: category === "read-with-kids" }
+            // A story read with a child gets the smaller stat budget with plain names, a third player stat from age 9
+            { kids, ...(kidAges ? { kidAges } : {}) }
           ),
         (state) => {
           const problem = storyStateStartProblem(state, playerCount);
@@ -287,11 +292,7 @@ export class StoryCreationService {
 
       const story = Story.create(storyState);
 
-      // Add player codes, pregeneration setting and category to state; a story read with a child records the children's
-      // ages, which its turns are written for: the form's read-with-kids setting, else (a premise sent without it, from
-      // an older client) the age line of its premise
-      const kids = category === "read-with-kids";
-      const kidAges = kids ? requestedKidAges ?? kidAgesFromPremise(prompt) : undefined;
+      // Add player codes, pregeneration setting, category and the children's ages to state
       if (kids && !kidAges && kidAgeAnswer(prompt) !== undefined) {
         // The answer is never logged, as no premise text is
         Logger.Route.log(

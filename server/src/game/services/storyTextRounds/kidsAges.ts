@@ -62,6 +62,13 @@ import { replaceOnce, splitAtState } from "./roundEdits.js";
  * (the kids budget line, the inventory's player stat line and the player
  * stats' field). Production's kids setup byte for byte for the younger bands
  * and where no age is set.
+ *
+ * Adopted after the run of 2026-10-01, turns and setup (production's copy is
+ * kidsTurnRules.ts, KIDS_BAND_TURNS, and setupPromptText.ts, OLDER_KIDS_STATS;
+ * the kept tests hold production to this variant byte for byte, prompt and
+ * JSON schema). Its bases are production's grown-up turn and its kids setup
+ * without an age, which the adoption left as they were, so it still builds as
+ * measured.
  */
 
 const LABEL = "Kids-ages variant";
