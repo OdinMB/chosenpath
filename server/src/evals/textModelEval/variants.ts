@@ -57,6 +57,7 @@ import { resultsAsOutcomesRequest } from "../../game/services/storyTextRounds/re
 import { kidsShortTextCount, kidsTurnRequest } from "../../game/services/storyTextRounds/kidsTurn.js";
 import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
 import { moneyAddsUpRequest } from "../../game/services/storyTextRounds/moneyAddsUp.js";
+import { latePacingRequest } from "../../game/services/storyTextRounds/latePacing.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -301,6 +302,23 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * earns named ("two coins", never a handful), and on a switch turn and the
  * ending the worked-out stat's exception right after the thread-resolution
  * line that sends the turn to each stat's adjustments after threads.
+ * "latePacing" is the late-pacing stage's switch planner, chapter planner and
+ * turn (2026-10-01, fix 8 of the second playthroughs' review,
+ * storyTextRounds/latePacing.ts): production's chapter planner whose PACING
+ * allows only the lengths that leave as many threads after the chapter as
+ * milestones still needed (the eval's plan check reads the same lengths,
+ * pacedLengths), production's switch planner whose priority step keeps a
+ * milestone for the story's last thread and never lets a forced situation take
+ * a thread from a player with none to spare, and production's turn whose hint
+ * is tied to something a later beat can explain early and gives way, in the
+ * story's late part, to explaining an earlier one (interludes too), with the
+ * ending explaining the details the story kept bringing back; production's
+ * request byte for byte elsewhere, with production's limits for the role and
+ * player count. "latePacingB" is its fix-and-retest: the switch planner's
+ * step b also names the story's SWITCH/THREAD INSTRUCTIONS (a threshold's, the
+ * final thread's) as ranked below a player's needed milestones, after the
+ * variant's food-trucks playthrough gave its last thread to the complete
+ * contract; its chapter planner and turn are the variant's.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -368,7 +386,9 @@ export type VariantId =
   | "resultsAsOutcomes"
   | "kidsTurn"
   | "moneyAddsUp"
-  | "moneyAddsUpB";
+  | "moneyAddsUpB"
+  | "latePacing"
+  | "latePacingB";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -433,6 +453,8 @@ export const VARIANTS: VariantId[] = [
   "kidsTurn",
   "moneyAddsUp",
   "moneyAddsUpB",
+  "latePacing",
+  "latePacingB",
 ];
 
 /**
@@ -889,6 +911,25 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     if (input.role !== "beat") throw new Error(`Variant moneyAddsUpB does not cover role ${input.role}`);
     const count = beatCheckOptions(input.story).textCount;
     return { ...moneyAddsUpRequest(input.story, { b: true }), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // The late-pacing stage's switch planner, chapter planner and turn: lengths that leave the last chapter a milestone, a
+  // forced situation below a player's needed milestones, hints planted early and paid off late; production's limits and
+  // production's retry count where it has its own
+  latePacing: (input): CheckedTextRequest => {
+    if (input.role !== "beat" && input.role !== "switch" && input.role !== "thread") throw new Error(`Variant latePacing does not cover role ${input.role}`);
+    const limits = productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers());
+    if (input.role !== "beat") return { ...latePacingRequest(input.story, input.role), limits };
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...latePacingRequest(input.story, "beat"), limits, ...(count ? { shortTextCount: count } : {}) };
+  },
+  // Its fix-and-retest: the switch planner's step b names the story's instructions (a threshold's, the final thread's) as
+  // ranked below a player's needed milestones; the chapter planner and the turn as the variant's
+  latePacingB: (input): CheckedTextRequest => {
+    if (input.role !== "beat" && input.role !== "switch" && input.role !== "thread") throw new Error(`Variant latePacingB does not cover role ${input.role}`);
+    const limits = productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers());
+    if (input.role !== "beat") return { ...latePacingRequest(input.story, input.role, { b: true }), limits };
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...latePacingRequest(input.story, "beat", { b: true }), limits, ...(count ? { shortTextCount: count } : {}) };
   },
 };
 

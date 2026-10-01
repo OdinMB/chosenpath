@@ -33,17 +33,26 @@ export type ReplayedTurn = {
 
 const FALLBACK_DIFFICULTY = { title: "Balanced", modifier: -10 };
 
-/** Every turn the run wrote a reply for, with the states it saw; stops at the ending or where the run stopped. */
+/**
+ * Every turn the run wrote a reply for, with the states it saw; stops at the
+ * ending or where the run stopped. A short playthrough (the late-pacing stage)
+ * replays from where it started, on its own seeds, its first chapter resolved
+ * already in its start.
+ */
 export function replayRun(run: PlayRun): ReplayedTurn[] {
   if (!run.start) return [];
-  const id = playRunId(run.spec, run.sample);
+  const id = run.from?.seedId ?? playRunId(run.spec, run.sample);
   let story = Story.create(run.start);
   const difficulty = story.getState().difficultyLevel || FALLBACK_DIFFICULTY;
   const replayed: ReplayedTurn[] = [];
+  let resolvedAlready = run.from !== undefined;
   for (const played of run.turns) {
     if (story.getCurrentTurn() + 1 !== played.turn) throw new Error(`${id}: turn ${played.turn} follows turn ${story.getCurrentTurn()}`);
-    const resolving = story.clone();
-    story = withSeededDice(`${id}|t${played.turn}|chapter`, () => ThreadResolutionService.resolveCurrentThreads(resolving));
+    if (!resolvedAlready) {
+      const resolving = story.clone();
+      story = withSeededDice(`${id}|t${played.turn}|chapter`, () => ThreadResolutionService.resolveCurrentThreads(resolving));
+    }
+    resolvedAlready = false;
     for (const change of played.repicks ?? []) {
       const chosen = story.updateChoice(change.slot as PlayerSlot, change.to);
       story = withSeededDice(`${id}|t${played.turn}|repick|${change.slot}`, () => BeatResolutionService.resolveChoice(chosen, change.slot as PlayerSlot, change.to, difficulty));

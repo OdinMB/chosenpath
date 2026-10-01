@@ -44,7 +44,13 @@ export type PlanCheck<P> = {
 };
 
 /** What a thread plan check reads beyond the plan's structure: `lengths`, the length PACING allows (production's planner call). */
-export type ThreadCheckOptions = { lengths?: boolean };
+/**
+ * `lengths`: also read the chapter's length against the lengths PACING allows
+ * (production's planner call). `allowedLengths`: another length rule to read it
+ * against (an eval variant's, which prints its own lengths); production's
+ * (allowedLengths on the turns left) otherwise.
+ */
+export type ThreadCheckOptions = { lengths?: boolean; allowedLengths?: (story: Story) => number[] };
 
 const OUTCOME_CHECKS_SKIPPED = "outcomeChecksSkipped";
 
@@ -496,9 +502,9 @@ const lengthsText = (lengths: number[]) =>
  * two-beat chapter; the last chapter takes exactly the turns left. When no
  * length fits (too few turns left), any is accepted.
  */
-function chapterLengthProblem(story: Story, duration: number): string | undefined {
+function chapterLengthProblem(story: Story, duration: number, allowed: (story: Story) => number[] = (s) => allowedLengths(turnsLeft(s))): string | undefined {
   const left = turnsLeft(story);
-  const lengths = allowedLengths(left);
+  const lengths = allowed(story);
   if (lengths.length === 0 || lengths.includes(duration)) return undefined;
   return `the thread is ${duration} beats long, and with ${left} turns left, this one included, PACING allows ${lengthsText(lengths)}`;
 }
@@ -565,7 +571,7 @@ export function checkThreadPlan(story: Story, reply: ThreadAnalysis, options: Th
     checkFirstThread(story, threads, outcomes, problems);
   }
   const checked = planCheck({ ...reply, duration, threads }, repairs, problems);
-  const lengthProblem = options.lengths ? chapterLengthProblem(story, duration) : undefined;
+  const lengthProblem = options.lengths ? chapterLengthProblem(story, duration, options.allowedLengths) : undefined;
   return lengthProblem ? { ...checked, lengthProblem } : checked;
 }
 
@@ -665,14 +671,15 @@ export function checkedSwitchPlan(
 /**
  * A thread plan call, checked with the length PACING allows: the repaired
  * plan, one retry told the problem, else an UnusableResultError (never for a
- * length alone).
+ * length alone). `allowedLengths`: another length rule (an eval variant's).
  */
 export function checkedThreadPlan(
   story: Story,
   prompt: string,
   invoke: (prompt: string) => Promise<ThreadAnalysis>,
-  log?: (line: string) => void
+  log?: (line: string) => void,
+  allowedLengths?: (story: Story) => number[]
 ): Promise<ThreadAnalysis> {
-  const check = (checked: Story, reply: ThreadAnalysis) => checkThreadPlan(checked, reply, { lengths: true });
+  const check = (checked: Story, reply: ThreadAnalysis) => checkThreadPlan(checked, reply, { lengths: true, ...(allowedLengths ? { allowedLengths } : {}) });
   return checkedPlan({ what: "thread plan", role: "threadAnalysis", check }, story, prompt, invoke, log);
 }

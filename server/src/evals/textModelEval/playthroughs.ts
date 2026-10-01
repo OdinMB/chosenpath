@@ -46,7 +46,7 @@ import { judgedThread, stageJudgeRequest } from "./stageJudge.js";
 import { checkSetup, merge, type CheckResult, type SetupShape } from "./textChecks.js";
 import { checkBeatDesign, checkSwitchDesign, checkThreadDesign } from "./turnDesignChecks.js";
 import type { TurnKind } from "./turnWaits.js";
-import { isSplitRequest, requestFor, type EvalRequest, type SetupInput } from "./variants.js";
+import { isSplitRequest, requestFor, type EvalRequest, type SetupInput, type VariantId } from "./variants.js";
 
 /*
  * Whole-story playthroughs on production's own code and models (the
@@ -190,10 +190,13 @@ export function playthroughSetupInput(spec: PlaythroughSpec, premises = SETUP_PR
 /** Production's text settings with no env set: its code defaults, which apply once the text-model variables are deleted at merge. */
 const PRODUCTION_SETTINGS = resolveTextModelConfig({}, () => undefined);
 
-/** Production's own model and effort for a role at a player count, on production's own code (adopted: its requests and limits). */
-export function playthroughArm(role: EvalRole, players: number): Arm {
+/**
+ * Production's own model and effort for a role at a player count, on production's own code (adopted: its requests and
+ * limits), or on an eval variant's requests (the late-pacing stage's short playthroughs).
+ */
+export function playthroughArm(role: EvalRole, players: number, variant: VariantId = "adopted"): Arm {
   const { model, reasoningEffort } = settingsFor(PRODUCTION_SETTINGS, productionRole(role), { multiplayer: players > 1 });
-  return makeArm({ model, reasoningEffort }, "adopted");
+  return makeArm({ model, reasoningEffort }, variant);
 }
 
 // ---------------------------------------------------------------- the player
@@ -364,6 +367,8 @@ export type PlanPacing = {
   lastChapterLength?: number;
   /** A thread plan: the lengths PACING allows */
   allowedLengths?: number[];
+  /** A thread plan under a variant's own length rule (the late-pacing stage): the lengths it allows */
+  pacedLengths?: number[];
   /** Each seat's outcomes as PACING counts them */
   needs: { slot: string; id: string; recorded: number; intended: number; pending: number; stillNeeded: number; noChapterYet: boolean }[];
 };
@@ -469,11 +474,23 @@ export type JudgeKind = "stage" | "ending" | "options" | "results";
 /** A judged check's reading (playthroughMode.ts runs them after the story). */
 export type JudgedItem = { key: string; kind: JudgeKind; turn: number; label: string; verdict?: boolean; evidence?: string; lines: string[]; costUsd: number };
 
+/**
+ * Where a short playthrough started (the late-pacing stage): a stored story's
+ * sample replayed to the chapter resolution before this turn, then played on
+ * with a variant's requests; its dice seeded under `seedId`.
+ */
+export type PlayedFrom = { story: string; turn: number; sample: number; variant: VariantId; seedId: string };
+
+/** A short playthrough's start: the story as the stored turn saw it before its planner, each seat's place in the player's rotation, and the record of where it came from. */
+export type PlayFrom = { story: Story; policies: Record<string, PolicyState>; from: PlayedFrom };
+
 export type PlayRun = {
   spec: PlaythroughSpec;
   sample: number;
   /** The round it was played in (playthroughMode.ts); a run stored without one is round 1's */
   round?: number;
+  /** A short playthrough: where it started; `start` is then the story before that turn's planner, its chapter already resolved */
+  from?: PlayedFrom;
   input: SetupInput;
   setup?: { calls: PlayCallLog[]; output?: unknown; checks?: CheckResult; backgroundFixes?: string };
   /** After character selection */
@@ -514,7 +531,7 @@ function turnKind(story: Story, next: BeatType, analysis: "switch" | "thread" | 
   return "chapter step";
 }
 
-function planPacing(story: Story, kind: "switch" | "thread"): PlanPacing {
+function planPacing(story: Story, kind: "switch" | "thread", planLengths?: (story: Story) => number[]): PlanPacing {
   const left = turnsLeft(story);
   const needs = story.getPlayerSlots().flatMap((slot) =>
     outcomeNeeds(story, slot, kind === "switch").map((n) => ({
@@ -531,7 +548,7 @@ function planPacing(story: Story, kind: "switch" | "thread"): PlanPacing {
     const last = lastChapterAfterSwitch(left);
     return { turnsLeft: left, lastChapter: last !== undefined, threadsFit: chaptersThatFit(left), ...(last !== undefined ? { lastChapterLength: last } : {}), needs };
   }
-  return { turnsLeft: left, lastChapter: isLastChapter(left), allowedLengths: allowedLengths(left), needs };
+  return { turnsLeft: left, lastChapter: isLastChapter(left), allowedLengths: allowedLengths(left), ...(planLengths ? { pacedLengths: planLengths(story) } : {}), needs };
 }
 
 /** The option of a topic switch whose direction pushes the outcome: its structured direction, else the direction text naming the id. */
@@ -656,23 +673,41 @@ function promptOf(request: EvalRequest): string {
  * the budget stops a call. With `repickStuckSwitches`, a group chapter whose
  * every send failed on an unusable plan gets the harness's re-pick
  * (coordinatedRepick) and one more send, marked as the harness's.
+ *
+ * The late-pacing stage's short playthroughs (2026-10-01): `from` starts at a
+ * stored story's state before a turn's planner (its chapter resolved, no
+ * setup), with each seat's place in the player's rotation; `variant` sends an
+ * eval variant's requests on its own arm in place of production's (the setup
+ * stays production's); `planLengths` holds the chapter plans to another length
+ * rule, as the variant prints it; `stopAfterLastChapterPlan` stops once the
+ * story's last chapter is planned, writing no beat for it.
  */
 export async function playStory(
   spec: PlaythroughSpec,
   input: SetupInput,
   call: PlayCall,
-  options: { sample: number; turnLimit?: number; tryAgain?: number; repickStuckSwitches?: boolean }
+  options: {
+    sample: number;
+    turnLimit?: number;
+    tryAgain?: number;
+    repickStuckSwitches?: boolean;
+    variant?: VariantId;
+    planLengths?: (story: Story) => number[];
+    from?: PlayFrom;
+    stopAfterLastChapterPlan?: boolean;
+  }
 ): Promise<PlayResult> {
-  const id = playRunId(spec, options.sample);
+  const id = options.from?.from.seedId ?? playRunId(spec, options.sample);
+  const variant = options.variant ?? "adopted";
   const players = input.playerCount;
-  const run: PlayRun = { spec, sample: options.sample, input, turns: [], stopped: "", complete: false };
+  const run: PlayRun = { spec, sample: options.sample, input, turns: [], stopped: "", complete: false, ...(options.from ? { from: options.from.from } : {}) };
   const judgeTargets: JudgeTarget[] = [];
   let index = 0;
   const nextCaseId = (kind: string) => `${id}-${String(index++).padStart(3, "0")}-${kind.replace(/\s+/g, "-")}`;
 
   /** Production's invoke for one call site: each call through `call`, logged; nothing usable throws, as production's model does after its re-sends. */
   const invoker = (kind: string, role: EvalRole, base: EvalRequest, logs: PlayCallLog[], read?: (log: PlayCallLog, parsed: unknown) => void) => {
-    const arm = playthroughArm(role, players);
+    const arm = playthroughArm(role, players, role === "setup" ? "adopted" : variant);
     return async (prompt: string): Promise<unknown> => {
       const retry = logs.length > 0;
       const log: PlayCallLog = { caseId: nextCaseId(retry ? `${kind} retry` : kind), retry, latencyMs: 0, costUsd: 0, sends: [], repairs: [] };
@@ -688,41 +723,52 @@ export async function playStory(
     };
   };
 
-  // The setup, asked once more when the story can't start from it (StoryCreationService)
-  const setupRequest = requestFor("adopted", { role: "setup", setup: input });
-  const setupLogs: PlayCallLog[] = [];
-  const invokeSetup = invoker("setup", "setup", setupRequest, setupLogs);
-  let setupReply: unknown;
-  let made: StoryState;
-  try {
-    made = await withOneRetry(
-      async () => {
-        setupReply = await invokeSetup(promptOf(setupRequest));
-        return storyFromSetup(setupReply, input, id);
-      },
-      (state) => {
-        const problem = storyStateStartProblem(state, players);
-        if (problem) setupLogs[setupLogs.length - 1].problem = problem;
-        return problem;
-      },
-      "story setup"
-    );
-  } catch (error) {
-    run.setup = { calls: setupLogs };
-    run.stopped = `the setup: ${describe(error)}`;
-    return { run, judgeTargets };
+  let story: Story;
+  let policies: Map<string, PolicyState>;
+  if (options.from) {
+    // A short playthrough: the stored story before this turn's planner, the player's rotation where the stored run left it
+    const from = options.from;
+    story = from.story;
+    policies = new Map(story.getPlayerSlots().map((slot) => [slot, from.policies[slot] ?? START_POLICY]));
+  } else {
+    // The setup, asked once more when the story can't start from it (StoryCreationService)
+    const setupRequest = requestFor("adopted", { role: "setup", setup: input });
+    const setupLogs: PlayCallLog[] = [];
+    const invokeSetup = invoker("setup", "setup", setupRequest, setupLogs);
+    let setupReply: unknown;
+    let made: StoryState;
+    try {
+      made = await withOneRetry(
+        async () => {
+          setupReply = await invokeSetup(promptOf(setupRequest));
+          return storyFromSetup(setupReply, input, id);
+        },
+        (state) => {
+          const problem = storyStateStartProblem(state, players);
+          if (problem) setupLogs[setupLogs.length - 1].problem = problem;
+          return problem;
+        },
+        "story setup"
+      );
+    } catch (error) {
+      run.setup = { calls: setupLogs };
+      run.stopped = `the setup: ${describe(error)}`;
+      return { run, judgeTargets };
+    }
+    const { state: checked, fixed } = checkStoryStateBackgrounds(made);
+    run.setup = {
+      calls: setupLogs,
+      output: setupReply,
+      checks: merge([checkSetup(setupReply as SetupShape, input), checkSetupDesign(setupReply, input)]),
+      ...(fixed.length ? { backgroundFixes: describeBackgroundFixes(fixed) } : {}),
+    };
+    story = selectCharacters(Story.create(checked), id);
+    policies = new Map(story.getPlayerSlots().map((slot) => [slot, START_POLICY]));
   }
-  const { state: checked, fixed } = checkStoryStateBackgrounds(made);
-  run.setup = {
-    calls: setupLogs,
-    output: setupReply,
-    checks: merge([checkSetup(setupReply as SetupShape, input), checkSetupDesign(setupReply, input)]),
-    ...(fixed.length ? { backgroundFixes: describeBackgroundFixes(fixed) } : {}),
-  };
-  let story = selectCharacters(Story.create(checked), id);
   run.start = story.getState();
   const difficulty = story.getState().difficultyLevel || { title: "Balanced", modifier: -10 };
-  const policies = new Map(story.getPlayerSlots().map((slot) => [slot, START_POLICY]));
+  // A short playthrough starts with its first chapter already resolved
+  let resolvedAlready = options.from !== undefined;
 
   /** A failed send's reason, from what threw. */
   const failedWith = (what: string, error: unknown, beat: boolean): TurnFailed => {
@@ -739,11 +785,14 @@ export async function playStory(
   /** A planner's call, checked and retried as production does (its one retry told the problem); the story with the plan and its judge targets, or why the send fails. */
   const plan = async (kind: "switch" | "thread", before: Story, turn: PlayTurn, suffix: string, targets: JudgeTarget[]): Promise<Story | TurnFailed> => {
     const label = kind === "switch" ? "switch plan" : "chapter plan";
-    const request = requestFor("adopted", { role: kind, story: before });
-    const record: PlayPlan = { kind: label, calls: [], pacing: planPacing(before, kind) };
+    const request = requestFor(variant, { role: kind, story: before });
+    const record: PlayPlan = { kind: label, calls: [], pacing: planPacing(before, kind, options.planLengths) };
     turn.plan = record;
     const read = (log: PlayCallLog, parsed: unknown) => {
-      const result = kind === "switch" ? checkSwitchPlan(before, parsed as SwitchAnalysis) : checkThreadPlan(before, parsed as ThreadAnalysis, { lengths: true });
+      const result =
+        kind === "switch"
+          ? checkSwitchPlan(before, parsed as SwitchAnalysis)
+          : checkThreadPlan(before, parsed as ThreadAnalysis, { lengths: true, ...(options.planLengths ? { allowedLengths: options.planLengths } : {}) });
       if (result.problem) log.problem = result.problem;
       if (result.lengthProblem) log.lengthProblem = result.lengthProblem;
       log.repairs = result.repairs.map(repairLine);
@@ -756,7 +805,7 @@ export async function playStory(
         Object.assign(record, { plan: stored, checks: checkSwitchDesign(before, stored) });
         return switchStep.apply(before, stored);
       }
-      const stored = await checkedThreadPlan(before, promptOf(request), async (prompt) => (await invoke(prompt)) as ThreadAnalysis, note);
+      const stored = await checkedThreadPlan(before, promptOf(request), async (prompt) => (await invoke(prompt)) as ThreadAnalysis, note, options.planLengths);
       record.plan = stored;
       record.checks = checkThreadDesign(before, stored);
       record.stages = stored.threads.map((thread) => {
@@ -786,7 +835,12 @@ export async function playStory(
    * judge targets, or why the send fails; the turn holds this send's plan,
    * calls and readings either way.
    */
-  const writeTurn = async (resolved: Story, turn: PlayTurn, analysis: "switch" | "thread" | undefined, suffix: string): Promise<{ story: Story; targets: JudgeTarget[] } | TurnFailed> => {
+  const writeTurn = async (
+    resolved: Story,
+    turn: PlayTurn,
+    analysis: "switch" | "thread" | undefined,
+    suffix: string
+  ): Promise<{ story: Story; targets: JudgeTarget[]; planOnly?: true } | TurnFailed> => {
     const targets: JudgeTarget[] = [];
     Object.assign(turn, { calls: [], repairs: [], levers: [], unfit: [] });
     for (const key of ["plan", "reply", "mechanics", "checks", "endingStates", "contestResults"] as const) delete turn[key];
@@ -795,8 +849,10 @@ export async function playStory(
       const planned = await plan(analysis, resolved, turn, suffix, targets);
       if (!(planned instanceof Story)) return planned;
       before = planned;
+      // A short playthrough stops once the story's last chapter is planned
+      if (analysis === "thread" && options.stopAfterLastChapterPlan && isLastChapter(turnsLeft(resolved))) return { story: before, targets, planOnly: true };
     }
-    const request = requestFor("adopted", { role: "beat", story: before });
+    const request = requestFor(variant, { role: "beat", story: before });
     // As AIStoryGenerator checks a beat reply: the ending shows no options, and a single player's kids turn's retry asks for
     // its short count
     const beatCheck = beatCheckOptions(before);
@@ -888,16 +944,20 @@ export async function playStory(
       run.stopped = `turn ${written + 1}: the story ran ${OVERRUN_TURNS} turns past its length without an ending`;
       break;
     }
-    // Before the next beat: the chapter's latest steps resolved (StoryProgressionService.handleProgression)
-    const resolving = story.clone();
-    story = withSeededDice(`${id}|t${written + 1}|chapter`, () => ThreadResolutionService.resolveCurrentThreads(resolving));
+    // Before the next beat: the chapter's latest steps resolved (StoryProgressionService.handleProgression); a short
+    // playthrough's start is resolved already
+    if (!resolvedAlready) {
+      const resolving = story.clone();
+      story = withSeededDice(`${id}|t${written + 1}|chapter`, () => ThreadResolutionService.resolveCurrentThreads(resolving));
+    }
+    resolvedAlready = false;
     const next = story.determineNextBeatType();
     const analysis = analysisBefore(story, next);
     const turn = newTurn(written + 1, turnKind(story, next, analysis), story);
 
     // Production's sends of the turn: the first, the queue's resend, then each press of Try again with its own resend
     const sends = turnSends(options.tryAgain ?? 0);
-    let done: { story: Story; targets: JudgeTarget[] } | undefined;
+    let done: { story: Story; targets: JudgeTarget[]; planOnly?: true } | undefined;
     let failed: TurnFailed | undefined;
     for (const send of sends) {
       const result = await writeTurn(story, turn, analysis, send === "first" ? "" : ` ${send}`);
@@ -937,6 +997,10 @@ export async function playStory(
     turn.milestones = milestoneCounts(story);
     settle(turn);
     run.turns.push(turn);
+    if (done.planOnly) {
+      run.stopped = "the last chapter's plan";
+      break;
+    }
     if (turn.kind === "ending") {
       run.complete = true;
       run.stopped = "the ending";

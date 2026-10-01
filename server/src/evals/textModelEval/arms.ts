@@ -63,7 +63,12 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * the variant beside production's turn on the mouse story's turns and a
  * template tagged Kids, each turn with production's one checked retry), then
  * money and counts that add up in a learning story (money-adds-up: the
- * variant beside production's turn on the lemonade story's turns).
+ * variant beside production's turn on the lemonade story's turns), then
+ * pacing that leaves the story's last chapter a milestone, story instructions
+ * ranked below pacing and hints paid off (late-pacing: the variant's switch
+ * planner beside production's on switches of the second round's stored runs,
+ * its turn beside production's on their endings, and short playthroughs of
+ * both from mid-story, the --late-pacing-play mode's prep calls).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -90,6 +95,7 @@ export const FEEDBACK_STAGES = [
   "challenge-results",
   "kids-turns",
   "money-adds-up",
+  "late-pacing",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -275,6 +281,12 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   moneyAddsUp: "adopted",
   // Its one fix-and-retest, against production's turn
   moneyAddsUpB: "adopted",
+  // The late-pacing stage (2026-10-01, fix 8 of the review): the chapter planner's lengths that leave the last chapter a
+  // milestone, the switch planner's priority step and the turn's hints planted early and paid off late, against
+  // production's, which runs beside it
+  latePacing: "adopted",
+  // Its one fix-and-retest (the story's instructions named in the switch planner's step b), against production's
+  latePacingB: "adopted",
 };
 
 /**
@@ -610,9 +622,73 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return kidsTurnsArms(role);
     case "money-adds-up":
       return moneyAddsUpArms(role);
+    case "late-pacing":
+      return latePacingArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the late-pacing stage (2026-10-01, fix 8 of the second
+ * playthroughs' review): production's own code, its requests unchanged since
+ * the money-adds-up stage (adopted14), under a tag of its own so production
+ * runs beside the variant in the same minutes; the short playthroughs' calls
+ * (--late-pacing-play) are prep calls under it too.
+ */
+export const LATE_PACING_PROMPT_STATE = "adopted15";
+
+/**
+ * The stage's cases. The switch plans of the second round's stored runs
+ * (latePacingCases.ts, no calls): the space pirates' switches at turns 14 and
+ * 18, after the ship's integrity fell to the setup's threshold, where
+ * production gave the complete ship a grouped thread while the scout's own
+ * outcome waited; and the switches with a thread to spare where production's
+ * last chapter then settled nothing (New Avalon's and the food trucks' at 20,
+ * the estate agents' at 19). The stored endings the turn's payoff line is read
+ * on, frozen by the outcome-settled stage.
+ */
+export const LATE_PACING_CASES = {
+  switches: [
+    "round-late-switch-space-pirates-t14",
+    "round-late-switch-space-pirates-t18",
+    "round-late-switch-avalon-t20",
+    "round-late-switch-food-trucks-t20",
+    "round-late-switch-estate-agents-t19",
+  ],
+  endings: ["round-settled-avalon-t26", "round-settled-lemonade-t11", "round-settled-space-pirates-t26", "round-settled-estate-agents-t26", "round-settled-food-trucks-t26"],
+  // The fix-and-retest's case: the variant's own last switch in its food-trucks short playthrough (latePacingCases.ts)
+  retest: ["round-late-switch-food-trucks-variant-t21"],
+} as const;
+
+/**
+ * The late-pacing stage (the coordinator's fix 8 after the second
+ * playthroughs' review): production's switch planner (adopted) and the
+ * variant's (latePacing) on the planner model (Luna low, both player counts'
+ * planner groups) twice on the switch cases, and their turns on each player
+ * count's turn model twice on the stored endings, interleaved, under
+ * adopted15. The short playthroughs are the --late-pacing-play mode's. The
+ * fix-and-retest (latePacingB, its switch planner's step b naming the story's
+ * instructions): twice on the stored switches, and production, the variant
+ * and B four times each on the variant's own last switch in its food-trucks
+ * short playthrough, where it gave the last thread to the complete contract.
+ */
+function latePacingArms(role: EvalRole): ArmPlan[] {
+  const variants = ["adopted", "latePacing"] as const;
+  if (role === "switch") {
+    const switches = (variant: VariantId, samples: number, caseIds: readonly string[]) => ({ arm: adoptedDefault("analysis", variant), samples, scope: "all" as const, caseIds: [...caseIds] });
+    return [
+      ...variants.map((variant) => switches(variant, 2, LATE_PACING_CASES.switches)),
+      switches("latePacingB", 2, LATE_PACING_CASES.switches),
+      ...(["adopted", "latePacing", "latePacingB"] as const).map((variant) => switches(variant, 4, LATE_PACING_CASES.retest)),
+    ];
+  }
+  if (role !== "beat") return [];
+  const endings = [...LATE_PACING_CASES.endings];
+  return [
+    ...variants.map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: endings })),
+    ...variants.map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: endings })),
+  ];
 }
 
 /**
@@ -1283,6 +1359,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "challenge-results",
   "kids-turns",
   "money-adds-up",
+  "late-pacing",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1339,6 +1416,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The money-adds-up stage's lemonade turns from the second playthroughs (2026-10-01), frozen after every earlier stage
   // had closed
   ...MONEY_ADDS_UP_CASES.map((id): [string, Stage] => [id, "money-adds-up"]),
+  // The late-pacing stage's switch plans from the second playthroughs (2026-10-01), frozen after every earlier stage had
+  // closed; the stored endings it reads are the outcome-settled stage's
+  ...[...LATE_PACING_CASES.switches, ...LATE_PACING_CASES.retest].map((id): [string, Stage] => [id, "late-pacing"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

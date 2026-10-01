@@ -647,6 +647,14 @@ describe("checkThreadPlan", () => {
     it("is not read without the option, so the eval's plan readings stay as they ran", () => {
       expect(checkThreadPlan(threadStory(1), threadPlan([aThread("challenge", 4, ["player1"])])).lengthProblem).toBeUndefined();
     });
+
+    it("reads another length rule where one is given (an eval variant's), production's otherwise", () => {
+      const onlyTwo = () => [2];
+      const result = checkThreadPlan(threadStory(1), threadPlan([aThread("challenge", 3, ["player1"])]), { lengths: true, allowedLengths: onlyTwo });
+      expect(result.lengthProblem).toBe("the thread is 3 beats long, and with 6 turns left, this one included, PACING allows 2 beats");
+      expect(checkThreadPlan(threadStory(1), threadPlan([aThread("challenge", 2, ["player1"])]), { lengths: true, allowedLengths: onlyTwo }).lengthProblem).toBeUndefined();
+      expect(checkThreadPlan(threadStory(1), threadPlan([aThread("challenge", 3, ["player1"])]), { lengths: true }).lengthProblem).toBeUndefined();
+    });
   });
 
   describe("one kind per thread (PL-8)", () => {
@@ -953,6 +961,16 @@ describe("checked plan calls", () => {
       expect(invoke).toHaveBeenCalledTimes(2);
       expect(plan.duration).toBe(4);
       expect(lines.join("\n")).toContain('"lengthNotAllowed":1');
+    });
+
+    it("checks against another length rule where one is given, and retries told it", async () => {
+      const onlyTwo = () => [2];
+      const { invoke, prompts } = planner(fits(), threadPlan([aThread("challenge", 2, ["player1"])]));
+
+      const plan = await checkedThreadPlan(threadStory(1), "THE PROMPT", invoke, () => undefined, onlyTwo);
+
+      expect(prompts[1]).toBe(withPlanProblem("THE PROMPT", "the thread is 3 beats long, and with 6 turns left, this one included, PACING allows 2 beats"));
+      expect(plan.duration).toBe(2);
     });
 
     it("keeps the first reply when the second can't be used at all", async () => {

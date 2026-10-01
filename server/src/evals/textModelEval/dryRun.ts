@@ -110,6 +110,8 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "challenge-results": "Challenge and contest results that tell how the attempt turns out, not the approach (resultsAsOutcomes beside production's chapter planner under adopted12, --role thread)",
   "kids-turns": "Read-with-kids turns shorter and simpler for the child's age (kidsTurn beside production's turn under adopted13, --role beat, each with production's checked retry)",
   "money-adds-up": "Money and counts that add up in a learning story (moneyAddsUp beside production's turn under adopted14, --role beat)",
+  "late-pacing":
+    "Pacing that leaves the last chapter a milestone, instructions below pacing, hints paid off (latePacing beside production under adopted15: --role switch and --role beat; the short playthroughs with --late-pacing-play, listed below)",
 };
 
 /** Jobs by arm key, in plan order. */

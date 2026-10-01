@@ -54,6 +54,7 @@ import { buildParallelCasesMode, judgeParallelMode } from "./parallelThreadsPrep
 import { buildChallengeCasesMode, judgeChallengeResultsMode } from "./challengeResultsPrep.js";
 import { buildKidsCasesMode, kidsTurnsMode } from "./kidsTurnPrep.js";
 import { buildMoneyCasesMode, judgeMoneyMode } from "./moneyAddsUpPrep.js";
+import { buildLatePacingCasesMode, judgeCluesMode, latePacingPlayMode, printLatePacingPlan } from "./latePacingPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
@@ -211,6 +212,20 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-money [--max-spend 0.05]  the stage's judged check figuresAddUp on its calibration (two samples) and every
  *     reply of the stage's arms (one call per player, one sample), then judged-money.md and .json, every reply listed
  *     with its stat changes; --cases <item or case ids> sends only those (a smoke)
+ *   Pacing that leaves the last chapter a milestone, instructions below pacing, hints paid off (latePacingPrep.ts,
+ *   2026-10-01), in the late-pacing stage:
+ *   --build-late-pacing-cases [--rebuild-cases]  switch plans of the second round's stored runs (latePacingCases.ts,
+ *     replayed), each only where its request is the one production sent; no calls; they then run with --run --stage
+ *     late-pacing --role switch --prompt-state adopted15 (production's switch planner and latePacing's), and the stored
+ *     endings with --role beat
+ *   --late-pacing-play [--cases <story ids>] [--samples N] [--turns N] [--arms <variants>] [--max-spend 0.50]
+ *     [--report-only]  the short playthroughs (latePacingPlay.ts): each stored story replayed to its start and played on
+ *     with production's code and the variant's, side by side (or the variants --arms names: latePacingB, the
+ *     fix-and-retest), to the story's last chapter plan; prep-calls.jsonl, under adopted15; writes late-pacing.md and
+ *     .json (the runs, their readings and the stored switches' plans read the same way)
+ *   --judge-clues [--max-spend 0.06]  the stage's judged checks on planted details (cluesJudge.ts) on their calibration
+ *     (two samples), the short playthroughs' late turns and the stage's endings (one sample), then judged-clues.md and
+ *     .json; --cases <item or case ids> sends only those (a smoke)
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -273,6 +288,9 @@ type Mode =
   | "kids-turns"
   | "build-money-cases"
   | "judge-money"
+  | "build-late-pacing-cases"
+  | "late-pacing-play"
+  | "judge-clues"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -413,6 +431,9 @@ function parseArgs(argv: string[]): Args {
       case "--kids-turns":
       case "--build-money-cases":
       case "--judge-money":
+      case "--build-late-pacing-cases":
+      case "--late-pacing-play":
+      case "--judge-clues":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -668,6 +689,7 @@ async function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guar
   });
   printPrepPlan(files, (line) => console.log(line));
   for (const round of Object.values(PLAYTHROUGH_ROUNDS)) printPlaythroughPlan(files, (line) => console.log(line), round);
+  printLatePacingPlan(files, (line) => console.log(line));
 }
 
 const DEFAULT_PREP_MAX_SPEND = 0.1;
@@ -1139,6 +1161,20 @@ async function main() {
     case "judge-money":
       // The stage's judged check books to its own stage
       return judgeMoneyMode(prepContext(args, files, "money-adds-up"), { caseIds: args.caseIds });
+    case "build-late-pacing-cases":
+      return buildLatePacingCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "late-pacing-play":
+      // The short playthroughs book to the stage, one invocation at most the stage's cap unless --max-spend says less
+      return latePacingPlayMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "late-pacing", DEFAULT_STAGE_CAPS["late-pacing"]), {
+        sample: args.samples ?? 1,
+        caseIds: args.caseIds,
+        turns: args.turns,
+        reportOnly: args.reportOnly,
+        armKeys: args.armKeys,
+      });
+    case "judge-clues":
+      // The stage's judged checks book to its own stage
+      return judgeCluesMode(prepContext(args, files, "late-pacing"), { caseIds: args.caseIds });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":
