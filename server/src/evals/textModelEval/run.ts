@@ -61,6 +61,7 @@ import { runaway2Mode } from "./runaway2Prep.js";
 import { optionsO2cMode } from "./optionsO2cPrep.js";
 import { buildMoneyCasesMode, judgeMoneyMode } from "./moneyAddsUpPrep.js";
 import { buildLatePacingCasesMode, judgeCluesMode, latePacingPlayMode, printLatePacingPlan } from "./latePacingPrep.js";
+import { judgePacingCluesMode, pacingCluesBlindMode, pacingCluesPlayMode, printPacingCluesPlan } from "./pacingCluesPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
@@ -277,6 +278,15 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     sacrifice or reward, the variety checks and the odds (which kind of option leads), O2c against production and
  *     against O2b's stored replies under the stop rule, every lever's text, the automatic checks, waits and cost;
  *     options-o2c.md and .json
+ *   Fix 8's retest in whole short playthroughs (pacingCluesPrep.ts, 2026-10-01), in the pacing-clues stage:
+ *   --pacing-clues-play [--cases <story ids>] [--samples N] [--turns N] [--max-spend 0.50] [--report-only]  production's
+ *     code and pacingClues (the late-pacing fix-and-retest's planners and the late part's clue lines) from the
+ *     late-pacing stage's three starts and the space pirates' switch at 14 to the story's last chapter plan, on the same
+ *     seeded dice; prep-calls.jsonl, under adopted21; writes pacing-clues.md and .json
+ *   --pacing-clues-blind  no calls: the late turns both arms played, runs coded, no arm named (pacing-clues-blind.md; the
+ *     key in keys/pacing-clues-blind.json), for the hand reading in pacingCluesHand.ts
+ *   --judge-pacing-clues [--max-spend 0.20]  the clue judge's v2 on its late-turn calibration (two samples) and, where
+ *     that reads reliable, on the window's turns (one sample); then pacing-clues.md and .json again
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -350,6 +360,9 @@ type Mode =
   | "short-replies"
   | "runaway-2"
   | "options-o2c"
+  | "pacing-clues-play"
+  | "pacing-clues-blind"
+  | "judge-pacing-clues"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -501,6 +514,9 @@ function parseArgs(argv: string[]): Args {
       case "--short-replies":
       case "--runaway-2":
       case "--options-o2c":
+      case "--pacing-clues-play":
+      case "--pacing-clues-blind":
+      case "--judge-pacing-clues":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -757,6 +773,7 @@ async function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guar
   printPrepPlan(files, (line) => console.log(line));
   for (const round of Object.values(PLAYTHROUGH_ROUNDS)) printPlaythroughPlan(files, (line) => console.log(line), round);
   printLatePacingPlan(files, (line) => console.log(line));
+  printPacingCluesPlan(files, (line) => console.log(line));
 }
 
 const DEFAULT_PREP_MAX_SPEND = 0.1;
@@ -1263,6 +1280,20 @@ async function main() {
     case "options-o2c":
       // A deterministic reading: no calls, so no key and no caps
       return optionsO2cMode({ files, log: (line) => console.log(line) });
+    case "pacing-clues-play":
+      // The short playthroughs book to the stage, one invocation at most the stage's cap unless --max-spend says less
+      return pacingCluesPlayMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "pacing-clues", DEFAULT_STAGE_CAPS["pacing-clues"]), {
+        sample: args.samples ?? 1,
+        caseIds: args.caseIds,
+        turns: args.turns,
+        reportOnly: args.reportOnly,
+      });
+    case "pacing-clues-blind":
+      // No calls: the blind reading's file and its key
+      return pacingCluesBlindMode({ files, log: (line) => console.log(line) });
+    case "judge-pacing-clues":
+      // The stage's judged check books to its own stage
+      return judgePacingCluesMode(prepContext(args, files, "pacing-clues"));
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

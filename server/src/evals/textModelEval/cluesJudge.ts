@@ -36,8 +36,22 @@ export const NEW_MYSTERY_CHECK = "noNewMystery" as const;
 export const EXPLAINED_CHECK = "detailsExplained" as const;
 export type ClueCheck = typeof NEW_MYSTERY_CHECK | typeof EXPLAINED_CHECK;
 
-/** Part of each judge call's key: a wording change is judged afresh. */
-export const CLUES_JUDGE_PROMPT_VERSION = 1;
+/**
+ * Part of each judge call's key: a wording change is judged afresh. v1 ran in
+ * the late-pacing stage (not reliable on its calibration); v2 is its one fix,
+ * run in the pacing-clues stage (2026-10-01): a new side of a detail the story
+ * holds is no new mystery, each story element's own description is read beside
+ * the facts, and naming what kind of thing a detail is explains nothing.
+ */
+export type CluesJudgeVersion = 1 | 2;
+export const CLUES_JUDGE_PROMPT_VERSION: CluesJudgeVersion = 2;
+
+/** v2's two sentences (the tests pin them). */
+export const CLUES_V2_TEXT = {
+  newSide:
+    "A detail the story already holds stays the same mystery when a turn shows another side of it (it sounds, moves or comes back again, it pauses, someone guesses at what it might be): that is not a new mystery. Nor is a detail a story element's own description already holds.",
+  kindOnly: "Naming what kind of thing a detail is (a signal, a mark, a message, a warning) without saying what it is or was, who made it or why it happens is not explaining it either.",
+} as const;
 
 type Loose = Record<string, unknown>;
 const asObject = (value: unknown): Loose => (value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Loose) : {});
@@ -46,11 +60,14 @@ const asString = (value: unknown): string => (typeof value === "string" ? value 
 
 const WHAT_A_MYSTERY_IS = `A planted mystery is a small detail the story presents as unexplained, inviting the player to wonder about it: a mark or sign no one can account for, an odd sound or light, a strange or missing object, a behavior no one explains, a hint of a secret, a rumor. These are not mysteries: ordinary scene detail (weather, light, a sound with an obvious cause, a character's habit or mood); a question the chapter itself puts to the player (a choice, a dilemma, a test or trial still running); a matter the story already tracks as pending (an inquiry not yet answered, a reading not yet verified, a decision not yet made).`;
 
-const INTRO_NEW = `YOUR JOB: CHECK ONE PLAYER'S TURN OF A STORY GAME FOR NEW MYSTERIES
+/** What counts as a mystery: v1's definition, and v2's sentence on a new side of a held detail after it. */
+const whatAMysteryIs = (version: CluesJudgeVersion) => (version === 1 ? WHAT_A_MYSTERY_IS : `${WHAT_A_MYSTERY_IS} ${CLUES_V2_TEXT.newSide}`);
+
+const introNew = (version: CluesJudgeVersion) => `YOUR JOB: CHECK ONE PLAYER'S TURN OF A STORY GAME FOR NEW MYSTERIES
 
 This turn is in the late part of a story game, where the story should be closing what it has opened. It may bring back a detail it planted earlier, or explain one; it should not plant a new one.
 
-${WHAT_A_MYSTERY_IS}
+${whatAMysteryIs(version)}
 
 Read the facts the story recorded before this turn and the player's earlier interludes: a detail they already hold is not new, even when this turn adds to it. Then read the turn: its text, its interludes, and the facts it records. List every mystery-like detail the turn presents, say whether the story already had it or it is new, and whether this turn explains it; then answer the question.
 
@@ -58,13 +75,13 @@ An example from another story: the story recorded "A bell in the tower rings at 
 
 const QUESTION_NEW = `${NEW_MYSTERY_CHECK}: Does the turn plant no new mystery? Answer no if its text, an interlude or a fact it records presents an unexplained detail the story did not have before (not in the facts or the earlier interludes) and this turn does not explain it. Answer yes otherwise.`;
 
-const INTRO_EXPLAINED = `YOUR JOB: CHECK THE ENDING OF A STORY GAME FOR THE MYSTERIES IT LEFT
+const introExplained = (version: CluesJudgeVersion) => `YOUR JOB: CHECK THE ENDING OF A STORY GAME FOR THE MYSTERIES IT LEFT
 
 Over a story, turns plant small unexplained details, and many come back turn after turn. A good ending explains at least one of them in the story's own terms (says what it is or was); an ending that explains none leaves the player with clues the story forgot.
 
-${WHAT_A_MYSTERY_IS} A question about one of the story's outcomes (who wins, what is decided) is not one either.
+${whatAMysteryIs(version)} A question about one of the story's outcomes (who wins, what is decided) is not one either.
 
-Read the facts the story recorded and the player's earlier interludes, and list the unexplained details they hold (each once, at most twelve, the ones the story brought back most first). Then read the ending and say, for each, whether it explains it: what it is or was, who made it, why it happens. Mentioning it again, or saying it remains unexplained, is not explaining it. Then answer the question.
+Read the facts the story recorded and the player's earlier interludes, and list the unexplained details they hold (each once, at most twelve, the ones the story brought back most first). Then read the ending and say, for each, whether it explains it: what it is or was, who made it, why it happens. Mentioning it again, or saying it remains unexplained, is not explaining it.${version === 1 ? "" : ` ${CLUES_V2_TEXT.kindOnly}`} Then answer the question.
 
 An example from another story: the facts hold "A bell in the tower rings at noon, though its rope was cut years ago" and "Salt appears on the windowsill each morning". An ending in which the keeper admits she rings the bell with a long pole passes, even if the salt stays a mystery. An ending that says "the bell still rings at noon, and no one knows why" fails.`;
 
@@ -113,11 +130,20 @@ export function explainedSchema() {
   });
 }
 
-/** Every fact the story has recorded so far: each story element's, then the world's. */
-export function storyFactLines(story: Story): string[] {
+/**
+ * Every fact the story has recorded so far: each story element's, then the
+ * world's; from v2 each element's own description (its appearance) before its
+ * facts, since a detail the description holds (a map whose district lines
+ * shift) is no new mystery.
+ */
+export function storyFactLines(story: Story, version: CluesJudgeVersion = CLUES_JUDGE_PROMPT_VERSION): string[] {
   const state = story.getState();
   return [
-    ...(state.storyElements ?? []).flatMap((e) => (e.facts ?? []).filter(Boolean).map((fact) => `- (${e.name || e.id}) ${fact}`)),
+    ...(state.storyElements ?? []).flatMap((e) => {
+      const name = e.name || e.id;
+      const described = version >= 2 && e.appearance?.trim() ? [`- (${name}, as described) ${e.appearance.trim()}`] : [];
+      return [...described, ...(e.facts ?? []).filter(Boolean).map((fact) => `- (${name}) ${fact}`)];
+    }),
     ...(state.worldFacts ?? []).filter(Boolean).map((fact) => `- (world) ${fact}`),
   ];
 }
@@ -138,16 +164,16 @@ function interludeLines(reply: SetOfBeatGenerationSchema, slot: string): string[
     .map((text) => `- ${text}`);
 }
 
-function slotRequest(story: Story, reply: SetOfBeatGenerationSchema, slot: PlayerSlot, check: ClueCheck): TextRequest {
+function slotRequest(story: Story, reply: SetOfBeatGenerationSchema, slot: PlayerSlot, check: ClueCheck, version: CluesJudgeVersion): TextRequest {
   const name = story.getPlayer(slot)?.name ?? slot;
-  const facts = storyFactLines(story);
+  const facts = storyFactLines(story, version);
   const earlier = earlierInterludes(story, slot);
   const recorded = factLines(story, reply);
   const interludes = interludeLines(reply, slot);
   const text = [`${name}'s text (${slot}):`, ...paragraphsOf(reply, slot).map((p, i) => `[${i + 1}] ${p}`)].join("\n");
   const ending = check === EXPLAINED_CHECK;
   const sections = [
-    ending ? INTRO_EXPLAINED : INTRO_NEW,
+    ending ? introExplained(version) : introNew(version),
     ["======= THE STORY =======", `Title: ${story.getTitle()}`, `The player's character: ${name}`].join("\n"),
     ["======= FACTS THE STORY RECORDED BEFORE THIS TURN =======", ...(facts.length ? facts : ["none"])].join("\n"),
     [`======= ${name.toUpperCase()}'S EARLIER INTERLUDES (shown between turns, oldest first) =======`, ...(earlier.length ? earlier : ["none"])].join("\n"),
@@ -162,16 +188,21 @@ function slotRequest(story: Story, reply: SetOfBeatGenerationSchema, slot: Playe
 /**
  * The judge's requests for one reply (as the game keeps it, after the beat
  * repairs) on its turn's story: at the ending, detailsExplained per player; on
- * a turn in the story's late part, noNewMystery per player; none earlier.
+ * a turn in the story's late part, noNewMystery per player; none earlier. At
+ * the prompt version given (v1 as the late-pacing stage ran it).
  */
-export function cluesJudgeRequests(story: Story, reply: SetOfBeatGenerationSchema): { slot: PlayerSlot; check: ClueCheck; request: TextRequest }[] {
+export function cluesJudgeRequests(
+  story: Story,
+  reply: SetOfBeatGenerationSchema,
+  version: CluesJudgeVersion = CLUES_JUDGE_PROMPT_VERSION
+): { slot: PlayerSlot; check: ClueCheck; request: TextRequest }[] {
   if (story.isFirstBeat()) return [];
   const check: ClueCheck | undefined = story.getCurrentBeatType() === "ending" ? EXPLAINED_CHECK : isLatePart(story) ? NEW_MYSTERY_CHECK : undefined;
   if (!check) return [];
   return story
     .getPlayerSlots()
     .filter((slot) => paragraphsOf(reply, slot).length > 0)
-    .map((slot) => ({ slot, check, request: slotRequest(story, reply, slot, check) }));
+    .map((slot) => ({ slot, check, request: slotRequest(story, reply, slot, check, version) }));
 }
 
 /** The verdict: true when the judge answered yes, undefined where it answered neither. */
@@ -194,22 +225,22 @@ export function cluesEvidenceFrom(parsed: unknown, check: ClueCheck): { evidence
   return { ...(evidence ? { evidence } : {}), lines };
 }
 
-export const cluesJudgeCaseId = (key: string, check: ClueCheck, version = CLUES_JUDGE_PROMPT_VERSION) => `judge-clues-${check === NEW_MYSTERY_CHECK ? "new" : "explained"}-v${version}-${key}`;
+export const cluesJudgeCaseId = (key: string, check: ClueCheck, version: CluesJudgeVersion = CLUES_JUDGE_PROMPT_VERSION) => `judge-clues-${check === NEW_MYSTERY_CHECK ? "new" : "explained"}-v${version}-${key}`;
 
 /** Luna low lists a turn's details and answers: about 500-1,000 tokens, reasoning included; an ending's list is longer */
 const OUTPUT_TOKENS: Record<ClueCheck, number> = { [NEW_MYSTERY_CHECK]: 900, [EXPLAINED_CHECK]: 1200 };
 
 export type CluesTarget = { key: string; check: ClueCheck; request: TextRequest; samples: number };
 
-/** The judge calls: each target at its number of samples (the calibration's two, the rest one). */
-export function cluesJudgeJobs(targets: CluesTarget[], arm: Arm, promptState: string, stage: Stage): Job[] {
+/** The judge calls: each target at its number of samples (the calibration's two, the rest one), keyed by the prompt version that built them. */
+export function cluesJudgeJobs(targets: CluesTarget[], arm: Arm, promptState: string, stage: Stage, version: CluesJudgeVersion = CLUES_JUDGE_PROMPT_VERSION): Job[] {
   return targets.flatMap((target) =>
     Array.from({ length: target.samples }, (_, i) =>
       prepJob({
         kind: "judge",
         stage,
         promptState,
-        caseId: cluesJudgeCaseId(target.key, target.check),
+        caseId: cluesJudgeCaseId(target.key, target.check, version),
         sample: i + 1,
         arm,
         role: "beat",

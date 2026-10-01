@@ -7,7 +7,6 @@ import type { EvalFiles } from "./evalFiles.js";
 import { caseStory, type EvalCase } from "./cases.js";
 import {
   CLUES_CALIBRATION,
-  CLUES_JUDGE_PROMPT_VERSION,
   EXPLAINED_CHECK,
   NEW_MYSTERY_CHECK,
   cluesEvidenceFrom,
@@ -18,12 +17,13 @@ import {
   scoreCluesCalibration,
   type ClueCheck,
   type CluesCalibrationItem,
+  type CluesJudgeVersion,
   type CluesTarget,
 } from "./cluesJudge.js";
 import { replyVerdict } from "./endingJudge.js";
 import { jobEstimateUsd } from "./jobPlan.js";
 import { JUDGE_ARMS, outputIdOf } from "./judgedChecks.js";
-import { latePacingCasesToFreeze, latePacingRetestCases, LATE_PACING_STARTS } from "./latePacingCases.js";
+import { latePacingCasesToFreeze, latePacingRetestCases, LATE_PACING_STARTS, type LatePacingStart } from "./latePacingCases.js";
 import { latePacingComparisons, playOn, readLatePacing, renderLatePacing, switchPacingReading, type LatePacingReading, type SwitchPacingReading } from "./latePacingPlay.js";
 import { withEdits } from "./outcomeSettledPrep.js";
 import { measuredCallCosts, playthroughRunsFrom, type ModeCall, type RoleCosts } from "./playthroughMode.js";
@@ -58,6 +58,8 @@ import type { VariantId } from "./variants.js";
 
 const STAGE: Stage = "late-pacing";
 const PLAY_FILE = "late-pacing";
+/** The clue judge's prompt as this stage ran it (v1; its one fix, v2, runs in the pacing-clues stage) */
+export const LATE_PACING_CLUES_VERSION: CluesJudgeVersion = 1;
 const CALIBRATION_SAMPLES = 2;
 const PLAYTHROUGHS_2 = "playthroughs-2";
 const LUNA_LOW = { model: "gpt-6-luna", reasoningEffort: "low" } as const;
@@ -127,12 +129,12 @@ export function latePacingCall(ctx: PrepContext, sample: number, limitUsd: numbe
 /** A short playthrough's key: its story, start, arm and sample. */
 export const playRunKey = (run: PlayRun) => `${run.spec.id}|${run.from?.turn ?? 1}|${run.from?.variant ?? "adopted"}|${run.sample}`;
 
-/** The file's runs with new ones: a run played again replaces its key, in the starts' order, then arm and sample. */
-export function mergeLatePacingRuns(existing: PlayRun[], added: PlayRun[]): PlayRun[] {
+/** The file's runs with new ones: a run played again replaces its key, in the starts' order, then sample and arm (a stage's own starts and arms where given). */
+export function mergeLatePacingRuns(existing: PlayRun[], added: PlayRun[], starts: LatePacingStart[] = LATE_PACING_STARTS, variants: VariantId[] = PLAY_VARIANTS): PlayRun[] {
   const replaced = new Set(added.map(playRunKey));
   const order = (run: PlayRun) => {
-    const at = LATE_PACING_STARTS.findIndex((s) => s.story === run.spec.id);
-    return [at < 0 ? LATE_PACING_STARTS.length : at, PLAY_VARIANTS.indexOf(run.from?.variant ?? "adopted"), run.sample];
+    const at = starts.findIndex((s) => s.story === run.spec.id);
+    return [at < 0 ? starts.length : at, variants.indexOf(run.from?.variant ?? "adopted"), run.sample];
   };
   const compare = (a: PlayRun, b: PlayRun) => {
     const [x, y] = [order(a), order(b)];
@@ -316,15 +318,15 @@ export function printLatePacingPlan(files: EvalFiles, log: (line: string) => voi
 /** A judge call on a short playthrough's turn or a frozen ending: the reading's arm, case and sample, the turn and player. */
 export type CluesReplyTarget = CluesTarget & { armKey: string; caseId: string; sample: number; turn: number; slot: string; outputId: string };
 
-/** Every turn of the short playthroughs in the story's late part, once per player, as the game kept it, under the arm's key. */
-export function cluesPlayTargets(runs: PlayRun[]): CluesReplyTarget[] {
+/** Every turn of the short playthroughs in the story's late part, once per player, as the game kept it, under the arm's key; the judge's prompt at `version`. */
+export function cluesPlayTargets(runs: PlayRun[], version: CluesJudgeVersion = LATE_PACING_CLUES_VERSION): CluesReplyTarget[] {
   return runs.flatMap((run) => {
     const variant = run.from?.variant ?? "adopted";
     const players = run.input.playerCount;
     return replayRun(run).flatMap((r) => {
       const reply = r.played.reply as SetOfBeatGenerationSchema | undefined;
       if (!reply) return [];
-      return cluesJudgeRequests(r.before, reply).map((q) => ({
+      return cluesJudgeRequests(r.before, reply, version).map((q) => ({
         key: `${run.spec.id}-from${run.from?.turn ?? 1}-${variant}-s${run.sample}-t${r.turn}-${q.slot}`,
         check: q.check,
         request: q.request,
@@ -350,21 +352,25 @@ export function cluesEndingTargets({ records, cases, load }: Lookup): CluesReply
     if (!evalCase?.state || !parsed) return [];
     const story = caseStory(evalCase);
     const outputId = outputIdOf(r.outputFile);
-    return cluesJudgeRequests(story, repairBeatReply(story, parsed).reply).map((q) => ({ key: `${outputId}-${q.slot}`, check: q.check, request: q.request, samples: 1, armKey: r.armKey, caseId: r.caseId, sample: r.sample, turn: 0, slot: q.slot, outputId }));
+    return cluesJudgeRequests(story, repairBeatReply(story, parsed).reply, LATE_PACING_CLUES_VERSION).map((q) => ({ key: `${outputId}-${q.slot}`, check: q.check, request: q.request, samples: 1, armKey: r.armKey, caseId: r.caseId, sample: r.sample, turn: 0, slot: q.slot, outputId }));
   });
 }
 
 export type CluesCalibrationTarget = CluesTarget & { itemId: string };
 
-/** The hand-read items' judge requests, each at two samples, and what could not be built. */
-export function cluesCalibrationTargets(runs: PlayRun[], items: CluesCalibrationItem[] = CLUES_CALIBRATION): { targets: CluesCalibrationTarget[]; problems: string[] } {
+/** The hand-read items' judge requests at the prompt `version`, each at two samples, and what could not be built. */
+export function cluesCalibrationTargets(
+  runs: PlayRun[],
+  items: CluesCalibrationItem[] = CLUES_CALIBRATION,
+  version: CluesJudgeVersion = LATE_PACING_CLUES_VERSION
+): { targets: CluesCalibrationTarget[]; problems: string[] } {
   const problems: string[] = [];
   const targets: CluesCalibrationTarget[] = [];
   for (const item of items) {
     try {
       const { before, played } = replayedTurn(runs, item.story, item.turn);
       const reply = withEdits(played.reply as SetOfBeatGenerationSchema, item.edits ?? []);
-      const target = cluesJudgeRequests(before, reply).find((r) => r.slot === item.slot && r.check === item.check);
+      const target = cluesJudgeRequests(before, reply, version).find((r) => r.slot === item.slot && r.check === item.check);
       if (!target) throw new Error(`turn ${item.turn} of ${item.story} has no ${item.check} request for ${item.slot}`);
       targets.push({ itemId: item.id, key: `cal-${item.id}`, check: item.check, request: target.request, samples: CALIBRATION_SAMPLES });
     } catch (error) {
@@ -388,10 +394,10 @@ export function cluesReadings(targets: CluesReplyTarget[], answerOf: (target: Cl
 }
 
 /** Every target once, at the most samples any reading asks of it. */
-function mergedTargets(targets: CluesTarget[]): CluesTarget[] {
+export function mergedTargets(targets: CluesTarget[], version: CluesJudgeVersion = LATE_PACING_CLUES_VERSION): CluesTarget[] {
   const byKey = new Map<string, CluesTarget>();
   for (const t of targets) {
-    const id = cluesJudgeCaseId(t.key, t.check);
+    const id = cluesJudgeCaseId(t.key, t.check, version);
     const known = byKey.get(id);
     if (!known || known.samples < t.samples) byKey.set(id, { ...t, samples: Math.max(t.samples, known?.samples ?? 0) });
   }
@@ -407,7 +413,7 @@ export async function judgeCluesMode(ctx: PrepContext, options: { caseIds?: stri
   const read = options.caseIds ? replies.filter((r) => options.caseIds?.includes(r.caseId)) : replies;
   const targets = mergedTargets([...items, ...read]);
   const arm = JUDGE_ARMS[0];
-  const jobs = cluesJudgeJobs(targets, arm, LATE_PACING_PROMPT_STATE, STAGE);
+  const jobs = cluesJudgeJobs(targets, arm, LATE_PACING_PROMPT_STATE, STAGE, LATE_PACING_CLUES_VERSION);
   const done = finishedJobKeys(files.readPrepRecords());
   const open = jobs.filter((j) => !done.has(keyOf(j)));
   const estimate = open.reduce((sum, j) => sum + jobEstimateUsd(j), 0);
@@ -424,7 +430,7 @@ export function writeJudgedClues(ctx: Pick<PrepContext, "files" | "log">, calibr
   const prep = files.readPrepRecords();
   const arm = JUDGE_ARMS[0];
   const parsedAt = (key: string, check: ClueCheck, sample: number) => {
-    const record = finishedPrepRecord(prep, jobKey(cluesJudgeCaseId(key, check), prepArmKey("judge", arm), LATE_PACING_PROMPT_STATE, sample));
+    const record = finishedPrepRecord(prep, jobKey(cluesJudgeCaseId(key, check, LATE_PACING_CLUES_VERSION), prepArmKey("judge", arm), LATE_PACING_PROMPT_STATE, sample));
     return record ? files.loadOutput(record) : undefined;
   };
   const judged = calibration.map((t) => {
@@ -444,7 +450,7 @@ export function writeJudgedClues(ctx: Pick<PrepContext, "files" | "log">, calibr
   const lines = [
     "# Judged checks: planted details in the story's late part and at the ending",
     "",
-    `Generated ${generatedAt.toISOString()} from prep-calls.jsonl (cluesJudge.ts, prompt v${CLUES_JUDGE_PROMPT_VERSION}). One Luna low call per player's turn. noNewMystery on a turn in the story's late part: no new unexplained detail the story didn't have. detailsExplained on an ending: at least one of the story's unexplained details explained. A check is reliable when sample 1 agrees on at least 85% of the hand yes and of the hand no, each side holding at least 3, and two samples agree on at least 90%. Spent on these judge calls: $${spentUsd.toFixed(4)}.`,
+    `Generated ${generatedAt.toISOString()} from prep-calls.jsonl (cluesJudge.ts, prompt v${LATE_PACING_CLUES_VERSION}). One Luna low call per player's turn. noNewMystery on a turn in the story's late part: no new unexplained detail the story didn't have. detailsExplained on an ending: at least one of the story's unexplained details explained. A check is reliable when sample 1 agrees on at least 85% of the hand yes and of the hand no, each side holding at least 3, and two samples agree on at least 90%. Spent on these judge calls: $${spentUsd.toFixed(4)}.`,
     "",
     "| Check | Agree (sample 1) | Hand yes / no | Judged no where the hand says yes | Judged yes where the hand says no | Samples agree | On partial items (yes / no) | Reading |",
     "|---|---|---|---|---|---|---|---|",
@@ -477,7 +483,7 @@ export function writeJudgedClues(ctx: Pick<PrepContext, "files" | "log">, calibr
     ...rows.map((r) => `| ${r.caseId} | ${r.armKey} | ${r.sample} | ${r.slot} | ${r.check} | ${verdictText(r.verdict)} | ${r.lines.join("; ").replace(/\|/g, "/")} | ${(r.evidence ?? "").replace(/\s+/g, " ").replace(/\|/g, "/")} |`),
     ...(problems.length ? ["", "## Problems", "", ...problems.map((p) => `- ${p}`)] : []),
   ];
-  files.writePlaythroughs(`${lines.join("\n")}\n`, { generatedAt: generatedAt.toISOString(), promptState: LATE_PACING_PROMPT_STATE, promptVersion: CLUES_JUDGE_PROMPT_VERSION, agreement, judged, readings, rows, problems, spentUsd }, "judged-clues");
+  files.writePlaythroughs(`${lines.join("\n")}\n`, { generatedAt: generatedAt.toISOString(), promptState: LATE_PACING_PROMPT_STATE, promptVersion: LATE_PACING_CLUES_VERSION, agreement, judged, readings, rows, problems, spentUsd }, "judged-clues");
   for (const a of agreement) log(`${a.check}: ${a.agree} of ${a.decided} agree (hand yes ${a.handPasses}, no ${a.handFails}), samples ${a.pairsAgree} of ${a.pairs}: ${a.reliable ? "reliable" : "not reliable"}`);
   for (const check of [NEW_MYSTERY_CHECK, EXPLAINED_CHECK] as const) for (const r of readings[check]) log(`  ${check} ${r.armKey}: ${readingText(r)}`);
   log(`The stage's clue judge calls so far $${spentUsd.toFixed(4)}. Wrote judged-clues.md and .json.`);

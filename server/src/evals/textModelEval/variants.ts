@@ -57,7 +57,7 @@ import { resultsAsOutcomesRequest } from "../../game/services/storyTextRounds/re
 import { kidsShortTextCount, kidsTurnRequest } from "../../game/services/storyTextRounds/kidsTurn.js";
 import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
 import { moneyAddsUpRequest } from "../../game/services/storyTextRounds/moneyAddsUp.js";
-import { latePacingRequest } from "../../game/services/storyTextRounds/latePacing.js";
+import { latePacingRequest, pacingCluesRequest } from "../../game/services/storyTextRounds/latePacing.js";
 import { kidsAgesSetupRequest, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../game/services/storyTextRounds/kidsAges.js";
 import { groupLeversRequest } from "../../game/services/storyTextRounds/groupLevers.js";
 import { shortRepliesRequest } from "../../game/services/storyTextRounds/shortReplies.js";
@@ -379,6 +379,15 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * chapter only for a strong reason in the option's text); production's request
  * byte for byte elsewhere, with production's single-player turn limits and
  * retry count.
+ * "pacingClues" is the pacing-clues stage's switch planner, chapter planner
+ * and turn (2026-10-01, fix 8's retest in whole short playthroughs,
+ * storyTextRounds/latePacing.ts): latePacingB's planners (the paced lengths,
+ * step b with the story's instructions ranked below a player's needed
+ * milestones) and, of latePacing's turn lines, only the late part's (no new
+ * mystery, an earlier one explained where it fits, the interludes too);
+ * production's request byte for byte elsewhere (an early turn's hint, the
+ * first turn, the ending), with production's limits for the role and player
+ * count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -455,7 +464,8 @@ export type VariantId =
   | "shortReplies"
   | "noThreadAudit"
   | "noNewMilestones"
-  | "turnO2c";
+  | "turnO2c"
+  | "pacingClues";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -529,6 +539,7 @@ export const VARIANTS: VariantId[] = [
   "noThreadAudit",
   "noNewMilestones",
   "turnO2c",
+  "pacingClues",
 ];
 
 /**
@@ -1062,6 +1073,15 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     if (input.role !== "beat") throw new Error(`Variant turnO2c does not cover role ${input.role}`);
     const count = beatCheckOptions(input.story).textCount;
     return { ...optionsO2cRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // The pacing-clues stage's switch planner, chapter planner and turn: B's planners and the late part's clue lines only;
+  // production's limits and production's retry count where it has its own
+  pacingClues: (input): CheckedTextRequest => {
+    if (input.role !== "beat" && input.role !== "switch" && input.role !== "thread") throw new Error(`Variant pacingClues does not cover role ${input.role}`);
+    const limits = productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers());
+    if (input.role !== "beat") return { ...pacingCluesRequest(input.story, input.role), limits };
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...pacingCluesRequest(input.story, "beat"), limits, ...(count ? { shortTextCount: count } : {}) };
   },
 };
 

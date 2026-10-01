@@ -11,6 +11,7 @@ import {
   neededAfterChapter,
   pacedLengths,
   pacedLengthsFor,
+  pacingCluesRequest,
 } from "../../../../../src/game/services/storyTextRounds/latePacing.js";
 import { allowedLengths, fewestThreads, turnsLeft } from "../../../../../src/game/services/pacing.js";
 import { beatStep, switchStep, threadStep } from "../../../../../src/game/services/storyTextSteps.js";
@@ -243,6 +244,79 @@ describe("the turn: plant early, pay off late", () => {
       ].reduce((text, [from, to]) => text.split(from).join(to), variant);
       expect([c.id, back === beatStep.request(story).prompt]).toEqual([c.id, true]);
     }
+  });
+});
+
+/*
+ * The pacing-clues stage's variant (2026-10-01, fix 8's retest in whole short
+ * playthroughs, the coordinator's call after the owner's decisions): the
+ * fix-and-retest's planners (the paced lengths; step b with the story's
+ * instructions ranked below a player's needed milestones) and, of the turn's
+ * lines, only the late part's: no new mystery, an earlier one explained where it
+ * fits, the interludes too. An early turn's hint and the ending stay
+ * production's: the early line had no reading of its own, and the ending line
+ * moved nothing (0 of 18 -> 1 of 18).
+ */
+describe("pacingClues: B's planners and the late part's clue lines only", () => {
+  it.each([1, 2, 3])("the switch planner is B's (%i players)", (players) => {
+    const story = switchAnalysisAfterThread(players);
+    expect(pacingCluesRequest(story, "switch").prompt).toBe(latePacingRequest(story, "switch", { b: true }).prompt);
+    expect(json(pacingCluesRequest(story, "switch").schema)).toBe(json(switchStep.request(story).schema));
+  });
+
+  it("the chapter planner is the variant's: the paced lengths where they narrow, production's elsewhere", () => {
+    const narrowed = planning(1, 13, [outcome("shared_main", { intendedNumberOfMilestones: 2 })]);
+    expect(pacingCluesRequest(narrowed, "thread").prompt).toBe(latePacingRequest(narrowed, "thread").prompt);
+    expect(pacingCluesRequest(narrowed, "thread").prompt).toContain(LATE_PACING_TEXT.longer);
+    const wide = planning(1, 25);
+    expect(pacingCluesRequest(wide, "thread").prompt).toBe(threadStep.request(wide).prompt);
+  });
+
+  it.each([1, 3])("a late turn (%i players): the late lines, as the variant writes them", (players) => {
+    const story = late(players);
+    const variant = pacingCluesRequest(story, "beat");
+    expect(variant.prompt).toBe(latePacingRequest(story, "beat").prompt);
+    expect(occurrences(variant.prompt, LATE_PACING_TEXT.hintLate)).toBe(1);
+    expect(occurrences(variant.prompt, LATE_PACING_TEXT.interludeLate)).toBe(1);
+    expect(json(variant.schema)).toBe(json(beatStep.request(story).schema));
+  });
+
+  it.each([1, 3])("an early turn (%i players): production's request byte for byte, no early hint line", (players) => {
+    const story = early(players);
+    expect(pacingCluesRequest(story, "beat").prompt).toBe(beatStep.request(story).prompt);
+    expect(pacingCluesRequest(story, "beat").prompt).not.toContain(LATE_PACING_TEXT.hintEarly);
+  });
+
+  it.each([1, 2])("the ending (%i players) and the first turn: production's request byte for byte", (players) => {
+    for (const story of [endingBeat(players), firstSwitchBeat(players)]) {
+      expect(pacingCluesRequest(story, "beat").prompt).toBe(beatStep.request(story).prompt);
+    }
+  });
+
+  (frozen.length ? it : it.skip)("every frozen turn case: production's request around the late lines, and no other line", () => {
+    const turns = frozen.filter((c) => c.role === "beat" && c.state);
+    for (const c of turns) {
+      const story: Story = caseStory(c);
+      const variant = pacingCluesRequest(story, "beat").prompt;
+      expect([c.id, variant.includes(LATE_PACING_TEXT.hintEarly) || variant.includes(LATE_PACING_TEXT.endingLine)]).toEqual([c.id, false]);
+      const back = variant.split(LATE_PACING_TEXT.hintLate).join(LATE_PACING_TEXT.hint).split(LATE_PACING_TEXT.interludeLate).join("");
+      expect([c.id, back === beatStep.request(story).prompt]).toEqual([c.id, true]);
+    }
+  });
+
+  it("the eval variant sends them with production's limits for each role and player count", () => {
+    for (const players of [1, 3]) {
+      const turn = late(players);
+      expect(requestText(requestFor("pacingClues", { role: "beat", story: turn }))).toBe(pacingCluesRequest(turn, "beat").prompt);
+      expect(callLimitsOf(requestFor("pacingClues", { role: "beat", story: turn }))).toEqual(productionCallLimits("beat", players));
+      const sw = switchAnalysisAfterThread(players);
+      expect(requestText(requestFor("pacingClues", { role: "switch", story: sw }))).toBe(pacingCluesRequest(sw, "switch").prompt);
+      expect(callLimitsOf(requestFor("pacingClues", { role: "switch", story: sw }))).toEqual(productionCallLimits("switchAnalysis", players));
+      const plan = threadAnalysisAfterSwitch(players);
+      expect(requestText(requestFor("pacingClues", { role: "thread", story: plan }))).toBe(pacingCluesRequest(plan, "thread").prompt);
+      expect(callLimitsOf(requestFor("pacingClues", { role: "thread", story: plan }))).toEqual(productionCallLimits("threadAnalysis", players));
+    }
+    expect(() => requestFor("pacingClues", { role: "setup", setup: { premise: "x", playerCount: 1, gameMode: "singlePlayer" as never, maxTurns: 10 } })).toThrow(/does not cover role setup/);
   });
 });
 

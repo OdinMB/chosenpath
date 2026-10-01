@@ -50,6 +50,20 @@ export const LATE_PACING_STARTS: LatePacingStart[] = [
   { story: "play-estate-agents", turn: 13, why: "Nia two milestones after the chapter, thirteen turns left: 3 or 4 beats; production chose 2" },
 ];
 
+/**
+ * The pacing-clues stage's starts (2026-10-01, fix 8's retest in whole short
+ * playthroughs): the late-pacing stage's three, and the space pirates' switch at
+ * turn 14, where the setup's "When Wayward Comet Integrity is 30% or lower, the
+ * next switch must offer a repair, salvage, or ship-rescue thread" met pacing:
+ * production gave the complete ship a grouped flavor thread there and at 18
+ * while the scout's own outcome, 0 of 2, waited, and it ended unfinished. Its
+ * request is the stored run's byte for byte (a test).
+ */
+export const PACING_CLUES_STARTS: LatePacingStart[] = [
+  ...LATE_PACING_STARTS,
+  { story: "play-space-pirates", turn: 14, why: "the switch after the ship fell to the setup's 30% threshold, the ship complete, the scout 0 of 2 with three threads left; production gave all three the ship" },
+];
+
 const CATEGORY = "late-pacing";
 
 /**

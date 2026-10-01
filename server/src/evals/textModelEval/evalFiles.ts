@@ -46,6 +46,8 @@ import type { CallRecord } from "./runner.js";
  *   group-levers.md|json   the group-levers stage's report, each group turn read whole, its players' sacrifices and rewards against their computed lines, own stats and shared ones (--group-levers)
  *   short-replies.md|json  the short-replies stage's report, each turn read whole, each player's paragraphs in the first reply and the reply kept (--short-replies)
  *   runaway-2.md|json      the second runaway replay's report, each job's first try answered or run away, each arm against production (--runaway-2)
+ *   pacing-clues.md|json   the pacing-clues stage's short playthroughs, their pacing readings and the late turns' clue readings (--pacing-clues-play, --judge-pacing-clues)
+ *   pacing-clues-blind.md  its blind hand reading, runs coded (--pacing-clues-blind); the key in keys/pacing-clues-blind.json
  *   judged-money.md|json   the money-adds-up stage's judged check, the figures adding up, and every reply with its stat changes (--judge-money)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  *   playthroughs.md|json   the whole-story playthroughs on production's own code (--playthroughs)
@@ -274,6 +276,15 @@ export function evalFiles(outDir: string) {
       return path.join(dir, fileName);
     },
     writeKey: (key: RatingKey) => writeJson(at("keys", key.keyFile), key),
+    /** A blind hand reading's key (keys/<name>.json, never next to its reading), when written */
+    readBlindKey: (name: string): unknown => (fs.existsSync(at("keys", `${name}.json`)) ? JSON.parse(fs.readFileSync(at("keys", `${name}.json`), "utf-8")) : undefined),
+    writeBlindKey: (name: string, key: unknown) => writeJson(at("keys", `${name}.json`), key),
+    /** A blind hand reading (<name>.md): the items coded, no arm named; its path */
+    writeBlindReading: (name: string, markdown: string) => {
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(at(`${name}.md`), markdown);
+      return at(`${name}.md`);
+    },
     /**
      * A page's answer key: in keys/, else in keys/superseded/, where a
      * replaced page's key goes, so an export from a superseded page still

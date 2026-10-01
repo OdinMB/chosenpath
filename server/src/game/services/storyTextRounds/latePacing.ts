@@ -204,6 +204,10 @@ export function isLatePart(story: Story): boolean {
   return phaseOf(story.getCurrentTurn() + 1, story.getMaxTurns(), false) === "late";
 }
 
+/** The late part's lines on a turn's instructions: no new mystery in place of the hint, the interludes' line after their examples. */
+const withLateLines = (instructions: string) =>
+  replaceOnce(LABEL, replaceOnce(LABEL, instructions, HINT, HINT_LATE), INTERLUDE_ANCHOR, `${INTERLUDE_ANCHOR}${INTERLUDE_LATE}`);
+
 function turnRequest(story: Story): TextRequest {
   const production = beatStep.request(story);
   let { instructions } = splitAtState(LABEL, production.prompt);
@@ -215,9 +219,16 @@ function turnRequest(story: Story): TextRequest {
   }
   if (!instructions.includes(HINT)) return production;
   if (!isLatePart(story)) return { ...production, prompt: replaceOnce(LABEL, instructions, HINT, HINT_EARLY) + state };
-  instructions = replaceOnce(LABEL, instructions, HINT, HINT_LATE);
-  instructions = replaceOnce(LABEL, instructions, INTERLUDE_ANCHOR, `${INTERLUDE_ANCHOR}${INTERLUDE_LATE}`);
-  return { ...production, prompt: instructions + state };
+  return { ...production, prompt: withLateLines(instructions) + state };
+}
+
+/** The turn with the late part's lines only: production's on an early turn, the first turn and the ending. */
+function lateOnlyTurnRequest(story: Story): TextRequest {
+  const production = beatStep.request(story);
+  if (story.getCurrentBeatType() === "ending" || !isLatePart(story)) return production;
+  const { instructions, state } = splitAtState(LABEL, production.prompt);
+  if (!instructions.includes(HINT)) return production;
+  return { ...production, prompt: withLateLines(instructions) + state };
 }
 
 /**
@@ -232,4 +243,24 @@ export function latePacingRequest(story: Story, role: "beat" | "switch" | "threa
   if (role === "switch") return switchRequest(story, options.b === true);
   if (role === "thread") return threadRequest(story);
   return turnRequest(story);
+}
+
+/**
+ * The pacing-clues stage's variant (2026-10-01, fix 8's retest in whole short
+ * playthroughs): the fix-and-retest's planners (the chapter planner's paced
+ * lengths, step b with the story's SWITCH/THREAD INSTRUCTIONS ranked below a
+ * player's needed milestones) and, of the turn's lines, only the late part's
+ * (no new mystery, an earlier one explained where it fits, the interludes
+ * too). An early turn's hint and the ending are production's: the early line
+ * had no reading of its own, and the ending line moved nothing in the
+ * late-pacing stage (0 of 18 player endings explained a detail, 1 of 18 with
+ * it), so what runs is what would be adopted.
+ */
+export function pacingCluesRequest(story: Story, role: "switch"): PlanRequest<SwitchAnalysis>;
+export function pacingCluesRequest(story: Story, role: "thread"): PlanRequest<ThreadAnalysis>;
+export function pacingCluesRequest(story: Story, role: "beat" | "switch" | "thread"): TextRequest & { assemble?: (reply: unknown) => unknown };
+export function pacingCluesRequest(story: Story, role: "beat" | "switch" | "thread"): TextRequest & { assemble?: (reply: unknown) => unknown } {
+  if (role === "switch") return switchRequest(story, true);
+  if (role === "thread") return threadRequest(story);
+  return lateOnlyTurnRequest(story);
 }

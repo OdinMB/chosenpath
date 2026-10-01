@@ -118,6 +118,8 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "short-replies": "Turns that come back as one short paragraph (shortReplies beside production's turn under adopted18, --role beat, each with production's checked retry)",
   "runaway-2": "The runaway turn's cause again (noThreadAudit and noNewMilestones beside production's closing turn under adopted19, --role beat, on the case that ran away most)",
   "options-o2c": "Option variety with fewer rewards (turnO2c beside production's turn under adopted20, --role beat, on the stored rolled chapter steps)",
+  "pacing-clues":
+    "Fix 8's retest in whole short playthroughs (pacingClues beside production under adopted21: no --run arms; --pacing-clues-play, listed below, then --pacing-clues-blind and --judge-pacing-clues)",
 };
 
 /** Jobs by arm key, in plan order. */

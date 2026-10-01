@@ -84,7 +84,11 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * without one of the two blocks only a turn that closes a chapter carries, on
  * the case that ran away most), then option variety with fewer rewards
  * (options-o2c: O2b's stat lines with a reward the game places, beside
- * production's turn on the stored rolled chapter steps).
+ * production's turn on the stored rolled chapter steps), then fix 8's retest
+ * in whole short playthroughs (pacing-clues: no --run arms, the
+ * --pacing-clues-play mode's prep calls, production's code and the variant
+ * from four mid-story starts to the story's last chapter plan, and the clue
+ * judge's v2 on the late turns both played).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -117,6 +121,7 @@ export const FEEDBACK_STAGES = [
   "short-replies",
   "runaway-2",
   "options-o2c",
+  "pacing-clues",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -328,6 +333,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // Option variety with fewer rewards (2026-10-01, the owner's feedback on O2b): O2b's stat lines and a reward the game
   // places, against production's single-player turn, which runs beside it
   turnO2c: "adopted",
+  // Fix 8's retest in whole short playthroughs (2026-10-01): latePacingB's planners and the late part's clue lines,
+  // against production's code, which plays beside it from the same starts on the same dice
+  pacingClues: "adopted",
 };
 
 /**
@@ -692,6 +700,15 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
  * earlier stage used, so production runs beside O2c in the same minutes.
  */
 export const OPTIONS_O2C_PROMPT_STATE = "adopted20";
+
+/**
+ * The prompt state of the pacing-clues stage (2026-10-01, fix 8's retest in
+ * whole short playthroughs): production's own code since the options-o2c
+ * adoption (a single player's rolled step), under a tag no earlier stage used;
+ * the stage's calls are the --pacing-clues-play mode's prep calls and the clue
+ * judge's (pacingCluesPrep.ts), so it has no --run arms.
+ */
+export const PACING_CLUES_PROMPT_STATE = "adopted21";
 
 /**
  * Option variety with fewer rewards (the coordinator's brief of 2026-10-01,

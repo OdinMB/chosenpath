@@ -133,6 +133,18 @@ describe("the fix-and-retest's runs", () => {
     expect(planLengthsOf("adopted")).toBeUndefined();
   });
 
+  it("the pacing-clues stage's variant (2026-10-01) holds its chapter plans to the paced lengths too, as it plays", async () => {
+    expect(planLengthsOf("pacingClues")).toBeDefined();
+    const run = await storedRun();
+    const at = run.turns.find((t) => t.turn > 2 && t.plan?.kind === "chapter plan")!;
+    const { call, calls } = fakeCall(1, { length: 2 });
+    const { run: played } = await playOn(run, at.turn, "pacingClues", call, 1);
+    const first = replayRun(run).find((r) => r.turn === at.turn)!.beforePlan;
+    expect(promptOf(calls[0])).toBe(requestText(requestFor("pacingClues", { role: "thread", story: first })));
+    expect(calls.every((c) => c.arm.key.endsWith("/pacingClues"))).toBe(true);
+    expect(played.turns[0].plan?.pacing.pacedLengths).toEqual(pacedLengths(first).lengths);
+  });
+
   it("read against production on the stories the retest played only", () => {
     const readings = [
       reading("play-avalon", "adopted", 1, false),

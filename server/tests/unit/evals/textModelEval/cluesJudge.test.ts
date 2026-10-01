@@ -5,6 +5,8 @@ import { Story } from "core/models/Story.js";
 import type { SetOfBeatGenerationSchema } from "core/types/index.js";
 import {
   CLUES_CALIBRATION,
+  CLUES_JUDGE_PROMPT_VERSION,
+  CLUES_V2_TEXT,
   EXPLAINED_CHECK,
   NEW_MYSTERY_CHECK,
   cluesEvidenceFrom,
@@ -14,7 +16,9 @@ import {
   cluesVerdictFrom,
   scoreCluesCalibration,
 } from "../../../../src/evals/textModelEval/cluesJudge.js";
+import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import { JUDGE_ARMS } from "../../../../src/evals/textModelEval/judgedChecks.js";
+import { LATE_PACING_CLUES_VERSION, cluesCalibrationTargets } from "../../../../src/evals/textModelEval/latePacingPrep.js";
 import { withEdits } from "../../../../src/evals/textModelEval/outcomeSettledPrep.js";
 import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthroughMode.js";
 import { replayedTurn } from "../../../../src/evals/textModelEval/playthroughReplay.js";
@@ -115,14 +119,67 @@ describe("the judge's answers and calls", () => {
   });
 
   it("keys each call by its check and the prompt version, and books it to the stage", () => {
-    const [target] = cluesJudgeRequests(planted(threadBeat), reply("You count.", "A bell."));
-    const jobs = cluesJudgeJobs([{ key: "abc", check: NEW_MYSTERY_CHECK, request: target.request, samples: 2 }], JUDGE_ARMS[0], "adopted15", "late-pacing");
+    const [target] = cluesJudgeRequests(planted(threadBeat), reply("You count.", "A bell."), 1);
+    const jobs = cluesJudgeJobs([{ key: "abc", check: NEW_MYSTERY_CHECK, request: target.request, samples: 2 }], JUDGE_ARMS[0], "adopted15", "late-pacing", 1);
     expect(jobs.map((j) => [j.caseId, j.sample, j.stage, j.promptState])).toEqual([
-      [cluesJudgeCaseId("abc", NEW_MYSTERY_CHECK), 1, "late-pacing", "adopted15"],
-      [cluesJudgeCaseId("abc", NEW_MYSTERY_CHECK), 2, "late-pacing", "adopted15"],
+      [cluesJudgeCaseId("abc", NEW_MYSTERY_CHECK, 1), 1, "late-pacing", "adopted15"],
+      [cluesJudgeCaseId("abc", NEW_MYSTERY_CHECK, 1), 2, "late-pacing", "adopted15"],
     ]);
-    expect(cluesJudgeCaseId("abc", NEW_MYSTERY_CHECK)).toBe("judge-clues-new-v1-abc");
-    expect(cluesJudgeCaseId("abc", EXPLAINED_CHECK)).toBe("judge-clues-explained-v1-abc");
+    expect(cluesJudgeCaseId("abc", NEW_MYSTERY_CHECK, 1)).toBe("judge-clues-new-v1-abc");
+    expect(cluesJudgeCaseId("abc", EXPLAINED_CHECK, 1)).toBe("judge-clues-explained-v1-abc");
+  });
+});
+
+/*
+ * Prompt v2 (2026-10-01, the pacing-clues stage): the calibration's one fix,
+ * written before the late-pacing stage closed and not run there. v1 read a new
+ * side of a detail the story held as a new mystery (a hum beneath the familiar
+ * chime, the paper lifting with a knock, the taps "maybe a signal"), the food
+ * trucks' route map as new though a story element's own description says its
+ * district lines shift, and the mouse ending's "sending a signal" as an
+ * explanation. v2 says a new side of a detail is no new mystery, reads each
+ * story element's own description beside the facts, and says naming what kind
+ * of thing a detail is explains nothing. v1's requests stay as they ran.
+ */
+describe("prompt v2: the calibration's one fix", () => {
+  const MAP = { id: "route_map", name: "Route Map", role: "A map.", instructions: "", appearance: "A brass map whose district lines shift slowly.", facts: ["It hangs in the hall."] };
+  const withMap = (build: typeof threadBeat, maxTurns = 5) => {
+    const story = planted(build, 1, maxTurns);
+    return Story.create({ ...story.getState(), storyElements: [...(story.getState().storyElements ?? []), MAP] });
+  };
+
+  it("v1 stays as it ran: no element descriptions, no v2 lines", () => {
+    const [request] = cluesJudgeRequests(withMap(threadBeat), reply("You count.", "The map's lines shift."), 1);
+    expect(request.request.prompt).toContain("- (Route Map) It hangs in the hall.");
+    expect(request.request.prompt).not.toContain("A brass map whose district lines shift slowly.");
+    expect(request.request.prompt).not.toContain(CLUES_V2_TEXT.newSide);
+    expect(cluesJudgeCaseId("abc", NEW_MYSTERY_CHECK, 1)).toBe("judge-clues-new-v1-abc");
+  });
+
+  it("v2 reads each story element's own description beside its facts, and says a new side of a held detail is no new mystery", () => {
+    expect(CLUES_JUDGE_PROMPT_VERSION).toBe(2);
+    const [request] = cluesJudgeRequests(withMap(threadBeat), reply("You count.", "The map's lines shift."));
+    const prompt = request.request.prompt;
+    expect(prompt).toContain("- (Route Map, as described) A brass map whose district lines shift slowly.");
+    expect(prompt).toContain("- (Route Map) It hangs in the hall.");
+    expect(prompt).toContain(CLUES_V2_TEXT.newSide);
+    expect(prompt).not.toContain(CLUES_V2_TEXT.kindOnly);
+  });
+
+  it("v2's ending says naming what kind of thing a detail is explains nothing", () => {
+    const [request] = cluesJudgeRequests(withMap(endingBeat, 6), reply("The tapping was a signal.", "The pennants come down."));
+    expect(request.request.prompt).toContain(CLUES_V2_TEXT.kindOnly);
+    expect(request.request.prompt).toContain(CLUES_V2_TEXT.newSide);
+  });
+
+  it("keys v2's calls apart from v1's, and its jobs carry the version", () => {
+    expect(cluesJudgeCaseId("abc", NEW_MYSTERY_CHECK)).toBe("judge-clues-new-v2-abc");
+    expect(cluesJudgeCaseId("abc", EXPLAINED_CHECK)).toBe("judge-clues-explained-v2-abc");
+    const [target] = cluesJudgeRequests(planted(threadBeat), reply("You count.", "A bell."));
+    const v1 = cluesJudgeJobs([{ key: "abc", check: NEW_MYSTERY_CHECK, request: target.request, samples: 1 }], JUDGE_ARMS[0], "adopted15", "late-pacing", 1);
+    const v2 = cluesJudgeJobs([{ key: "abc", check: NEW_MYSTERY_CHECK, request: target.request, samples: 1 }], JUDGE_ARMS[0], "adopted21", "pacing-clues");
+    expect(v1.map((j) => j.caseId)).toEqual(["judge-clues-new-v1-abc"]);
+    expect(v2.map((j) => [j.caseId, j.stage, j.promptState])).toEqual([["judge-clues-new-v2-abc", "pacing-clues", "adopted21"]]);
   });
 });
 
@@ -158,5 +215,28 @@ describe("the calibration's stored turns (skipped where the output folder is abs
       const target = cluesJudgeRequests(before, edited).find((r) => r.slot === item.slot);
       expect([item.id, target?.check]).toEqual([item.id, item.check]);
     }
+  });
+
+  const sentHashes = (() => {
+    const file = path.join(DIR, "prep-calls.jsonl");
+    if (!fs.existsSync(file)) return new Map<string, string>();
+    const records = fs
+      .readFileSync(file, "utf-8")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { caseId?: string; sample?: number; promptHash?: string });
+    return new Map(records.flatMap((r) => (r.caseId?.startsWith("judge-clues-") && r.sample === 1 && r.promptHash ? [[r.caseId, r.promptHash] as [string, string]] : [])));
+  })();
+
+  (stored2.length && sentHashes.size ? it : it.skip)("v1's requests rebuild byte for byte as the late-pacing stage sent them; v2's differ", () => {
+    const { targets, problems } = cluesCalibrationTargets(stored2, CLUES_CALIBRATION, LATE_PACING_CLUES_VERSION);
+    expect(problems).toEqual([]);
+    expect(LATE_PACING_CLUES_VERSION).toBe(1);
+    for (const target of targets) {
+      const sent = sentHashes.get(cluesJudgeCaseId(target.key, target.check, 1));
+      expect([target.itemId, sha256(target.request.prompt)]).toEqual([target.itemId, sent]);
+    }
+    const v2 = cluesCalibrationTargets(stored2, CLUES_CALIBRATION, 2).targets;
+    expect(v2.every((t, i) => t.request.prompt !== targets[i].request.prompt)).toBe(true);
   });
 });

@@ -62,8 +62,11 @@ export function continuationStart(run: PlayRun, turn: number, variant: VariantId
   };
 }
 
+/** The variants whose chapter planner prints the paced lengths: the late-pacing stage's, its retest's and the pacing-clues stage's. */
+const PACED_VARIANTS: VariantId[] = ["latePacing", "latePacingB", "pacingClues"];
+
 /** The variant's length rule for its chapter plans, its retest's too (the plan check reads it as its PACING prints it); production's own otherwise. */
-export const planLengthsOf = (variant: VariantId) => (variant === "latePacing" || variant === "latePacingB" ? (story: Story) => pacedLengths(story).lengths : undefined);
+export const planLengthsOf = (variant: VariantId) => (PACED_VARIANTS.includes(variant) ? (story: Story) => pacedLengths(story).lengths : undefined);
 
 /**
  * A stored story played on from a turn with an arm's requests, to the story's
@@ -341,14 +344,22 @@ const quantile = (values: number[], q: number) => {
 const moveText = (m: RateMove | MeanMove) =>
   m.moved ? `moved ${m.moved}${"p" in m && m.p !== undefined ? ` (p ${m.p.toFixed(3)})` : ""}` : m.beyondNoise ? `beyond the noise, not moved${"p" in m && m.p !== undefined ? ` (p ${m.p.toFixed(3)})` : ""}` : "within the noise";
 
-/** late-pacing.md: each short playthrough's chapters and switches, then the arms against each other. */
-export function renderLatePacing(readings: LatePacingReading[], generatedAt: Date): string {
-  const lines = [
-    "# Short playthroughs: pacing that leaves the last chapter a milestone",
-    "",
-    `Generated ${generatedAt.toISOString()} (latePacingPlay.ts). Each run: a stored story of the second round replayed to a chapter plan, then played on with production's code (adopted) or the variant (latePacing) to the story's last chapter plan. Readings are the game's arithmetic: no judge.`,
-    "",
-  ];
+/** A short-playthrough report's own words: its title, its first paragraph, and each candidate read against production with its section title. */
+export type PlayReportText = { title: string; intro: string; candidates: { variant: VariantId; title: string }[] };
+
+const LATE_PACING_REPORT: PlayReportText = {
+  title: "Short playthroughs: pacing that leaves the last chapter a milestone",
+  intro:
+    "Each run: a stored story of the second round replayed to a chapter plan, then played on with production's code (adopted) or the variant (latePacing) to the story's last chapter plan. Readings are the game's arithmetic: no judge.",
+  candidates: [
+    { variant: "latePacing", title: "The variant against production" },
+    { variant: "latePacingB", title: "The fix-and-retest (latePacingB) against production" },
+  ],
+};
+
+/** late-pacing.md (or another stage's short playthroughs, in its own words): each short playthrough's chapters and switches, then the arms against each other. */
+export function renderLatePacing(readings: LatePacingReading[], generatedAt: Date, text: PlayReportText = LATE_PACING_REPORT): string {
+  const lines = [`# ${text.title}`, "", `Generated ${generatedAt.toISOString()} (latePacingPlay.ts). ${text.intro}`, ""];
   for (const r of readings) {
     lines.push(`## ${r.story} from turn ${r.from}, ${r.variant}, sample ${r.sample}`, "", `Stopped: ${r.stopped}. Cost $${r.costUsd.toFixed(4)}.`, "");
     lines.push("| Turn | Length | Production allows | Variant allows | Last | Threads (outcome, stage) | Length retry | Planner wait |", "|---|---|---|---|---|---|---|---|");
@@ -367,11 +378,10 @@ export function renderLatePacing(readings: LatePacingReading[], generatedAt: Dat
     }
     lines.push("");
   }
-  for (const candidate of ["latePacing", "latePacingB"] as const) {
+  for (const { variant: candidate, title } of text.candidates) {
     if (!readings.some((r) => r.variant === candidate)) continue;
     const c = latePacingComparisons(readings, candidate);
     const stories = [...new Set(readings.filter((r) => r.variant === candidate).map((r) => r.story))];
-    const title = candidate === "latePacing" ? "The variant against production" : "The fix-and-retest (latePacingB) against production";
     lines.push(`## ${title} (${stories.join(", ")})`, "", "| Reading | Production | Candidate | Noise | Reading |", "|---|---|---|---|---|");
     for (const rate of c.rates) lines.push(`| ${rate.reading} | ${pct(rate.production)} | ${pct(rate.variant)} | ${rate.noise === undefined ? "–" : `${Math.round(100 * rate.noise)} pts`} | ${moveText(rate.move)} |`);
     lines.push(`| milestones left unfinished (mean) | ${c.unfinished.production.toFixed(2)} | ${c.unfinished.variant.toFixed(2)} | – | ${moveText(c.unfinished.move)} |`);

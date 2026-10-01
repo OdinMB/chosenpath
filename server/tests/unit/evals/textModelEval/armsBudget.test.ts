@@ -21,6 +21,7 @@ import {
   OPTIONS_O2_CASES,
   OPTIONS_O2_PROMPT_STATE,
   OPTIONS_O2C_PROMPT_STATE,
+  PACING_CLUES_PROMPT_STATE,
   pipelinePlans,
   PLAYTHROUGHS_2_PROMPT_STATE,
   productionArm,
@@ -451,6 +452,9 @@ describe("budget caps", () => {
       // The coordinator's brief of 2026-10-01: option variety with fewer rewards (O2c), its estimate (with its judged
       // checks and room for one fix-and-retest) plus 30%
       "options-o2c": 0.85,
+      // The coordinator's call of 2026-10-01: fix 8's retest in whole short playthroughs, its estimate (16 runs, the clue
+      // judge's calibration and its run on the late turns) plus 30%
+      "pacing-clues": 1.3,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -482,6 +486,7 @@ describe("budget caps", () => {
       "short-replies",
       "runaway-2",
       "options-o2c",
+      "pacing-clues",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -491,9 +496,10 @@ describe("budget caps", () => {
     }
     // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, the sixteen caps up to
     // the second playthroughs still fit (the hard cap $42 since the second round of playthroughs)
-    const decisions = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("late-pacing") + 1);
+    const decisions = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("late-pacing") + 1, FEEDBACK_STAGES.indexOf("options-o2c") + 1);
     const review = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("outcome-settled"), FEEDBACK_STAGES.indexOf("late-pacing") + 1);
-    const before = FEEDBACK_STAGES.filter((stage) => !review.includes(stage) && !decisions.includes(stage));
+    const after = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("options-o2c") + 1);
+    const before = FEEDBACK_STAGES.filter((stage) => !review.includes(stage) && !decisions.includes(stage) && !after.includes(stage));
     const capsOf = (stages: readonly (typeof FEEDBACK_STAGES)[number][]) => stages.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
     expect(capsOf(before)).toBeCloseTo(7.58);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + capsOf(before)).toBeLessThanOrEqual(HARD_CEILING);
@@ -507,6 +513,10 @@ describe("budget caps", () => {
     expect(decisions).toEqual(["kids-ages", "group-levers", "short-replies", "runaway-2", "options-o2c"]);
     expect(LEDGER_WHEN_DECISIONS_OPENED).toBe(39.94);
     expect(LEDGER_WHEN_DECISIONS_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisions)).toBeLessThanOrEqual(HARD_CEILING);
+    // Fix 8's retest (pacing-clues) opened with those five closed at what they spent (the ledger at $41.59): its cap fits
+    // with the $1.3 on top
+    expect(after).toEqual(["pacing-clues"]);
+    expect(41.59 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["pacing-clues"]).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
     const { caps: defaults } = resolveCaps({});
@@ -854,6 +864,21 @@ describe("budget caps", () => {
     // The coordinator's cap: $0.25, inside the $40 hard cap with the ledger at $37.11 and the stalled Stage 4 calls on top
     expect(DEFAULT_STAGE_CAPS["choice-line-sp"]).toBe(0.25);
     expect(37.11 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["choice-line-sp"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("gives fix 8's retest in whole short playthroughs (pacing-clues, 2026-10-01) a stage of its own: no --run arms, its calls prep calls under a tag of its own", () => {
+    for (const role of ["setup", "beat", "switch", "thread", "iteration"] as const) expect(armsFor("pacing-clues", role)).toEqual([]);
+    expect(pipelinePlans("pacing-clues")).toEqual([]);
+    expect(stageRunsBaseline("pacing-clues")).toBe(false);
+    // Production's code since the options-o2c adoption, under a tag no earlier stage used
+    expect(PACING_CLUES_PROMPT_STATE).toBe("adopted21");
+    expect([OPTIONS_O2C_PROMPT_STATE, RUNAWAY_2_PROMPT_STATE, SHORT_REPLIES_PROMPT_STATE, PLAYTHROUGHS_2_PROMPT_STATE]).not.toContain(PACING_CLUES_PROMPT_STATE);
+    // The variant reads against production's code, which plays beside it
+    expect(referenceKey(armKey({ model: "gpt-6-luna", reasoningEffort: "low" }, "pacingClues"))).toBe("gpt-6-luna@low/adopted");
+    expect(STAGE_CAP_REASONS["pacing-clues"]).toMatch(/2026-10-01/);
+    expect(STAGE_CAP_REASONS["pacing-clues"]).toMatch(/pacingClues/);
+    expect(STAGE_CAP_REASONS["pacing-clues"]).toMatch(/space pirates/);
+    expect(STAGE_CAP_REASONS["pacing-clues"]).toMatch(/few bucks don't matter/);
   });
 
   it("gives the whole-story playthroughs (playthroughs, 2026-09-30) a stage of their own: no --run arms, their calls prep calls in its ledger", () => {
