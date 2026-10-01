@@ -37,6 +37,7 @@ import { repairBeatReply } from "./beatRepairs.js";
 import { checkedBeatReply } from "./beatChecks.js";
 import { beatCheckOptions } from "./kidsTurnRules.js";
 import { checkedSwitchPlan, checkedThreadPlan } from "./planChecks.js";
+import { campsOfSetup } from "./scoreboards.js";
 import { logRepairs } from "./textRepairs.js";
 import {
   beatCallLimits,
@@ -174,6 +175,7 @@ export class AIStoryGenerator {
       pregenerateBeats: false, // Default to false - will be set by client/user preference
       images: [],
       playerCodes: {},
+      ...(setup.camps ? { camps: setup.camps } : {}),
     };
 
     // Create a Story instance to ensure proper state management
@@ -318,11 +320,13 @@ export class AIStoryGenerator {
         }
       }
 
-      // The character-selection plan (with the seat roles) is not kept after generation
+      // The character-selection plan (with the seat roles) is not kept after generation, but for the camps the seat
+      // roles name (three players and a contest, since 2026-10-01), which the plan check reads for a contest's side
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { characterSelectionPlan, ...storySetupData } = result;
+      const camps = campsOfSetup(result, playerCount);
 
-      return storySetupData as unknown as StorySetupGeneration<typeof playerCount>;
+      return { ...storySetupData, ...(camps ? { camps } : {}) } as unknown as StorySetupGeneration<typeof playerCount>;
     } catch (error) {
       Logger.Story.error("Failed to initialize story:", error);
       throw new Error("Failed to initialize story. Please try again.");

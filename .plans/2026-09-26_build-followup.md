@@ -2573,3 +2573,31 @@ A review checked the round-3 report against the stored pages and the code; eight
   - "reads a singular form only as a word of its own, and only where the text names no stat by its name": City Stability with Abilities, "your ability" with Personal Reserve, "stability" alone, and "a new ability";
   - "reads a list's payment on a later step of the chapter only where the stat's rules keep a beat from changing it".
 - **Docs:** `.context/story.md` (the shared-lever reading and the lever repair).
+
+## 2026-10-01 (evening): the review of decision A's fixes, a converted contest's side from the setup's camps (fix 2's finding; no calls, $0)
+
+- **Finding: the planner's written side was trusted (fix 2, 40146e2).** In a three-player game where player1 is not among a converted contest's winners, `boardSideOf` stored the side the planner wrote. Nothing checks that side: the planner is told only that player1's camp is side A. `boardResultOf` reads every converted challenge as oriented. Take camps player1 against {player2, player3}, with player3 written alone on side A. Then player3's favorable result named board side A, and the direction repair would turn a correct 50 → 35 into 65. That broke the guarantee that a correct move is never turned around, and the module's own rule that the planner's sides say nothing when player1 sits out. This was not seen in play: both stored conversions wrote the lone player's camp. I had accepted the risk knowingly at line 2527.
+- **Why not the finding's first remedy:** storing a side only where player1 is among the winners, or in a two-player game, would bring back the bug fix 2 closed. Oren is player3 in a three-player game, so his turn-10 move would go uncorrected again.
+- **The change, a camp source the stored story lacked:**
+  - **The setup's camps are kept.** Setup round 3's form already asks each seat's role line to name its camp, with three players and a contest ("player3: … (side B)", `PLAYER_ROLES_CAMP`). The game dropped those lines with the rest of the plan after generation. `AIStoryGenerator.generateStorySetup` now reads them (`campsOfSetup` → `campsFromSeatRoles` in `scoreboards.ts`), and `createInitialState` stores them as `StoryState.camps` (core: `Camp`, `Camps`, `Story.getRecordedCamp`, `Story.getThreadAnalyses`; `StorySetupGeneration.camps`). The request is unchanged.
+  - **When camps are kept:** only where every seat names exactly one camp, player1's is side A, and side B holds a seat. A line without "playerN:" counts as the seat at its place. Two players record none, since their camps are their seats.
+  - **How a seat's camp is read (`campOf`):** player1 → A. Player2 in a two-player game → B. Otherwise the camp the setup recorded, else the side the seat played beside or against player1 in the story's earlier contests, where those agree.
+  - **`boardSideOf`:** side A wherever player1 is among the winners, else the camp the winners share. Where no camp is known it stores no side, so the challenge's result names no winner (as before 40146e2).
+  - **The harness:** its copy, `storyFromSetup`, keeps the camps too.
+- **What play now does differently:**
+  - A three-player converted contest without player1 is read by its players' recorded camp, not by the side the planner wrote.
+  - With no recorded camp and no earlier contest to go on, it is not read at all. That covers a template's three-player story (a template keeps no plan) and a cooperative story (no camps).
+- **How often camps are there (a temporary Jest probe over every stored three-player setup reply in `calls.jsonl` and `prep-calls.jsonl`, deleted; no calls):** every contested three-player setup on round 3's form names a camp for every seat: 10 of 10 (`setupR3` 4, `setupR3b` 1, `adopted` 1, the chain 1, the three playthrough rounds' space pirates 3). The pre-round-3 forms never named camps (0 of 11 contested). Round 2's space pirates wrote "side A's sole claimant" and "side B's claimant", which the reading accepts.
+- **On the stored stories (`playthroughReplay.test.ts`):**
+  - Each run's camps are added from its stored setup, as production would now start the story (`withCampsKept`). All three rounds' space pirates record player1 on side A against player2 and player3 on side B.
+  - The three converted plans store the same sides as before: Pip B, Amara A, Oren B. Exactly the one move changes, round 3's space pirates turn 10.
+- **Tests:**
+  - **Changed on purpose (`planChecks.test.ts`):**
+    - The fix-2 case that expected a lone player2 written on side A to store "sideA" now reads the setup's camps, and stores "sideB" whichever side was written.
+    - The cooperative two-sided conversion with player1 elsewhere now stores no side; before, it stored the written side A.
+  - **Test-first, failed first:** `scoreboards.test.ts` (could not load `campsFromSeatRoles`, `campsOfSetup` and `campOf`), the two `planChecks.test.ts` cases, and `setupChain.test.ts`'s storyFromSetup case (camps kept).
+  - **Pinned after the code:** the replay reading (camps per round).
+- **Not done, and open:**
+  - The camps are not read for a contest player1 sits out. Its sides stay the planner's, unread by the scoreboard repair. Orienting those by the recorded camps would extend the repair; it is unmeasured on stored play.
+  - The planner is still not told the camps. Telling it would be a measured prompt change.
+- **Docs:** `.context/story.md` (PL-12 and camps, the scoreboard bullet, PL-11's note), `.context/text-model-eval.md` (the harness's `storyFromSetup`).

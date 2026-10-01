@@ -1,5 +1,5 @@
 import type { Story } from "core/models/Story.js";
-import type { Resolution, Stat, Thread } from "core/types/index.js";
+import type { Camp, Camps, PlayerSlot, Resolution, Stat, Thread } from "core/types/index.js";
 import { getThreadType } from "core/types/thread.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 
@@ -15,10 +15,70 @@ import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
  * planner's sides, which no check reads, so its result says nothing about
  * the scoreboard's direction. The setup's rule moves a scoreboard only after
  * a thread about that contest, 10 to 20 points toward the side that won,
- * none after a mixed result (setupPromptText.ts, SCOREBOARD_LINE).
+ * none after a mixed result (setupPromptText.ts, SCOREBOARD_LINE). Which camp
+ * a seat plays for (campOf) is the setup's record or what the story played,
+ * never the planner's sides.
  */
 
-export type ScoreboardWinner = "sideA" | "sideB";
+export type ScoreboardWinner = Camp;
+
+/** A camp named in a seat's line: "(side B)", "side B's claimant"; never "a side bet". */
+const SIDE_NAMED = /\b[Ss]ide ([AB])\b/g;
+
+/**
+ * The camps a setup's seat roles name. With three players and a contest, setup round 3's form asks each seat's line
+ * to name its camp ("player3: the landlord's nephew (side B)", PLAYER_ROLES_CAMP; round 2's space pirates wrote "side
+ * B's claimant"); a line without "playerN:" is the seat at its place, as the form orders them. Undefined unless every
+ * seat names exactly one camp, player1's is side A (the board's first side, as the form puts it) and side B holds a
+ * seat; and for fewer than three players, whose camps are their seats (campOf).
+ */
+export function campsFromSeatRoles(lines: unknown, playerCount: number): Camps | undefined {
+  if (!Array.isArray(lines) || playerCount < 3) return undefined;
+  const camps: Record<string, Camp> = {};
+  for (const [index, line] of lines.entries()) {
+    if (typeof line !== "string") return undefined;
+    const seat = /^\s*(player\d+)\s*:/i.exec(line)?.[1]?.toLowerCase() ?? `player${index + 1}`;
+    const sides = new Set([...line.matchAll(SIDE_NAMED)].map((match) => match[1]));
+    if (sides.size !== 1 || seat in camps) return undefined;
+    camps[seat] = sides.has("A") ? "sideA" : "sideB";
+  }
+  const seats = Array.from({ length: playerCount }, (_, i) => `player${i + 1}`);
+  if (Object.keys(camps).length !== playerCount || !seats.every((seat) => seat in camps)) return undefined;
+  if (camps.player1 !== "sideA" || !seats.some((seat) => camps[seat] === "sideB")) return undefined;
+  return camps as Camps;
+}
+
+/** The camps a setup reply names, as the game assembles it: its seat roles are its plan's multiplayerCoordination. */
+export function campsOfSetup(setup: unknown, playerCount: number): Camps | undefined {
+  const plan = setup !== null && typeof setup === "object" ? (setup as { characterSelectionPlan?: unknown }).characterSelectionPlan : undefined;
+  const roles = plan !== null && typeof plan === "object" ? (plan as { multiplayerCoordination?: unknown }).multiplayerCoordination : undefined;
+  return campsFromSeatRoles(roles, playerCount);
+}
+
+/**
+ * The camp a seat plays for on its contests' scoreboards (since the review of decision A's fixes, 2026-10-01): side A
+ * for player1; side B for player2 in a two-player game; else the camp the setup recorded (Story.getRecordedCamp); else
+ * the side the seat played on beside or against player1 in the story's earlier contests (PL-11 puts player1 on side
+ * A), where they agree. Undefined where none says: the planner's sides in a contest player1 sits out are never read.
+ */
+export function campOf(story: Story, slot: string): Camp | undefined {
+  if (slot === "player1") return "sideA";
+  if (story.getPlayerSlots().length === 2) return "sideB";
+  const recorded = story.getRecordedCamp(slot as PlayerSlot);
+  if (recorded) return recorded;
+  const played = new Set<Camp>();
+  for (const thread of story.getThreadAnalyses().flatMap((chapter) => chapter.threads)) {
+    if (getThreadType(thread) !== "contest") continue;
+    const [withPlayer1, against] = thread.playersSideA.includes("player1")
+      ? [thread.playersSideA, thread.playersSideB]
+      : thread.playersSideB.includes("player1")
+        ? [thread.playersSideB, thread.playersSideA]
+        : [[], []];
+    if (withPlayer1.includes(slot)) played.add("sideA");
+    if (against.includes(slot)) played.add("sideB");
+  }
+  return played.size === 1 ? [...played][0] : undefined;
+}
 
 const SCORED_BY = /Scored by ([^.]+)\.?\s*$/i;
 
@@ -96,8 +156,8 @@ export function resultsFollowed(story: Story): { thread: Thread; result: Resolut
 /**
  * A contest's result as its scoreboard reads it: the result in contest terms, and whether side A is the board's first
  * side (player1's: a contest player1 is on side A of, or one the plan check made one side's challenge, whose stored side
- * is the board's). Undefined for a thread that is no contest: a challenge without a stored side (planned as one, or
- * converted before 2026-10-01) or an exploration. The eval's playthroughs record it too.
+ * is the board's). Undefined for a thread that is no contest: a challenge without a stored side (planned as one,
+ * converted before 2026-10-01, or one whose camp nothing said) or an exploration. The eval's playthroughs record it too.
  */
 export type BoardResult = { result: "sideAWins" | "mixed" | "sideBWins" | null; oriented: boolean; converted?: true };
 
@@ -128,8 +188,8 @@ function winnerOf(read: BoardResult): ScoreboardWinner | null {
  * PL-11 never saw). A contest the plan check made one side's challenge is
  * read by the side it stored (`favorableSide`, since 2026-10-01): its
  * favorable result is that side's win, its unfavorable one the other's; a
- * challenge without one (planned as such, or converted before then) names no
- * winner. A scoreboard is left alone where its contests disagree or any of
+ * challenge without one (planned as such, converted before then, or one whose
+ * players' camp nothing said, campOf) names no winner. A scoreboard is left alone where its contests disagree or any of
  * them names no winner.
  */
 export function scoreboardWinners(story: Story): Map<string, ScoreboardWinner> {

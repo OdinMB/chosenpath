@@ -145,6 +145,14 @@ describe("storyFromSetup: the story a custom setup starts (AIStoryGenerator.crea
   it("marks a kids story as read with kids", () => {
     expect(storyFromSetup(setupReply(2), { ...input(2), kids: true }, "chain-k").category).toBe("read-with-kids");
   });
+
+  it("records the camps three seats' roles name, as production keeps them since 2026-10-01, and none where they name none", () => {
+    const roles = ["player1: the captain (side A)", "player2: the quartermaster (side B)", "player3: the scout (side B)"];
+    const reply = { ...setupReply(3), characterSelectionPlan: { ...setupReply(3).characterSelectionPlan, multiplayerCoordination: roles } };
+    const three = { ...input(3 as PlayerCount), gameMode: GameModes.CooperativeCompetitive };
+    expect(storyFromSetup(reply, three, "chain-c").camps).toEqual({ player1: "sideA", player2: "sideB", player3: "sideB" });
+    expect(storyFromSetup(setupReply(3), three, "chain-c")).not.toHaveProperty("camps");
+  });
 });
 
 describe("the trigger probe: a stat set to the value a switch rule names", () => {

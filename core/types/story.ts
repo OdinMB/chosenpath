@@ -354,6 +354,8 @@ export type StorySetupBase<N extends PlayerCount> = {
 
 export type StorySetupGeneration<N extends PlayerCount> = StorySetupBase<N> & {
   difficultyLevel: DifficultyLevel;
+  /** The camps its seat roles name, read by the server before the plan holding them is dropped (StoryState.camps). */
+  camps?: Camps;
 };
 
 export type TemplateSetupGeneration<N extends PlayerCount> =
@@ -426,6 +428,12 @@ export type PregeneratedState = {
   status: "pending" | "completed" | "failed";
 };
 
+/** A contest's side on its scoreboard, and the camp that plays for it: side A is player1's (setup round 3's form). */
+export type Camp = "sideA" | "sideB";
+
+/** The camp each seat plays for, by seat. */
+export type Camps = Partial<Record<PlayerSlot, Camp>>;
+
 // Direct type definition for StoryState
 export type StoryState = {
   id: string;
@@ -461,6 +469,12 @@ export type StoryState = {
   kidAges?: KidAges;
   /** Stories saved between the kids-turns stage and the setting (2026-10-01): the child's age the premise stated ("5", "8-10"), read only where kidAges is absent. */
   readingAge?: string;
+  /**
+   * Three players with contests: the camp each seat plays for, as its setup's seat roles name it ("player3: the
+   * landlord's nephew (side B)", setup round 3's form), kept since 2026-10-01. Absent on a story set up before then, on
+   * a template's story, and where the seat roles don't name one camp for every seat.
+   */
+  camps?: Camps;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
 };
 

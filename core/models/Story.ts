@@ -19,6 +19,7 @@ import {
   Thread,
   Resolution,
   StoryCategory,
+  Camp,
   KidAges,
   kidAgesFrom,
   kidAgesText,
@@ -230,6 +231,16 @@ export class Story {
   isThreadAnalysis(phase: StoryPhase | null): phase is ThreadAnalysis {
     if (!phase) return false;
     return "threads" in phase;
+  }
+
+  /** Every chapter plan the story holds, in the order played. */
+  getThreadAnalyses(): ThreadAnalysis[] {
+    return this.state.storyPhases.filter((phase): phase is ThreadAnalysis => this.isThreadAnalysis(phase));
+  }
+
+  /** The camp a seat plays for as the story's setup named it (`camps`, since 2026-10-01); undefined where it named none. */
+  getRecordedCamp(playerSlot: PlayerSlot): Camp | undefined {
+    return this.state.camps?.[playerSlot];
   }
 
   /** Whether the story holds a thread plan: false until its first thread analysis is added. */

@@ -15,6 +15,7 @@ import {
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { ChangeService } from "../../game/services/ChangeService.js";
 import { checkSwitchPlan, checkThreadPlan } from "../../game/services/planChecks.js";
+import { campsOfSetup } from "../../game/services/scoreboards.js";
 import { createEmptyPlayerState } from "../../game/services/StoryStateFactory.js";
 import { analysisBefore, beatStep } from "../../game/services/storyTextSteps.js";
 import { ThreadResolutionService } from "../../game/services/ThreadResolutionService.js";
@@ -96,10 +97,12 @@ const ALLOWED_MODIFIERS = new Set([-20, -10, 0, 10, 20]);
  * shared list (one player on the new form) starts with none (setup doc B1.8).
  * No images and no pregeneration; a kids premise is a read-with-kids story,
  * with the children's ages (the input's setting, else its premise's line), as
- * StoryCreationService records them.
+ * StoryCreationService records them. The camps the seat roles name are kept,
+ * as production keeps them since 2026-10-01 (campsOfSetup).
  */
 export function storyFromSetup(setup: unknown, input: SetupInput, id: string): StoryState {
   const reply = asObject(setup);
+  const camps = campsOfSetup(setup, input.playerCount);
   const slots = PLAYER_SLOTS.slice(0, input.playerCount);
   const sharedStats = asArray(reply.sharedStats) as Stat[];
   const written = asObject(reply.difficultyLevel) as DifficultyLevel;
@@ -128,6 +131,7 @@ export function storyFromSetup(setup: unknown, input: SetupInput, id: string): S
     pregenerateBeats: false,
     images: [],
     playerCodes: {},
+    ...(camps ? { camps } : {}),
     ...(input.kids ? { category: "read-with-kids" as const } : {}),
     // The children's ages as the game records them (StoryCreationService: the read-with-kids setting, else the premise's
     // age line, since 2026-10-01); the second round's stored runs predate them and recorded none

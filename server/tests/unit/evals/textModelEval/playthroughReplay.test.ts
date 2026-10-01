@@ -8,7 +8,7 @@ import { contestLastStageProblem, contestsAtLastStage } from "../../../../src/ga
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
 import { checkThreadPlan } from "../../../../src/game/services/planChecks.js";
 import { CLOSING_TURN_CAP } from "../../../../src/shared/llm/chatModel.js";
-import { scoreboardWinners } from "../../../../src/game/services/scoreboards.js";
+import { campsOfSetup, scoreboardWinners } from "../../../../src/game/services/scoreboards.js";
 import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthroughMode.js";
 import { replayRun, replayedTurn } from "../../../../src/evals/textModelEval/playthroughReplay.js";
@@ -289,10 +289,19 @@ function chargedOnOffer(runs: PlayRun[], before: (run: PlayRun) => number = () =
 
 type ConvertedSide = { id: string; round: number; turn: number; thread: string; favorableSide?: "sideA" | "sideB"; recheckedEqualsStored: boolean };
 
+/**
+ * The run as production would start it now: its story keeping the camps its setup's seat roles name (campsOfSetup, since
+ * the review of decision A's fixes, 2026-10-01; the stored runs dropped them with the rest of the plan).
+ */
+function withCampsKept(run: PlayRun): PlayRun {
+  const camps = campsOfSetup(run.setup?.output, run.input.playerCount);
+  return camps && run.start ? { ...run, start: { ...run.start, camps } } : run;
+}
+
 /** Each stored chapter plan the plan check converted a contest in, checked again from the reply its run used: the side the check stores now. */
 function convertedSides(runs: PlayRun[]): ConvertedSide[] {
   return runs.flatMap((run) =>
-    replayRun(run).flatMap((r) => {
+    replayRun(withCampsKept(run)).flatMap((r) => {
       const plan = r.played.plan;
       if (plan?.kind !== "chapter plan" || !plan.plan) return [];
       const used = [...plan.calls].reverse().find((c) => !c.problem && c.outputFile);
@@ -396,9 +405,13 @@ describe("replayRun on the stored round 3 (skipped where the output folder is ab
    * used; the stored story then carries the side, as production's would now.
    */
   (stored3.length ? it : it.skip)("a converted contest now stores its side, and the space pirates' turn-10 move toward the losing camp is turned around", () => {
+    // The camps each stored three-player setup's seat roles name, which production keeps since the review of decision A's
+    // fixes (2026-10-01): every round's space pirates, player1's camp alone against the other two
+    const camps = [stored, stored2, stored3].flatMap((runs, i) => runs.filter((run) => run.input.playerCount === 3).map((run) => [i + 1, run.spec.id, campsOfSetup(run.setup?.output, 3)]));
+    expect(camps).toEqual([1, 2, 3].map((round) => [round, "play-space-pirates", { player1: "sideA", player2: "sideB", player3: "sideB" }]));
     const sides = [...convertedSides(stored), ...convertedSides(stored2), ...convertedSides(stored3)];
-    // Round 2's space pirates (Pip, the crew-plan camp) and round 3's (Oren, the salvagers): side B as the planner wrote
-    // them, their camp; round 3's food trucks (Amara, player1): side A. Round 1 converted none.
+    // Round 2's space pirates (Pip, the crew-plan camp) and round 3's (Oren, the salvagers): side B, their camp as the
+    // setup named it (and as the planner wrote them); round 3's food trucks (Amara, player1): side A. Round 1 converted none.
     expect(sides.map(({ id, turn, thread, favorableSide }) => [id, turn, thread, favorableSide])).toEqual([
       ["play-space-pirates", 10, "the_crew_benefit_on_the_slate", "sideB"],
       ["play-food-trucks", 12, "the_scarce_slot_showcase", "sideA"],

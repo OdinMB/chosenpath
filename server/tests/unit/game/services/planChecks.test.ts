@@ -532,18 +532,39 @@ describe("checkThreadPlan", () => {
      * The third playthroughs' space pirates (2026-10-01): the seal's first contest held only Oren (player3), on side B, so
      * the check made it his challenge; his favorable result was his camp's win, and the switch after it moved the score
      * toward the other camp, since nothing stored which side the challenge was. It stores it now (favorableSide): the
-     * board side whose win the favorable result is, player1's side A wherever player1 is in it, player2's side B in a
-     * two-player game, else the side the planner wrote (the planner is told player1's camp is side A).
+     * board side whose win the favorable result is, player1's side A wherever player1 is in it, else the camp of the
+     * players in it (campOf: player2's side B in a two-player game, the camp the setup recorded, an earlier contest
+     * player1 was in). Until the review of decision A's fixes (2026-10-01) the last case took the side the planner wrote,
+     * which nothing checks (the planner is told only that player1's camp is side A), so a lone player written on the
+     * other side would have turned a correct move around; where no camp is known, nothing is stored and the challenge's
+     * result names no winner.
      */
+    const besidePlayer1 = (lone: Thread) =>
+      threadPlan([aThread("challenge", 2, ["player1"], [], { id: "escape" }), lone, aThread("exploration", 2, ["player3"], [], { id: "ship", outcomeId: "player3_ship" })]);
+
     it("stores the board side whose win the challenge's favorable result is, so the scoreboard can follow it (the space pirates' turn 6)", () => {
-      const story = groupAfterPicks(GameModes.CooperativeCompetitive, THREE);
-      const sideB = checkThreadPlan(story, threadPlan([aThread("challenge", 2, ["player1"], [], { id: "escape" }), contestThread([], ["player2"], "the_ledger"), aThread("exploration", 2, ["player3"], [], { id: "ship", outcomeId: "player3_ship" })]));
+      // The setup's camps: player2 and player3 against player1
+      const story = groupAfterPicks(GameModes.CooperativeCompetitive, THREE).clone({ camps: { player1: "sideA", player2: "sideB", player3: "sideB" } });
+      const sideB = checkThreadPlan(story, besidePlayer1(contestThread([], ["player2"], "the_ledger")));
       expect(sideB.plan.threads.map((t) => t.favorableSide)).toEqual([undefined, "sideB", undefined]);
-      const sideA = checkThreadPlan(story, threadPlan([aThread("challenge", 2, ["player1"], [], { id: "escape" }), contestThread(["player2"], [], "the_ledger"), aThread("exploration", 2, ["player3"], [], { id: "ship", outcomeId: "player3_ship" })]));
-      expect(sideA.plan.threads[1].favorableSide).toBe("sideA");
+      // player2's camp, whichever side the planner wrote
+      expect(checkThreadPlan(story, besidePlayer1(contestThread(["player2"], [], "the_ledger"))).plan.threads[1].favorableSide).toBe("sideB");
       // player1's own: side A
       const own = checkThreadPlan(groupAfterPicks(GameModes.Competitive, { player1: "shared_crown", player2: "player2_debt" }), threadPlan([contestThread(["player1"], [], "the_route"), aThread("exploration", 2, ["player2"], [], { id: "debt", outcomeId: "player2_debt" })]));
       expect(own.plan.threads[0].favorableSide).toBe("sideA");
+    });
+
+    it("takes a three-player camp from an earlier contest player1 was in, and stores no side where no camp is known", () => {
+      const story = groupAfterPicks(GameModes.CooperativeCompetitive, THREE);
+      const unknown = checkThreadPlan(story, besidePlayer1(contestThread(["player2"], [], "the_ledger")));
+      expect(unknown.problem).toBeUndefined();
+      expect(getThreadType(unknown.plan.threads[1])).toBe("challenge");
+      expect(unknown.plan.threads[1]).not.toHaveProperty("favorableSide");
+      // The chapter before was a contest with player2 beside player1
+      const [opening, ended, current] = story.getState().storyPhases as [SwitchAnalysis, ThreadAnalysis, SwitchAnalysis];
+      const contested = { ...ended, threads: ended.threads.map((t) => ({ ...t, playersSideA: ["player1", "player2"], playersSideB: ["player3"] })) };
+      const afterContest = story.clone({ storyPhases: [opening, contested, current] });
+      expect(checkThreadPlan(afterContest, besidePlayer1(contestThread([], ["player2"], "the_ledger"))).plan.threads[1].favorableSide).toBe("sideA");
     });
 
     it("takes player2's side as side B in a two-player game whatever side the planner wrote, the results staying the written side's", () => {
@@ -632,9 +653,10 @@ describe("checkThreadPlan", () => {
       ]));
       expect(elsewhere.problem).toBeUndefined();
       expect(elsewhere.plan.threads[1]).toMatchObject({ playersSideA: ["player3", "player2"], possibleMilestones: { favorable: "A takes the crown" } });
-      // The board side whose win the favorable result is: player1's, side A, wherever player1 is in it; else the written side
+      // The board side whose win the favorable result is: player1's, side A, wherever player1 is in it; else the players'
+      // camp, which a cooperative story never records (since the review of decision A's fixes, 2026-10-01: the written side)
       expect(onB.plan.threads[0].favorableSide).toBe("sideA");
-      expect(elsewhere.plan.threads[1].favorableSide).toBe("sideA");
+      expect(elsewhere.plan.threads[1]).not.toHaveProperty("favorableSide");
     });
 
     it("uses the first reply: no retry, so the chapter is never refused twice", async () => {

@@ -1,9 +1,9 @@
 import type { Story } from "core/models/Story.js";
-import type { Stat } from "core/types/index.js";
+import type { Stat, StoryState } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
-import { scoreboardOf, scoreboardsOf } from "../../../../src/game/services/scoreboards.js";
-import { laterSwitchBeat } from "../../../helpers/promptStories.js";
-import { outcome, stat } from "../../../helpers/textFixtures.js";
+import { campOf, campsFromSeatRoles, campsOfSetup, scoreboardOf, scoreboardsOf } from "../../../../src/game/services/scoreboards.js";
+import { laterSwitchBeat, slotsOf } from "../../../helpers/promptStories.js";
+import { outcome, stat, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 
 /*
  * Which shared opposites stat a contested outcome's "Scored by …" names. Setup round 3's form asks for the stat's name;
@@ -67,5 +67,81 @@ describe("scoreboardOf: the stat a contested outcome's 'Scored by …' names", (
   it("lists every contest's board by its stat id (scoreboardsOf)", () => {
     expect([...scoreboardsOf(contestStory("Scored by Contract Race.", [CALM, RACE])).keys()]).toEqual([RACE.id]);
     expect(scoreboardsOf(contestStory("Both owners want it.", [CALM, RACE])).size).toBe(0);
+  });
+});
+
+/*
+ * Which camp a seat plays for on a contest's scoreboard (the review of decision A's fixes, 2026-10-01). The plan check
+ * stores a contest it made one side's challenge by that side's camp (PL-12's favorableSide); with three players and
+ * player1 elsewhere it took the side the planner wrote, which nothing checks, so a lone player written on the wrong side
+ * would have turned a correct move around. Setup round 3's form names each seat's camp in its seat roles, which the game
+ * dropped with the rest of the plan; it keeps them now (StoryState.camps).
+ */
+describe("campsFromSeatRoles: the camps a setup's seat roles name", () => {
+  const SPACE_PIRATES_3 = [
+    "player1: the Comet's route-reader and negotiator (side A)",
+    "player2: the Comet's engineer and salvage specialist (side B)",
+    "player3: the Comet's scout and boarding lead (side B)",
+  ];
+
+  it("reads each seat's camp from its line: round 3's '(side B)' and round 2's 'side B's claimant'", () => {
+    expect(campsFromSeatRoles(SPACE_PIRATES_3, 3)).toEqual({ player1: "sideA", player2: "sideB", player3: "sideB" });
+    const round2 = [
+      "player1: the ship's captain and side A's sole claimant, who wants the Gloam Cache's captain's share.",
+      "player2: the ship's quartermaster and side B's claimant, who wants the share redistributed to the crew.",
+      "player3: the ship's scout and side B's claimant, who wants a crew-owned freeport berth.",
+    ];
+    expect(campsFromSeatRoles(round2, 3)).toEqual({ player1: "sideA", player2: "sideB", player3: "sideB" });
+    // A line without its seat's name is that seat by its place, as the form orders them
+    expect(campsFromSeatRoles(["the organizer (side A)", "the treasurer (side A)", "the rival (side B)"], 3)).toEqual({ player1: "sideA", player2: "sideA", player3: "sideB" });
+  });
+
+  it("records none unless every seat names exactly one camp, player1's is side A and side B holds a seat", () => {
+    const lines = (...camps: string[]) => camps.map((camp, i) => `player${i + 1}: a role${camp}`);
+    expect(campsFromSeatRoles(lines(" (side A)", " (side B)"), 3)).toBeUndefined();
+    expect(campsFromSeatRoles(lines(" (side A)", "", " (side B)"), 3)).toBeUndefined();
+    expect(campsFromSeatRoles(lines(" (side A)", ", side A against side B", " (side B)"), 3)).toBeUndefined();
+    expect(campsFromSeatRoles(lines(" (side B)", " (side A)", " (side A)"), 3)).toBeUndefined();
+    expect(campsFromSeatRoles(lines(" (side A)", " (side A)", " (side A)"), 3)).toBeUndefined();
+    expect(campsFromSeatRoles(["player1: x (side A)", "player1: y (side B)", "player3: z (side B)"], 3)).toBeUndefined();
+    expect(campsFromSeatRoles("player1: the organizer (side A)", 3)).toBeUndefined();
+    // "a side bet" names no side
+    expect(campsFromSeatRoles(lines(" (side A)", " who keeps a side bet (side B)", " (side B)"), 3)).toEqual({ player1: "sideA", player2: "sideB", player3: "sideB" });
+    // Two players' camps are their seats (campOf), so a two-player setup records none
+    expect(campsFromSeatRoles(lines(" (side A)", " (side B)"), 2)).toBeUndefined();
+  });
+
+  it("reads them from a setup reply as the game assembles it (its plan's multiplayerCoordination)", () => {
+    expect(campsOfSetup({ characterSelectionPlan: { multiplayerCoordination: SPACE_PIRATES_3 } }, 3)).toEqual({ player1: "sideA", player2: "sideB", player3: "sideB" });
+    expect(campsOfSetup({ characterSelectionPlan: { multiplayerCoordination: [] } }, 3)).toBeUndefined();
+    expect(campsOfSetup({}, 3)).toBeUndefined();
+  });
+});
+
+describe("campOf: the camp a seat plays for", () => {
+  const three = (extra: Partial<StoryState> = {}) => laterSwitchBeat(3).clone({ gameMode: GameModes.CooperativeCompetitive, ...extra });
+  const withContests = (...contests: [string[], string[]][]) =>
+    three({ storyPhases: [switchAnalysis(slotsOf(3), 0), ...contests.map(([sideA, sideB], i) => threadAnalysis("contest", 2, 1 + 2 * i, sideA, sideB)), switchAnalysis(slotsOf(3), 1 + 2 * contests.length)] });
+
+  it("is side A for player1, and side B for player2 in a two-player game", () => {
+    expect(campOf(three(), "player1")).toBe("sideA");
+    expect(campOf(laterSwitchBeat(2).clone({ gameMode: GameModes.Competitive }), "player2")).toBe("sideB");
+  });
+
+  it("reads the camp the setup recorded, before anything the story played", () => {
+    const recorded = withContests([["player1", "player3"], ["player2"]]).clone({ camps: { player1: "sideA", player2: "sideA", player3: "sideB" } });
+    expect(["player2", "player3"].map((slot) => campOf(recorded, slot))).toEqual(["sideA", "sideB"]);
+  });
+
+  it("else takes the side a seat played on beside or against player1 in the story's earlier contests", () => {
+    expect(["player2", "player3"].map((slot) => campOf(withContests([["player1", "player3"], ["player2"]]), slot))).toEqual(["sideB", "sideA"]);
+    // A contest player1 sits out says nothing about either camp, and contests that disagree say nothing
+    expect(campOf(withContests([["player2"], ["player3"]]), "player2")).toBeUndefined();
+    expect(campOf(withContests([["player1", "player2"], ["player3"]], [["player1"], ["player2", "player3"]]), "player2")).toBeUndefined();
+    expect(campOf(withContests([["player1", "player2"], ["player3"]], [["player1"], ["player2", "player3"]]), "player3")).toBe("sideB");
+  });
+
+  it("says nothing where the setup recorded none and no earlier contest had the seat beside or against player1", () => {
+    expect(campOf(three(), "player3")).toBeUndefined();
   });
 });
