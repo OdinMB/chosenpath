@@ -22,6 +22,7 @@ import {
   handRows,
   mergePacingCluesRuns,
   pacingCluesCall,
+  pacingCluesPlayVariants,
   renderBlindReading,
   stageJudgeTargets,
   type ClueRow,
@@ -78,7 +79,7 @@ function context() {
 }
 
 /** A stored 13-turn single-player story on the fakes, played on from its chapter plan after turn 6 by an arm. */
-async function continued(variant: "adopted" | "pacingClues", sample = 1, players: 1 | 2 = 1): Promise<PlayRun> {
+async function continued(variant: "adopted" | "pacingClues" | "pacingCluesB", sample = 1, players: 1 | 2 = 1): Promise<PlayRun> {
   const { call } = fakeCall(players);
   const { run: stored } = await playStory(PLAYTHROUGHS[0], input(players, 13), call, { sample: 1 });
   const at = stored.turns.find((t) => t.turn > 6 && t.plan?.kind === "chapter plan")!;
@@ -100,6 +101,12 @@ describe("the stage's starts and arms", () => {
     expect(await pacingCluesCall(ctx, 1, 1)(spec)).toMatchObject({ parsed: { ok: true } });
     expect(prep[0]).toMatchObject({ caseId: spec.caseId, armKey: "play>gpt-6-luna@low/pacingClues", stage: "pacing-clues", promptState: "adopted21", group: "prep", sample: 1 });
     expect((await pacingCluesCall(ctx, 1, 0)({ ...spec, caseId: "x" })).notSent).toMatch(/spend limit/);
+  });
+
+  it("plays production and the variant by default, the fix-and-retest (pacingCluesB) alone where --arms names it", () => {
+    expect(pacingCluesPlayVariants()).toEqual(["adopted", "pacingClues"]);
+    expect(pacingCluesPlayVariants(["pacingCluesB"])).toEqual(["pacingCluesB"]);
+    expect(() => pacingCluesPlayVariants(["latePacingB"])).toThrow(/pacingCluesB/);
   });
 
   it("keeps one run per story, start, arm and sample, production before the variant, a run played again replacing it", async () => {
@@ -124,6 +131,13 @@ describe("the late turns both arms played", () => {
       expect(mine.map((i) => i.k)).toEqual(late.flatMap((_, j) => [j + 1, j + 1]));
       expect(mine.every((i) => i.judgeKey === `${run.spec.id}-from${run.from?.turn}-${run.from?.variant}-s1-t${i.turn}-${i.slot}`)).toBe(true);
     }
+  });
+
+  it("reads production and the variant only: the fix-and-retest's runs move neither the window nor the items", async () => {
+    const runs = [await continued("adopted"), await continued("pacingClues")];
+    const retest = { ...(await continued("pacingClues")), turns: [], from: { ...runs[1].from!, variant: "pacingCluesB" as const } };
+    expect(clueItems([...runs, retest]).map((i) => i.judgeKey)).toEqual(clueItems(runs).map((i) => i.judgeKey));
+    expect(mergePacingCluesRuns([], [retest, runs[1], runs[0]]).map((r) => r.from?.variant)).toEqual(["adopted", "pacingClues", "pacingCluesB"]);
   });
 
   it("judges each of them at the clue judge's v2, under the arm's key", async () => {

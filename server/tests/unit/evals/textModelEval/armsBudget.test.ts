@@ -453,8 +453,8 @@ describe("budget caps", () => {
       // checks and room for one fix-and-retest) plus 30%
       "options-o2c": 0.85,
       // The coordinator's call of 2026-10-01: fix 8's retest in whole short playthroughs, its estimate (16 runs, the clue
-      // judge's calibration and its run on the late turns) plus 30%
-      "pacing-clues": 1.3,
+      // judge's calibration and its run on the late turns) plus 30% ($1.30), raised for its one fix-and-retest's 8 runs
+      "pacing-clues": 1.5,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -879,6 +879,10 @@ describe("budget caps", () => {
     expect(STAGE_CAP_REASONS["pacing-clues"]).toMatch(/pacingClues/);
     expect(STAGE_CAP_REASONS["pacing-clues"]).toMatch(/space pirates/);
     expect(STAGE_CAP_REASONS["pacing-clues"]).toMatch(/few bucks don't matter/);
+    // Raised for its one fix-and-retest, the reason recorded
+    expect(STAGE_CAP_REASONS["pacing-clues"]).toMatch(/pacingCluesB/);
+    expect(referenceKey(armKey({ model: "gpt-6-luna", reasoningEffort: "low" }, "pacingCluesB"))).toBe("gpt-6-luna@low/adopted");
+    expect(estimateBaseKey(armKey({ model: "gpt-6-luna", reasoningEffort: "low" }, "pacingCluesB"))).toBe("gpt-6-luna@low/pacingClues");
   });
 
   it("gives the whole-story playthroughs (playthroughs, 2026-09-30) a stage of their own: no --run arms, their calls prep calls in its ledger", () => {

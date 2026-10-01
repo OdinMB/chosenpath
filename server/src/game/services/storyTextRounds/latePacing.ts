@@ -1,6 +1,7 @@
 import type { Story } from "core/models/Story.js";
-import type { SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
-import { allowedLengths, fewestThreads, isLastChapter, outcomeNeeds, phaseOf, pickedOutcome, turnsLeft } from "../pacing.js";
+import type { Switch, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
+import { outcomeIdsNamed } from "../outcomeIds.js";
+import { allowedLengths, chaptersThatFit, fewestThreads, isLastChapter, outcomeNeeds, outcomesFor, phaseOf, pickedOutcome, turnsLeft } from "../pacing.js";
 import { beatStep, switchStep, threadStep, type PlanRequest, type TextRequest } from "../storyTextSteps.js";
 import { replaceOnce, splitAtState } from "./roundEdits.js";
 
@@ -87,8 +88,13 @@ const ENDING_ANCHOR = "- Use references to important story elements and things t
 const ENDING_LINE =
   "\n- Where the story kept bringing back a detail it never explained (a mark, a sound, a missing or odd object), explain it briefly, in the story's own terms, without settling any outcome beyond its milestones. Bring up no new mystery.";
 
+/** The fix-and-retest's problem (the pacing-clues stage) where a thread is to spare and the last milestone goes before the last thread. */
+const SPARE_PROBLEM =
+  "a thread is to spare before the story's last thread, but this switch lets every milestone still needed be settled before it, so the last thread would have none left to settle: keep one outcome's last milestone for the thread the last switch opens, and give this thread to another outcome (a complete one if no other is open)";
+
 /** The passages the tests pin. */
 export const LATE_PACING_TEXT = {
+  spareProblem: SPARE_PROBLEM,
   stepB: STEP_B,
   stepBVariant: STEP_B_VARIANT,
   stepBVariantB: STEP_B_VARIANT_B,
@@ -195,6 +201,81 @@ function switchRequest(story: Story, b: boolean): PlanRequest<SwitchAnalysis> {
   const { instructions, state } = splitAtState(LABEL, production.prompt);
   if (!instructions.includes(STEP_B)) return production;
   return { ...production, prompt: replaceOnce(LABEL, instructions, STEP_B, b ? STEP_B_VARIANT_B : STEP_B_VARIANT) + state };
+}
+
+// --- A switch plan against PACING's arithmetic ---
+
+const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
+
+/** The outcomes a switch offers its players, by position: a flavor switch's one, a topic switch's directions'. */
+export function offeredOutcomes(story: Story, sw: Switch, slot: string): string[] {
+  if (sw.type === "flavor") return sw.outcomeId ? [sw.outcomeId] : [];
+  const structured = (sw as Switch & { topicDirections?: { outcomeId?: unknown }[] }).topicDirections;
+  if (Array.isArray(structured) && structured.length) return structured.map((d) => (typeof d?.outcomeId === "string" ? d.outcomeId : ""));
+  const known = outcomesFor(story, slot).map((o) => o.id);
+  return (sw.topicChoices ?? []).map((text) => outcomeIdsNamed(text, known).known[0] ?? "");
+}
+
+export type SwitchPacingReading = {
+  /** Threads that fit after the switch, the one it opens included (production's count) */
+  fit: number;
+  /** Each player's milestones still needed, the chapter that just ended pending, and the outcomes offered */
+  players: { slot: string; needed: number; offered: string[]; offeredComplete: string[] }[];
+  /** A player with no thread to spare (as many milestones needed as threads, or more) offered a complete outcome: a thread a forced situation took */
+  completeWhileNeeded: boolean;
+  /** More threads than any player's milestones: one is to spare */
+  spare: boolean;
+  /** Where one is to spare and threads follow this one: some player still needs a milestone after this chapter, whichever direction they take */
+  keepsLast?: boolean;
+};
+
+/** A switch plan read against PACING's arithmetic: whether a complete outcome took a needed thread, and whether a spare thread kept the last thread's milestone. */
+export function switchPacingReading(story: Story, plan: SwitchAnalysis): SwitchPacingReading {
+  const fit = chaptersThatFit(turnsLeft(story));
+  const players = story.getPlayerSlots().map((slot) => {
+    const needs = outcomeNeeds(story, slot, true);
+    const needed = sum(needs.map((n) => n.stillNeeded));
+    const sw = plan.switches.find((s) => s.players.includes(slot));
+    const offered = sw ? offeredOutcomes(story, sw, slot) : [];
+    const complete = new Set(needs.filter((n) => n.complete).map((n) => n.id));
+    return { slot, needed, offered, offeredComplete: offered.filter((id) => complete.has(id)), needs };
+  });
+  const completeWhileNeeded = players.some((p) => p.needed >= fit && p.offeredComplete.length > 0);
+  const most = Math.max(0, ...players.map((p) => p.needed));
+  const spare = most < fit;
+  // Worst case: each player takes a direction on an outcome they still need, where one is offered
+  const after = players.map((p) => p.needed - (p.offered.some((id) => p.needs.some((n) => n.id === id && n.stillNeeded > 0)) ? 1 : 0));
+  return {
+    fit,
+    players: players.map(({ slot, needed, offered, offeredComplete }) => ({ slot, needed, offered, offeredComplete })),
+    completeWhileNeeded,
+    spare,
+    ...(spare && fit >= 2 ? { keepsLast: Math.max(0, ...after) >= 1 } : {}),
+  };
+}
+
+const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
+
+/**
+ * The pacing-clues stage's fix-and-retest (2026-10-01): what the switch plan
+ * check tells the planner where a plan breaks step b's pacing, read from
+ * PACING's arithmetic (switchPacingReading), or undefined. A player with no
+ * thread to spare offered a complete outcome (the setup's final-thread or
+ * threshold instruction taking a needed thread); a thread to spare whose plan
+ * lets every milestone still needed be settled before the story's last thread.
+ * The check asks once more, told the problem, and never fails the turn on it.
+ */
+export function switchPacingProblem(story: Story, plan: SwitchAnalysis): string | undefined {
+  const reading = switchPacingReading(story, plan);
+  const problems = reading.players
+    .filter((p) => p.needed >= reading.fit && p.offeredComplete.length > 0)
+    .map(
+      (p) =>
+        `${p.slot} still needs ${plural(p.needed, "milestone")} with ${plural(reading.fit, "thread")} left, the one this switch opens included, but its switch offers ${p.offeredComplete.join(", ")}, already complete: offer ${p.slot} an outcome that still needs milestones, and let the story's instructions shape that thread instead`
+    );
+  // Only where some milestone is still needed: with every outcome complete, no plan keeps one
+  if (reading.keepsLast === false && reading.players.some((p) => p.needed > 0)) problems.push(SPARE_PROBLEM);
+  return problems.length ? problems.join("; ") : undefined;
 }
 
 // --- The turn ---

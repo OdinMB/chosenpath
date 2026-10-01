@@ -387,7 +387,11 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * mystery, an earlier one explained where it fits, the interludes too);
  * production's request byte for byte elsewhere (an early turn's hint, the
  * first turn, the ending), with production's limits for the role and player
- * count.
+ * count. "pacingCluesB" is its fix-and-retest: the same requests, its switch
+ * plans read against PACING's arithmetic in the plan check (switchPacingProblem:
+ * no complete outcome for a player with no thread to spare; where a thread is to
+ * spare, a milestone kept for the story's last thread), one retry told the
+ * problem, never failing the turn.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -465,7 +469,8 @@ export type VariantId =
   | "noThreadAudit"
   | "noNewMilestones"
   | "turnO2c"
-  | "pacingClues";
+  | "pacingClues"
+  | "pacingCluesB";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -540,6 +545,7 @@ export const VARIANTS: VariantId[] = [
   "noNewMilestones",
   "turnO2c",
   "pacingClues",
+  "pacingCluesB",
 ];
 
 /**
@@ -1076,14 +1082,20 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   },
   // The pacing-clues stage's switch planner, chapter planner and turn: B's planners and the late part's clue lines only;
   // production's limits and production's retry count where it has its own
-  pacingClues: (input): CheckedTextRequest => {
-    if (input.role !== "beat" && input.role !== "switch" && input.role !== "thread") throw new Error(`Variant pacingClues does not cover role ${input.role}`);
-    const limits = productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers());
-    if (input.role !== "beat") return { ...pacingCluesRequest(input.story, input.role), limits };
-    const count = beatCheckOptions(input.story).textCount;
-    return { ...pacingCluesRequest(input.story, "beat"), limits, ...(count ? { shortTextCount: count } : {}) };
-  },
+  pacingClues: (input) => pacingCluesBuild(input, "pacingClues"),
+  // Its fix-and-retest: the same requests, the switch plan check reading them against PACING's arithmetic (the play's,
+  // latePacingPlay.ts's switchProblemOf)
+  pacingCluesB: (input) => pacingCluesBuild(input, "pacingCluesB"),
 };
+
+/** The pacing-clues stage's requests (its variant's and its fix-and-retest's): B's planners and the late part's clue lines; production's limits and retry count. */
+function pacingCluesBuild(input: RequestInput, variant: VariantId): CheckedTextRequest {
+  if (input.role !== "beat" && input.role !== "switch" && input.role !== "thread") throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+  const limits = productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers());
+  if (input.role !== "beat") return { ...pacingCluesRequest(input.story, input.role), limits };
+  const count = beatCheckOptions(input.story).textCount;
+  return { ...pacingCluesRequest(input.story, "beat"), limits, ...(count ? { shortTextCount: count } : {}) };
+}
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {
   return BUILDERS[variant](input);

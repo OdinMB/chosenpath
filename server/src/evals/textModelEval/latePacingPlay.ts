@@ -1,8 +1,6 @@
 import type { Story } from "core/models/Story.js";
-import type { Switch, SwitchAnalysis } from "core/types/index.js";
-import { chaptersThatFit, outcomeNeeds, outcomesFor, turnsLeft } from "../../game/services/pacing.js";
-import { outcomeIdsNamed } from "../../game/services/outcomeIds.js";
-import { pacedLengths } from "../../game/services/storyTextRounds/latePacing.js";
+import type { SwitchAnalysis } from "core/types/index.js";
+import { offeredOutcomes, pacedLengths, switchPacingProblem, switchPacingReading, type SwitchPacingReading } from "../../game/services/storyTextRounds/latePacing.js";
 import { meanMove, momentsOf, rateMove, type MeanMove, type RateMove, type Tally } from "./stopRule.js";
 import { replayRun } from "./playthroughReplay.js";
 import { START_POLICY, playStory, turnCalls, type PlayCall, type PlayFrom, type PlayResult, type PlayRun, type PlayTurn, type PolicyState } from "./playthroughs.js";
@@ -63,10 +61,14 @@ export function continuationStart(run: PlayRun, turn: number, variant: VariantId
 }
 
 /** The variants whose chapter planner prints the paced lengths: the late-pacing stage's, its retest's and the pacing-clues stage's. */
-const PACED_VARIANTS: VariantId[] = ["latePacing", "latePacingB", "pacingClues"];
+const PACED_VARIANTS: VariantId[] = ["latePacing", "latePacingB", "pacingClues", "pacingCluesB"];
 
 /** The variant's length rule for its chapter plans, its retest's too (the plan check reads it as its PACING prints it); production's own otherwise. */
 export const planLengthsOf = (variant: VariantId) => (PACED_VARIANTS.includes(variant) ? (story: Story) => pacedLengths(story).lengths : undefined);
+
+/** The pacing-clues stage's fix-and-retest (pacingCluesB): its switch plans read against PACING's arithmetic in the plan check; none otherwise. */
+export const switchProblemOf = (variant: VariantId): ((story: Story, plan: SwitchAnalysis) => string | undefined) | undefined =>
+  variant === "pacingCluesB" ? switchPacingProblem : undefined;
 
 /**
  * A stored story played on from a turn with an arm's requests, to the story's
@@ -76,6 +78,7 @@ export const planLengthsOf = (variant: VariantId) => (PACED_VARIANTS.includes(va
  */
 export function playOn(run: PlayRun, turn: number, variant: VariantId, call: PlayCall, sample: number, turnLimit?: number): Promise<PlayResult> {
   const planLengths = planLengthsOf(variant);
+  const switchProblem = switchProblemOf(variant);
   return playStory(run.spec, run.input, call, {
     sample,
     variant,
@@ -84,58 +87,16 @@ export function playOn(run: PlayRun, turn: number, variant: VariantId, call: Pla
     tryAgain: 1,
     repickStuckSwitches: true,
     ...(planLengths ? { planLengths } : {}),
+    ...(switchProblem ? { switchProblem } : {}),
     ...(turnLimit !== undefined ? { turnLimit } : {}),
   });
 }
 
 // ---------------------------------------------------------------- the switch plans
 
-/** The outcomes a switch offers its players, by position: a flavor switch's one, a topic switch's directions'. */
-export function offeredOutcomes(story: Story, sw: Switch, slot: string): string[] {
-  if (sw.type === "flavor") return sw.outcomeId ? [sw.outcomeId] : [];
-  const structured = (sw as Switch & { topicDirections?: { outcomeId?: unknown }[] }).topicDirections;
-  if (Array.isArray(structured) && structured.length) return structured.map((d) => (typeof d?.outcomeId === "string" ? d.outcomeId : ""));
-  const known = outcomesFor(story, slot).map((o) => o.id);
-  return (sw.topicChoices ?? []).map((text) => outcomeIdsNamed(text, known).known[0] ?? "");
-}
-
-export type SwitchPacingReading = {
-  /** Threads that fit after the switch, the one it opens included (production's count) */
-  fit: number;
-  /** Each player's milestones still needed, the chapter that just ended pending, and the outcomes offered */
-  players: { slot: string; needed: number; offered: string[]; offeredComplete: string[] }[];
-  /** A player with no thread to spare (as many milestones needed as threads, or more) offered a complete outcome: a thread a forced situation took */
-  completeWhileNeeded: boolean;
-  /** More threads than any player's milestones: one is to spare */
-  spare: boolean;
-  /** Where one is to spare and threads follow this one: some player still needs a milestone after this chapter, whichever direction they take */
-  keepsLast?: boolean;
-};
-
-/** A switch plan read against PACING's arithmetic: whether a complete outcome took a needed thread, and whether a spare thread kept the last thread's milestone. */
-export function switchPacingReading(story: Story, plan: SwitchAnalysis): SwitchPacingReading {
-  const fit = chaptersThatFit(turnsLeft(story));
-  const players = story.getPlayerSlots().map((slot) => {
-    const needs = outcomeNeeds(story, slot, true);
-    const needed = sum(needs.map((n) => n.stillNeeded));
-    const sw = plan.switches.find((s) => s.players.includes(slot));
-    const offered = sw ? offeredOutcomes(story, sw, slot) : [];
-    const complete = new Set(needs.filter((n) => n.complete).map((n) => n.id));
-    return { slot, needed, offered, offeredComplete: offered.filter((id) => complete.has(id)), needs };
-  });
-  const completeWhileNeeded = players.some((p) => p.needed >= fit && p.offeredComplete.length > 0);
-  const most = Math.max(0, ...players.map((p) => p.needed));
-  const spare = most < fit;
-  // Worst case: each player takes a direction on an outcome they still need, where one is offered
-  const after = players.map((p) => p.needed - (p.offered.some((id) => p.needs.some((n) => n.id === id && n.stillNeeded > 0)) ? 1 : 0));
-  return {
-    fit,
-    players: players.map(({ slot, needed, offered, offeredComplete }) => ({ slot, needed, offered, offeredComplete })),
-    completeWhileNeeded,
-    spare,
-    ...(spare && fit >= 2 ? { keepsLast: Math.max(0, ...after) >= 1 } : {}),
-  };
-}
+// The switch plan read against PACING's arithmetic lives beside the variant (storyTextRounds/latePacing.ts), whose
+// fix-and-retest's plan check reads it too
+export { offeredOutcomes, switchPacingReading, type SwitchPacingReading };
 
 // ---------------------------------------------------------------- a short playthrough's readings
 
@@ -168,7 +129,8 @@ export type LatePacingReading = {
   aftermathsBeforeLast: number;
   /** Milestones still needed once the last chapter settles its stages (distinct outcomes) */
   leftUnfinished: number;
-  switches: { turn: number; reading: SwitchPacingReading }[];
+  /** Each switch plan read against PACING; `retried`: asked once more over a pacing rule (the fix-and-retest's plan check) */
+  switches: { turn: number; reading: SwitchPacingReading; retried: boolean }[];
   waits: { chapterPlans: number[]; switchPlans: number[]; turns: { turn: number; kind: string; ms: number }[] };
   costUsd: number;
 };
@@ -209,7 +171,8 @@ export function readLatePacing(run: PlayRun): LatePacingReading {
     const plan = turn.plan;
     if (plan?.kind !== "switch plan" || !plan.plan) return [];
     const before = replayed.find((r) => r.turn === turn.turn)?.beforePlan;
-    return before ? [{ turn: turn.turn, reading: switchPacingReading(before, plan.plan as SwitchAnalysis) }] : [];
+    const retried = plan.calls.some((c) => c.lengthProblem !== undefined);
+    return before ? [{ turn: turn.turn, reading: switchPacingReading(before, plan.plan as SwitchAnalysis), retried }] : [];
   });
   return {
     story: run.spec.id,
@@ -374,7 +337,9 @@ export function renderLatePacing(readings: LatePacingReading[], generatedAt: Dat
     );
     for (const s of r.switches) {
       const who = s.reading.players.map((p) => `${p.slot} needs ${p.needed}, offered ${p.offered.join(", ") || "none"}${p.offeredComplete.length ? ` (complete: ${p.offeredComplete.join(", ")})` : ""}`).join("; ");
-      lines.push(`- Switch ${s.turn}: ${s.reading.fit} threads fit; ${who}. A complete outcome took a needed thread: ${s.reading.completeWhileNeeded ? "yes" : "no"}${s.reading.keepsLast !== undefined ? `; a thread to spare, the last keeps a milestone: ${s.reading.keepsLast ? "yes" : "no"}` : ""}.`);
+      lines.push(
+        `- Switch ${s.turn}: ${s.reading.fit} threads fit; ${who}. A complete outcome took a needed thread: ${s.reading.completeWhileNeeded ? "yes" : "no"}${s.reading.keepsLast !== undefined ? `; a thread to spare, the last keeps a milestone: ${s.reading.keepsLast ? "yes" : "no"}` : ""}${s.retried ? "; asked once more over the pacing rule" : ""}.`
+      );
     }
     lines.push("");
   }

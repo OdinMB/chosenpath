@@ -340,7 +340,7 @@ export type PlayCallLog = {
   notSent?: string;
   /** Why production's check can't use the reply as it is */
   problem?: string;
-  /** A chapter length PACING does not allow (production retries once, and never fails the turn on it) */
+  /** A chapter length PACING does not allow, or a switch plan a variant's pacing rule finds wanting (retried once, never failing the turn) */
   lengthProblem?: string;
   /** What production's check repaired, "kind: detail" */
   repairs: string[];
@@ -693,6 +693,8 @@ export async function playStory(
     repickStuckSwitches?: boolean;
     variant?: VariantId;
     planLengths?: (story: Story) => number[];
+    /** A pacing rule the switch plan check reads (an eval variant's: the pacing-clues stage's fix-and-retest), one retry, never failing the turn */
+    switchProblem?: (story: Story, plan: SwitchAnalysis) => string | undefined;
     from?: PlayFrom;
     stopAfterLastChapterPlan?: boolean;
   }
@@ -795,13 +797,16 @@ export async function playStory(
           : checkThreadPlan(before, parsed as ThreadAnalysis, { lengths: true, ...(options.planLengths ? { allowedLengths: options.planLengths } : {}) });
       if (result.problem) log.problem = result.problem;
       if (result.lengthProblem) log.lengthProblem = result.lengthProblem;
+      // A switch plan a variant's pacing rule finds wanting: the soft problem, as the checked call reads it
+      const pacing = kind === "switch" && !result.problem ? options.switchProblem?.(before, result.plan as SwitchAnalysis) : undefined;
+      if (pacing) log.lengthProblem = pacing;
       log.repairs = result.repairs.map(repairLine);
     };
     const note = (line: string) => turn.notes.push(line);
     const invoke = invoker(`${label}${suffix}`, kind, request, record.calls, read);
     try {
       if (kind === "switch") {
-        const stored = await checkedSwitchPlan(before, promptOf(request), async (prompt) => (await invoke(prompt)) as SwitchAnalysis, note);
+        const stored = await checkedSwitchPlan(before, promptOf(request), async (prompt) => (await invoke(prompt)) as SwitchAnalysis, note, options.switchProblem);
         Object.assign(record, { plan: stored, checks: checkSwitchDesign(before, stored) });
         return switchStep.apply(before, stored);
       }

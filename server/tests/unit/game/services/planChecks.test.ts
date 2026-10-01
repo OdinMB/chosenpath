@@ -1113,6 +1113,44 @@ describe("checked plan calls", () => {
     );
   });
 
+  /*
+   * The pacing-clues stage's fix-and-retest (2026-10-01, eval only): a switch
+   * plan read against another pacing rule (the variant's), its problem worth
+   * the one retry but never a reason to fail the turn, as a chapter length is.
+   * Production passes no rule, so its check is as before.
+   */
+  describe("a switch plan read against another pacing rule (an eval variant's)", () => {
+    const story = switchStory(1);
+    const first = () => switchPlan(story, [topic(["player1"], GOOD.slice(0, 3))]);
+    const second = () => switchPlan(story, [topic(["player1"], GOOD.slice(1, 4))]);
+    const rule = (_: Story, plan: SwitchAnalysis) => (plan.switches[0]?.topicChoices?.[0] === GOOD[0] ? "keep the archive for the story's last thread" : undefined);
+
+    it("calls once more told the rule's problem, and applies the reply that keeps it", async () => {
+      const lines: string[] = [];
+      const { invoke, prompts } = planner(first(), second());
+      await expect(checkedSwitchPlan(story, "THE PROMPT", invoke, (line) => lines.push(line), rule)).resolves.toEqual(second());
+      expect(prompts[1]).toBe(withPlanProblem("THE PROMPT", "keep the archive for the story's last thread"));
+      expect(lines.join("\n")).toContain('"pacingNotFollowed":1');
+    });
+
+    it("keeps the second reply when it still misses, and the first when the retry's call fails: the rule never fails the turn", async () => {
+      const again = planner(first(), first());
+      await expect(checkedSwitchPlan(story, "THE PROMPT", again.invoke, () => undefined, rule)).resolves.toEqual(first());
+      expect(again.invoke).toHaveBeenCalledTimes(2);
+      const invoke = jest.fn(async (prompt: string) => {
+        if (prompt === "THE PROMPT") return first();
+        throw new Error("Request timed out.");
+      });
+      await expect(checkedSwitchPlan(story, "THE PROMPT", invoke, () => undefined, rule)).resolves.toEqual(first());
+    });
+
+    it("is production's check alone without a rule", async () => {
+      const plain = planner(first());
+      await expect(checkedSwitchPlan(story, "THE PROMPT", plain.invoke, () => undefined)).resolves.toEqual(first());
+      expect(plain.invoke).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("logs one [LLM] repair line per reply, with counts only", async () => {
     const lines: string[] = [];
     const { invoke } = planner(threadPlan([aThread("challenge", 2, ["player1", "player3"], [], { outcomeId: "shared_escape" })], 3));

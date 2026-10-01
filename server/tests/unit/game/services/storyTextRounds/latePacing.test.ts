@@ -12,7 +12,9 @@ import {
   pacedLengths,
   pacedLengthsFor,
   pacingCluesRequest,
+  switchPacingProblem,
 } from "../../../../../src/game/services/storyTextRounds/latePacing.js";
+import type { SwitchAnalysis } from "core/types/index.js";
 import { allowedLengths, fewestThreads, turnsLeft } from "../../../../../src/game/services/pacing.js";
 import { beatStep, switchStep, threadStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
@@ -20,7 +22,7 @@ import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, switchAnalysisAfterThread, threadAnalysisAfterSwitch, threadBeat } from "../../../../helpers/promptStories.js";
-import { outcome } from "../../../../helpers/textFixtures.js";
+import { outcome, switchAnalysis } from "../../../../helpers/textFixtures.js";
 
 /*
  * Pacing so the story's last chapter still has a milestone to settle, story
@@ -317,6 +319,57 @@ describe("pacingClues: B's planners and the late part's clue lines only", () => 
       expect(callLimitsOf(requestFor("pacingClues", { role: "thread", story: plan }))).toEqual(productionCallLimits("threadAnalysis", players));
     }
     expect(() => requestFor("pacingClues", { role: "setup", setup: { premise: "x", playerCount: 1, gameMode: "singlePlayer" as never, maxTurns: 10 } })).toThrow(/does not cover role setup/);
+  });
+});
+
+/*
+ * The pacing-clues stage's fix-and-retest (2026-10-01): in its short
+ * playthroughs step b's sentences did not hold at the switches that decide the
+ * last chapter. The food trucks' last switch gave both players' one remaining
+ * thread to the complete contract again (the setup's final-thread rule, 1 of 2
+ * runs), and the space pirates' switch with a thread to spare let the scout's
+ * last milestone go before the last thread (2 of 2), whose chapter then settled
+ * nothing. The retest reads each switch plan against PACING's arithmetic in the
+ * plan check (switchPacingProblem), worth one retry told the problem, never a
+ * reason to fail the turn.
+ */
+describe("switchPacingProblem: a switch plan read against PACING's arithmetic", () => {
+  const PENDING = "outcome_1";
+  /** A single player's switch after a chapter on outcome_1 (pending, its one milestone), the main outcome 1 of 2: this many turns in all. */
+  const atSwitch = (maxTurns: number, mainIntended = 2) =>
+    switchAnalysisAfterThread(1, {
+      maxTurns,
+      sharedOutcomes: [outcome(PENDING, { intendedNumberOfMilestones: 1 }), outcome("main", { intendedNumberOfMilestones: mainIntended, milestones: ["The first stage"] })],
+    });
+  const plan = (story: Story, outcomeId: string): SwitchAnalysis => {
+    const base = switchAnalysis(story.getPlayerSlots());
+    return { ...base, switches: [{ ...base.switches[0], type: "flavor", outcomeId, question: "How?", topicChoices: [] }] };
+  };
+
+  it("one thread left, the player one milestone short, offered only a complete outcome: the milestone would stay unfinished", () => {
+    const story = atSwitch(7);
+    expect(turnsLeft(story)).toBe(4);
+    expect(switchPacingProblem(story, plan(story, PENDING))).toBe(
+      `player1 still needs 1 milestone with 1 thread left, the one this switch opens included, but its switch offers ${PENDING}, already complete: offer player1 an outcome that still needs milestones, and let the story's instructions shape that thread instead`
+    );
+    expect(switchPacingProblem(story, plan(story, "main"))).toBeUndefined();
+  });
+
+  it("a thread to spare, the last milestone offered now: the story's last thread would have none to settle", () => {
+    const story = atSwitch(9);
+    expect(turnsLeft(story)).toBe(6);
+    expect(switchPacingProblem(story, plan(story, "main"))).toBe(LATE_PACING_TEXT.spareProblem);
+    // A complete outcome now keeps the last milestone for the last thread
+    expect(switchPacingProblem(story, plan(story, PENDING))).toBeUndefined();
+  });
+
+  it("asks nothing where every thread is needed, or where a milestone is left for the last thread whichever way the player goes", () => {
+    // One thread fits, one milestone needed
+    expect(switchPacingProblem(atSwitch(8), plan(atSwitch(8), "main"))).toBeUndefined();
+    // Five threads fit, three milestones needed: one taken now leaves two
+    expect(switchPacingProblem(atSwitch(25, 4), plan(atSwitch(25, 4), "main"))).toBeUndefined();
+    // Every outcome complete: no plan can keep a milestone, so nothing is asked
+    expect(switchPacingProblem(atSwitch(9, 1), plan(atSwitch(9, 1), "main"))).toBeUndefined();
   });
 });
 

@@ -279,10 +279,11 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     against O2b's stored replies under the stop rule, every lever's text, the automatic checks, waits and cost;
  *     options-o2c.md and .json
  *   Fix 8's retest in whole short playthroughs (pacingCluesPrep.ts, 2026-10-01), in the pacing-clues stage:
- *   --pacing-clues-play [--cases <story ids>] [--samples N] [--turns N] [--max-spend 0.50] [--report-only]  production's
- *     code and pacingClues (the late-pacing fix-and-retest's planners and the late part's clue lines) from the
- *     late-pacing stage's three starts and the space pirates' switch at 14 to the story's last chapter plan, on the same
- *     seeded dice; prep-calls.jsonl, under adopted21; writes pacing-clues.md and .json
+ *   --pacing-clues-play [--cases <story ids>] [--samples N] [--turns N] [--arms pacingCluesB] [--max-spend 0.50]
+ *     [--report-only]  production's code and pacingClues (the late-pacing fix-and-retest's planners and the late part's
+ *     clue lines) from the late-pacing stage's three starts and the space pirates' switch at 14 to the story's last
+ *     chapter plan, on the same seeded dice (--arms pacingCluesB: the stage's fix-and-retest alone, its switch plans read
+ *     against PACING's arithmetic in the plan check); prep-calls.jsonl, under adopted21; writes pacing-clues.md and .json
  *   --pacing-clues-blind  no calls: the late turns both arms played, runs coded, no arm named (pacing-clues-blind.md; the
  *     key in keys/pacing-clues-blind.json), for the hand reading in pacingCluesHand.ts
  *   --judge-pacing-clues [--max-spend 0.20]  the clue judge's v2 on its late-turn calibration (two samples) and, where
@@ -1287,6 +1288,7 @@ async function main() {
         caseIds: args.caseIds,
         turns: args.turns,
         reportOnly: args.reportOnly,
+        armKeys: args.armKeys,
       });
     case "pacing-clues-blind":
       // No calls: the blind reading's file and its key

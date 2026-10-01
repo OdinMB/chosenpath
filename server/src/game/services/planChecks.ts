@@ -36,9 +36,10 @@ export type PlanCheck<P> = {
   /** Why the plan can't be used, phrased to follow a colon; absent when it can */
   problem?: string;
   /**
-   * A chapter length PACING does not allow (only with the `lengths` option):
-   * worth the one retry, but never a reason to fail the turn, so a plan with
-   * only this problem is still used.
+   * A chapter length PACING does not allow (only with the `lengths` option),
+   * or a switch plan an eval variant's pacing rule finds wanting
+   * (checkedSwitchPlan's `pacing`): worth the one retry, but never a reason to
+   * fail the turn, so a plan with only this problem is still used.
    */
   lengthProblem?: string;
 };
@@ -641,7 +642,9 @@ async function checkedPlan<P>(
   const attempt = async (previousProblem?: string): Promise<PlanCheck<P>> => {
     const reply = await invoke(previousProblem ? withPlanProblem(prompt, previousProblem) : prompt);
     const result = kind.check(story, reply);
-    const repairs = result.lengthProblem ? [...result.repairs, { kind: "lengthNotAllowed", note: true }] : result.repairs;
+    // A thread plan's soft problem is its length; a switch plan's, an eval variant's pacing rule
+    const soft = kind.what === "switch plan" ? "pacingNotFollowed" : "lengthNotAllowed";
+    const repairs = result.lengthProblem ? [...result.repairs, { kind: soft, note: true }] : result.repairs;
     logPlanRepairs(kind.role, story, repairs, log);
     // The problem stays out of the log: it names model-written ids
     if (result.problem) {
@@ -670,14 +673,26 @@ async function checkedPlan<P>(
   }
 }
 
-/** A switch plan call, checked: the repaired plan, one retry told the problem, else an UnusableResultError. */
+/**
+ * A switch plan call, checked: the repaired plan, one retry told the problem,
+ * else an UnusableResultError. `pacing`: a pacing rule to read a usable plan
+ * against (an eval variant's, the pacing-clues stage's fix-and-retest), whose
+ * problem is worth the one retry but, like a chapter length, never fails the
+ * turn; production passes none.
+ */
 export function checkedSwitchPlan(
   story: Story,
   prompt: string,
   invoke: (prompt: string) => Promise<SwitchAnalysis>,
-  log?: (line: string) => void
+  log?: (line: string) => void,
+  pacing?: (story: Story, plan: SwitchAnalysis) => string | undefined
 ): Promise<SwitchAnalysis> {
-  return checkedPlan({ what: "switch plan", role: "switchAnalysis", check: checkSwitchPlan }, story, prompt, invoke, log);
+  const check = (checked: Story, reply: SwitchAnalysis): PlanCheck<SwitchAnalysis> => {
+    const result = checkSwitchPlan(checked, reply);
+    const lengthProblem = pacing && !result.problem ? pacing(checked, result.plan) : undefined;
+    return lengthProblem ? { ...result, lengthProblem } : result;
+  };
+  return checkedPlan({ what: "switch plan", role: "switchAnalysis", check }, story, prompt, invoke, log);
 }
 
 /**

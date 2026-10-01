@@ -72,9 +72,20 @@ const BLIND_FILE = "pacing-clues-blind";
 const CALIBRATION_SAMPLES = 2;
 const PLAYTHROUGHS_2 = "playthroughs-2";
 
-/** The stage's arms: production's code and the variant, in the file's order. */
+/** The stage's arms the clues are read on: production's code and the variant, in the file's order. */
 export const PACING_CLUES_VARIANTS: VariantId[] = ["adopted", "pacingClues"];
 const CANDIDATE: VariantId = "pacingClues";
+/** Its fix-and-retest (the switch plan check reading step b's pacing): played alone, read on pacing only. */
+const RETEST: VariantId = "pacingCluesB";
+const PLAY_VARIANTS: VariantId[] = [...PACING_CLUES_VARIANTS, RETEST];
+
+/** The arms an invocation plays: production and the variant, or those --arms names (the fix-and-retest alone). */
+export function pacingCluesPlayVariants(armKeys?: string[]): VariantId[] {
+  if (!armKeys?.length) return [...PACING_CLUES_VARIANTS];
+  const unknown = armKeys.filter((key) => !PLAY_VARIANTS.includes(key as VariantId));
+  if (unknown.length) throw new Error(`--arms for --pacing-clues-play names variants, one of ${PLAY_VARIANTS.join(", ")}; not ${unknown.join(", ")}`);
+  return armKeys as VariantId[];
+}
 
 /** The clue judge's calibration in this stage: the late-turn items (the short playthroughs play no ending). */
 export const PACING_CLUES_CALIBRATION: CluesCalibrationItem[] = CLUES_CALIBRATION.filter((i) => i.check === NEW_MYSTERY_CHECK);
@@ -83,7 +94,10 @@ const REPORT: PlayReportText = {
   title: "Fix 8's retest in whole short playthroughs (pacing-clues)",
   intro:
     "Each run: a stored story of the second round replayed to a chapter plan (the space pirates to their switch at turn 14), then played on with production's code (adopted) or the variant (pacingClues: the late-pacing stage's fix-and-retest planners and the late part's clue lines) to the story's last chapter plan, on the same seeded dice. Pacing readings are the game's arithmetic; the clue readings follow.",
-  candidates: [{ variant: CANDIDATE, title: "The variant against production" }],
+  candidates: [
+    { variant: CANDIDATE, title: "The variant against production" },
+    { variant: RETEST, title: "The fix-and-retest (pacingCluesB: the switch plan check reading step b's pacing) against production" },
+  ],
 };
 
 const runs2Of = (files: EvalFiles): PlayRun[] => playthroughRunsFrom(files.readPlaythroughs(PLAYTHROUGHS_2));
@@ -101,8 +115,8 @@ export function pacingCluesCall(ctx: PrepContext, sample: number, limitUsd: numb
   });
 }
 
-/** The file's runs with new ones: a run played again replaces its key, in the starts' order, then sample, then production before the variant. */
-export const mergePacingCluesRuns = (existing: PlayRun[], added: PlayRun[]): PlayRun[] => mergeLatePacingRuns(existing, added, PACING_CLUES_STARTS, PACING_CLUES_VARIANTS);
+/** The file's runs with new ones: a run played again replaces its key, in the starts' order, then sample, then production, the variant and its retest. */
+export const mergePacingCluesRuns = (existing: PlayRun[], added: PlayRun[]): PlayRun[] => mergeLatePacingRuns(existing, added, PACING_CLUES_STARTS, PLAY_VARIANTS);
 
 // ---------------------------------------------------------------- the late turns both arms played
 
@@ -137,8 +151,12 @@ export function clueWindowEnds(runs: PlayRun[]): Map<string, number> {
   return ends;
 }
 
-/** Every player's turn in the story's late part (not the ending) within its window, as the game kept it, once per player with text. */
-export function clueItems(runs: PlayRun[]): ClueItem[] {
+/**
+ * Every player's turn in the story's late part (not the ending) within its window, as the game kept it, once per
+ * player with text; production's and the variant's runs only (the fix-and-retest is read on pacing).
+ */
+export function clueItems(all: PlayRun[]): ClueItem[] {
+  const runs = all.filter((run) => PACING_CLUES_VARIANTS.includes(variantOf(run)));
   const ends = clueWindowEnds(runs);
   return runs.flatMap((run) => {
     const end = ends.get(windowKey(run)) ?? 0;
@@ -230,7 +248,8 @@ function interludesOf(reply: SetOfBeatGenerationSchema, slot: string): string[] 
  * part, then each window turn, each player's text, interludes and the facts
  * the turn records. No arm, sample, turn number or chapter is named.
  */
-export function renderBlindReading(runs: PlayRun[], salt: string): string {
+export function renderBlindReading(all: PlayRun[], salt: string): string {
+  const runs = all.filter((run) => PACING_CLUES_VARIANTS.includes(variantOf(run)));
   const items = clueItems(runs);
   const lines = [
     "# Blind reading: new unexplained details in the story's late part",
@@ -425,8 +444,9 @@ export function writePacingClues(ctx: Pick<PrepContext, "files" | "log">, runs: 
 
 // ---------------------------------------------------------------- the modes
 
-export async function pacingCluesPlayMode(ctx: PrepContext, options: { sample: number; caseIds?: string[]; turns?: number; reportOnly?: boolean }): Promise<void> {
+export async function pacingCluesPlayMode(ctx: PrepContext, options: { sample: number; caseIds?: string[]; turns?: number; reportOnly?: boolean; armKeys?: string[] }): Promise<void> {
   const { files, log } = ctx;
+  const variants = pacingCluesPlayVariants(options.armKeys);
   const stored = runs2Of(files);
   const starts = PACING_CLUES_STARTS.filter((s) => !options.caseIds?.length || options.caseIds.includes(s.story));
   if (starts.length === 0) throw new Error(`No short playthrough among --cases; one of ${PACING_CLUES_STARTS.map((s) => s.story).join(", ")}`);
@@ -436,11 +456,11 @@ export async function pacingCluesPlayMode(ctx: PrepContext, options: { sample: n
     const stageLeft = ctx.caps.stageCaps[STAGE] - spend.byStage[STAGE];
     const limit = Math.min(ctx.caps.maxSpend ?? Number.POSITIVE_INFINITY, stageLeft, ctx.caps.globalCap - spend.total);
     log(
-      `Playing on: ${starts.map((s) => `${s.story} from turn ${s.turn}`).join(", ")}, ${PACING_CLUES_VARIANTS.join(" and ")} (sample ${options.sample}${options.turns ? `, the first ${options.turns} turns each` : ""}); this invocation spends at most $${limit.toFixed(4)} (stage ${STAGE} spent $${spend.byStage[STAGE].toFixed(4)} of $${ctx.caps.stageCaps[STAGE]}; the ledger $${spend.total.toFixed(2)} of $${ctx.caps.globalCap})`
+      `Playing on: ${starts.map((s) => `${s.story} from turn ${s.turn}`).join(", ")}, ${variants.join(" and ")} (sample ${options.sample}${options.turns ? `, the first ${options.turns} turns each` : ""}); this invocation spends at most $${limit.toFixed(4)} (stage ${STAGE} spent $${spend.byStage[STAGE].toFixed(4)} of $${ctx.caps.stageCaps[STAGE]}; the ledger $${spend.total.toFixed(2)} of $${ctx.caps.globalCap})`
     );
     const call = pacingCluesCall(ctx, options.sample, limit);
     const jobs = starts.flatMap((start) =>
-      PACING_CLUES_VARIANTS.map(async (variant) => {
+      variants.map(async (variant) => {
         const run = stored.find((r) => r.spec.id === start.story && r.sample === 1);
         if (!run) throw new Error(`No stored second-round playthrough ${start.story}`);
         return (await playOn(run, start.turn, variant, (s) => call({ kind: "play", ...s }), options.sample, options.turns)).run;
@@ -455,8 +475,9 @@ export async function pacingCluesPlayMode(ctx: PrepContext, options: { sample: n
   const all = mergePacingCluesRuns(playRunsOf(files), played);
   const readings = writePacingClues(ctx, all);
   for (const run of played) log(`${run.spec.id} from ${run.from?.turn}, ${run.from?.variant}, s${run.sample}: ${run.turns.length} turns, stopped: ${run.stopped}`);
-  if (readings.some((r) => r.variant === CANDIDATE)) {
-    for (const rate of latePacingComparisons(readings, CANDIDATE).rates) log(`  ${rate.reading}: production ${rate.production.hits}/${rate.production.n}, ${CANDIDATE} ${rate.variant.hits}/${rate.variant.n}`);
+  for (const candidate of [CANDIDATE, RETEST]) {
+    if (!readings.some((r) => r.variant === candidate)) continue;
+    for (const rate of latePacingComparisons(readings, candidate).rates) log(`  ${candidate}, ${rate.reading}: production ${rate.production.hits}/${rate.production.n}, ${candidate} ${rate.variant.hits}/${rate.variant.n}`);
   }
   const cost = played.reduce((total, run) => total + readLatePacing(run).costUsd, 0);
   log(`Played ${played.length} short playthroughs, $${cost.toFixed(4)}. Wrote pacing-clues.md and .json.`);
@@ -465,7 +486,7 @@ export async function pacingCluesPlayMode(ctx: PrepContext, options: { sample: n
 /** pacing-clues-blind.md and its key (the same salt once written); no calls. */
 export function pacingCluesBlindMode(ctx: Pick<PrepContext, "files" | "log">): void {
   const { files, log } = ctx;
-  const runs = playRunsOf(files);
+  const runs = playRunsOf(files).filter((run) => PACING_CLUES_VARIANTS.includes(variantOf(run)));
   if (runs.length === 0) throw new Error("No short playthroughs in pacing-clues.json. Run --pacing-clues-play first.");
   const key = blindKeyOf(files, runs);
   const where = files.writeBlindReading(BLIND_FILE, renderBlindReading(runs, key.salt));
@@ -495,7 +516,8 @@ export async function judgePacingCluesMode(ctx: PrepContext): Promise<void> {
   const stage = stageJudgeTargets(clueJudgeTargets(clueItems(runs)), agreement);
   if (stage.length) await run(stage, `${stage.length} player turns of the stage's window`);
   else log("The calibration does not read reliable: the stage's turns are not sent to the judge.");
-  writePacingClues(ctx, runs);
+  // The file read again: a playthrough invocation may have added runs meanwhile
+  writePacingClues(ctx, playRunsOf(files));
   log("Wrote pacing-clues.md and .json.");
 }
 
@@ -519,4 +541,5 @@ export function printPacingCluesPlan(files: EvalFiles, log: (line: string) => vo
     log(`  ${start.story} from turn ${start.turn}: about ${estimate.calls} calls an arm, est $${estimate.usd.toFixed(3)} an arm${runs.length ? `; held: ${runs.join("; ")}` : ""}`);
   }
   log(`  A sample of both arms: est $${total.toFixed(3)} before retries (two samples $${(2 * total).toFixed(3)}); spent in the stage so far $${sum(prep.map((r) => r.costUsd)).toFixed(4)} over ${prep.length} prep attempts`);
+  log(`  The fix-and-retest (--arms ${RETEST}) alone: est $${(total / 2).toFixed(3)} a sample before retries (two samples $${total.toFixed(3)})`);
 }

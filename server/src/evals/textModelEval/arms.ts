@@ -336,6 +336,8 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // Fix 8's retest in whole short playthroughs (2026-10-01): latePacingB's planners and the late part's clue lines,
   // against production's code, which plays beside it from the same starts on the same dice
   pacingClues: "adopted",
+  // Its fix-and-retest (the switch plan check reading step b's pacing), against production's code
+  pacingCluesB: "adopted",
 };
 
 /**
@@ -359,6 +361,7 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   outcomeSettledB: "outcomeSettled",
   groupLeversB: "groupLevers",
   turnO2c: "turnO2b",
+  pacingCluesB: "pacingClues",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);

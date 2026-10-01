@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { withPlanProblem } from "../../../../src/game/services/planChecks.js";
-import { pacedLengths } from "../../../../src/game/services/storyTextRounds/latePacing.js";
+import { pacedLengths, switchPacingProblem } from "../../../../src/game/services/storyTextRounds/latePacing.js";
 import { PLAYTHROUGHS, playStory, playthroughArm, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { replayRun } from "../../../../src/evals/textModelEval/playthroughReplay.js";
 import {
@@ -10,6 +10,7 @@ import {
   playOn,
   policiesAfter,
   readLatePacing,
+  switchProblemOf,
   type LatePacingReading,
 } from "../../../../src/evals/textModelEval/latePacingPlay.js";
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
@@ -143,6 +144,31 @@ describe("the fix-and-retest's runs", () => {
     expect(promptOf(calls[0])).toBe(requestText(requestFor("pacingClues", { role: "thread", story: first })));
     expect(calls.every((c) => c.arm.key.endsWith("/pacingClues"))).toBe(true);
     expect(played.turns[0].plan?.pacing.pacedLengths).toEqual(pacedLengths(first).lengths);
+  });
+
+  it("the pacing-clues stage's fix-and-retest (pacingCluesB): pacingClues's requests and lengths, its switch plans read against PACING's arithmetic", async () => {
+    expect(planLengthsOf("pacingCluesB")).toBeDefined();
+    expect(switchProblemOf("pacingCluesB")).toBe(switchPacingProblem);
+    for (const variant of ["adopted", "pacingClues", "latePacingB"] as const) expect(switchProblemOf(variant)).toBeUndefined();
+    const run = await storedRun();
+    const at = run.turns.find((t) => t.turn > 2 && t.plan?.kind === "chapter plan")!;
+    const { call, calls } = fakeCall(1);
+    const { run: played } = await playOn(run, at.turn, "pacingCluesB", call, 1);
+    expect(calls.every((c) => c.arm.key.endsWith("/pacingCluesB"))).toBe(true);
+    for (const r of replayRun(played)) {
+      expect(requestText(requestFor("pacingCluesB", { role: "beat", story: r.before }))).toBe(requestText(requestFor("pacingClues", { role: "beat", story: r.before })));
+      if (r.played.plan) {
+        const role = r.played.plan.kind === "switch plan" ? "switch" : "thread";
+        expect(requestText(requestFor("pacingCluesB", { role, story: r.beforePlan }))).toBe(requestText(requestFor("pacingClues", { role, story: r.beforePlan })));
+      }
+    }
+    // A switch the rule finds wanting is asked once more, told the problem, and read as retried
+    const switches = readLatePacing(played).switches;
+    expect(switches.length).toBeGreaterThan(0);
+    for (const s of switches) {
+      const turn = played.turns.find((t) => t.turn === s.turn)!;
+      expect(s.retried).toBe(turn.plan!.calls.some((c) => c.lengthProblem !== undefined));
+    }
   });
 
   it("read against production on the stories the retest played only", () => {
