@@ -16,6 +16,7 @@ import {
   adoptedTurn,
   kidsAgesAsMeasured,
   withContestLastStage,
+  withContestSettled,
   withKidsBandImageSlots,
   withLateClues,
   withLeverDirectionSchema,
@@ -66,7 +67,10 @@ import { groupOptionsBase } from "../../../../src/game/services/storyTextRounds/
  * chapter planner where a group's picks split the players and a group's
  * chapter step with several threads with the shared-scenes insertions
  * (sharedScenesB, the scenes stage of 2026-10-01; withSharedScenes and
- * withSharedScenesSchema put them on the forms measured before), and AI
+ * withSharedScenesSchema put them on the forms measured before), the chapter
+ * planner where a pick sets a contested outcome at its last stage with PACING's
+ * deciding-thread line (contestSettled, the contest-settled stage of
+ * 2026-10-01; withContestSettled puts it on the forms measured before), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -164,7 +168,7 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
       // the scenes stage that evening, where a group's picks split the players, the shared-scenes line and each thread's
       // scene, as sharedScenesB measured them
       return {
-        prompt: withSharedScenes(withPacedLengths(withResultsAsOutcomes(prompt, input.story), input.story), input.story, "thread"),
+        prompt: withContestSettled(withSharedScenes(withPacedLengths(withResultsAsOutcomes(prompt, input.story), input.story), input.story, "thread"), input.story),
         schema: withSharedScenesSchema(withResultsAsOutcomesSchema(json(measured), input.story), input.story),
       };
     case "switch":

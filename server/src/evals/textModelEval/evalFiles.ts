@@ -46,6 +46,8 @@ import type { CallRecord } from "./runner.js";
  *   group-levers.md|json   the group-levers stage's report, each group turn read whole, its players' sacrifices and rewards against their computed lines, own stats and shared ones (--group-levers)
  *   group-options.md|json  the group-options stage's report, each group turn read whole, each rolled player's set against the owner's rules and B6's rate, its variety and odds (--group-options)
  *   judged-scenes.md|json  the scenes stage's judged check on round 3's chains and chapter steps, its calibration with round 3's hand-read turns, the chains' plans (--judge-scenes)
+ *   contest-settled.md|json  the contest-settled stage's report, each plan at the contest it decides, the blind hand reading unblinded (--contest-settled)
+ *   contest-settled-blind.md  its blind hand reading, plans coded (--contest-settled-blind); the key in keys/contest-settled-blind.json
  *   short-replies.md|json  the short-replies stage's report, each turn read whole, each player's paragraphs in the first reply and the reply kept (--short-replies)
  *   runaway-2.md|json      the second runaway replay's report, each job's first try answered or run away, each arm against production (--runaway-2)
  *   pacing-clues.md|json   the pacing-clues stage's short playthroughs, their pacing readings and the late turns' clue readings (--pacing-clues-play, --judge-pacing-clues)
@@ -215,6 +217,11 @@ export function evalFiles(outDir: string) {
     writeGroupOptions: (markdown: string, json: unknown) => {
       writeJson(at("group-options.json"), json);
       fs.writeFileSync(at("group-options.md"), markdown);
+    },
+    /** The contest-settled stage's report: each plan at the contest it decides, the blind hand reading unblinded (--contest-settled, contestSettledPrep.ts) */
+    writeContestSettled: (markdown: string, json: unknown) => {
+      writeJson(at("contest-settled.json"), json);
+      fs.writeFileSync(at("contest-settled.md"), markdown);
     },
     /** The scenes stage's judged check, its calibration and the chains' plans (--judge-scenes, sharedScenesPrep.ts) */
     writeJudgedScenes: (markdown: string, json: unknown) => {

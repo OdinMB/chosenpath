@@ -3,6 +3,7 @@ import { choiceResultCases, productionSends, type ChoiceCaseSpec, type PromptHas
 import type { PlayRun } from "./playthroughs.js";
 import { groupOptionsBase } from "../../game/services/storyTextRounds/groupOptions.js";
 import { withoutSharedScenes } from "../../game/services/storyTextRounds/sharedScenes.js";
+import { withoutContestSettledLines } from "../../game/services/storyTextRounds/contestSettled.js";
 
 /*
  * The group-options stage's cases (decision A, the evening of 2026-10-01; no
@@ -129,12 +130,14 @@ const CATEGORY = "group-options";
  * the stage's adoption (2026-10-01, evening): the variant's base, production with them taken out (groupOptionsBase);
  * and for a chapter planner where a group's picks split the players and a group chapter's opening step with several
  * threads, whose shared-scenes insertions production prints since the scenes stage's adoption (later that evening):
- * without them (withoutSharedScenes; the scene field is in the schema, not the prompt).
+ * without them (withoutSharedScenes; the scene field is in the schema, not the prompt); and for a chapter planner
+ * where a pick sets a contest at its last stage, whose PACING line production prints since the contest-settled stage's
+ * adoption (later still): without it (withoutContestSettledLines).
  */
 export const playthroughs3Sent: SentRequestText = (input) => {
   if (input.role === "beat") return withoutSharedScenes(groupOptionsBase(input.story).prompt, input.story);
   const sent = productionSends(input);
-  return input.role === "thread" ? withoutSharedScenes(sent, input.story) : sent;
+  return input.role === "thread" ? withoutContestSettledLines(withoutSharedScenes(sent, input.story), input.story) : sent;
 };
 
 /** The stage's cases from the third round's stored runs, each only where its request is the one the run sent; and what could not be built. */

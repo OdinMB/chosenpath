@@ -65,6 +65,7 @@ import { noNewMilestonesRequest, noThreadAuditRequest } from "../../game/service
 import { optionsO2cRequest } from "../../game/services/storyTextRounds/optionsO2c.js";
 import { groupOptionsRequest } from "../../game/services/storyTextRounds/groupOptions.js";
 import { sharedScenesRequest } from "../../game/services/storyTextRounds/sharedScenes.js";
+import { contestSettledRequest } from "../../game/services/storyTextRounds/contestSettled.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -418,6 +419,13 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * more bullet (where two threads would need the same person, crew, vehicle or
  * object, only one thread's scene has them; a contest only one side chose
  * stands no one in for the absent side), the turn the variant's.
+ * "contestSettled" is decision A's seal fix (the evening of 2026-10-01, the
+ * contest-settled stage; storyTextRounds/contestSettled.ts): production's
+ * chapter planner with, in PACING, where a pick sets a contested outcome whose
+ * thread settles its last stage, a line that this thread decides the contest,
+ * its three possible milestones the outcome's three resolutions, none putting
+ * the decision off; production's request byte for byte elsewhere, with
+ * production's limits for the role and player count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -499,7 +507,8 @@ export type VariantId =
   | "pacingCluesB"
   | "groupOptions"
   | "sharedScenes"
-  | "sharedScenesB";
+  | "sharedScenesB"
+  | "contestSettled";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -578,6 +587,7 @@ export const VARIANTS: VariantId[] = [
   "groupOptions",
   "sharedScenes",
   "sharedScenesB",
+  "contestSettled",
 ];
 
 /**
@@ -1134,6 +1144,12 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   // Its one fix-and-retest: one more planner bullet, one person or group in one thread's scene and no stand-in for a
   // contest's absent side; the turn the variant's
   sharedScenesB: (input) => sharedScenesBuild(input, "sharedScenesB"),
+  // A contest's deciding chapter decides it: the chapter planner's PACING line where a pick sets a contested outcome at
+  // its last stage; production's limits for the role and player count
+  contestSettled: (input): CheckedTextRequest => {
+    if (input.role !== "thread") throw new Error(`Variant contestSettled does not cover role ${input.role}`);
+    return { ...contestSettledRequest(input.story), limits: productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers()) };
+  },
 };
 
 /** The scenes stage's requests (its variant's and its fix-and-retest's): production's limits for the role and player count, production's turn limits and retry count. */

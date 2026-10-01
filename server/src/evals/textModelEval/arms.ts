@@ -97,7 +97,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * shared scenes in group stories (scenes: the variant beside production's group
  * turn on later chapter steps of the third round's stored runs, each turn with
  * production's one checked retry, and its chapter planner into its group turn
- * beside production's chains on that round's chapter openings).
+ * beside production's chains on that round's chapter openings), then a
+ * contest's deciding chapter that decides it (contest-settled: the variant's
+ * chapter planner beside production's on every stored plan of rounds 1-3 that
+ * settles a contested outcome's last stage).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -134,6 +137,7 @@ export const FEEDBACK_STAGES = [
   "playthroughs-3",
   "group-options",
   "scenes",
+  "contest-settled",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -358,6 +362,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   sharedScenes: "adopted",
   // Its one fix-and-retest (one person or group in one thread's scene), against production's, the run's variant second
   sharedScenesB: "adopted",
+  // A contest's deciding chapter decides it (decision A's seal fix, 2026-10-01 evening): the chapter planner's PACING line
+  // at a contest's last stage, against production's chapter planner, which runs beside it
+  contestSettled: "adopted",
 };
 
 /**
@@ -721,9 +728,54 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return groupOptionsArms(role);
     case "scenes":
       return scenesArms(role);
+    case "contest-settled":
+      return contestSettledArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the contest-settled stage (decision A's seal fix, the
+ * evening of 2026-10-01): production's own code since the scenes adoption (the
+ * chapter planner's shared-scenes line and a group chapter opening's block),
+ * under a tag no earlier stage used, so production runs beside the variant in
+ * the same minutes.
+ */
+export const CONTEST_SETTLED_PROMPT_STATE = "adopted25";
+
+/**
+ * The stage's cases (contestSettledCases.ts, no calls): the chapter planner's
+ * input wherever a stored playthrough of rounds 1-3 planned a contested
+ * outcome's last stage: round 3's seal and contract, which the stored plans put
+ * off, and the six the stored plans settled.
+ */
+export const CONTEST_SETTLED_CASES = [
+  "round-contest-r3-space-pirates-t11",
+  "round-contest-r3-food-trucks-t17",
+  "round-contest-r3-estate-agents-t22",
+  "round-contest-r2-food-trucks-t17",
+  "round-contest-r2-space-pirates-t10",
+  "round-contest-r2-estate-agents-t13",
+  "round-contest-r1-food-trucks-t6",
+  "round-contest-r1-space-pirates-t10",
+] as const;
+
+/**
+ * A contest's deciding chapter that decides it (decision A, the coordinator's
+ * brief of the evening of 2026-10-01): production's chapter planner (adopted)
+ * and the variant (contestSettled) on the group planner model (Luna low), twice
+ * on the stage's cases, interleaved, under adopted25. A reply is read after the
+ * game's plan check, as challenge-results read its plans; no checked retry.
+ */
+function contestSettledArms(role: EvalRole): ArmPlan[] {
+  if (role !== "thread") return [];
+  return (["adopted", "contestSettled"] as const).map((variant) => ({
+    arm: adoptedDefault("multiplayerAnalysis", variant),
+    samples: 2,
+    scope: "multiplayer" as const,
+    caseIds: [...CONTEST_SETTLED_CASES],
+  }));
 }
 
 /**
@@ -1829,6 +1881,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "options-o2c",
   "group-options",
   "scenes",
+  "contest-settled",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1903,6 +1956,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The scenes stage's chapter openings and steps from the third playthroughs (2026-10-01, decision A), frozen after every
   // earlier stage had closed
   ...[...SCENES_CASES.chains, ...SCENES_CASES.turns].map((id): [string, Stage] => [id, "scenes"]),
+  // The contest-settled stage's chapter plans from the playthroughs of rounds 1-3 (2026-10-01, decision A), frozen after
+  // every earlier stage had closed
+  ...CONTEST_SETTLED_CASES.map((id): [string, Stage] => [id, "contest-settled"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

@@ -125,6 +125,8 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
     "The owner's option rules for group turns (groupOptions beside production's group turn under adopted23, --role beat, each with production's checked retry, on group steps of the third playthroughs)",
   scenes:
     "Shared scenes in group stories (sharedScenes beside production under adopted24: --role beat, each with production's checked retry, on chapter steps of the third playthroughs, and --role thread --mode pipeline for its chapter openings' chains)",
+  "contest-settled":
+    "A contest's deciding chapter decides it (contestSettled beside production's chapter planner under adopted25, --role thread, on every stored plan of rounds 1-3 at a contest's last stage)",
 };
 
 /** Jobs by arm key, in plan order. */

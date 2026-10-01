@@ -467,6 +467,9 @@ describe("budget caps", () => {
       // Decision A of 2026-10-01 (evening): shared scenes in group stories, round-3 chains and turns twice, its estimate
       // plus 30% ($0.36), raised to $0.40 for its fix-and-retest (sharedScenesB's chains)
       scenes: 0.4,
+      // Decision A of 2026-10-01 (evening): a contest's deciding chapter that decides it (the seal), every stored contest
+      // last-stage plan twice, its estimate with room for one fix-and-retest, plus 30%
+      "contest-settled": 0.2,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -502,6 +505,7 @@ describe("budget caps", () => {
       "playthroughs-3",
       "group-options",
       "scenes",
+      "contest-settled",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -538,7 +542,7 @@ describe("budget caps", () => {
     expect(42.87 + DEFAULT_STAGE_CAPS["playthroughs-3"]).toBeLessThanOrEqual(HARD_CEILING);
     // Decision A (the evening of 2026-10-01) opened its measurements with the ledger at $43.61 of the $48 hard cap: their
     // caps fit with the $1.3 on top
-    expect(decisionA).toEqual(["group-options", "scenes"]);
+    expect(decisionA).toEqual(["group-options", "scenes", "contest-settled"]);
     expect(LEDGER_WHEN_DECISION_A_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisionA)).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);

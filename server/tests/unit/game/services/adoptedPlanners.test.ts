@@ -18,6 +18,7 @@ import {
 } from "../../../helpers/promptStories.js";
 import {
   withContestLastStage,
+  withContestSettled,
   withPacedLengths,
   withPacingStepB,
   withResultsAsOutcomes,
@@ -60,7 +61,9 @@ import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "..
  * and withResultsAsOutcomesSchema); and, since the scenes stage of that
  * evening, where a group's picks split the players, the measured shared-scenes
  * line and each thread's scene (sharedScenesB: withSharedScenes and
- * withSharedScenesSchema). The same prompt and JSON schema, byte for byte, on every story
+ * withSharedScenesSchema); and, since the contest-settled stage later that
+ * evening, where a pick sets a contested outcome at its last stage, PACING's
+ * deciding-thread line (contestSettled: withContestSettled). The same prompt and JSON schema, byte for byte, on every story
  * the tests build and on every frozen planning case; and a reply is assembled
  * into today's stored plan the way the eval assembles it.
  */
@@ -190,7 +193,7 @@ function expectThreadLikeMeasured(story: Story) {
   // Since the pacing-clues adoption (2026-10-01): the paced lengths where they narrow, as pacingCluesB measured them; since
   // the scenes adoption that evening, where a group's picks split the players, the shared-scenes line and each thread's
   // scene, as sharedScenesB measured them
-  expect(production.prompt).toBe(withSharedScenes(withPacedLengths(withResultsAsOutcomes(measured.prompt, story), story), story, "thread"));
+  expect(production.prompt).toBe(withContestSettled(withSharedScenes(withPacedLengths(withResultsAsOutcomes(measured.prompt, story), story), story, "thread"), story));
   expect(json(production.schema)).toBe(withSharedScenesSchema(withResultsAsOutcomesSchema(json(measured.schema), story), story));
 }
 

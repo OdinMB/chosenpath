@@ -587,6 +587,73 @@ function pickedNeeds(story: Story): { need: OutcomeNeed; slots: string[] }[] {
   return [...byId.values()];
 }
 
+// --- A contest decided by this thread (the contest-settled stage, decision A, the evening of 2026-10-01) ---
+
+/*
+ * Where a pick sets a contested shared outcome whose thread settles its last
+ * stage, PACING says that this thread decides the contest: its three possible
+ * milestones are the outcome's three resolutions, each as the thread's
+ * situation settles it, none putting the decision off. Round 3's space pirates'
+ * seal was complete by count, but the chapter that settled its last stage asked
+ * which camp would "frame the next custody discussion", renamed the stage
+ * "without assigning custody" (after a switch question that said so), and wrote
+ * three milestones that each put the decision off, so two endings told the seal
+ * as unassigned; the food trucks' contract the same round (a brace check that
+ * "informs the final contract decision"). Measured as the eval's contestSettled
+ * (storyTextRounds/contestSettled.ts) on every stored plan of rounds 1-3 at a
+ * contest's last stage, twice, the plans read blind by hand: each milestone
+ * deciding the contest 11 of 16 -> 16 of 16 (moved, p 0.022), reasoning tokens
+ * lower; adopted as measured, byte for byte.
+ */
+
+const CONTEST_MODES_PLAYED: string[] = [GameModes.Competitive, GameModes.CooperativeCompetitive];
+
+/** The line's passages (the eval's CONTEST_SETTLED_TEXT is this object). */
+export const CONTEST_DECIDED = {
+  /** The PACING line the contest lines go before */
+  anchor: "\nRecent threads:",
+  decides:
+    "gets its last milestone here, so this thread decides the contest. Its last stage is the outcome's own question, and the thread's three possible milestones are its three resolutions, each told as this thread's situation settles it:",
+  noDeferral:
+    "The thread's question stays about this thread's own situation, but its answer is the contest's result: each possible milestone settles what its resolution settles, and none puts the decision off to a later discussion, vote, review or agreement, or settles only who may shape it.",
+  writtenBefore: "Where the switch's question, an earlier milestone or a fact says the outcome is not decided yet, that was written before this last stage: this thread decides it.",
+  oneSided:
+    "Not every player chose it: where this thread holds one side's players only, it is that side's challenge, and its favorable milestone is that side's resolution, its unfavorable the other side's, its mixed the mixed resolution.",
+};
+
+/**
+ * The contested shared outcomes a pick sets whose thread settles their last stage (one milestone still needed), in a
+ * group that plays contests, in the order the players' picks name them.
+ */
+export function contestsDecidedHere(story: Story): string[] {
+  if (!story.isMultiplayer() || !CONTEST_MODES_PLAYED.includes(story.getGameMode())) return [];
+  const contested = new Set(story.getSharedOutcomes().filter(isContestedOutcome).map((o) => o.id));
+  const found: string[] = [];
+  for (const slot of story.getPlayerSlots()) {
+    const id = pickedOutcome(story, slot)?.outcomeId;
+    if (!id || !contested.has(id) || found.includes(id)) continue;
+    const need = outcomeNeeds(story, slot, false).find((n) => n.id === id);
+    if (need?.stillNeeded === 1) found.push(id);
+  }
+  return found;
+}
+
+/** PACING's line for one contest this thread decides: the outcome's question and resolutions, and the one-sided clause where not every player picked it. */
+export function contestDecidedLine(story: Story, outcomeId: string): string {
+  const outcome = story.getOutcomeById(outcomeId);
+  if (!outcome || !isContestedOutcome(outcome)) throw new Error(`${outcomeId} is not a contested outcome`);
+  const resolutions = outcome.possibleResolutions as unknown as Record<"sideAWins" | "mixed" | "sideBWins", string>;
+  const picking = story.getPlayerSlots().filter((slot) => pickedOutcome(story, slot)?.outcomeId === outcomeId);
+  const oneSided = picking.length < story.getPlayerSlots().length;
+  return [
+    `Deciding thread: ${outcomeId} ("${outcome.question}") ${CONTEST_DECIDED.decides}`,
+    `- Side A wins: "${resolutions.sideAWins}"`,
+    `- Mixed: "${resolutions.mixed}"`,
+    `- Side B wins: "${resolutions.sideBWins}"`,
+    `${CONTEST_DECIDED.noDeferral} ${CONTEST_DECIDED.writtenBefore}${oneSided ? ` ${CONTEST_DECIDED.oneSided}` : ""}`,
+  ].join("\n");
+}
+
 /** The block for the chapter planner, at the end of its state. */
 export function threadPacingBlock(story: Story): string {
   const left = turnsLeft(story);
@@ -597,6 +664,8 @@ export function threadPacingBlock(story: Story): string {
   const picked = pickedNeeds(story);
   if (picked.length === 1 && !story.isMultiplayer()) lines.push(`The outcome this thread pushes: ${pushedLine(picked[0].need)}`);
   else if (picked.length > 0) lines.push("The outcomes the players' choices set:", ...picked.map((p) => `- ${pushedLine(p.need)} (${p.slots.join(", ")})`));
+  // A contest this thread decides (the contest-settled stage): its milestones are the outcome's resolutions
+  lines.push(...contestsDecidedHere(story).map((id) => contestDecidedLine(story, id)));
   lines.push(recentLine(story, false));
   lines.push(`Phase: ${THREAD_PHASE[phaseOf(turn, story.getMaxTurns(), last)]}`);
   return lines.join("\n");

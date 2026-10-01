@@ -58,6 +58,7 @@ import { kidsAgesMode } from "./kidsAgesPrep.js";
 import { buildGroupLeverCasesMode, groupLeversMode } from "./groupLeversPrep.js";
 import { buildGroupOptionsCasesMode, groupOptionsMode } from "./groupOptionsPrep.js";
 import { buildScenesCasesMode, judgeScenesMode, writeJudgedScenes } from "./sharedScenesPrep.js";
+import { buildContestSettledCasesMode, contestSettledBlindMode, writeContestSettled } from "./contestSettledPrep.js";
 import { buildShortReplyCasesMode, shortRepliesMode } from "./shortRepliesPrep.js";
 import { runaway2Mode } from "./runaway2Prep.js";
 import { optionsO2cMode } from "./optionsO2cPrep.js";
@@ -121,7 +122,8 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     one checked retry; scenes under adopted24: --role beat, production's group turn and sharedScenes twice on later
  *     chapter steps of the third playthroughs on their stored plans, interleaved, each with production's one checked
  *     retry, and --role thread --mode pipeline, each side's chapter planner into its own group turn on that round's
- *     chapter openings, interleaved)
+ *     chapter openings, interleaved; contest-settled --role thread under adopted25: production's chapter planner and
+ *     contestSettled twice on every stored plan of rounds 1-3 at a contested outcome's last stage, interleaved)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -306,6 +308,16 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     variant against production per kind and pooled, every judged turn, the chains' plans, the turns' waits, cost and
  *     automatic checks; --cases sends only those (a smoke)
  *   --scenes  judged-scenes.md and .json again from what is recorded; no calls
+ *   A contest's deciding chapter that decides it (contestSettledPrep.ts, 2026-10-01 evening, decision A's seal fix), in
+ *   the contest-settled stage:
+ *   --build-contest-settled-cases [--rebuild-cases]  every stored plan of rounds 1-3 at a contested outcome's last stage
+ *     (contestSettledCases.ts); no calls; they then run with --run --stage contest-settled --prompt-state adopted25
+ *     --role thread (production's chapter planner and contestSettled)
+ *   --contest-settled-blind  no calls: each plan's thread on the contest its chapter decides, coded, no arm named
+ *     (contest-settled-blind.md; the key in keys/contest-settled-blind.json), for the hand reading in contestSettledHand.ts
+ *   --contest-settled  the stage's report, no calls: the blind hand reading unblinded, the variant against production
+ *     under the stop rule, a word heuristic, the plan check, reasoning, waits and cost, the automatic checks, every
+ *     plan's thread; contest-settled.md and .json
  *   Fix 8's retest in whole short playthroughs (pacingCluesPrep.ts, 2026-10-01), in the pacing-clues stage:
  *   --pacing-clues-play [--cases <story ids>] [--samples N] [--turns N] [--arms pacingCluesB] [--max-spend 0.50]
  *     [--report-only]  production's code and pacingClues (the late-pacing fix-and-retest's planners and the late part's
@@ -396,6 +408,9 @@ type Mode =
   | "build-scenes-cases"
   | "judge-scenes"
   | "scenes"
+  | "build-contest-settled-cases"
+  | "contest-settled-blind"
+  | "contest-settled"
   | "pacing-clues-play"
   | "pacing-clues-blind"
   | "judge-pacing-clues"
@@ -555,6 +570,9 @@ function parseArgs(argv: string[]): Args {
       case "--build-scenes-cases":
       case "--judge-scenes":
       case "--scenes":
+      case "--build-contest-settled-cases":
+      case "--contest-settled-blind":
+      case "--contest-settled":
       case "--pacing-clues-play":
       case "--pacing-clues-blind":
       case "--judge-pacing-clues":
@@ -1335,6 +1353,14 @@ async function main() {
     case "scenes":
       // The report again from what is recorded: no calls, so no key and no caps
       return writeJudgedScenes({ files, log: (line) => console.log(line) });
+    case "build-contest-settled-cases":
+      return buildContestSettledCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "contest-settled-blind":
+      // No calls: the blind reading's file and its key
+      return contestSettledBlindMode({ files, log: (line) => console.log(line) });
+    case "contest-settled":
+      // The report from what is recorded: no calls, so no key and no caps
+      return writeContestSettled({ files, log: (line) => console.log(line) });
     case "pacing-clues-play":
       // The short playthroughs book to the stage, one invocation at most the stage's cap unless --max-spend says less
       return pacingCluesPlayMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "pacing-clues", DEFAULT_STAGE_CAPS["pacing-clues"]), {

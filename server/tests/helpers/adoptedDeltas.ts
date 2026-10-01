@@ -55,7 +55,12 @@
  * sharedScenesB (the scene line and field; where everyone is and the
  * consistency line): not
  * a delta; withSharedScenes and withSharedScenesSchema put them on the forms
- * measured before, beforeSharedScenes and productionThen take them out.
+ * measured before, beforeSharedScenes and productionThen take them out. Since
+ * the contest-settled stage, later still, the chapter planner where a pick sets
+ * a contested outcome whose thread settles its last stage is the measured
+ * contestSettled (PACING's deciding-thread line): not a delta;
+ * withContestSettled puts it on the forms measured before, beforeContestSettled
+ * takes it out.
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
@@ -83,6 +88,7 @@ import { LATE_PACING_TEXT, pacedLengthsEdit } from "../../src/game/services/stor
 import { withoutGroupOptions } from "../../src/game/services/storyTextRounds/groupOptions.js";
 import { SHARED_SCENES, takesScenesBlock as productionTakesScenesBlock, takesScenesPlanner } from "../../src/game/services/sharedScenes.js";
 import { withSharedScenesLines, withoutSharedScenes } from "../../src/game/services/storyTextRounds/sharedScenes.js";
+import { withContestSettledLines, withoutContestSettledLines } from "../../src/game/services/storyTextRounds/contestSettled.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -534,6 +540,26 @@ export function withSharedScenesSchema(measuredJson: string, story: Story): stri
   );
   if (thread.required) thread.required = thread.required.flatMap((key) => (key === "playersSideB" ? [key, "scene"] : [key]));
   return JSON.stringify(schema);
+}
+
+/*
+ * The contest-settled stage's adoption (decision A, the evening of
+ * 2026-10-01): where a pick sets a contested shared outcome whose thread settles
+ * its last stage, the chapter planner's PACING carries the deciding-thread line
+ * (the outcome's question and resolutions, none put off) before its recent
+ * threads. The measured contestSettled, not a delta (contestSettled.test.ts
+ * holds production to it): withContestSettled puts it on the forms measured
+ * before, beforeContestSettled takes it out. No other request changed.
+ */
+
+/** Production's chapter planner prompt as it stood before the contest-settled adoption (a prompt without the line as it is). */
+export function beforeContestSettled(production: string, story: Story): string {
+  return withoutContestSettledLines(production, story);
+}
+
+/** A chapter planner form measured before the contest-settled stage with the deciding-thread line where production prints it. */
+export function withContestSettled(measured: string, story: Story): string {
+  return withContestSettledLines(measured, story);
 }
 
 /**
