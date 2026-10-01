@@ -1,6 +1,7 @@
 import type { EvalCase } from "./cases.js";
 import { choiceResultCases, productionSends, type ChoiceCaseSpec, type PromptHashOf, type SentRequestText } from "./choiceResultCases.js";
 import type { PlayRun } from "./playthroughs.js";
+import { groupOptionsBase } from "../../game/services/storyTextRounds/groupOptions.js";
 
 /*
  * The group-options stage's cases (decision A, the evening of 2026-10-01; no
@@ -9,7 +10,8 @@ import type { PlayRun } from "./playthroughs.js";
  * frozen beside the other cases with --build-group-options-cases. Each is
  * rebuilt by replaying its stored run from its start (playthroughReplay.ts)
  * and built only where its request is the one production sent there, byte for
- * byte (playthroughs3Sent: production's turn is unchanged since that run). A
+ * byte (playthroughs3Sent: production's turn as it stood before the stage's
+ * adoption, unchanged since that run until then). A
  * chapter opening is the story before its plan with the plan as its fixed
  * analysis; a later step is its input.
  *
@@ -121,10 +123,11 @@ export const GROUP_OPTIONS_CASE_SPECS: ChoiceCaseSpec[] = [
 const CATEGORY = "group-options";
 
 /**
- * What production sent in the third round of playthroughs: today's request (its turn is unchanged since that run; the
- * fixes since changed repairs and checks, not the turn's request).
+ * What production sent in the third round of playthroughs: today's request (the fixes since changed repairs and
+ * checks, not the turn's request), but for a group's rolled step, whose group-options lines production prints since
+ * the stage's adoption (2026-10-01, evening): the variant's base, production with them taken out (groupOptionsBase).
  */
-export const playthroughs3Sent: SentRequestText = (input) => productionSends(input);
+export const playthroughs3Sent: SentRequestText = (input) => (input.role === "beat" ? groupOptionsBase(input.story).prompt : productionSends(input));
 
 /** The stage's cases from the third round's stored runs, each only where its request is the one the run sent; and what could not be built. */
 export function groupOptionsCases(

@@ -2,11 +2,15 @@ import { describe, expect, it } from "@jest/globals";
 import { Story } from "core/models/Story.js";
 import type { Beat, BeatOption, ThreadAnalysis } from "core/types/index.js";
 import {
+  GROUP_LEVER_QUESTION,
+  GROUP_OPTION_VARIETY,
   GROUP_SHARED_AND_OWN,
   NO_DOUBLE_SACRIFICE,
   THREE_WAYS,
   groupLeverLine,
+  groupLeverRule,
   groupLeverSlots,
+  groupRewardTurn,
   groupSacrificeRewardLines,
   optionLeverLine,
   rewardTurn,
@@ -16,6 +20,12 @@ import {
 } from "../../../../src/game/services/optionRules.js";
 import { OPTIONS_CONTINUITY_TEXT } from "../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 import { OPTIONS_O2C_TEXT, o2cLeverLine, o2cRewardTurn } from "../../../../src/game/services/storyTextRounds/optionsO2c.js";
+import {
+  GROUP_OPTIONS_TEXT,
+  groupOptionsLine,
+  groupOptionsRule,
+  groupRewardTurn as groupOptionsRewardTurn,
+} from "../../../../src/game/services/storyTextRounds/groupOptions.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, slotsOf, threadBeat } from "../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 import { beatGeneration, challengeOptions, stat, switchAnalysis, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
@@ -100,11 +110,13 @@ describe("groupLeverSlots: a group's players in a challenge or contest thread (t
   });
 
   it("gives each rolled player their own computed line, then the group sentence and no second sacrifice", () => {
+    // Step 2 of the chapter, no lever offered before: a sacrifice fits and no reward (the owner's rules for groups since
+    // the group-options stage of 2026-10-01; B6's "one fits" before)
     const story = mixedGroupStep(3);
     expect(groupSacrificeRewardLines(story)).toBe(
       "--- Sacrifice or reward, for each player in a Challenge or Contest thread (each player's own options):\n" +
-        "----- player2 (Test Player 2): one fits this turn if a stat allows it.\n" +
-        "----- player3 (Test Player 3): one fits this turn if a stat allows it.\n" +
+        "----- player2 (Test Player 2): a sacrifice fits this turn if a stat allows it. No reward this turn.\n" +
+        "----- player3 (Test Player 3): a sacrifice fits this turn if a stat allows it. No reward this turn.\n" +
         `--- ${GROUP_SHARED_AND_OWN}\n--- ${NO_DOUBLE_SACRIFICE}\n`
     );
   });
@@ -135,14 +147,16 @@ describe("a group's lever lines where only the owner's roll counts", () => {
     groupSacrificeRewardLines(story)
       .split("\n")
       .filter((line) => line.startsWith("----- "));
-  const FITS = "one fits this turn if a stat allows it.";
+  // Step 2 of the chapter, no lever before: the owner's rules for groups give a sacrifice and no reward (since the
+  // group-options stage of 2026-10-01)
+  const FITS = "a sacrifice fits this turn if a stat allows it. No reward this turn.";
   const NONE = "none this turn.";
 
-  it("gives a player in a thread on another player's own outcome none this turn when that owner is in it; the owner keeps the rate line", () => {
+  it("gives a player in a thread on another player's own outcome none this turn when that owner is in it; the owner keeps their own line", () => {
     expect(linesOf(ownOutcomeStep(2, "player2_own"))).toEqual([`----- player1 (Test Player 1): ${NONE}`, `----- player2 (Test Player 2): ${FITS}`]);
     expect(linesOf(ownOutcomeStep(3, "player3_own"))).toEqual([`----- player1 (Test Player 1): ${NONE}`, `----- player2 (Test Player 2): ${NONE}`, `----- player3 (Test Player 3): ${FITS}`]);
     expect(groupLeverLine(ownOutcomeStep(2, "player2_own"), "player1")).toBe("Sacrifice or reward: none this turn.");
-    expect(groupLeverLine(ownOutcomeStep(2, "player2_own"), "player2")).toBe("Sacrifice or reward: one fits this turn if a stat allows it.");
+    expect(groupLeverLine(ownOutcomeStep(2, "player2_own"), "player2")).toBe(`Sacrifice or reward: ${FITS}`);
   });
 
   it("does the same in a contest on one player's own outcome, on both sides", () => {
@@ -154,7 +168,7 @@ describe("a group's lever lines where only the owner's roll counts", () => {
     ]);
   });
 
-  it("keeps every player's rate line where every roll pools: a shared outcome, or a player's own outcome its owner is not in", () => {
+  it("keeps every player's own line where every roll pools: a shared outcome, or a player's own outcome its owner is not in", () => {
     expect(linesOf(ownOutcomeStep(3, "shared_sale"))).toEqual([1, 2, 3].map((n) => `----- player${n} (Test Player ${n}): ${FITS}`));
     // player3 sits in no thread here, so has no line at all
     expect(linesOf(ownOutcomeStep(3, "player3_own", "challenge", ["player1", "player2"]))).toEqual([1, 2].map((n) => `----- player${n} (Test Player ${n}): ${FITS}`));
@@ -257,5 +271,83 @@ describe("the adopted O2c lines (options-o2c, 2026-10-01)", () => {
       "Sacrifice or reward: none this turn.",
     ]);
     for (const story of stories) expect(optionLeverLine(story, "player1")).toBe(o2cLeverLine(story, "player1"));
+  });
+});
+
+/*
+ * The owner's option rules for a group's rolled players (the group-options
+ * stage, decision A of the evening of 2026-10-01, measured as the eval's
+ * groupOptions and adopted): each rolled player's line computed per player and
+ * chapter as a single player's is (the reward turn the game places, a
+ * sacrifice on B6's rate, a second only for a strong reason, none), none where
+ * the step discards the player's roll, O2b's stat lines for their options,
+ * and the plan's lever question asked from those lines.
+ */
+describe("the adopted group-options lines (group-options, 2026-10-01)", () => {
+  const NERVE = stat("player_nerve", { name: "Nerve", optionsToSacrifice: "Spend 10% Nerve to push through", optionsToGainAsReward: "Regain 10% Nerve by stopping to catch your breath" });
+  const slots = (n: number) => slotsOf(n);
+
+  /** A group chapter (every player in one challenge thread on `outcomeId`, `duration` steps) from history index `first`, with a stat that allows levers. */
+  function groupChapter(histories: Beat[][], first: number, duration = 3, outcomeId = "shared_goal", own: Record<string, string> = {}): Story {
+    const players = slots(histories.length);
+    const turns = histories[0].length;
+    const analysis = threadAnalysis("challenge", duration, first, players);
+    const chapter: ThreadAnalysis = {
+      ...analysis,
+      threads: analysis.threads.map((t) => ({ ...t, outcomeId, progression: t.progression.map((step, i) => ({ ...step, resolution: i < turns - first ? ("favorable" as const) : null })) })),
+    };
+    const phases =
+      first === 1 ? [switchAnalysis(players, 0), chapter] : [switchAnalysis(players, 0), endedChapter("shared_goal", first - 2, 1, "Done", players), switchAnalysis(players, first - 1), chapter];
+    const playerOutcomes = Object.fromEntries(Object.entries(own).map(([slot, id]) => [slot, [outcome(id)]]));
+    const story = roundStory({ players: players.length, turns, maxTurns: 20, phases, sharedOutcomes: [outcome("shared_goal")], playerOutcomes });
+    const state = story.getState();
+    return Story.create({ ...state, playerStats: [NERVE], players: Object.fromEntries(players.map((slot, i) => [slot, { ...state.players[slot], beatHistory: histories[i] }])) });
+  }
+  const offered = (levers: BeatOption["resourceType"][], choice = 1): Beat => ({ ...challengeBeat(levers), choice });
+
+  const STORIES: [string, Story][] = [
+    ["the story's first chapter, its first step", groupChapter([[switchBeat()], [switchBeat()]], 1)],
+    ["its second step", groupChapter([[switchBeat(), challengeBeat()], [switchBeat(), challengeBeat()]], 1)],
+    ["after a lever", groupChapter([[switchBeat(), offered(["sacrifice"])], [switchBeat(), offered(["reward"])]], 1)],
+    ["a four-step chapter's last step after a first-step sacrifice, taken", groupChapter([0, 1].map(() => [switchBeat(), offered(["normal", "sacrifice"]), challengeBeat(), challengeBeat()]), 1, 4)],
+    [
+      "the next chapter after one that offered player1 a reward",
+      groupChapter(
+        [
+          [switchBeat(), offered(["reward"]), offered([]), switchBeat()],
+          [switchBeat(), offered([]), offered([]), switchBeat()],
+        ],
+        4
+      ),
+    ],
+    ["a chapter on player2's own outcome", groupChapter([[switchBeat()], [switchBeat()]], 1, 3, "player2_own", { player2: "player2_own" })],
+    ["a group's mixed step", mixedGroupStep(3)],
+  ];
+
+  it("computes each rolled player's line as the measured variant does: the reward turn, a sacrifice that fits, a second only for a strong reason, none, and none for a discarded roll", () => {
+    for (const [label, story] of STORIES) {
+      for (const slot of groupLeverSlots(story)) {
+        expect({ label, slot, line: groupLeverLine(story, slot) }).toEqual({ label, slot, line: groupOptionsLine(story, slot) });
+        expect({ label, slot, turn: groupRewardTurn(story, slot) }).toEqual({ label, slot, turn: groupOptionsRewardTurn(story, slot) });
+        expect({ label, slot, rule: groupLeverRule(story, slot) }).toEqual({ label, slot, rule: groupOptionsRule(story, slot) });
+      }
+    }
+    const lines = (story: Story) => groupLeverSlots(story).map((slot) => groupLeverLine(story, slot).replace("Sacrifice or reward: ", ""));
+    expect(lines(STORIES[0][1])).toEqual(["offer a reward this turn if a stat allows one. No sacrifice this turn.", "offer a reward this turn if a stat allows one. No sacrifice this turn."]);
+    expect(lines(STORIES[3][1])[0]).toMatch(/^this thread already offered a sacrifice, which the player took, so offer another sacrifice only if the scene gives a strong reason/);
+    expect(lines(STORIES[4][1])).toEqual(["none this turn.", "offer a reward this turn if a stat allows one. No sacrifice this turn."]);
+    expect(lines(STORIES[5][1])).toEqual(["none this turn.", "offer a reward this turn if a stat allows one. No sacrifice this turn."]);
+  });
+
+  it("prints the measured texts: O2b's stat lines for a group's rolled players, and the plan's lever question from the lines", () => {
+    expect(`${GROUP_OPTION_VARIETY}\n`).toBe(GROUP_OPTIONS_TEXT.variety);
+    expect(GROUP_LEVER_QUESTION).toBe(GROUP_OPTIONS_TEXT.leverQuestion);
+    expect(GROUP_OPTION_VARIETY).toContain(OPTIONS_CONTINUITY_TEXT.o2NegativeBase);
+    expect(GROUP_OPTION_VARIETY).toContain(OPTIONS_CONTINUITY_TEXT.riskOnlyWeak);
+  });
+
+  it("keeps a single player's line as it was (the strong-reason clause is shared)", () => {
+    expect(optionLeverLine(threadBeat(1), "player1")).toBe(o2cLeverLine(threadBeat(1), "player1"));
+    expect(groupRewardTurn(threadBeat(1), "player1")).toBe(false);
   });
 });

@@ -20,7 +20,9 @@ import { ThreadResolutionService } from "./ThreadResolutionService.js";
  * groupSacrificeRewardLines). Since the options-o2c stage of the same day a
  * single player's three ways carry O2b's stat lines and the single player's
  * lever line is the one the game computes from B6's rate and the chapters
- * (optionLeverLine, below). BeatPromptService prints the lines,
+ * (optionLeverLine, below); since the group-options stage (decision A, that
+ * evening) a group's rolled players get the same rules per player and chapter
+ * (groupLeverLine) and O2b's stat lines (GROUP_OPTION_VARIETY). BeatPromptService prints the lines,
  * storyTextSteps.beatStep puts the field texts in the schema;
  * adoptedTurns.test.ts holds both equal to the measured forms.
  */
@@ -143,13 +145,10 @@ export function sacrificeRewardLine(story: Story, slot: string): string {
  * "none this turn" where the rate gives none. Measured twice on the 32 stored
  * rolled steps beside production: rewards 10 of 64 sets (target about 4-6 per
  * 32), all on the reward turn (10 of 10) and none elsewhere (production 4 of
- * 54), sacrifices 24 -> 12, second sacrifices 18 -> 6. A group's players keep
- * B6's rate line (groupSacrificeRewardLines), so these rules are a single
- * player's only (the review of 2026-10-01): a group's line allows a second
- * reward at a four-step chapter's last step (it only prefers a sacrifice
- * there) and rewards in consecutive chapters, asks no reason for a second
- * sacrifice, and a group's sets carry none of O2b's variety lines. Unmeasured
- * for groups; the owner's call whether to extend them.
+ * 54), sacrifices 24 -> 12, second sacrifices 18 -> 6. A group's players kept
+ * B6's rate line until the group-options stage (decision A, the evening of
+ * 2026-10-01), which measured the same rules for them and adopted them
+ * (groupLeverLine and GROUP_OPTION_VARIETY, below).
  */
 const NONE_THIS_TURN = "Sacrifice or reward: none this turn.";
 const REWARD_TURN = "Sacrifice or reward: offer a reward this turn if a stat allows one. No sacrifice this turn.";
@@ -191,19 +190,26 @@ export function rewardTurn(story: Story, slot: string): boolean {
 const WORDS = ["no", "one", "two", "three", "four", "five"];
 const inWords = (n: number) => WORDS[n] ?? String(n);
 
-/** A single player's lever line on a rolled chapter step, in B6's line's place: the reward turn's, a sacrifice that fits, a second only for a strong reason, or none. */
-export function optionLeverLine(story: Story, slot: string): string {
-  if (rewardTurn(story, slot)) return REWARD_TURN;
-  if (sacrificeRewardLine(story, slot) === NONE_THIS_TURN) return NONE_THIS_TURN;
+/** The sacrifices this player's chapter offered so far (chosen or not); 0 before any. */
+const chapterSacrifices = (story: Story, slot: string) => offeredIn(chapterBeats(story, slot), "sacrifice");
+
+/** The line where the chapter already offered this player a sacrifice: another only for a strong reason stated in the option's text, and no reward. */
+function strongReasonLine(story: Story, slot: string): string {
   const beats = chapterBeats(story, slot);
   const sacrifices = offeredIn(beats, "sacrifice");
-  if (sacrifices === 0) return SACRIFICE_FITS;
   const taken = beats.filter((beat) => beat.choice >= 0 && beat.options?.[beat.choice]?.resourceType === "sacrifice").length;
   const soFar =
     sacrifices === 1
       ? `a sacrifice, which the player ${taken > 0 ? "took" : "didn't take"}`
       : `${inWords(sacrifices)} sacrifices, and the player took ${taken === 0 ? "none of them" : taken === sacrifices ? (sacrifices === 2 ? "both" : "all of them") : `${inWords(taken)} of them`}`;
   return `Sacrifice or reward: this thread already offered ${soFar}, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text. No reward this turn.`;
+}
+
+/** A single player's lever line on a rolled chapter step, in B6's line's place: the reward turn's, a sacrifice that fits, a second only for a strong reason, or none. */
+export function optionLeverLine(story: Story, slot: string): string {
+  if (rewardTurn(story, slot)) return REWARD_TURN;
+  if (sacrificeRewardLine(story, slot) === NONE_THIS_TURN) return NONE_THIS_TURN;
+  return chapterSacrifices(story, slot) === 0 ? SACRIFICE_FITS : strongReasonLine(story, slot);
 }
 
 /*
@@ -226,14 +232,69 @@ export function optionLeverLine(story: Story, slot: string): string {
  * on the player's own stat 0 -> 21, rewards 0 -> 8, none where the line said
  * none, sets that only risk tells apart 88% -> 74%, waits level. B6's other
  * parts (the three ways, the base-point scale, at most two bonuses) stay a
- * single player's: they were not measured for groups.
+ * single player's: they were not measured for groups. Since the group-options
+ * stage (the same evening) each player's line follows the owner's rules per
+ * chapter (groupLeverLine) and the plan's question is asked from those lines.
  */
 export const GROUP_SHARED_AND_OWN =
   "A sacrifice or reward on one of a player's own stats is that player's alone; one on a shared stat spends or gains for the whole group, so offer it to one player at most this turn. Prefer the player's own stats where they allow one.";
 
-/** The plan's lever question for a player in a group's challenge or contest thread: asked from the player's computed line. */
+/**
+ * The plan's lever question for a player in a group's challenge or contest thread: asked from the player's computed
+ * line (groupLeversB's question, reworded at the group-options stage for that stage's lines: one where the line offers
+ * a reward or says a sacrifice fits; a second sacrifice only where the scene gives a strong reason; "None" where the
+ * line says none, since groupLeversB's "Say 'None' only where the line says none" would ask for a second sacrifice
+ * wherever the strong-reason line stands).
+ */
 export const GROUP_LEVER_QUESTION =
-  "Based on the stats' options to sacrifice and options to gain as reward attributes, and this player's sacrifice-or-reward line in the option instructions: where the line says one fits this turn, describe exactly one sacrifice or reward option (total) for this beat, on one of this player's own stats where one allows it, and the reason this scene gives for it. Say 'None' only where the line says none this turn, or where no stat allows one.";
+  "Based on the stats' options to sacrifice and options to gain as reward attributes, and this player's sacrifice-or-reward line in the option instructions: where the line offers a reward or says a sacrifice fits this turn, describe exactly one such option (total) for this beat, on one of this player's own stats where one allows it, and the reason this scene gives for it. Where the line allows another sacrifice only for a strong reason, describe one only if this scene gives such a reason, and state that reason. Say 'None' where the line says none this turn, or where no stat allows one.";
+
+/*
+ * The owner's option rules for a group's rolled players (the group-options
+ * stage, decision A of the evening of 2026-10-01: "one reward a chapter, a
+ * strong reason for a second sacrifice, options on different stats, not only
+ * risk"; measured as the eval's groupOptions and adopted). Until then a group's
+ * rolled players got B6's rate line, which never looks at chapters, and a
+ * group's options carried none of O2b's variety lines: in the third
+ * playthroughs 8 of 14 group rewards fell off a chapter's first step or in the
+ * chapter after one with a reward, and 78 of 103 rolled sets had two options
+ * only risk tells apart. Now each rolled player's line is computed per player
+ * and chapter as a single player's is (groupLeverRule: the reward turn the game
+ * places, a sacrifice on B6's rate, a second only for a strong reason, none),
+ * none where the step discards the player's roll, and their options get O2b's
+ * stat lines (GROUP_OPTION_VARIETY, BeatPromptService prints it after the option
+ * examples). Measured on twelve group steps of the third playthroughs, twice:
+ * rewards off the reward turn 9 of 32 -> 0, rewards on it 4 of 16 -> 11,
+ * sacrifices where one fits 9 of 24 -> 19, main stats distinct 1 -> 11 of 48,
+ * only-risk sets 36 -> 18 of 48, none where the rules say none; reasoning
+ * tokens +31% (not moved), the odds level.
+ */
+export const GROUP_OPTION_VARIETY = `- In a Challenge or Contest thread, each player's three options draw on different stats:
+${STATS_DIFFER.replace("--- The options also draw on different stats: no two", "--- No two")}
+${NEGATIVE_BASE_HOLDS}
+${RISK_ONLY_WEAK}`;
+
+/**
+ * The reward turn the game places for a group's rolled player: a group chapter's first step, where that player's
+ * previous chapter offered no reward (offered, chosen or not) and some stat allows one; at most one a chapter per
+ * player, never two chapters running.
+ */
+export function groupRewardTurn(story: Story, slot: string): boolean {
+  if (!groupLeverSlots(story).includes(slot)) return false;
+  return story.getCurrentThreadBeatsCompleted() === 0 && previousChapterRewards(story, slot) === 0 && rewardAllowed(story);
+}
+
+/** What a rolled group player's line allows: a reward (the reward turn only), and a sacrifice that fits, none, or a second only for a strong reason; none where the step discards the player's roll. */
+export type GroupLeverRule = { reward: boolean; sacrifice: "fits" | "none" | "strongReason"; ownersRoll?: true };
+
+export function groupLeverRule(story: Story, slot: string): GroupLeverRule {
+  const thread = story.getCurrentThreadAnalysis()?.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
+  const owner = thread ? ThreadResolutionService.rollingOwner(thread, story) : undefined;
+  if (owner !== undefined && owner !== slot) return { reward: false, sacrifice: "none", ownersRoll: true };
+  if (groupRewardTurn(story, slot)) return { reward: true, sacrifice: "none" };
+  if (sacrificeRewardLine(story, slot) === NONE_THIS_TURN) return { reward: false, sacrifice: "none" };
+  return { reward: false, sacrifice: chapterSacrifices(story, slot) > 0 ? "strongReason" : "fits" };
+}
 
 /** The players in a challenge or contest thread on a group's chapter step, in seat order; none on any other turn, and none for a single player (B6 is theirs). */
 export function groupLeverSlots(story: Story): string[] {
@@ -267,11 +328,17 @@ export function takesGroupLeverRules(story: Story): boolean {
  * no lever in any arm.
  */
 
-/** A rolled group player's line: B6's rate (sacrificeRewardLine) on their own history, or none where their roll doesn't count (another player's own outcome, that owner in the thread). */
+/**
+ * A rolled group player's line (since the group-options stage, the owner's rules per player and chapter, in a single
+ * player's words): the reward turn's, a sacrifice that fits, a second only for a strong reason, or none; none where
+ * their roll doesn't count (another player's own outcome, that owner in the thread). B6's rate line (sacrificeRewardLine)
+ * before.
+ */
 export function groupLeverLine(story: Story, slot: string): string {
-  const thread = story.getCurrentThreadAnalysis()?.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
-  const owner = thread ? ThreadResolutionService.rollingOwner(thread, story) : undefined;
-  return owner !== undefined && owner !== slot ? NONE_THIS_TURN : sacrificeRewardLine(story, slot);
+  const rule = groupLeverRule(story, slot);
+  if (rule.reward) return REWARD_TURN;
+  if (rule.sacrifice === "none") return NONE_THIS_TURN;
+  return rule.sacrifice === "fits" ? SACRIFICE_FITS : strongReasonLine(story, slot);
 }
 
 /** The lines after the "0 or 1 sacrifice/reward option" rule on a group's rolled step: each rolled player's computed line, the group sentence, no second sacrifice. */

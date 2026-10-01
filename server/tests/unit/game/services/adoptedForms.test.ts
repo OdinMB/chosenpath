@@ -32,6 +32,7 @@ import { takesGroupLevers } from "../../../../src/game/services/storyTextRounds/
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { takesOptionRules } from "../../../../src/game/services/optionRules.js";
 import { optionsO2cBase } from "../../../../src/game/services/storyTextRounds/optionsO2c.js";
+import { groupOptionsBase } from "../../../../src/game/services/storyTextRounds/groupOptions.js";
 
 /*
  * The adoption's free final test (rounds status note, section 9, step 3):
@@ -44,7 +45,9 @@ import { optionsO2cBase } from "../../../../src/game/services/storyTextRounds/op
  * stage's measured edits (2026-10-01) for the chapter, today's
  * turn form with B6 alone (turnB6) for a single player and today's form
  * (prod) for groups, a group's rolled chapter step with B6's lever parts for
- * each rolled player (groupLeversB, the group-levers stage of 2026-10-01), an
+ * each rolled player (groupLeversB, the group-levers stage of 2026-10-01;
+ * since the group-options stage that evening groupOptions, the owner's option
+ * rules per player and chapter, whose base is groupLeversB as before), an
  * exploration step with the exploration-order line
  * (choiceResult; a group's and, since the choice-line-sp stage, a single
  * player's, 2026-09-30), every ending as the ending told as its
@@ -94,9 +97,10 @@ function measuredVariant(input: RequestInput): VariantId {
       if (takesKidsRules(input.story)) return "kidsAges";
       // Every ending since 2026-09-30: the ending told as its milestones leave it
       if (input.story.getCurrentBeatType() === "ending") return "endingStateB";
-      // A group's chapter step with a player in a challenge or contest thread since the group-levers stage (2026-10-01):
-      // B6's lever parts for each such player, the plan's lever question asked from the player's line (groupLeversB)
-      if (takesGroupLevers(input.story)) return "groupLeversB";
+      // A group's chapter step with a player in a challenge or contest thread since the group-options stage (2026-10-01,
+      // decision A): each rolled player's line by the owner's rules, O2b's stat lines, the plan's question from the lines
+      // (groupOptions, built on production with its lines taken out, which is groupLeversB with the deltas as before)
+      if (takesGroupLevers(input.story)) return "groupOptions";
       // An exploration step: the exploration-order line (choiceResult as measured), a group's since the choice-result stage,
       // a single player's since the choice-line-sp stage (measured with production's one retry of a short reply in the loop)
       if (takesExplorationOrder(input.story)) return "choiceResult";
@@ -125,6 +129,16 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     const before = requestFor("turnB6", input);
     const lined = withShortReplies({ prompt: withLateClues(adoptedTurn(requestText(before), input.story), input.story), schema: (before as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
     const base = optionsO2cBase(input.story);
+    expect({ prompt: base.prompt === lined.prompt, schema: JSON.stringify(toJsonSchema(base.schema)) === lined.json }).toEqual({ prompt: true, schema: true });
+    return { prompt, schema: json(measured) };
+  }
+  // groupOptions is built on production's live group turn with its lines taken out; that base must be groupLeversB as
+  // before, with the turn deltas (a discarded roll's "none") and the short-replies lines (groupLeversB, built on
+  // production's live turn, carries the late clue lines already)
+  if (variant === "groupOptions" && input.role === "beat") {
+    const before = requestFor("groupLeversB", input);
+    const lined = withShortReplies({ prompt: withLateClues(adoptedTurn(requestText(before), input.story), input.story), schema: (before as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
+    const base = groupOptionsBase(input.story);
     expect({ prompt: base.prompt === lined.prompt, schema: JSON.stringify(toJsonSchema(base.schema)) === lined.json }).toEqual({ prompt: true, schema: true });
     return { prompt, schema: json(measured) };
   }

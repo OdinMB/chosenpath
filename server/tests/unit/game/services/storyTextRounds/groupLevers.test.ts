@@ -8,6 +8,7 @@ import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, sacrificeRewardLine } from "../.
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { beatCheckOptions } from "../../../../../src/game/services/kidsTurnRules.js";
 import { shortRepliesBase, withShortRepliesLines } from "../../../../../src/game/services/storyTextRounds/shortReplies.js";
+import { groupOptionsBase } from "../../../../../src/game/services/storyTextRounds/groupOptions.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
@@ -109,11 +110,14 @@ describe("the base the variant builds on: production's group turn as the stage m
       expect(base.prompt.length).toBeLessThan(production.prompt.length);
       expect(json(base.schema)).toContain("(Many beats are better without any sacrifice or reward options.)");
       expect(json(base.schema)).not.toContain("a reward option is the one exception");
-      // Production since the adoption is the measured fix-and-retest byte for byte, with the short-replies stage's lines
-      // adopted later that day (withShortRepliesLines, the measured shortReplies edit)
+      // Production since the adoption was the measured fix-and-retest byte for byte, with the short-replies stage's lines
+      // adopted later that day (withShortRepliesLines, the measured shortReplies edit), until the group-options stage's
+      // adoption that evening: production with that stage's lines taken out (groupOptionsBase) still is
       const adopted = withShortRepliesLines(groupLeversRequest(story, { b: true }));
-      expect(production.prompt).toBe(adopted.prompt);
-      expect(json(production.schema)).toBe(json(adopted.schema));
+      const beforeGroupOptions = groupOptionsBase(story);
+      expect(beforeGroupOptions.prompt).toBe(adopted.prompt);
+      expect(json(beforeGroupOptions.schema)).toBe(json(adopted.schema));
+      expect(production.prompt).not.toBe(adopted.prompt);
     }
   });
 

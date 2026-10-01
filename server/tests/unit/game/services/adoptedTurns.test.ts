@@ -33,7 +33,8 @@ import { KIDS_TURN_TEXT, kidsTurnRequest } from "../../../../src/game/services/s
 import { KIDS_AGES_TEXT, kidsAgesBand, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsAges.js";
 import { KIDS_BAND_TURNS, beatCheckOptions, takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { GROUP_LEVERS_TEXT, groupLeversBase, groupLeversRequest, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
-import { GROUP_LEVER_QUESTION, GROUP_SHARED_AND_OWN, REWARD_EXCEPTION, groupSacrificeRewardLines, takesOptionRules } from "../../../../src/game/services/optionRules.js";
+import { GROUP_LEVER_QUESTION, GROUP_SHARED_AND_OWN, REWARD_EXCEPTION, groupLeverSlots, groupSacrificeRewardLines, takesOptionRules } from "../../../../src/game/services/optionRules.js";
+import { GROUP_OPTIONS_TEXT, groupOptionsBase, groupOptionsLine, groupOptionsRequest } from "../../../../src/game/services/storyTextRounds/groupOptions.js";
 import { o2cLeverLine, optionsO2cBase, optionsO2cRequest } from "../../../../src/game/services/storyTextRounds/optionsO2c.js";
 import { OPTIONS_CONTINUITY_TEXT } from "../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 
@@ -71,7 +72,11 @@ import { OPTIONS_CONTINUITY_TEXT } from "../../../../src/game/services/storyText
  * same day every turn, every form, carries that stage's measured lines (the
  * text never ends after its first paragraph: one in the text rules, one in each
  * player's text field), which the forms measured before it never had
- * (withShortReplies).
+ * (withShortReplies). Since the group-options stage of the same day (decision
+ * A, that evening), a group's rolled step is the measured groupOptions byte for
+ * byte (each rolled player's line by the owner's rules per player and chapter,
+ * O2b's stat lines, the plan's lever question from those lines), whose base is
+ * groupLeversB as before (expectGroup).
  */
 
 /**
@@ -464,38 +469,58 @@ function contestEnding(players: number, mode: GameMode = GameModes.Competitive, 
   return scoreboard ? story.clone({ sharedStats: [SCOREBOARD], sharedStatValues: [{ statId: SCOREBOARD.id, value: 40 }] }) : story;
 }
 
-describe("group turns: today's form, a rolled chapter step as groupLeversB, an exploration step as choiceResult, the ending as endingStateB", () => {
+/**
+ * A group's turn as production must send it. Since the group-options stage of 2026-10-01 (decision A) a group's rolled
+ * chapter step (not read with a child) is the measured groupOptions byte for byte, prompt and JSON schema; its base,
+ * production with those lines taken out (groupOptionsBase), is groupLeversB as before, with the deltas and the
+ * short-replies lines (asAdopted), so the measured variant stands on the form measured before it.
+ */
+function expectGroup(story: Story) {
+  if (!takesKidsRules(story) && takesGroupLevers(story)) {
+    expectSame(beatStep.request(story), groupOptionsRequest(story));
+    expectSame(groupOptionsBase(story), asAdopted(measuredTurn(story), story));
+    return;
+  }
+  expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
+}
+
+describe("group turns: today's form, a rolled chapter step as groupOptions, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(GROUPS)("%s", (_, build) => {
-    const story = build();
-    expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
+    expectGroup(build());
   });
 
-  it("prints the measured lever parts from production's own constants on a group's rolled step, once, for each rolled player; on no other group turn (the group-levers stage, 2026-10-01)", () => {
+  it("prints the measured lever parts from production's own constants on a group's rolled step, once, for each rolled player; on no other group turn (the group-levers stage, then the group-options stage, 2026-10-01)", () => {
     expect(GROUP_SHARED_AND_OWN).toBe(GROUP_LEVERS_TEXT.sharedAndOwn);
-    expect(GROUP_LEVER_QUESTION).toBe(GROUP_LEVERS_TEXT.leverQuestionB);
+    // The plan's lever question asked from the owner's rules' lines since the group-options stage (groupLeversB's before)
+    expect(GROUP_LEVER_QUESTION).toBe(GROUP_OPTIONS_TEXT.leverQuestion);
+    expect(GROUP_LEVER_QUESTION).not.toBe(GROUP_LEVERS_TEXT.leverQuestionB);
     for (const story of [threadBeat(2), threadBeat(3), groupStep(3, "mixed")]) {
       const prompt = beatStep.request(story).prompt;
-      expect(groupSacrificeRewardLines(story)).toBe(GROUP_LEVERS_TEXT.block(story));
-      expect(prompt.split(`${GROUP_LEVERS_TEXT.leverAnchor}${GROUP_LEVERS_TEXT.block(story)}`)).toHaveLength(2);
+      expect(prompt.split(`${GROUP_LEVERS_TEXT.leverAnchor}${groupSacrificeRewardLines(story)}`)).toHaveLength(2);
+      for (const slot of groupLeverSlots(story)) expect(groupSacrificeRewardLines(story)).toContain(`): ${groupOptionsLine(story, slot).replace("Sacrifice or reward: ", "")}\n`);
       expect(prompt.split(`${GROUP_LEVERS_TEXT.derailAnchor} ${REWARD_EXCEPTION}`)).toHaveLength(2);
-      // Production's group turn before the adoption, which the stage measured beside the variant
+      expect(prompt.split(`${GROUP_OPTIONS_TEXT.diversionAnchor}${GROUP_OPTIONS_TEXT.variety}`)).toHaveLength(2);
+      // Production's group turn before the group-levers adoption, which that stage measured beside its variant
       expect(groupLeversBase(story).prompt).not.toContain(GROUP_SHARED_AND_OWN);
+      expect(groupLeversBase(story).prompt).not.toContain(GROUP_OPTIONS_TEXT.variety);
       expect(json(beatStep.request(story).schema)).toContain(JSON.stringify(GROUP_LEVER_QUESTION).slice(1, -1));
     }
     for (const story of [firstSwitchBeat(2), laterSwitchBeat(3), groupStep(2, "exploration"), endingBeat(3), threadBeat(1)]) {
       expect(beatStep.request(story).prompt).not.toContain(GROUP_SHARED_AND_OWN);
+      expect(beatStep.request(story).prompt).not.toContain(GROUP_OPTIONS_TEXT.variety);
       expect(json(beatStep.request(story).schema)).not.toContain("this player's sacrifice-or-reward line");
     }
   });
 
-  it("gives no lever to a player whose roll the step discards, on a step on another player's own outcome: the one logged difference from groupLeversB (the review of 2026-10-01)", () => {
+  it("gives no lever to a player whose roll the step discards, on a step on another player's own outcome: measured since the group-options stage (a logged delta on groupLeversB before)", () => {
     for (const players of [2, 3]) {
       const story = ownOutcomeStep(players);
       const prompt = beatStep.request(story).prompt;
       const others = ["player1", "player3"].slice(0, players - 1);
       for (const slot of others) expect(prompt).toContain(`----- ${slot} (Test Player ${slot.slice(-1)}): none this turn.\n`);
-      expect(prompt).toContain("----- player2 (Test Player 2): one fits this turn if a stat allows it.\n");
-      // As measured, every rolled player had the rate line; the delta is that line's own "none" for the others
+      // The owner's own line: step 2 of the chapter, no lever before (no stat here allows a reward)
+      expect(prompt).toContain("----- player2 (Test Player 2): a sacrifice fits this turn if a stat allows it. No reward this turn.\n");
+      // As groupLeversB measured it, every rolled player had the rate line; production's "none" for the others was a delta
       expect(groupLeversRequest(story, { b: true }).prompt).toContain("----- player1 (Test Player 1): one fits this turn if a stat allows it.\n");
       // Their fields still ask the plan's lever question from the line
       expect(json(beatStep.request(story).schema).split(JSON.stringify(GROUP_LEVER_QUESTION).slice(1, -1)).length - 1).toBeGreaterThan(0);
@@ -570,12 +595,9 @@ describe("group turns: today's form, a rolled chapter step as groupLeversB, an e
     expect(beatStep.request(story).prompt).toContain(ENDING_STATE_TEXT.tellAsLeft);
   });
 
-  (frozen.length ? it : it.skip)("every frozen group turn: today's form, the ending as endingStateB", () => {
+  (frozen.length ? it : it.skip)("every frozen group turn: today's form, a rolled chapter step as groupOptions, the ending as endingStateB", () => {
     const cases = frozen.filter((c) => c.role === "beat" && c.tags.multiplayer);
     expect(cases.length).toBeGreaterThan(10);
-    for (const c of cases) {
-      const story = caseStory(c);
-      expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
-    }
+    for (const c of cases) expectGroup(caseStory(c));
   });
 });

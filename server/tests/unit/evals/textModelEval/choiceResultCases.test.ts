@@ -14,7 +14,7 @@ import {
 } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { CHOICE_RESULT_TEXT } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { threadBeat } from "../../../helpers/promptStories.js";
-import { beforeGroupLevers, beforeOptionsO2c, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
+import { beforeGroupLevers, beforeGroupOptions, beforeOptionsO2c, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
 import { replayRun } from "../../../../src/evals/textModelEval/playthroughReplay.js";
 import { takesOptionRules } from "../../../../src/game/services/optionRules.js";
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
@@ -100,8 +100,11 @@ describe("playthroughsSent: what production sent in the stored playthroughs, bef
     expect(playthroughsSent(group)).toBe(beforeShortReplies(productionSends(group)).replace(CHOICE_RESULT_TEXT.explorationOrder, ""));
     // A group's challenge step as production sent it before the group-levers adoption (2026-10-01, beforeGroupLevers),
     // every turn before the short-replies adoption later that day (beforeShortReplies)
-    // and a single player's rolled step before the options-o2c adoption after it (beforeOptionsO2c)
-    for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) expect(playthroughsSent({ role: "beat", story })).toBe(beforeGroupLevers(beforeShortReplies(beforeOptionsO2c(productionSends({ role: "beat", story }), story)), story));
+    // and a single player's rolled step before the options-o2c adoption after it (beforeOptionsO2c), a group's challenge
+    // step before the group-options adoption that evening (beforeGroupOptions)
+    for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) {
+      expect(playthroughsSent({ role: "beat", story })).toBe(beforeGroupLevers(beforeShortReplies(beforeOptionsO2c(beforeGroupOptions(productionSends({ role: "beat", story }), story), story)), story));
+    }
     const { run, hashOf } = await playedFake();
     const [opening, step] = choiceResultCases([run], hashOf, SPECS, productionSends).cases;
     for (const c of [opening, step]) {

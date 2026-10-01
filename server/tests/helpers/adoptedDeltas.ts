@@ -44,7 +44,12 @@
  * review of that day, a group's rolled step gives a player whose roll the step
  * discards (in a thread on another player's own outcome, that owner in it) no
  * lever: a logged delta on groupLeversB, unmeasured (withOwnersRollLevers, in
- * adoptedTurn).
+ * adoptedTurn). Since the group-options stage, that evening, a group's rolled
+ * step is the measured groupOptions (each rolled player's line by the owner's
+ * rules, that "none" included and measured, O2b's stat lines, the plan's lever
+ * question from the lines): not a delta; groupOptionsBase is groupLeversB with
+ * the deltas as before, and beforeGroupOptions and productionThen take the new
+ * lines out for the variants measured earlier.
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
@@ -69,6 +74,7 @@ import { OPTIONS_O2C_TEXT, o2cLeverLine } from "../../src/game/services/storyTex
 import { OPTIONS_CONTINUITY_TEXT } from "../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 import { LATE_CLUES_TEXT, takesLateClues } from "../../src/game/services/lateClues.js";
 import { LATE_PACING_TEXT, pacedLengthsEdit } from "../../src/game/services/storyTextRounds/latePacing.js";
+import { withoutGroupOptions } from "../../src/game/services/storyTextRounds/groupOptions.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -465,16 +471,33 @@ export function beforeLateClues(production: string, story: Story): string {
   }, production);
 }
 
+/*
+ * The group-options stage's adoption (decision A, the evening of 2026-10-01): a
+ * group's rolled step carries O2b's stat lines for its rolled players after the
+ * option examples, each rolled player's line by the owner's rules per player
+ * and chapter (groupLeverLine) in place of B6's rate line, and the plan's lever
+ * question asked from those lines. The measured groupOptions, not a delta
+ * (adoptedTurns.test.ts and adoptedForms.test.ts hold it); the forms measured
+ * before it carry none of it. A read-with-kids group's rolled step carries
+ * them too (kidsAges is built on production's live turn), unmeasured for kids.
+ */
+
+/** Production's prompt as it stood before the group-options adoption: a group's rolled step without its lines, the rate lines back (any other turn, and a prompt already without them, as it is). */
+export function beforeGroupOptions(production: string, story: Story): string {
+  return withoutGroupOptions(production, story);
+}
+
 /**
  * A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones
  * (beforeEndingOnlyPlayed), before the group-levers adoption of the same day (beforeGroupLevers; a group's rolled
  * step's schema as it was built then, groupLeversBase) and before the short-replies adoption later that day
  * (beforeShortReplies; the schema as shortRepliesBase builds it), before the options-o2c adoption after it
- * (beforeOptionsO2c; a single player's rolled step, prompt only), and before the pacing-clues adoption after that
- * (beforeLateClues; a late turn, prompt only). The variants measured before compare with it.
+ * (beforeOptionsO2c; a single player's rolled step, prompt only), before the pacing-clues adoption after that
+ * (beforeLateClues; a late turn, prompt only), and before the group-options adoption that evening (beforeGroupOptions;
+ * a group's rolled step, prompt; its schema is groupLeversBase's). The variants measured before compare with it.
  */
 export function productionThen<R extends { prompt: string }>(request: R, story: Story): R {
-  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(beforeShortReplies(beforeOptionsO2c(beforeLateClues(request.prompt, story), story)), story), story);
+  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeGroupOptions(request.prompt, story), story), story)), story), story);
   const schema = "schema" in request ? { schema: takesGroupLevers(story) ? groupLeversBase(story).schema : shortRepliesBase(story).schema } : {};
   return { ...request, prompt, ...schema };
 }

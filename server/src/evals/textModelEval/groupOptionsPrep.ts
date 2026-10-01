@@ -3,8 +3,8 @@ import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import type { BeatOption, ChallengeOption, SetOfBeatGenerationSchema } from "core/types/index.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { allowsLever, leverStatOf, leverStatsOf, type Lever } from "../../game/services/leverPayments.js";
-import { groupLeverLine, groupLeverSlots } from "../../game/services/optionRules.js";
-import { groupOptionsRule } from "../../game/services/storyTextRounds/groupOptions.js";
+import { groupLeverSlots } from "../../game/services/optionRules.js";
+import { groupOptionsRule, groupRateLine } from "../../game/services/storyTextRounds/groupOptions.js";
 import { chapterLevers } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
 import { armKey, GROUP_OPTIONS_PROMPT_STATE, type Stage } from "./arms.js";
 import { favorableChances } from "./balanceSim.js";
@@ -40,7 +40,8 @@ import { variantComparisons, type VariantComparison } from "./variantComparison.
  *   for that player (groupOptionsRule: the reward turn the game places, a
  *   sacrifice that fits, a second only for a strong reason, none, or none
  *   because the step discards the player's roll) and B6's rate line production
- *   gives that player (groupLeverLine: one fits, preferring a kind, or none);
+ *   gave that player until the stage's adoption (groupRateLine: one fits,
+ *   preferring a kind, or none);
  *   the sacrifice or reward the set carries and its stat as the game reads it
  *   (leverStatOf); a second sacrifice in the chapter and whether its text
  *   states a reason (statesReason, a heuristic); the owner's variety on the set
@@ -68,7 +69,7 @@ export type GroupSetReading = {
   slot: string;
   /** The owner's rules for this player (groupOptionsRule) */
   rule: "reward" | "fits" | "strongReason" | "none" | "ownersRoll";
-  /** B6's rate line, production's line for this player (groupLeverLine), and the kind it prefers after an earlier lever */
+  /** B6's rate line, production's line for this player until the adoption (groupRateLine), and the kind it prefers after an earlier lever */
   rate: "fits" | "none";
   prefers?: Lever;
   lever?: Lever;
@@ -112,7 +113,7 @@ export function groupOptionsTurnReading(story: Story, written: SetOfBeatGenerati
   const sets = groupLeverSlots(story).map((slot): GroupSetReading => {
     const ruleOf = groupOptionsRule(story, slot);
     const rule: GroupSetReading["rule"] = ruleOf.ownersRoll ? "ownersRoll" : ruleOf.reward ? "reward" : ruleOf.sacrifice;
-    const line = groupLeverLine(story, slot);
+    const line = groupRateLine(story, slot);
     const prefers = /prefer a (sacrifice|reward)\)/.exec(line)?.[1] as Lever | undefined;
     const beat = (reply as unknown as Record<string, { options?: BeatOption[] } | undefined>)[slot];
     const options = (Array.isArray(beat?.options) ? beat.options : []).filter((o) => o && typeof o === "object");

@@ -26,7 +26,7 @@ import { sacrificeRewardLine } from "../../../../src/game/services/optionRules.j
 import { groupLeverSlots, groupLeversBase, groupLeversRequest, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { withShortRepliesLines } from "../../../../src/game/services/storyTextRounds/shortReplies.js";
 import { fakeCall, input } from "./playFixtures.js";
-import { beforeLateClues, withOwnersRollLevers } from "../../../helpers/adoptedDeltas.js";
+import { beforeGroupOptions, beforeLateClues, withOwnersRollLevers } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * The group-levers stage's cases (2026-10-01, the coordinator's brief after the
@@ -121,7 +121,7 @@ function sentHashOf(id: string): string | undefined {
 }
 
 describe("groupLeversCases on the second round's stored playthroughs (skipped where the output folder is absent)", () => {
-  (stored2.length ? it : it.skip)("builds every case, each request the one production sent, the base the variant builds on; production since the adoption sends the measured fix-and-retest; each a group chapter step with a player in a rolled thread", () => {
+  (stored2.length ? it : it.skip)("builds every case, each request the one production sent, the base the variant builds on; production since the adoption sends the measured fix-and-retest (with the group-options lines since that stage); each a group chapter step with a player in a rolled thread", () => {
     const { cases, problems } = groupLeversCases(stored2, (file) => storedHashes.get(outputIdOf(file)));
     expect(problems).toEqual([]);
     expect(cases.map((c) => c.id)).toEqual(GROUP_LEVERS_CASE_SPECS.map((s) => s.id));
@@ -135,9 +135,12 @@ describe("groupLeversCases on the second round's stored playthroughs (skipped wh
       // The run sent the variant's base; production today sends groupLeversB (the group-levers adoption, 2026-10-01) with
       // the short-replies stage's lines, adopted later that day, and on a late turn the pacing-clues stage's, later again
       expect([c.id, sha256(beforeLateClues(groupLeversBase(story).prompt, story))]).toEqual([c.id, sentHashOf(c.id)]);
-      // Since the review of that day, a player whose roll the step discards gets no lever (withOwnersRollLevers, logged)
+      // Since the review of that day, a player whose roll the step discards gets no lever (withOwnersRollLevers, logged);
+      // since the group-options adoption that evening production prints that stage's lines on top (beforeGroupOptions)
       const measured = withShortRepliesLines(groupLeversRequest(story, { b: true })).prompt;
-      expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sha256(withOwnersRollLevers(measured, story))]);
+      const production = requestText(requestFor("adopted", requestInputFor(c)));
+      expect([c.id, sha256(beforeGroupOptions(production, story))]).toEqual([c.id, sha256(withOwnersRollLevers(measured, story))]);
+      expect([c.id, production === beforeGroupOptions(production, story)]).toEqual([c.id, false]);
       if (withOwnersRollLevers(measured, story) !== measured) ownersRollCases.push(c.id);
       const slots = groupLeverSlots(story);
       expect([c.id, slots.length > 0]).toEqual([c.id, true]);

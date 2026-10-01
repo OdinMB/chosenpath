@@ -6,6 +6,7 @@ import {
 import { POINTS_FOR_SACRIFICE, POINTS_FOR_REWARD } from "core/config.js";
 import {
   EXPLORATION_ORDER,
+  GROUP_OPTION_VARIETY,
   NO_DOUBLE_SACRIFICE,
   REWARD_EXCEPTION,
   THREE_WAYS,
@@ -531,7 +532,8 @@ ${takesLateClues(story) ? LATE_CLUES_TEXT.interludeLate : ""}${
   private static createOptionInstructions(story: Story): string {
     // The option rules (B6): a single player's rolled chapter steps only
     const rules = takesOptionRules(story);
-    // B6's lever parts for each player in a group's challenge or contest thread (the group-levers stage, 2026-10-01)
+    // B6's lever parts for each player in a group's challenge or contest thread (the group-levers stage, 2026-10-01), with
+    // the owner's rules per player and chapter and O2b's stat lines since the group-options stage of the same evening
     const groupLevers = takesGroupLeverRules(story);
     return `
 Options
@@ -554,7 +556,7 @@ Options
     }
 - Be specific.
 --- Bad: 'Propose a compromise'. Good: Specify what the compromise is.
---- Bad: 'Create a diversion'. Good: 'Divert the guards by throwing some gold coins around.'${rules ? `\n${THREE_WAYS}` : ""}
+--- Bad: 'Create a diversion'. Good: 'Divert the guards by throwing some gold coins around.'${rules ? `\n${THREE_WAYS}` : ""}${groupLevers ? `\n${GROUP_OPTION_VARIETY}` : ""}
 - Do NOT include the actual or likely consequences of a decision. (Except for mentioning the stat that is sacrificed or gained as a reward in sacrifice and reward options.)
 - Options determine how the story will continue after this beat. Whatever happened in the beat text is already established.
 - For each option, set the optionType field:

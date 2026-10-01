@@ -21,9 +21,9 @@ import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthr
 import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { productionSends } from "../../../../src/evals/textModelEval/choiceResultCases.js";
-import { groupLeverLine, groupLeverSlots } from "../../../../src/game/services/optionRules.js";
+import { groupLeverSlots } from "../../../../src/game/services/optionRules.js";
 import { chapterLevers } from "../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
-import { groupOptionsRule } from "../../../../src/game/services/storyTextRounds/groupOptions.js";
+import { groupOptionsBase, groupOptionsRequest, groupOptionsRule, groupRateLine } from "../../../../src/game/services/storyTextRounds/groupOptions.js";
 import { fakeCall, input } from "./playFixtures.js";
 
 /*
@@ -54,14 +54,14 @@ describe("groupOptionsCases on a played fake group story", () => {
     const step = run.turns.find((t) => t.kind === "chapter step");
     expect(step).toBeDefined();
     const specs = [{ id: "round-options-fake", story: PLAYTHROUGHS[2].id, turn: step?.turn ?? 0, role: "beat" as const, purpose: "A chapter step." }];
-    // A run played through today's code sent production's request as it is now, which the third round sent too
-    for (const sent of [productionSends, playthroughs3Sent]) {
-      const { cases, problems } = groupOptionsCases([run], hashOf, specs, sent);
-      expect(problems).toEqual([]);
-      expect(cases.map((c) => [c.id, c.role, c.fixedAnalysis, c.tags.source, c.tags.category, c.tags.players])).toEqual([["round-options-fake", "beat", undefined, "round", "group-options", 2]]);
-      expect(groupLeverSlots(caseStory(cases[0])).length).toBeGreaterThan(0);
-      expect(groupOptionsCasesToFreeze(cases, [run], hashOf, false, specs, sent).skipped).toEqual(["round-options-fake"]);
-    }
+    // A run played through today's code sent production's request as it is now
+    const { cases, problems } = groupOptionsCases([run], hashOf, specs, productionSends);
+    expect(problems).toEqual([]);
+    expect(cases.map((c) => [c.id, c.role, c.fixedAnalysis, c.tags.source, c.tags.category, c.tags.players])).toEqual([["round-options-fake", "beat", undefined, "round", "group-options", 2]]);
+    expect(groupLeverSlots(caseStory(cases[0])).length).toBeGreaterThan(0);
+    expect(groupOptionsCasesToFreeze(cases, [run], hashOf, false, specs, productionSends).skipped).toEqual(["round-options-fake"]);
+    // The third round's runs sent production's group turn before the group-options adoption
+    expect(groupOptionsCases([run], hashOf, specs).problems).toEqual([`round-options-fake: its request is not the one the run sent at turn ${step?.turn} of play-food-trucks`]);
   });
 });
 
@@ -108,7 +108,7 @@ const storedHashes = (() => {
 })();
 
 describe("groupOptionsCases on the third round's stored playthroughs (skipped where the output folder is absent)", () => {
-  (stored3.length ? it : it.skip)("builds every case, each request the one production sent and sends; the owner's rules and B6's rate read differently on most rolled sets", () => {
+  (stored3.length ? it : it.skip)("builds every case, each request the one production sent, the base the variant builds on; production since the adoption sends the variant; the owner's rules and B6's rate read differently on most rolled sets", () => {
     const { cases, problems } = groupOptionsCases(stored3, (file) => storedHashes.get(outputIdOf(file)));
     expect(problems).toEqual([]);
     expect(cases.map((c) => c.id)).toEqual(GROUP_OPTIONS_CASE_SPECS.map((s) => s.id));
@@ -116,10 +116,13 @@ describe("groupOptionsCases on the third round's stored playthroughs (skipped wh
     let earlierSacrifice = 0;
     for (const c of cases) {
       const story = caseStory(c);
-      expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sha256(playthroughs3Sent(requestInputFor(c)))]);
+      // The run sent the variant's base (production before the adoption); production today sends the measured variant
+      expect([c.id, sha256(playthroughs3Sent(requestInputFor(c)))]).toEqual([c.id, sha256(groupOptionsBase(story).prompt)]);
+      expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sha256(groupOptionsRequest(story).prompt)]);
       for (const slot of groupLeverSlots(story)) {
         const rule = groupOptionsRule(story, slot);
-        const rate = groupLeverLine(story, slot);
+        // B6's rate line, production's group line until the adoption (groupRateLine)
+        const rate = groupRateLine(story, slot);
         rules.push(`${rule.ownersRoll ? "owner" : rule.reward ? "reward" : rule.sacrifice}|${rate.endsWith("none this turn.") ? "none" : /prefer a reward/.test(rate) ? "prefer reward" : /prefer a sacrifice/.test(rate) ? "prefer sacrifice" : "fits"}`);
         // A sacrifice the player was offered earlier: in this chapter, or in the story before it
         const history = story.getPlayer(slot)?.beatHistory ?? [];

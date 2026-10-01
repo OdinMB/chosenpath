@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { getThreadType } from "core/types/index.js";
 import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
-import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, groupSacrificeRewardLines, sacrificeRewardLine } from "../optionRules.js";
+import { GROUP_OPTION_VARIETY, NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, groupSacrificeRewardLines, sacrificeRewardLine } from "../optionRules.js";
 import { beatSchemaForKids, takesKidsRules } from "../kidsTurnRules.js";
 import { canAddMilestones, type TextRequest } from "../storyTextSteps.js";
 import { replaceOnce, splitAtState } from "./roundEdits.js";
@@ -187,7 +187,11 @@ function schemaWithLevers(root: z.AnyZodObject, slots: string[], form: GroupLeve
  * built it before: core's set schema, with the band's kids text where the
  * story is read with a child. Since the short-replies adoption of the same day,
  * later, production's turn without that stage's lines (shortRepliesBase) on
- * every turn, as the stage measured it.
+ * every turn, as the stage measured it. Since the group-options adoption (the
+ * same evening) production's players' lines follow the owner's rules
+ * (groupSacrificeRewardLines prints them, so they are taken out as before) and
+ * the option examples are followed by O2b's stat lines for a group's rolled
+ * players (GROUP_OPTION_VARIETY), taken out too.
  */
 export function groupLeversBase(story: Story): TextRequest<z.AnyZodObject> {
   const production = shortRepliesBase(story);
@@ -196,7 +200,9 @@ export function groupLeversBase(story: Story): TextRequest<z.AnyZodObject> {
     .split(`${DERAIL_ANCHOR} ${REWARD_EXCEPTION}`)
     .join(DERAIL_ANCHOR)
     .split(`${LEVER_ANCHOR}${groupSacrificeRewardLines(story)}`)
-    .join(LEVER_ANCHOR);
+    .join(LEVER_ANCHOR)
+    .split(`\n${GROUP_OPTION_VARIETY}`)
+    .join("");
   const raw = createSetOfBeatGenerationSchema(story.getNumberOfPlayers(), canAddMilestones(story), story.isMultiplayer(), story.generatesImages(), story.hasImages());
   return { prompt, schema: takesKidsRules(story) ? beatSchemaForKids(raw, story) : raw };
 }

@@ -9,8 +9,10 @@ import {
   groupOptionsLine,
   groupOptionsRequest,
   groupOptionsRule,
+  groupRateLine,
   groupRewardTurn,
 } from "../../../../../src/game/services/storyTextRounds/groupOptions.js";
+import { GROUP_LEVERS_TEXT } from "../../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { GROUP_LEVER_QUESTION, groupLeverLine, groupLeverSlots, sacrificeRewardLine } from "../../../../../src/game/services/optionRules.js";
 import { OPTIONS_CONTINUITY_TEXT } from "../../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 import { OPTIONS_O2C_TEXT } from "../../../../../src/game/services/storyTextRounds/optionsO2c.js";
@@ -117,13 +119,13 @@ const explorationStep = (players: number): Story => {
   return Story.create(state);
 };
 
-/** The variant's prompt with its edits undone: production's prompt, if it changed nothing else. */
+/** The variant's prompt with its edits undone: its base's prompt (production as the stage measured it), if it changed nothing else. */
 function withoutEdits(prompt: string, story: Story): string {
   let undone = prompt.replace(`${GROUP_OPTIONS_TEXT.diversionAnchor}${GROUP_OPTIONS_TEXT.variety}`, GROUP_OPTIONS_TEXT.diversionAnchor);
   for (const slot of groupLeverSlots(story)) {
     const name = story.getPlayer(slot)?.name;
     const head = `----- ${slot}${name ? ` (${name})` : ""}: `;
-    undone = undone.replace(`${head}${groupOptionsLine(story, slot).replace("Sacrifice or reward: ", "")}\n`, `${head}${groupLeverLine(story, slot).replace("Sacrifice or reward: ", "")}\n`);
+    undone = undone.replace(`${head}${groupOptionsLine(story, slot).replace("Sacrifice or reward: ", "")}\n`, `${head}${groupRateLine(story, slot).replace("Sacrifice or reward: ", "")}\n`);
   }
   return undone;
 }
@@ -226,7 +228,7 @@ describe("the prompt", () => {
     expect(occurrences(prompt, `${GROUP_OPTIONS_TEXT.diversionAnchor}${GROUP_OPTIONS_TEXT.variety}`)).toBe(1);
     for (const slot of slotsOf(players)) expect(prompt).toContain(`----- ${slot} (${story.getPlayer(slot)?.name}): ${OPTIONS_O2C_TEXT.rewardTurn.replace("Sacrifice or reward: ", "")}\n`);
     expect(prompt).not.toContain("prefer a");
-    expect(withoutEdits(prompt, story)).toBe(beatStep.request(story).prompt);
+    expect(withoutEdits(prompt, story)).toBe(groupOptionsBase(story).prompt);
   });
 
   it("names only the players in a rolled thread beside one exploring, each with their own line", () => {
@@ -234,7 +236,7 @@ describe("the prompt", () => {
     const prompt = groupOptionsRequest(story).prompt;
     expect(prompt).not.toContain("----- player1");
     for (const slot of ["player2", "player3"]) expect(prompt).toContain(`----- ${slot} (${story.getPlayer(slot)?.name}): ${groupOptionsLine(story, slot).replace("Sacrifice or reward: ", "")}\n`);
-    expect(withoutEdits(prompt, story)).toBe(beatStep.request(story).prompt);
+    expect(withoutEdits(prompt, story)).toBe(groupOptionsBase(story).prompt);
   });
 
   it.each([
@@ -243,12 +245,13 @@ describe("the prompt", () => {
     ["a group's later switch", () => laterSwitchBeat(3)],
     ["a group's ending", () => endingBeat(2)],
     ["a group's exploration step", () => explorationStep(2)],
-  ])("is production's request byte for byte on %s", (_, build) => {
+  ])("is production's request byte for byte on %s, and so is its base", (_, build) => {
     const story = build();
     const variant = groupOptionsRequest(story);
     const production = beatStep.request(story);
     expect(variant.prompt).toBe(production.prompt);
     expect(json(variant.schema)).toBe(json(production.schema));
+    expect(groupOptionsBase(story).prompt).toBe(production.prompt);
   });
 
   it("carries O2b's stat lines and risk-only example word for word, under a lead for a group's rolled players", () => {
@@ -259,26 +262,36 @@ describe("the prompt", () => {
     expect(riskOnly).toBe(OPTIONS_CONTINUITY_TEXT.riskOnlyWeak);
   });
 
-  it("is built on production's live request (the base)", () => {
-    for (const story of [threadBeat(2), mixedStep(3), endingBeat(2)]) {
-      expect(groupOptionsBase(story).prompt).toBe(beatStep.request(story).prompt);
-      expect(json(groupOptionsBase(story).schema)).toBe(json(beatStep.request(story).schema));
+  it("is production's request byte for byte since its adoption; its base is production with the adopted lines taken out, as the stage measured beside it", () => {
+    for (const story of [threadBeat(2), mixedStep(3), groupStory([[switchBeat()], [switchBeat()]], 1), endingBeat(2), threadBeat(1)]) {
+      const production = beatStep.request(story);
+      expect(groupOptionsRequest(story).prompt).toBe(production.prompt);
+      expect(json(groupOptionsRequest(story).schema)).toBe(json(production.schema));
     }
+    for (const story of [threadBeat(2), mixedStep(3)]) {
+      const base = groupOptionsBase(story).prompt;
+      expect(base).not.toContain(GROUP_OPTIONS_TEXT.variety);
+      for (const slot of groupLeverSlots(story)) expect(base).toContain(`): ${groupRateLine(story, slot).replace("Sacrifice or reward: ", "")}\n`);
+      // The pre-adoption line: B6's rate, none for a roll the step discards (groupLeversB's, with production's delta)
+      for (const slot of groupLeverSlots(story)) expect(groupRateLine(story, slot)).toBe(sacrificeRewardLine(story, slot));
+    }
+    for (const story of [endingBeat(2), threadBeat(1), explorationStep(2)]) expect(groupOptionsBase(story).prompt).toBe(beatStep.request(story).prompt);
   });
 });
 
 describe("the reply schema", () => {
-  it("asks each rolled player's plan its lever question from the new lines; every other field production's", () => {
+  it("asks each rolled player's plan its lever question from the new lines (production's since the adoption); the base groupLeversB's question; every other field production's", () => {
     const story = mixedStep(3);
     const variant = groupOptionsRequest(story).schema;
-    const production = beatStep.request(story).schema;
+    const base = groupOptionsBase(story).schema;
     for (const slot of ["player2", "player3"]) {
-      expect(leverField(production, slot)).toBe(GROUP_LEVER_QUESTION);
       expect(leverField(variant, slot)).toBe(GROUP_OPTIONS_TEXT.leverQuestion);
+      expect(leverField(variant, slot)).toBe(GROUP_LEVER_QUESTION);
+      expect(leverField(base, slot)).toBe(GROUP_LEVERS_TEXT.leverQuestionB);
     }
     const inJson = (text: string) => JSON.stringify(text).slice(1, -1);
-    expect(json(variant).split(inJson(GROUP_OPTIONS_TEXT.leverQuestion)).join(inJson(GROUP_LEVER_QUESTION))).toBe(json(production));
-    expect(json(shape(variant).player1)).toBe(json(shape(production).player1));
+    expect(json(variant).split(inJson(GROUP_OPTIONS_TEXT.leverQuestion)).join(inJson(GROUP_LEVERS_TEXT.leverQuestionB))).toBe(json(base));
+    expect(json(shape(variant).player1)).toBe(json(shape(base).player1));
   });
 
   it("asks for a second sacrifice only where the scene gives a strong reason, and 'None' where the line says none", () => {

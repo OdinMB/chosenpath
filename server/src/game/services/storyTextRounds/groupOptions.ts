@@ -5,6 +5,7 @@ import { groupLeverLine, groupLeverSlots, sacrificeRewardLine, takesGroupLeverRu
 import { ThreadResolutionService } from "../ThreadResolutionService.js";
 import { beatStep, type TextRequest } from "../storyTextSteps.js";
 import { replaceOnce, splitAtState } from "./roundEdits.js";
+import { GROUP_LEVERS_TEXT } from "./groupLevers.js";
 import { OPTIONS_O2C_TEXT, previousChapterRewards } from "./optionsO2c.js";
 import { chapterLevers, OPTIONS_CONTINUITY_TEXT, type ChapterLevers } from "./turnOptionsContinuity.js";
 
@@ -62,6 +63,14 @@ import { chapterLevers, OPTIONS_CONTINUITY_TEXT, type ChapterLevers } from "./tu
  * Everything else production's request byte for byte: the reward exception,
  * GROUP_SHARED_AND_OWN, NO_DOUBLE_SACRIFICE, a player exploring beside the
  * others, every other turn.
+ *
+ * Adopted after the run of 2026-10-01 (evening): production's copy is
+ * optionRules.ts (GROUP_OPTION_VARIETY, groupRewardTurn, groupLeverRule,
+ * groupLeverLine, GROUP_LEVER_QUESTION), and the kept tests hold production to
+ * groupOptions byte for byte, prompt and JSON schema. The variant builds on
+ * production with those lines and that question taken out (groupOptionsBase,
+ * withoutGroupOptions; the rate line production printed before is
+ * groupRateLine), so it still builds as measured.
  */
 
 const LABEL = "Group-options turn";
@@ -132,13 +141,50 @@ export function groupOptionsLine(story: Story, slot: string): string {
 /** The passages the tests pin. */
 export const GROUP_OPTIONS_TEXT = { diversionAnchor: DIVERSION_ANCHOR, variety: VARIETY, leverQuestion: LEVER_QUESTION };
 
-/** Production's group turn as the stage measures it beside the variant: production's live request. */
+/**
+ * The line production printed for a rolled group player before the adoption, which the stage measured beside the
+ * variant: B6's rate (sacrificeRewardLine) on the player's own history, none where the step discards their roll.
+ */
+export function groupRateLine(story: Story, slot: string): string {
+  const thread = story.getCurrentThreadAnalysis()?.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
+  const owner = thread ? ThreadResolutionService.rollingOwner(thread, story) : undefined;
+  return owner !== undefined && owner !== slot ? NONE_THIS_TURN : sacrificeRewardLine(story, slot);
+}
+
+const headOf = (story: Story, slot: string) => {
+  const name = story.getPlayer(slot)?.name;
+  return `----- ${slot}${name ? ` (${name})` : ""}: `;
+};
+
+/**
+ * Production's group prompt with the adopted group-options edits taken out (a group's rolled step: the variety lines,
+ * each rolled player's line by the owner's rules back to the rate line; any other turn, and a prompt without them, as
+ * it is). The kept tests read production as it stood before through it too (beforeGroupOptions in adoptedDeltas.ts).
+ */
+export function withoutGroupOptions(prompt: string, story: Story): string {
+  if (!takesGroupLeverRules(story) || !prompt.includes(VARIETY)) return prompt;
+  let undone = replaceOnce(LABEL, prompt, `${DIVERSION_ANCHOR}${VARIETY}`, DIVERSION_ANCHOR);
+  for (const slot of groupLeverSlots(story)) {
+    undone = replaceOnce(LABEL, undone, `${headOf(story, slot)}${groupLeverLine(story, slot).replace(PREFIX, "")}\n`, `${headOf(story, slot)}${groupRateLine(story, slot).replace(PREFIX, "")}\n`);
+  }
+  return undone;
+}
+
+/**
+ * Production's group turn as the stage measured it beside the variant. Since the adoption (2026-10-01, decision A)
+ * production prints the variant's lines and question on a rolled group step (optionRules.ts: GROUP_OPTION_VARIETY,
+ * groupLeverLine, GROUP_LEVER_QUESTION), so they are taken out there (the texts are the variant's, which a test holds):
+ * the rate lines back, and groupLeversB's question in the rolled players' fields. Every other turn is production's as
+ * it is.
+ */
 export function groupOptionsBase(story: Story): TextRequest<z.AnyZodObject> {
-  return beatStep.request(story);
+  const production = beatStep.request(story);
+  if (!takesGroupLeverRules(story)) return production;
+  return { prompt: withoutGroupOptions(production.prompt, story), schema: schemaWithQuestion(production.schema, groupLeverSlots(story), GROUP_LEVERS_TEXT.leverQuestionB) };
 }
 
 /** A rolled player's beat schema with the plan question asked from the variant's lines. */
-function playerWithQuestion(player: z.AnyZodObject): z.AnyZodObject {
+function playerWithQuestion(player: z.AnyZodObject, question: string): z.AnyZodObject {
   const plan = player.shape.plan;
   if (!(plan instanceof z.ZodObject)) throw new Error(`${LABEL}: the plan is not an object schema`);
   const considerations = plan.shape.optionConsiderations;
@@ -147,18 +193,18 @@ function playerWithQuestion(player: z.AnyZodObject): z.AnyZodObject {
   if (!(detailed instanceof z.ZodObject)) throw new Error(`${LABEL}: optionConsiderations has no object form`);
   const lever = detailed.shape.upToOneSacrificeOrRewardOption;
   if (!(lever instanceof z.ZodString)) throw new Error(`${LABEL}: the lever question is not a string`);
-  const union = z.union([asText, detailed.extend({ upToOneSacrificeOrRewardOption: lever.describe(LEVER_QUESTION) })]);
+  const union = z.union([asText, detailed.extend({ upToOneSacrificeOrRewardOption: lever.describe(question) })]);
   return player.extend({ plan: plan.extend({ optionConsiderations: considerations.description === undefined ? union : union.describe(considerations.description) }) });
 }
 
-/** The reply schema with each rolled player's question edited; slots sharing one instance keep sharing one, as production's do. */
-function schemaWithQuestion(root: z.AnyZodObject, slots: string[]): z.AnyZodObject {
+/** The reply schema with each rolled player's question set; slots sharing one instance keep sharing one, as production's do. */
+function schemaWithQuestion(root: z.AnyZodObject, slots: string[], question: string): z.AnyZodObject {
   const editedOf = new Map<unknown, z.AnyZodObject>();
   const edited = Object.fromEntries(
     slots.map((slot) => {
       const player = root.shape[slot];
       if (!(player instanceof z.ZodObject)) throw new Error(`${LABEL}: ${slot} is not an object schema`);
-      const known = editedOf.get(player) ?? playerWithQuestion(player);
+      const known = editedOf.get(player) ?? playerWithQuestion(player, question);
       editedOf.set(player, known);
       return [slot, known];
     })
@@ -166,7 +212,7 @@ function schemaWithQuestion(root: z.AnyZodObject, slots: string[]): z.AnyZodObje
   return root.extend(edited);
 }
 
-/** Production's group turn with the owner's option rules on a group's rolled step; production's request byte for byte elsewhere. */
+/** Production's group turn (as measured) with the owner's option rules on a group's rolled step; production's request byte for byte elsewhere. */
 export function groupOptionsRequest(story: Story): TextRequest<z.AnyZodObject> {
   const production = groupOptionsBase(story);
   if (!takesGroupLeverRules(story)) return production;
@@ -174,9 +220,7 @@ export function groupOptionsRequest(story: Story): TextRequest<z.AnyZodObject> {
   const { instructions, state } = splitAtState(LABEL, production.prompt);
   let edited = replaceOnce(LABEL, instructions, DIVERSION_ANCHOR, `${DIVERSION_ANCHOR}${VARIETY}`);
   for (const slot of slots) {
-    const name = story.getPlayer(slot)?.name;
-    const head = `----- ${slot}${name ? ` (${name})` : ""}: `;
-    edited = replaceOnce(LABEL, edited, `${head}${groupLeverLine(story, slot).replace(PREFIX, "")}\n`, `${head}${groupOptionsLine(story, slot).replace(PREFIX, "")}\n`);
+    edited = replaceOnce(LABEL, edited, `${headOf(story, slot)}${groupRateLine(story, slot).replace(PREFIX, "")}\n`, `${headOf(story, slot)}${groupOptionsLine(story, slot).replace(PREFIX, "")}\n`);
   }
-  return { prompt: edited + state, schema: schemaWithQuestion(production.schema, slots) };
+  return { prompt: edited + state, schema: schemaWithQuestion(production.schema, slots, LEVER_QUESTION) };
 }
