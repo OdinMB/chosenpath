@@ -435,6 +435,8 @@ describe("budget caps", () => {
       "late-pacing": 0.78,
       // The owner's decisions of 2026-10-01: turns and setups by the children's age band, its estimate plus 30%
       "kids-ages": 0.39,
+      // The coordinator's brief of 2026-10-01: group sacrifices, rewards and own stats, its estimate plus 30%
+      "group-levers": 0.36,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -462,6 +464,7 @@ describe("budget caps", () => {
       "money-adds-up",
       "late-pacing",
       "kids-ages",
+      "group-levers",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -484,7 +487,7 @@ describe("budget caps", () => {
     expect(LEDGER_WHEN_REVIEW_OPENED + UNRECORDED_STAGE4_USD + capsOf(review)).toBeLessThanOrEqual(HARD_CEILING);
     // The owner's decisions of 2026-10-01 opened their measurements with the ledger at $39.94 of the $45 hard cap; their
     // caps fit with the $1.3 on top
-    expect(decisions).toEqual(["kids-ages"]);
+    expect(decisions).toEqual(["kids-ages", "group-levers"]);
     expect(LEDGER_WHEN_DECISIONS_OPENED).toBe(39.94);
     expect(LEDGER_WHEN_DECISIONS_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisions)).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
@@ -756,8 +759,8 @@ describe("budget caps", () => {
     expect(stageInterleavesArms("choice-line-sp")).toBe(true);
     // Its turns carry production's one retry of a short or option-less reply; no earlier stage's do
     expect(stageChecksTurns("choice-line-sp")).toBe(true);
-    // The kids-turns and kids-ages stages (2026-10-01) carry it too
-    for (const stage of STAGES.filter((s) => s !== "choice-line-sp" && s !== "kids-turns" && s !== "kids-ages")) expect(stageChecksTurns(stage)).toBe(false);
+    // The kids-turns, kids-ages and group-levers stages (2026-10-01) carry it too
+    for (const stage of STAGES.filter((s) => s !== "choice-line-sp" && s !== "kids-turns" && s !== "kids-ages" && s !== "group-levers")) expect(stageChecksTurns(stage)).toBe(false);
     // Production beside the variant under a tag of its own
     expect(CHOICE_LINE_SP_PROMPT_STATE).toBe("adopted6");
     expect([OPTIONS_CONTINUITY_PROMPT_STATE, OPTIONS_O2_PROMPT_STATE, ENDING_STATE_PROMPT_STATE, RUNAWAY_PROMPT_STATE, CHOICE_RESULT_PROMPT_STATE]).not.toContain(CHOICE_LINE_SP_PROMPT_STATE);

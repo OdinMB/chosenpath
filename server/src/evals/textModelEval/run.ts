@@ -55,6 +55,7 @@ import { buildChallengeCasesMode, judgeChallengeResultsMode } from "./challengeR
 import { buildKidsCasesMode, kidsTurnsMode } from "./kidsTurnPrep.js";
 import { buildKidsAgesCasesMode } from "./kidsAgesCases.js";
 import { kidsAgesMode } from "./kidsAgesPrep.js";
+import { buildGroupLeverCasesMode, groupLeversMode } from "./groupLeversPrep.js";
 import { buildMoneyCasesMode, judgeMoneyMode } from "./moneyAddsUpPrep.js";
 import { buildLatePacingCasesMode, judgeCluesMode, latePacingPlayMode, printLatePacingPlan } from "./latePacingPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
@@ -101,7 +102,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     production's one checked retry; money-adds-up --role beat under adopted14: production's turn and moneyAddsUp on
  *     the lemonade story's turns, interleaved; kids-ages under adopted16: --role beat, production's turn and kidsAges on
  *     the mouse story's turns read with a child aged 4 and 10 and a two-player kids story's turns at 4, 7 and 10,
- *     interleaved, each with production's one checked retry, and --role setup, production's setup and kidsAges at 10)
+ *     interleaved, each with production's one checked retry, and --role setup, production's setup and kidsAges at 10;
+ *     group-levers --role beat under adopted17: production's group turn and groupLevers on group chapter steps of the
+ *     second playthroughs, interleaved, each with production's one checked retry)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -239,6 +242,14 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     its length and plainness against its band's limits (kidsReadability.ts), per age and player count, the variant
  *     against production under the stop rule, the retries, the automatic checks, the waits and cost, and the setups'
  *     stats; kids-ages.md and .json
+ *   Group sacrifices, rewards and own stats (groupLeversPrep.ts, 2026-10-01), in the group-levers stage:
+ *   --build-group-lever-cases [--rebuild-cases]  group chapter steps of the second playthroughs where a player is in a
+ *     challenge or contest thread (groupLeversCases.ts); no calls; they then run with --run --stage group-levers
+ *     --prompt-state adopted17 --role beat (production's group turn and groupLevers, each with production's checked retry)
+ *   --group-levers  the stage's report, no calls: each turn read whole (checkedTurns.ts), each rolled player's kept set
+ *     read for its sacrifice or reward, that lever's stat (own or shared, allowed or not) and the line B6 computes for
+ *     the player, the variant against production under the stop rule, every lever's text, the retries, the automatic
+ *     checks, the waits and cost; group-levers.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -306,6 +317,8 @@ type Mode =
   | "judge-clues"
   | "build-kids-ages-cases"
   | "kids-ages"
+  | "build-group-lever-cases"
+  | "group-levers"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -451,6 +464,8 @@ function parseArgs(argv: string[]): Args {
       case "--judge-clues":
       case "--build-kids-ages-cases":
       case "--kids-ages":
+      case "--build-group-lever-cases":
+      case "--group-levers":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1197,6 +1212,11 @@ async function main() {
     case "kids-ages":
       // A deterministic check: no calls, so no key and no caps
       return kidsAgesMode({ files, log: (line) => console.log(line) });
+    case "build-group-lever-cases":
+      return buildGroupLeverCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "group-levers":
+      // A deterministic reading: no calls, so no key and no caps
+      return groupLeversMode({ files, log: (line) => console.log(line) });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

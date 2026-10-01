@@ -73,7 +73,9 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * variant beside production's turn on the mouse story's turns read with a
  * child aged 4 and 10 and a two-player kids story's turns at 4, 7 and 10, each
  * turn with production's one checked retry, and beside production's kids setup
- * at 10).
+ * at 10), then group sacrifices, rewards and players' own stats (group-levers:
+ * the variant beside production's group turn on group chapter steps of the
+ * second round's stored runs, each turn with production's one checked retry).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -102,6 +104,7 @@ export const FEEDBACK_STAGES = [
   "money-adds-up",
   "late-pacing",
   "kids-ages",
+  "group-levers",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -297,6 +300,12 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // the youngest child's age band, every player count, and the 9-12 band's setup budget, against production's turn and
   // setup, which run beside them
   kidsAges: "adopted",
+  // The group-levers stage (2026-10-01): B6's lever parts on a group's challenge and contest steps, against production's
+  // group turn, which runs beside it
+  groupLevers: "adopted",
+  // Its one fix-and-retest (the plan's lever question asked from the player's line), against production's, the run's
+  // variant second
+  groupLeversB: "adopted",
 };
 
 /**
@@ -318,6 +327,7 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   planV2f: "planV2e",
   choiceResultB: "choiceResult",
   outcomeSettledB: "outcomeSettled",
+  groupLeversB: "groupLevers",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -412,6 +422,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   // The outcome-settled retest against the run's lines, the sentences it changes, on both turn models
   [armKey(LUNA_MEDIUM, "outcomeSettledB")]: [armKey(LUNA_MEDIUM, "outcomeSettled")],
   [armKey(LUNA_LOW, "outcomeSettledB")]: [armKey(LUNA_LOW, "outcomeSettled")],
+  // The group-levers retest against the run's variant, the question it changes
+  [armKey(LUNA_LOW, "groupLeversB")]: [armKey(LUNA_LOW, "groupLevers")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
   // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
   // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
@@ -636,9 +648,27 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return latePacingArms(role);
     case "kids-ages":
       return kidsAgesArms(role);
+    case "group-levers":
+      return groupLeversArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The group-levers stage (the coordinator's brief of 2026-10-01): production's
+ * group turn (adopted) and the variant (groupLevers) on the group turn model
+ * (Luna low), twice on the stage's group chapter steps, interleaved, under
+ * adopted17, each turn with production's one checked retry; then its one
+ * fix-and-retest (groupLeversB, the plan's lever question asked from the
+ * player's line) on every case, once, and since it moved every target against
+ * production on that sample, a second time, so the form to adopt is measured
+ * as the run's was (the stage cap raised for its arm, the reason in
+ * budget-overrides.jsonl).
+ */
+function groupLeversArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return (["adopted", "groupLevers", "groupLeversB"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: [...GROUP_LEVERS_CASES] }));
 }
 
 /**
@@ -987,6 +1017,37 @@ export const KIDS_AGES_CASES = {
 };
 
 /**
+ * The prompt state of the group-levers stage (2026-10-01): production's own
+ * code since the kids-ages adoption (whose review changed no request), under a
+ * tag no earlier stage used, so production runs beside the variant in the
+ * same minutes.
+ */
+export const GROUP_LEVERS_PROMPT_STATE = "adopted17";
+
+/**
+ * The stage's cases (groupLeversCases.ts, no calls): group chapter steps of
+ * the second round's three group stories where a player is in a challenge or
+ * contest thread: chapter openings and later steps, a shared contest, shared
+ * and own challenges, a player exploring beside the others, a player whose
+ * computed line gives none (the pirates' pilot after Ship Integrity), one
+ * whose line names the other kind.
+ */
+export const GROUP_LEVERS_CASES = [
+  "round-levers-food-trucks-t2",
+  "round-levers-food-trucks-t10",
+  "round-levers-food-trucks-t13",
+  "round-levers-food-trucks-t15",
+  "round-levers-food-trucks-t21",
+  "round-levers-estate-agents-t10",
+  "round-levers-estate-agents-t16",
+  "round-levers-estate-agents-t20",
+  "round-levers-space-pirates-t2",
+  "round-levers-space-pirates-t10",
+  "round-levers-space-pirates-t12",
+  "round-levers-space-pirates-t16",
+] as const;
+
+/**
  * The prompt state of the recorded-result stage (2026-09-30, fix 2 of the
  * second playthroughs' review): production's own code, unchanged since the
  * outcome-settled stage (every turn request is adopted7's byte for byte),
@@ -1116,7 +1177,7 @@ function choiceLineSpArms(role: EvalRole): ArmPlan[] {
 export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
-const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages"];
+const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers"];
 
 export function stageChecksTurns(stage: Stage): boolean {
   return CHECKED_TURN_STAGES.includes(stage);
@@ -1435,6 +1496,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "money-adds-up",
   "late-pacing",
   "kids-ages",
+  "group-levers",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1497,6 +1559,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The kids-ages stage's turns and setups read with a child of each band's age (2026-10-01), frozen after every earlier
   // stage had closed
   ...[...KIDS_AGES_CASES.single, ...KIDS_AGES_CASES.groups, ...KIDS_AGES_CASES.setups].map((id): [string, Stage] => [id, "kids-ages"]),
+  // The group-levers stage's group chapter steps from the second playthroughs (2026-10-01), frozen after every earlier
+  // stage had closed
+  ...GROUP_LEVERS_CASES.map((id): [string, Stage] => [id, "group-levers"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

@@ -59,6 +59,7 @@ import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
 import { moneyAddsUpRequest } from "../../game/services/storyTextRounds/moneyAddsUp.js";
 import { latePacingRequest } from "../../game/services/storyTextRounds/latePacing.js";
 import { kidsAgesSetupRequest, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../game/services/storyTextRounds/kidsAges.js";
+import { groupLeversRequest } from "../../game/services/storyTextRounds/groupLevers.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -331,6 +332,21 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * (the setup input's kidAges); production's requests byte for byte elsewhere
  * (a single player's 6-8 or ageless kids turn included), with production's
  * limits for the role and player count.
+ * "groupLevers" is the group-levers stage's turn (2026-10-01, the
+ * coordinator's brief after the second playthroughs' review: groups got 1
+ * sacrifice or reward in 129 option sets and no reward,
+ * storyTextRounds/groupLevers.ts): production's group turn with B6's lever
+ * parts for each player in a challenge or contest thread on a chapter step
+ * (the reward exception, each such player's computed lever line, one sentence
+ * on a shared stat's lever going to one player a turn and a player's own
+ * stats first, no second sacrifice of a stat in a thread, and in those
+ * players' fields the reward exception and the plan's lever question without
+ * "(Many beats …)"); production's request byte for byte elsewhere, with
+ * production's turn limits and retry count. "groupLeversB" is its one
+ * fix-and-retest: the rolled players' plan question asked from their line
+ * (where it says one fits, one sacrifice or reward on the player's own stats
+ * first, with the scene's reason; "None" only where it says none or no stat
+ * allows one).
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -401,7 +417,9 @@ export type VariantId =
   | "moneyAddsUpB"
   | "latePacing"
   | "latePacingB"
-  | "kidsAges";
+  | "kidsAges"
+  | "groupLevers"
+  | "groupLeversB";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -469,6 +487,8 @@ export const VARIANTS: VariantId[] = [
   "latePacing",
   "latePacingB",
   "kidsAges",
+  "groupLevers",
+  "groupLeversB",
 ];
 
 /**
@@ -962,6 +982,19 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     if (input.role !== "beat") throw new Error(`Variant kidsAges does not cover role ${input.role}`);
     const count = kidsAgesShortTextCount(input.story);
     return { ...kidsAgesTurnRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // The group-levers stage's turn: B6's lever parts for each player in a group's challenge or contest thread; production's
+  // turn limits and production's retry count where it has its own
+  groupLevers: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant groupLevers does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...groupLeversRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // Its one fix-and-retest: the rolled players' plan question asked from their line
+  groupLeversB: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant groupLeversB does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...groupLeversRequest(input.story, { b: true }), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
   },
 };
 
