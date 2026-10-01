@@ -43,7 +43,10 @@ Don't make ANY assessment as to what the player should do to achieve their goals
  * the contest was settled in a thread the other side wasn't in. Replayed on
  * the three switches before such a stage, production offered it as a
  * direction one side could take alone in 5 of 6 plans, the line in 1 of 6
- * (moved, p 0.040), its switch planner no slower. Printed after the
+ * (moved, p 0.040), its switch planner no slower. Marginal: one of the line's
+ * five held the contest back instead of grouping it; grouped offers alone,
+ * 1 of 6 -> 4 of 6, read p 0.121, not moved. The chapter planned after a
+ * grouped switch the line produced was never measured. Printed after the
  * coordination examples where a contested shared outcome has one milestone
  * still needed (the chapter that just ended counted as pending), in a contest
  * game after the opening switch.

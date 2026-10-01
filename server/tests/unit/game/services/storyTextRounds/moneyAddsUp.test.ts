@@ -10,8 +10,10 @@ import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
 import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
+import { takesKidsRules } from "../../../../../src/game/services/kidsTurnRules.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { stat } from "../../../../helpers/textFixtures.js";
+import { withKidsImageSlots } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * Money and counts that add up in a learning story (eval only; fix 7 of the
@@ -119,12 +121,19 @@ describe("production's request byte for byte everywhere else", () => {
     expect(json(moneyAddsUpRequest(story).schema)).toBe(json(production.schema));
   });
 
+  /*
+   * The stage's base is production's turn as it stood then. Since the review of fix 6 (2026-10-01) a single player's
+   * kids turn that shows images names other image places (withKidsImageSlots, the kept tests' logged delta), so the
+   * frozen template case with images compares with that delta on the variant's base.
+   */
+  const asProductionNow = (prompt: string, story: Story) => (takesKidsRules(story) ? withKidsImageSlots(prompt, story) : prompt);
+
   (frozen.length ? it : it.skip)("every frozen turn case: production's request around the block, which only a learning story's turn carries", () => {
     const turns = frozen.filter((c) => c.role === "beat" && c.state);
     expect(turns.length).toBeGreaterThan(50);
     for (const c of turns) {
       const story = caseStory(c);
-      const variant = moneyAddsUpRequest(story).prompt;
+      const variant = asProductionNow(moneyAddsUpRequest(story).prompt, story);
       const production = beatStep.request(story).prompt;
       expect([c.id, withoutBlock(variant) === production, variant === production]).toEqual([c.id, true, !takesMoneyRule(story)]);
     }

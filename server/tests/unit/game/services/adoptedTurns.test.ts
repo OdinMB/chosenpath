@@ -12,7 +12,7 @@ import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 import { stat, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
-import { CHAPTER_RULES_HEADING, adoptedTurn } from "../../../helpers/adoptedDeltas.js";
+import { CHAPTER_RULES_HEADING, adoptedTurn, withKidsImageSlots, withKidsImageSlotsSchema } from "../../../helpers/adoptedDeltas.js";
 import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../../../src/game/services/storyTextRounds/endingState.js";
 import { SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
 import { CHOICE_RESULT_TEXT, choiceResultRequest, takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
@@ -38,7 +38,8 @@ import { KIDS_CONTEXT, KIDS_TEXT_COUNT, kidsFieldCount, kidsRepeat, kidsRules, t
  * stage of the same day, a single player's exploration step is too (measured
  * with production's one retry of a short reply in the loop). Since the
  * kids-turns stage of 2026-10-01, a single player's turn in a story read with
- * a child is the measured variant kidsTurn byte for byte, every turn kind.
+ * a child is the measured variant kidsTurn byte for byte, every turn kind,
+ * apart from the logged image places where it shows images.
  */
 
 /**
@@ -125,18 +126,28 @@ const GROUPS: [string, () => Story][] = [2, 3].flatMap((players): [string, () =>
   [`the ending, ${players} players`, () => endingBeat(players)],
 ]);
 
-function expectSame(production: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }, measured: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) {
-  expect(production.prompt).toBe(measured.prompt);
-  expect(json(production.schema)).toBe(json(measured.schema));
+type Request = { prompt: string; schema: Parameters<typeof toJsonSchema>[0] };
+/** What production must send: the prompt and the JSON schema's text. */
+type Expected = { prompt: string; json: string };
+
+function expectSame(production: Request, measured: Request | Expected) {
+  const want = "json" in measured ? measured : { prompt: measured.prompt, json: json(measured.schema) };
+  expect(production.prompt).toBe(want.prompt);
+  expect(json(production.schema)).toBe(want.json);
 }
 
 /**
- * The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. A
- * single player's read-with-kids turn is the measured kidsTurn byte for byte (the kids-turns stage of 2026-10-01; built on
- * production's turn as measured, so no delta applies on top).
+ * A single player's read-with-kids turn: the measured kidsTurn (the kids-turns stage of 2026-10-01; built on production's
+ * turn as measured) with, where it shows images, the logged image places (withKidsImageSlots, adoptedDeltas.ts).
  */
-const asAdopted = <T extends { prompt: string }>(measured: T, story: Story): T | ReturnType<typeof kidsTurnRequest> =>
-  takesKidsRules(story) ? kidsTurnRequest(story) : { ...measured, prompt: adoptedTurn(measured.prompt, story) };
+function kidsAdopted(story: Story): Expected {
+  const measured = kidsTurnRequest(story);
+  return { prompt: withKidsImageSlots(measured.prompt, story), json: withKidsImageSlotsSchema(json(measured.schema), story) };
+}
+
+/** The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. */
+const asAdopted = (measured: Request, story: Story): Expected =>
+  takesKidsRules(story) ? kidsAdopted(story) : { prompt: adoptedTurn(measured.prompt, story), json: json(measured.schema) };
 
 describe("single-player turns: today's form with B6 as measured, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(SINGLE_PLAYER)("%s", (_, build) => {
@@ -164,7 +175,10 @@ describe("single-player turns: today's form with B6 as measured, an exploration 
  * fix 6 of the second playthroughs' review): the measured kidsTurn byte for
  * byte, every turn kind, prompt and JSON schema; the child's age the story
  * recorded, or a young child where it recorded none (a template tagged Kids).
- * A group's read-with-kids turn is unchanged: the stage measured one player.
+ * Where the turn shows images, its image places are the one logged delta
+ * (withKidsImageSlots: the second paragraph, or the third of four, in place of
+ * the third or fourth). A group's read-with-kids turn is unchanged: the stage
+ * measured one player.
  */
 describe("a single player's read-with-kids turns: kidsTurn as measured", () => {
   const KIDS = { category: "read-with-kids" as const, readingAge: "5" };
@@ -179,6 +193,17 @@ describe("a single player's read-with-kids turns: kidsTurn as measured", () => {
     const story = threadBeat(1, { category: "read-with-kids" });
     expectSame(beatStep.request(story), kidsTurnRequest(story));
     expect(beatStep.request(story).prompt).toContain(KIDS_TURN_TEXT.rules("a young child"));
+  });
+
+  it.each([
+    ["generated images", { generateImages: true }],
+    ["a template's image library", { templateId: "tpl-kids" }],
+  ])("with %s: kidsTurn with the logged image places, where the measured lines named the third or fourth paragraph", (_, images) => {
+    for (const build of SINGLE_PLAYER.map(([, b]) => b)) {
+      const story = build().clone({ ...KIDS, ...images });
+      expect(kidsTurnRequest(story).prompt).toContain("one for the third or fourth paragraph");
+      expectSame(beatStep.request(story), kidsAdopted(story));
+    }
   });
 
   it.each(GROUPS)("leaves a group's turn as it was: %s", (_, build) => {

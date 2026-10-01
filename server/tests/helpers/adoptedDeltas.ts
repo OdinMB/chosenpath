@@ -16,6 +16,8 @@
  * near the end; since 2026-10-01 it also carries a measured line planner v2b
  * never had (a contest's last stage offered only as a grouped thread:
  * withContestLastStage, the parallel-threads stage's variant, not a delta).
+ * A single player's read-with-kids turn is kidsTurn (2026-10-01) with one
+ * delta where it shows images: the image places (withKidsImageSlots).
  */
 
 import type { Story } from "core/models/Story.js";
@@ -165,4 +167,49 @@ export function withoutChapterRules(measured: string, story: Story): string {
 /** Every turn delta: no chapter rules on a switch turn (endings are measured whole, as endingStateB). */
 export function adoptedTurn(measured: string, story: Story): string {
   return withoutChapterRules(measured, story);
+}
+
+/*
+ * A single player's read-with-kids turn with images (2026-10-01, the review of
+ * fix 6): kidsTurn, as measured, kept production's image lines, which put a
+ * second image on "the third or fourth paragraph" and none on the last. In the
+ * 3-4 paragraphs it asks for, a 3-paragraph turn had no allowed place for that
+ * image (its third paragraph is its last). Production names the second
+ * paragraph, or the third of four, instead. A correction of a contradiction in
+ * the measured request, unmeasured: the stage's one case with images wrote 4
+ * paragraphs both times. A turn without images is kidsTurn byte for byte.
+ */
+const KIDS_IMAGE_SLOTS = {
+  prompt: [
+    "--- A good distribution is an image tag for the first paragraph and one for the third or fourth paragraph.\n",
+    "--- A good distribution is an image tag for the first paragraph and one for the second paragraph (or the third, if there are four).\n",
+  ],
+  field: [
+    "--- A good distribution is to have one image tag right before the first paragraph and one on the third or fourth paragraph. Avoid using image tags in or right in front of the last paragraph.\n",
+    "--- A good distribution is to have one image tag right before the first paragraph and one on the second paragraph (or the third, if there are four). Never put an image tag on the last paragraph.\n",
+  ],
+  late: [
+    "Use it relatively late in the beat text (third or fourth paragraph).",
+    "Use it relatively late in the beat text (the second paragraph, or the third if there are four).",
+  ],
+} as const;
+
+const showsImages = (story: Story) => story.hasImages() || story.generatesImages();
+
+function swapOnce(text: string, [from, to]: readonly [string, string], what: string): string {
+  if (text.split(from).length !== 2) throw new Error(`The measured kids turn no longer carries ${what} once`);
+  return text.replace(from, () => to);
+}
+
+/** The measured kids turn's prompt with production's image places (a turn that shows images). */
+export function withKidsImageSlots(measured: string, story: Story): string {
+  return showsImages(story) ? swapOnce(measured, KIDS_IMAGE_SLOTS.prompt, "the image distribution line") : measured;
+}
+
+/** The measured kids turn's JSON schema text with production's image places in the text field. */
+export function withKidsImageSlotsSchema(measuredJson: string, story: Story): string {
+  const inJson = (pair: readonly [string, string]) => [JSON.stringify(pair[0]).slice(1, -1), JSON.stringify(pair[1]).slice(1, -1)] as const;
+  if (!showsImages(story)) return measuredJson;
+  const placed = swapOnce(measuredJson, inJson(KIDS_IMAGE_SLOTS.field), "the text field's image distribution");
+  return story.generatesImages() ? swapOnce(placed, inJson(KIDS_IMAGE_SLOTS.late), "the generated image's place") : placed;
 }

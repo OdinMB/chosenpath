@@ -65,19 +65,44 @@ export function categoryFromTemplateTags(
  */
 export const KID_AGE_LABEL = "How old is the child?";
 
-const KID_AGE_VALUE = /^(\d{1,2})(?:\s*[-–]\s*(\d{1,2}))?$/;
+/**
+ * The answer on the read-with-kids form's line of a premise, trimmed, as the
+ * person typed it; undefined where the premise has no such line.
+ */
+export function kidAgeAnswer(premise: string): string | undefined {
+  const line = premise.split("\n").find((l) => l.startsWith(`${KID_AGE_LABEL}:`));
+  return line === undefined ? undefined : line.slice(KID_AGE_LABEL.length + 1).trim();
+}
 
 /**
- * The child's age as a read-with-kids premise states it ("5", or a range such
- * as "8-10"): the value of the form's line, and only an age, since it goes
- * into every turn's instructions. Undefined where the premise has no such
- * line or its value is anything else.
+ * The words an age answer may carry besides its numbers ("6 years old", "about
+ * 7", "8 to 12", "a 5 year old and an 8 year old"). Anything else makes the
+ * answer unreadable, so free text never reaches a turn.
+ */
+const AGE_WORDS = new Set(
+  "a an and or to about around almost nearly roughly approximately approx age ages aged year years yr yrs y yo old".split(" ")
+);
+/** Separators between ages: a hyphen or dash for a range, a comma, ampersand or plus for a list. */
+const AGE_SEPARATORS = /[-–—,&+]/g;
+
+/**
+ * The child's age as a read-with-kids premise states it, for every turn's
+ * instructions: "5", or a range "8-10" from the youngest age the answer names
+ * to the oldest (a range, or two children's ages "5, 8"). Only numbers of one
+ * or two digits come out, never the answer's words, and only when every other
+ * word is one of AGE_WORDS; undefined otherwise, or where the premise has no
+ * such line. The form's field is free text (its placeholder "5, 8-10").
  */
 export function readingAgeFromPremise(premise: string): string | undefined {
-  const line = premise.split("\n").find((l) => l.startsWith(`${KID_AGE_LABEL}:`));
-  const match = line ? KID_AGE_VALUE.exec(line.slice(KID_AGE_LABEL.length + 1).trim()) : null;
-  if (!match) return undefined;
-  return match[2] ? `${match[1]}-${match[2]}` : match[1];
+  const answer = kidAgeAnswer(premise);
+  if (!answer) return undefined;
+  const tokens = answer.toLowerCase().replace(AGE_SEPARATORS, " ").split(/\s+/).filter(Boolean).map((t) => t.replace(/\.$/, ""));
+  if (!tokens.every((t) => /^\d{1,2}$/.test(t) || AGE_WORDS.has(t))) return undefined;
+  const ages = tokens.filter((t) => /^\d{1,2}$/.test(t)).map(Number);
+  if (ages.length === 0) return undefined;
+  const youngest = Math.min(...ages);
+  const oldest = Math.max(...ages);
+  return youngest === oldest ? `${youngest}` : `${youngest}-${oldest}`;
 }
 
 // GENERATION WITH LLM

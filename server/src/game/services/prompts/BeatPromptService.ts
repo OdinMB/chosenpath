@@ -15,7 +15,7 @@ import {
 } from "../optionRules.js";
 import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { outcomeStateLines } from "../endingStates.js";
-import { KIDS_CONTEXT, kidsListener, kidsRepeat, kidsRules, takesKidsRules } from "../kidsTurnRules.js";
+import { KIDS_CONTEXT, KIDS_IMAGE_DISTRIBUTION, kidsListener, kidsRepeat, kidsRules, takesKidsRules } from "../kidsTurnRules.js";
 
 /**
  * The scoreboard ending rule (the setup document's decision 3, question 1,
@@ -446,7 +446,10 @@ ${
   story.hasImages() || story.generatesImages()
     ? "You can include image tags in the beat text to show images from the story's image library:\n" +
       "- Add an '[image]' tag at the beginning of the paragraph that you want to show the image in.\n" +
-      "--- A good distribution is an image tag for the first paragraph and one for the third or fourth paragraph.\n" +
+      // A kids turn's 3-4 paragraphs have no fourth before the last (the review of fix 6, 2026-10-01)
+      (kids
+        ? KIDS_IMAGE_DISTRIBUTION
+        : "--- A good distribution is an image tag for the first paragraph and one for the third or fourth paragraph.\n") +
       "--- No image tags for the last paragraph, and no image tags after the last paragraph.\n" +
       "- Parameters:\n" +
       "--- id: the id of the image from the story's image library. The id must match exactly. Only use ids that are listed in the image library" +

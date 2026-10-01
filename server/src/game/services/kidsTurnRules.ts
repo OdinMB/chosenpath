@@ -6,7 +6,8 @@ import type { BeatCheckOptions } from "./beatChecks.js";
  * A single player's turn in a story read with a child (the kids-turns stage of
  * 2026-10-01, fix 6 of the second playthroughs' review; measured as the eval's
  * kidsTurn, storyTextRounds/kidsTurn.ts, which production equals byte for
- * byte). The second playthroughs' mouse story, read with a five-year-old, ran
+ * byte, apart from the image places below on a turn that shows images). The
+ * second playthroughs' mouse story, read with a five-year-old, ran
  * about 300 words a turn of grown-up prose: every turn is told three times to
  * write "5-6 paragraphs with 3-5 sentences each", and nothing in a turn said a
  * child was listening. On a single player's read-with-kids story (its
@@ -59,10 +60,31 @@ export function kidsFieldCount(who: string): string {
 /** What a retry of a one-paragraph reply asks for on a kids turn. */
 export const KIDS_TEXT_COUNT = "three or four short paragraphs of two or three short sentences each";
 
-/** The text field description's count and repeat, as core's beat schema writes them for every turn. */
+/*
+ * Where image tags go on a kids turn that shows images (2026-10-01, the review
+ * of fix 6). Production's lines put a second image on "the third or fourth
+ * paragraph" and none on the last; in a 3-paragraph kids turn the third
+ * paragraph is the last, so that image had no allowed place. A kids turn names
+ * the second paragraph, or the third of four. Unmeasured: the kids-turns
+ * stage's one case with images wrote 4 paragraphs both times; the kept tests
+ * log it as kidsTurn's one delta (withKidsImageSlots in adoptedDeltas.ts).
+ */
+/** The text rules' image line on a kids turn, in place of "one for the third or fourth paragraph". */
+export const KIDS_IMAGE_DISTRIBUTION =
+  "--- A good distribution is an image tag for the first paragraph and one for the second paragraph (or the third, if there are four).\n";
+/** The text field's image line on a kids turn. */
+export const KIDS_FIELD_IMAGE_DISTRIBUTION =
+  "--- A good distribution is to have one image tag right before the first paragraph and one on the second paragraph (or the third, if there are four). Never put an image tag on the last paragraph.\n";
+/** Where the text field places a generated image on a kids turn. */
+export const KIDS_FIELD_IMAGE_LATE = "Use it relatively late in the beat text (the second paragraph, or the third if there are four).";
+
+/** The text field description's count, repeat and image places, as core's beat schema writes them for every turn. */
 const FIELD_COUNT = "- Write 5-6 paragraphs.\n- Each paragraph must have 3-5 sentences.\n";
 const FIELD_REPEAT =
   "These are a lot of instructions, so let me repeat the most important one: You MUST write 5-6 paragraphs with 3-5 sentences each! Otherwise, there simply isn't enough text to move the story forward with enough depth and detail. So again: 5-6 paragraphs, 3-5 sentences each!";
+const FIELD_IMAGE_DISTRIBUTION =
+  "--- A good distribution is to have one image tag right before the first paragraph and one on the third or fourth paragraph. Avoid using image tags in or right in front of the last paragraph.\n";
+const FIELD_IMAGE_LATE = "Use it relatively late in the beat text (third or fourth paragraph).";
 
 function replaceOnce(text: string, passage: string, replacement: string): string {
   const n = text.split(passage).length - 1;
@@ -70,11 +92,22 @@ function replaceOnce(text: string, passage: string, replacement: string): string
   return text.replace(passage, () => replacement);
 }
 
+/** A kids turn's text description: the short count and repeat, and the image places where the story shows images. */
+function kidsTextDescription(description: string, story: Story): string {
+  const who = kidsListener(story);
+  let edited = replaceOnce(replaceOnce(description, FIELD_COUNT, kidsFieldCount(who)), FIELD_REPEAT, kidsRepeat(who));
+  // The same condition core's beat schema prints its image lines on
+  if (story.generatesImages() || story.hasImages()) edited = replaceOnce(edited, FIELD_IMAGE_DISTRIBUTION, KIDS_FIELD_IMAGE_DISTRIBUTION);
+  if (story.generatesImages()) edited = replaceOnce(edited, FIELD_IMAGE_LATE, KIDS_FIELD_IMAGE_LATE);
+  return edited;
+}
+
 /**
- * The reply schema with every player's text description given the short count
- * and repeat. Slots that share one beat schema instance keep sharing one.
+ * The reply schema with every player's text description given the short count,
+ * the repeat and the image places. Slots that share one beat schema instance
+ * keep sharing one.
  */
-export function beatSchemaForKids(root: z.AnyZodObject, who: string): z.AnyZodObject {
+export function beatSchemaForKids(root: z.AnyZodObject, story: Story): z.AnyZodObject {
   const edited = new Map<unknown, z.AnyZodObject>();
   const players = Object.fromEntries(
     Object.entries(root.shape)
@@ -85,8 +118,7 @@ export function beatSchemaForKids(root: z.AnyZodObject, who: string): z.AnyZodOb
         if (!(value instanceof z.ZodObject)) throw new Error(`Kids turn: ${key} is not an object schema`);
         const text = value.shape.text;
         if (!(text instanceof z.ZodString) || !text.description) throw new Error(`Kids turn: ${key}'s text has no description`);
-        const description = replaceOnce(replaceOnce(text.description, FIELD_COUNT, kidsFieldCount(who)), FIELD_REPEAT, kidsRepeat(who));
-        const next = value.extend({ text: z.string().describe(description) });
+        const next = value.extend({ text: z.string().describe(kidsTextDescription(text.description, story)) });
         edited.set(value, next);
         return [key, next];
       })

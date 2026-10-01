@@ -11,7 +11,16 @@ import { SCOREBOARD_ENDING_RULE as PRODUCTION_ENDING_RULE } from "../../../../sr
 import { ROUND3_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { ENDING_STATE_TEXT } from "../../../../src/game/services/storyTextRounds/endingState.js";
-import { adoptedSetupPrompt, adoptedTurn, withContestLastStage, withResultsAsOutcomes, withResultsAsOutcomesSchema, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
+import {
+  adoptedSetupPrompt,
+  adoptedTurn,
+  withContestLastStage,
+  withKidsImageSlots,
+  withKidsImageSlotsSchema,
+  withResultsAsOutcomes,
+  withResultsAsOutcomesSchema,
+  withThreadsThatFit,
+} from "../../../helpers/adoptedDeltas.js";
 import { takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 
@@ -86,8 +95,10 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
       // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured
       return { prompt: withContestLastStage(withThreadsThatFit(prompt, input.story), input.story), schema: json(measured) };
     case "beat":
-      // kidsTurn is built on production's turn as measured: no delta on top
-      return { prompt: takesKidsRules(input.story) ? prompt : adoptedTurn(prompt, input.story), schema: json(measured) };
+      // kidsTurn is built on production's turn as measured: its one delta is the image places where the turn shows images
+      return takesKidsRules(input.story)
+        ? { prompt: withKidsImageSlots(prompt, input.story), schema: withKidsImageSlotsSchema(json(measured), input.story) }
+        : { prompt: adoptedTurn(prompt, input.story), schema: json(measured) };
   }
 }
 

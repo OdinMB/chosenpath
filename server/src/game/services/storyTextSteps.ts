@@ -19,7 +19,7 @@ import { StorySetupPromptService, type SetupPromptOptions } from "./prompts/Stor
 import { assembleSetupReply, iterationSchema, setupGenerationSchema } from "./setupSchema.js";
 import { assembleSwitchPlan, assembleThreadPlan, switchReplySchema, threadReplySchema } from "./plannerReplies.js";
 import { beatSchemaWithOptionRules, takesOptionRules } from "./optionRules.js";
-import { beatSchemaForKids, kidsListener, takesKidsRules } from "./kidsTurnRules.js";
+import { beatSchemaForKids, takesKidsRules } from "./kidsTurnRules.js";
 import { paidLevers } from "./leverPayments.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
@@ -135,7 +135,7 @@ export const beatStep = {
     const withRules = takesOptionRules(story) ? beatSchemaWithOptionRules(schema) : schema;
     return {
       prompt: BeatPromptService.createBeatPrompt(story),
-      schema: takesKidsRules(story) ? beatSchemaForKids(withRules, kidsListener(story)) : withRules,
+      schema: takesKidsRules(story) ? beatSchemaForKids(withRules, story) : withRules,
     };
   },
 

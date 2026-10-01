@@ -223,22 +223,48 @@ describe("StoryCreationService setup status", () => {
     expect(args[7]).toEqual({ kids });
   });
 
-  it.each([
-    ["read-with-kids", "How old is the child?: 5", "5"],
-    ["read-with-kids", "A mouse story with no age", undefined],
-    ["enjoy-fiction", "How old is the child?: 5", undefined],
-  ] as const)("records the story's category and, read with a child, the age its premise states (%s, %s)", async (category, premise, age) => {
+  async function createWith(premise: string, category: "read-with-kids" | "enjoy-fiction"): Promise<{ storyId: string; state?: StoryState }> {
     createInitialState.mockResolvedValue(startableState());
     const service = new StoryCreationService();
-    const { res } = fakeResponse();
+    const { res, sent } = fakeResponse();
 
     await service.createStory(`Create an age-appropriate story.\n\n${premise}`, false, false, 1, 10, GameModes.Cooperative, undefined, res, undefined, category);
     await new Promise((resolve) => setImmediate(resolve));
     await new Promise((resolve) => setImmediate(resolve));
 
     const stored = storeStory.mock.calls[0]?.[1] as { getState(): StoryState } | undefined;
-    expect(stored?.getState().category).toBe(category);
-    expect(stored?.getState().readingAge).toBe(age);
+    return { storyId: sent[0]?.body.data?.storyId ?? "", state: stored?.getState() };
+  }
+
+  it.each([
+    ["read-with-kids", "How old is the child?: 5", "5"],
+    ["read-with-kids", "How old is the child?: 6 years", "6"],
+    ["read-with-kids", "How old is the child?: 5, 8", "5-8"],
+    ["read-with-kids", "A mouse story with no age", undefined],
+    ["enjoy-fiction", "How old is the child?: 5", undefined],
+  ] as const)("records the story's category and, read with a child, the age its premise states (%s, %s)", async (category, premise, age) => {
+    const { state } = await createWith(premise, category);
+    expect(state?.category).toBe(category);
+    expect(state?.readingAge).toBe(age);
+  });
+
+  it("logs a read-with-kids premise whose age answer it can't read, with the story id and never the answer", async () => {
+    const { storyId, state } = await createWith("How old is the child?: a toddler named Mirabel", "read-with-kids");
+
+    expect(state?.readingAge).toBeUndefined();
+    const ageLines = logs.filter((line) => line.includes("child's age"));
+    expect(ageLines).toHaveLength(1);
+    expect(ageLines[0]).toContain(storyId);
+    expect(ageLines[0]).toContain("a young child");
+    expect(logs.some((line) => line.includes("Mirabel") || line.includes("toddler"))).toBe(false);
+  });
+
+  it.each([
+    ["an age it reads", "How old is the child?: 7"],
+    ["no age line", "A mouse story with no age"],
+  ])("logs nothing about the age where the premise has %s", async (_, premise) => {
+    await createWith(premise, "read-with-kids");
+    expect(logs.some((line) => line.includes("child's age"))).toBe(false);
   });
 
   it("answers a content-filter refusal with its moderation response and starts no setup", async () => {

@@ -6,6 +6,7 @@ import {
   ImageRequest,
   IMAGE_SIZES,
   StoryCategory,
+  kidAgeAnswer,
   readingAgeFromPremise,
 } from "core/types/index.js";
 import { connectionManager } from "server/game/ConnectionManager.js";
@@ -285,6 +286,12 @@ export class StoryCreationService {
       // Add player codes, pregeneration setting and category to state; a story read with a child records the child's age
       // its premise states, which a single player's turns are written for
       const readingAge = category === "read-with-kids" ? readingAgeFromPremise(prompt) : undefined;
+      if (category === "read-with-kids" && !readingAge && kidAgeAnswer(prompt) !== undefined) {
+        // The form's age field is free text; an answer that isn't an age is never logged, as no premise text is
+        Logger.Route.log(
+          `Story ${storyId}: the premise's answer for the child's age is not an age or a range of ages, so its turns are written for a young child`
+        );
+      }
       const storyWithCodes = story.clone({
         playerCodes,
         pregenerateBeats,
