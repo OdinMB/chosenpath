@@ -14,7 +14,9 @@ import { ENDING_STATE_TEXT } from "../../../../src/game/services/storyTextRounds
 import {
   adoptedSetupPrompt,
   adoptedTurn,
+  kidsAgesAsMeasured,
   withContestLastStage,
+  withKidsBandImageSlots,
   withLeverDirectionSchema,
   withResultsAsOutcomes,
   withResultsAsOutcomesSchema,
@@ -89,8 +91,13 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
   const variant = measuredVariant(input);
   const measured = requestFor(variant, input);
   const prompt = requestText(measured);
-  // kidsAges is built on production's grown-up turn and production's kids setup, which the other cases hold to theirs
-  if (variant === "kidsAges") return { prompt, schema: json(measured) };
+  // kidsAges is built on production's grown-up turn and production's kids setup, which the other cases hold to theirs;
+  // a kids turn that shows images carries the logged picture places by band (no case of the stage showed images)
+  if (variant === "kidsAges") {
+    if (input.role !== "beat") return { prompt, schema: json(measured) };
+    const adopted = withKidsBandImageSlots(kidsAgesAsMeasured({ prompt, json: json(measured) }, input.story), input.story);
+    return { prompt: adopted.prompt, schema: adopted.json };
+  }
   switch (input.role) {
     // Since the lever-direction adoption (2026-10-01): the measured line and lever fields, wherever the setup carries them
     case "setup":

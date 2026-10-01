@@ -5,12 +5,12 @@ import {
   PublicationStatus,
   KidAges,
   categoryFromTemplateTags,
-  kidAgesText,
 } from "core/types";
 import {
   KID_AGES_PLACEHOLDER,
   readKidAgesField,
 } from "shared/utils/kidAgesField";
+import { kidAgesFieldText } from "client/resources/templates/utils/templateKidAges";
 import {
   Input,
   TextArea,
@@ -66,22 +66,26 @@ interface BasicInfoTabProps {
   onPublicationStatusChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   canPublish?: boolean;
   templateId?: string;
-  // The read-with-kids setting, on a template tagged Kids: the children's ages its stories are read with
+  // The read-with-kids setting, on a template tagged Kids: the children's ages its stories are read with, and the
+  // field's text as typed since the form last took a template (undefined shows the template's ages)
   kidAges?: KidAges | null;
-  handleKidAgesChange?: (kidAges: KidAges | null) => void;
+  kidAgesInput?: string;
+  handleKidAgesInput?: (text: string) => void;
 }
 
 /**
  * The children's ages of a template tagged Kids (the read-with-kids setting,
  * as on the setup form): one age or a range, which its stories inherit and
- * their turns are written for. A value it can't read shows the hint and is
- * not kept.
+ * their turns are written for. The form holds the text (useTemplateForm), so
+ * Discard changes and Revert to a save show the template's ages again; a
+ * value it can't read shows the hint, and Save refuses it.
  */
 const KidAgesField: React.FC<{
   kidAges?: KidAges | null;
-  onChange?: (kidAges: KidAges | null) => void;
-}> = ({ kidAges, onChange }) => {
-  const [text, setText] = useState(kidAges ? kidAgesText(kidAges) : "");
+  input?: string;
+  onInput?: (text: string) => void;
+}> = ({ kidAges, input, onInput }) => {
+  const text = kidAgesFieldText(input, kidAges);
   const { error } = readKidAgesField(text);
   return (
     <div className="space-y-1">
@@ -99,14 +103,11 @@ const KidAgesField: React.FC<{
           name="template-kid-ages"
           className="w-32"
           value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            onChange?.(readKidAgesField(e.target.value).ages ?? null);
-          }}
+          onChange={(e) => onInput?.(e.target.value)}
           placeholder={KID_AGES_PLACEHOLDER}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? "template-kid-ages-error" : undefined}
-          disabled={!onChange}
+          disabled={!onInput}
         />
       </div>
       {error && (
@@ -150,7 +151,8 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   canPublish,
   templateId,
   kidAges,
-  handleKidAgesChange,
+  kidAgesInput,
+  handleKidAgesInput,
 }) => {
   // Debugging TAG_CATEGORIES
   // console.log("TAG_CATEGORIES:", TAG_CATEGORIES);
@@ -648,9 +650,9 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       {/* A template tagged Kids: the read-with-kids setting */}
       {categoryFromTemplateTags(tags) === "read-with-kids" && (
         <KidAgesField
-          key={templateId ?? "new-template"}
           kidAges={kidAges}
-          onChange={handleKidAgesChange}
+          input={kidAgesInput}
+          onInput={handleKidAgesInput}
         />
       )}
 

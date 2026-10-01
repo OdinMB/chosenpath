@@ -12,12 +12,22 @@ import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 import { stat, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
-import { CHAPTER_RULES_HEADING, adoptedTurn, withEndingOnlyPlayed, withKidsImageSlots, withKidsImageSlotsSchema } from "../../../helpers/adoptedDeltas.js";
+import {
+  CHAPTER_RULES_HEADING,
+  GROWN_UP_PICTURE_PLACES,
+  KIDS_BAND_PICTURE_PLACES,
+  adoptedTurn,
+  kidsAgesAsMeasured,
+  withEndingOnlyPlayed,
+  withKidsBandImageSlots,
+  withKidsImageSlots,
+  withKidsImageSlotsSchema,
+} from "../../../helpers/adoptedDeltas.js";
 import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../../../src/game/services/storyTextRounds/endingState.js";
 import { ENDING_MILESTONES_PLAYED, ENDING_OUTCOME_KINDS, SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
 import { CHOICE_RESULT_TEXT, choiceResultRequest, takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { KIDS_TURN_TEXT, kidsTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsTurn.js";
-import { KIDS_AGES_TEXT, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsAges.js";
+import { KIDS_AGES_TEXT, kidsAgesBand, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsAges.js";
 import { KIDS_BAND_TURNS, beatCheckOptions, takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 
 /*
@@ -42,7 +52,8 @@ import { KIDS_BAND_TURNS, beatCheckOptions, takesKidsRules } from "../../../../s
  * a child is the measured variant kidsTurn byte for byte, every turn kind,
  * apart from the logged image places where it shows images; since the
  * kids-ages stage of the same day, a read-with-kids turn of every player count
- * is the measured kidsAges, by the children's age band. Since the owner's
+ * is the measured kidsAges, by the children's age band, apart from the logged
+ * picture places by band where it shows images. Since the owner's
  * decision of 2026-10-01 every ending carries one logged delta: only what was
  * played gets a milestone, and an unfinished outcome is told as unfinished
  * (withEndingOnlyPlayed).
@@ -65,6 +76,8 @@ const json = (schema: Parameters<typeof toJsonSchema>[0]) => JSON.stringify(toJs
 
 const CASES_DIR = path.resolve("..", "DOCS", "2026-09-26_gpt6-text-eval");
 const frozen = fs.existsSync(path.join(CASES_DIR, "cases", "cases.json")) ? evalFiles(CASES_DIR).readCases() : [];
+/** The kids-ages stage's turn cases (kidsAgesCases.ts), where the eval's output folder holds them. */
+const KIDS_AGES_CASES = frozen.filter((c) => c.role === "beat" && c.id.startsWith("round-kids-ages-"));
 
 const GUILD = "player1_guild_reform";
 const ENCLAVE = "player1_enclave_trust";
@@ -158,11 +171,12 @@ function kidsAdopted(story: Story): Expected {
 /**
  * A read-with-kids turn of every player count and band (the kids-ages stage of 2026-10-01): the measured kidsAges, the
  * grown-up turn (the same story without its category, which the other tests hold to its measured form) with the
- * band's kids lines.
+ * band's kids lines, and where the turn shows images the logged picture places by band (withKidsBandImageSlots,
+ * adoptedDeltas.ts: no case of the stage showed images, so none of its measured requests carried them).
  */
 const kidsAgesAdopted = (story: Story): Expected => {
-  const measured = kidsAgesTurnRequest(story);
-  return { prompt: measured.prompt, json: json(measured.schema) };
+  const variant = kidsAgesTurnRequest(story);
+  return withKidsBandImageSlots(kidsAgesAsMeasured({ prompt: variant.prompt, json: json(variant.schema) }, story), story);
 };
 
 /** The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. */
@@ -201,6 +215,9 @@ describe("single-player turns: today's form with B6 as measured, an exploration 
  * kidsTurn as measured, with its logged image places (withKidsImageSlots: the
  * second paragraph, or the third of four, in place of the third or fourth).
  * Until this stage a group's read-with-kids turn kept the grown-up count.
+ * The picture places by band (3-5, 9-12, and a group's 6-8) are a logged
+ * delta, unmeasured: every turn case of the stage had no images, so no
+ * measured request carried them (withKidsBandImageSlots).
  */
 describe("read-with-kids turns: kidsAges as measured, every band and player count", () => {
   const AGES: [string, Partial<StoryState>][] = [
@@ -239,7 +256,7 @@ describe("read-with-kids turns: kidsAges as measured, every band and player coun
     expect(beatStep.request(young).prompt).toContain(KIDS_TURN_TEXT.rules("a young child"));
   });
 
-  it("prints each band's measured text from production's own constants", () => {
+  it("prints each band's measured text, and its logged picture places, from production's own constants", () => {
     for (const band of ["3-5", "6-8", "9-12"] as const) {
       const production = KIDS_BAND_TURNS[band];
       const measured = KIDS_AGES_TEXT[band];
@@ -250,7 +267,8 @@ describe("read-with-kids turns: kidsAges as measured, every band and player coun
       }
       expect(production.context).toBe(measured.context);
       expect(production.textCount).toBe(measured.shortTextCount);
-      expect(production.image).toEqual({ distribution: measured.image.prompt, fieldDistribution: measured.image.field, fieldLate: measured.image.late });
+      const places = KIDS_BAND_PICTURE_PLACES[band];
+      expect(production.image).toEqual({ distribution: places.prompt, fieldDistribution: places.field, fieldLate: places.late });
     }
     // The 6-8 band is the kids-turns stage's measured text
     const who = "a child aged 7";
@@ -267,6 +285,41 @@ describe("read-with-kids turns: kidsAges as measured, every band and player coun
         const story = threadBeat(players, ages);
         expect(beatCheckOptions(story).textCount).toBe(kidsAgesShortTextCount(story));
       }
+    }
+  });
+
+  it("prints the band's picture places only where the turn shows images, in place of the grown-up lines the measured kidsAges kept (the logged delta)", () => {
+    for (const [, ages] of AGES) {
+      for (const players of [1, 2, 3]) {
+        for (const [, images] of IMAGES.slice(1)) {
+          const story = threadBeat(players, { ...ages, ...images });
+          const places = KIDS_BAND_PICTURE_PLACES[kidsAgesBand(story)];
+          const variant = kidsAgesTurnRequest(story);
+          const measured = kidsAgesAsMeasured({ prompt: variant.prompt, json: json(variant.schema) }, story);
+          expect(measured.prompt).toContain(GROWN_UP_PICTURE_PLACES.prompt);
+          expect(measured.prompt).not.toContain(places.prompt);
+          const production = beatStep.request(story);
+          expect(production.prompt).toContain(places.prompt);
+          expect(production.prompt).not.toContain(GROWN_UP_PICTURE_PLACES.prompt);
+          expect(json(production.schema)).toContain(JSON.stringify(places.field).slice(1, -1));
+        }
+        // No images: no picture places in either, and production is the measured request byte for byte
+        const plain = threadBeat(players, ages);
+        const variant = kidsAgesTurnRequest(plain);
+        const asText = { prompt: variant.prompt, json: json(variant.schema) };
+        expect(kidsAgesAsMeasured(asText, plain)).toEqual(asText);
+        expect(withKidsBandImageSlots(asText, plain)).toEqual(asText);
+        expectSame(beatStep.request(plain), asText);
+      }
+    }
+  });
+
+  (KIDS_AGES_CASES.length ? it : it.skip)("measured them on no case: every turn case of the kids-ages stage shows no images, and production sends its measured request byte for byte", () => {
+    expect(KIDS_AGES_CASES).toHaveLength(18);
+    for (const c of KIDS_AGES_CASES) {
+      const story = caseStory(c);
+      expect([c.id, story.hasImages() || story.generatesImages()]).toEqual([c.id, false]);
+      expectSame(beatStep.request(story), kidsAgesTurnRequest(story));
     }
   });
 });

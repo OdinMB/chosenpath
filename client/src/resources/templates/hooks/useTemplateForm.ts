@@ -13,8 +13,15 @@ import {
   Outcome,
   ImageInstructions,
   PlayerCount,
+  KidAges,
+  StoryCategory,
 } from "core/types";
 import { Logger } from "shared/logger";
+import { readKidAgesField } from "shared/utils/kidAgesField";
+import {
+  draftedKidsSetting,
+  unreadableTemplateKidAges,
+} from "../utils/templateKidAges";
 import { MAX_PLAYERS } from "core/config";
 import { useBasicInfoTab } from "./useBasicInfoTab";
 import { useGuidelinesEditor } from "./useGuidelinesEditor";
@@ -110,6 +117,9 @@ export function useTemplateForm({
     useState<StoryTemplate>(initialTemplate);
   const [saveHistory, setSaveHistory] = useState<SaveHistoryEntry[]>([]);
   const [pendingImageOperations, setPendingImageOperations] = useState<PendingImageOperation[]>([]);
+  // The Children's ages field's text as typed since the form last took a whole template (loaded, changes discarded,
+  // a save reverted, a draft), which drops it so the field shows that template's ages; undefined shows formData's
+  const [kidAgesInput, setKidAgesInput] = useState<string | undefined>(undefined);
   const navigate = useNavigate();
 
   // Helper function to get the effective image ID considering pending operations
@@ -209,6 +219,7 @@ export function useTemplateForm({
     
     setFormData(migratedTemplate);
     setSavedTemplate(migratedTemplate);
+    setKidAgesInput(undefined);
     setHasUnsavedChanges(false); // Reset unsaved changes when template is loaded
 
     // Add the initial template state to the first save slot
@@ -532,6 +543,14 @@ export function useTemplateForm({
   // Form submission handler
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Children's ages the field can't read: nothing is saved (saving would remove the template's ages while the
+    // field shows a value), as the setup form keeps Create Story disabled; the Meta tab shows the field and its hint
+    const kidAgesError = unreadableTemplateKidAges(tags, kidAgesInput);
+    if (kidAgesError) {
+      setActiveTab("basic");
+      notificationService.addErrorNotification(`Children's ages: ${kidAgesError}`);
+      return;
+    }
     Logger.UI.log("Form submission started");
     setIsLoading(true);
 
@@ -560,6 +579,9 @@ export function useTemplateForm({
     maxTurns: number;
     gameMode: GameMode;
     generateImages: boolean;
+    // The form's category, and on read-with-kids the ages it read (draftedKidsSetting)
+    category?: StoryCategory;
+    kidAges?: KidAges;
   }) => {
     setIsLoading(true);
     Logger.UI.log("AI draft setup initiated with options:", options);
@@ -593,6 +615,12 @@ export function useTemplateForm({
         }
       });
 
+      // On the read-with-kids category, the Kids tag and the ages the form read, which its stories are written for
+      const kidsSetting = draftedKidsSetting(
+        { tags, kidAges: formData.kidAges },
+        options
+      );
+
       // Update our existing template with the generated content (keeping the same ID)
       const updatedTemplateData: StoryTemplate = {
         ...formData, // Keep existing ID, createdAt, publicationStatus, etc.
@@ -620,6 +648,7 @@ export function useTemplateForm({
         maxTurnsMin: options.maxTurns,
         maxTurnsMax: options.maxTurns,
         difficultyLevels: generatedTemplateData.difficultyLevels || formData.difficultyLevels,
+        ...kidsSetting,
         updatedAt: new Date().toISOString(),
       };
 
@@ -638,8 +667,11 @@ export function useTemplateForm({
         }
       }
 
-      // Update the form data with our merged template
+      // Update the form data with our merged template; the editor's tag list (which Save sends) takes the Kids tag,
+      // and the ages field shows the drafted template's ages
       setFormData(updatedTemplateData);
+      if (kidsSetting.tags) handleTagsChange(kidsSetting.tags);
+      setKidAgesInput(undefined);
 
       // Save the updated template using the encapsulated save function
       await saveTemplateToServer(updatedTemplateData);
@@ -926,6 +958,7 @@ export function useTemplateForm({
   // Discard unsaved changes
   const discardChanges = () => {
     setFormData(savedTemplate);
+    setKidAgesInput(undefined);
     setHasUnsavedChanges(false);
   };
 
@@ -981,6 +1014,7 @@ export function useTemplateForm({
     // Set the selected history entry as the current state
     setFormData(historyEntry.template);
     setSavedTemplate(historyEntry.template);
+    setKidAgesInput(undefined);
     setHasUnsavedChanges(false);
     
     // Set pending image operations for any ID changes detected during revert
@@ -1124,7 +1158,12 @@ export function useTemplateForm({
     handleImageInstructionsChange,
     handleCoverReferenceImagesChange,
     handleDifficultyLevelsChange,
-    handleKidAgesChange,
+    // The Children's ages field: its text, and its change (the template keeps the ages it reads, or none)
+    kidAgesInput,
+    handleKidAgesInput: (text: string) => {
+      setKidAgesInput(text);
+      handleKidAgesChange(readKidAgesField(text).ages ?? null);
+    },
     // Helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { StoryInitializer } from "page/components/StoryInitializer";
 import { ImageCard } from "shared/components/ImageCard";
 import { PrimaryButton, Icons } from "components/ui";
-import { GameModes, PlayerCount } from "core/types";
+import { GameModes, KidAges, PlayerCount, StoryCategory } from "core/types";
 
 interface AiDraftTabProps {
   isSparse: boolean;
@@ -20,6 +20,9 @@ interface AiDraftTabProps {
     maxTurns: number;
     gameMode: GameModes;
     generateImages: boolean;
+    // The form's category, and on read-with-kids the ages it read: the drafted template's Kids tag and ages
+    category?: StoryCategory;
+    kidAges?: KidAges;
   }) => Promise<void>;
   handleAiDraftPromptChange: (prompt: string) => void;
   handleAiDraftPlayerCountChange: (playerCount: PlayerCount) => void;

@@ -14,7 +14,7 @@ jest.mock("../../../../src/config", () =>
  * form, one age or a range, and its stories inherit it. First paint only.
  */
 
-function render(tags: string[], kidAges?: KidAges | null): string {
+function render(tags: string[], kidAges?: KidAges | null, kidAgesInput?: string): string {
   const none = () => undefined;
   return renderMarkup(
     <BasicInfoTab
@@ -42,7 +42,8 @@ function render(tags: string[], kidAges?: KidAges | null): string {
       gameModeOptions={[{ value: 0, label: "Shared Goals" }]}
       getGameModeValue={() => 0}
       kidAges={kidAges}
-      handleKidAgesChange={none}
+      kidAgesInput={kidAgesInput}
+      handleKidAgesInput={none}
     />
   );
 }
@@ -68,5 +69,24 @@ describe("BasicInfoTab: the children's ages on a Kids template", () => {
     const html = render(["Fiction"], { min: 6, max: 8 });
     expect(ageInput(html)).toBeUndefined();
     expect(accessibleText(html)).not.toContain("Children's ages");
+  });
+
+  /*
+   * The field shows the form's own text (useTemplateForm's kidAgesInput), so
+   * when Discard changes or Revert to a save replaces the template, which
+   * drops that text, it shows the template's ages again rather than what was
+   * typed before (the review of 2026-10-01).
+   */
+  it("shows the text typed since the form last took a template, over the template's ages", () => {
+    expect(ageInput(render(["Kids"], { min: 8, max: 10 }, "4"))).toContain('value="4"');
+    expect(ageInput(render(["Kids"], { min: 8, max: 10 }, "8 to 10"))).toContain('value="8 to 10"');
+  });
+
+  it("shows the hint for typed ages it can't read, which Save then refuses", () => {
+    const html = render(["Kids"], null, "8-1");
+    expect(ageInput(html)).toContain('value="8-1"');
+    expect(ageInput(html)).toContain('aria-invalid="true"');
+    expect(ageInput(html)).toContain('aria-describedby="template-kid-ages-error"');
+    expect(accessibleText(html)).toContain(KID_AGES_HINT);
   });
 });

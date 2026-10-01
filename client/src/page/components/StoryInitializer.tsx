@@ -5,6 +5,8 @@ import {
   GameModes,
   DifficultyLevel,
   KID_AGE_LABEL,
+  KidAges,
+  StoryCategory,
   kidAgesText,
 } from "core/types";
 import {
@@ -69,6 +71,9 @@ interface StoryInitializerProps {
     generateImages: boolean;
     pregenerateBeats?: boolean;
     difficultyLevel?: DifficultyLevel;
+    // Draft World: the category, and on read-with-kids the ages the form read (the template's Kids tag and ages)
+    category?: StoryCategory;
+    kidAges?: KidAges;
   }) => Promise<void>;
   initialPlayerCount?: PlayerCount;
   initialMaxTurns?: number;
@@ -195,6 +200,8 @@ export const StoryInitializer = ({
     generateImages: boolean;
     pregenerateBeats?: boolean;
     difficultyLevel?: DifficultyLevel;
+    category?: StoryCategory;
+    kidAges?: KidAges;
   } | null>(null);
 
   // Update URL when relevant state changes
@@ -662,6 +669,9 @@ export const StoryInitializer = ({
         generateImages,
         pregenerateBeats: finalPregenerateBeats,
         ...(templateMode ? {} : { difficultyLevel: selectedDifficultyLevel }),
+        // The drafted template takes the Kids tag and these ages on read-with-kids (draftedKidsSetting)
+        category: selectedCategory,
+        ...(kidAgesField.ages ? { kidAges: kidAgesField.ages } : {}),
       };
 
       // Check if template is not sparse and show warning

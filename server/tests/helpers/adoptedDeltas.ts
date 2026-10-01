@@ -19,15 +19,17 @@
  * A single player's read-with-kids turn was kidsTurn (2026-10-01) with one
  * delta where it shows images: the image places (withKidsImageSlots); since
  * the kids-ages stage of the same day every read-with-kids turn is the
- * measured kidsAges, by age band (productionBeforeKidsAges gives production
- * as it stood before, for the variants measured earlier). Every
+ * measured kidsAges, by age band, with one delta where it shows images: the
+ * picture places by band, which no measured case carried
+ * (withKidsBandImageSlots; productionBeforeKidsAges gives production as it
+ * stood before, for the variants measured earlier). Every
  * ending, a kids ending too, carries one delta since the owner's decision of
  * 2026-10-01: only what was played gets a milestone (withEndingOnlyPlayed).
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
-import type { GameMode } from "core/types/index.js";
+import type { GameMode, KidsBand } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
 import { beatStep } from "../../src/game/services/storyTextSteps.js";
 import { KIDS_BAND_TURNS, kidsListener, kidsTurnText, takesKidsRules } from "../../src/game/services/kidsTurnRules.js";
@@ -39,6 +41,7 @@ import { PARALLEL_THREADS_TEXT, takesLastStageLine } from "../../src/game/servic
 import { RESULTS_AS_OUTCOMES_TEXT } from "../../src/game/services/storyTextRounds/resultsAsOutcomes.js";
 import { ENDING_STATE_TEXT } from "../../src/game/services/storyTextRounds/endingState.js";
 import { LEVER_DIRECTION_TEXT } from "../../src/game/services/storyTextRounds/leverDirection.js";
+import { KIDS_AGES_TEXT, kidsAgesBand } from "../../src/game/services/storyTextRounds/kidsAges.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -300,6 +303,75 @@ export function withKidsImageSlotsSchema(measuredJson: string, story: Story): st
   if (!showsImages(story)) return measuredJson;
   const placed = swapOnce(measuredJson, inJson(KIDS_IMAGE_SLOTS.field), "the text field's image distribution");
   return story.generatesImages() ? swapOnce(placed, inJson(KIDS_IMAGE_SLOTS.late), "the generated image's place") : placed;
+}
+
+/*
+ * The picture places by band (2026-10-01, the review of the kids-ages
+ * adoption). The kidsAges variant names each band's places for a turn's image
+ * tags where the turn shows images (3-5 the first paragraph, and the second
+ * only of three; 6-8 the second, or the third of four; 9-12 the first and the
+ * third; never the last) in place of the grown-up turn's "third or fourth
+ * paragraph" lines it is built on. None of the stage's 18 turn cases showed
+ * images (every one generateImages false, no image library, no template), so
+ * no measured request carried them: not the 3-5 or 9-12 lines, and not a
+ * group's, which until then sent the grown-up lines. Production prints them
+ * on every read-with-kids turn that shows images, most kids stories (the Read
+ * with Kids link opens the form with images on, and a template's story counts
+ * as showing them): a correction of where the pictures go, unmeasured, logged
+ * as withKidsImageSlots was, whose 6-8 lines these are (a single player's 6-8
+ * or ageless turn reads them through kidsTurn and that delta). A turn without
+ * images is kidsAges byte for byte as measured.
+ */
+type PicturePlaces = { prompt: string; field: string; late: string };
+type RequestText = { prompt: string; json: string };
+
+const placesOf = (side: 0 | 1): PicturePlaces => ({ prompt: KIDS_IMAGE_SLOTS.prompt[side], field: KIDS_IMAGE_SLOTS.field[side], late: KIDS_IMAGE_SLOTS.late[side] });
+
+/** The grown-up turn's picture places, which every measured kids turn with images carried. */
+export const GROWN_UP_PICTURE_PLACES: PicturePlaces = placesOf(0);
+
+/** Production's picture places by band on a read-with-kids turn that shows images: the logged delta. */
+export const KIDS_BAND_PICTURE_PLACES: Record<KidsBand, PicturePlaces> = {
+  "3-5": {
+    prompt: "--- A good distribution is an image tag for the first paragraph, and one for the second paragraph only if there are three.\n",
+    field:
+      "--- A good distribution is to have one image tag right before the first paragraph, and one on the second paragraph only if there are three. Never put an image tag on the last paragraph.\n",
+    late: "Use it on the second paragraph if there are three, else on the first.",
+  },
+  "6-8": placesOf(1),
+  "9-12": {
+    prompt: "--- A good distribution is an image tag for the first paragraph and one for the third paragraph.\n",
+    field: "--- A good distribution is to have one image tag right before the first paragraph and one on the third paragraph. Never put an image tag on the last paragraph.\n",
+    late: "Use it relatively late in the beat text (the third paragraph).",
+  },
+};
+
+/** One passage swapped wherever it stands (a group's players each have a text field), and at least once. */
+function swapEvery(text: string, from: string, to: string, what: string): string {
+  if (!text.includes(from)) throw new Error(`The kids-ages turn no longer carries ${what}`);
+  return text.split(from).join(to);
+}
+
+/** A kids turn's picture places swapped, prompt and text fields (the generated image's place where it generates them); a turn without images as it is. */
+function swapPicturePlaces(request: RequestText, story: Story, from: PicturePlaces, to: PicturePlaces): RequestText {
+  if (!showsImages(story)) return request;
+  const inJson = (text: string) => JSON.stringify(text).slice(1, -1);
+  const prompt = swapOnce(request.prompt, [from.prompt, to.prompt], "its picture places");
+  const placed = swapEvery(request.json, inJson(from.field), inJson(to.field), "its text field's picture places");
+  return { prompt, json: story.generatesImages() ? swapEvery(placed, inJson(from.late), inJson(to.late), "its generated picture's place") : placed };
+}
+
+/**
+ * The kidsAges request as the stage measured it: its band's lines on production's grown-up turn and, where the turn
+ * shows images, that turn's own picture places, the variant's by band (which no measured request carried) taken out.
+ */
+export function kidsAgesAsMeasured(variant: RequestText, story: Story): RequestText {
+  return swapPicturePlaces(variant, story, KIDS_AGES_TEXT[kidsAgesBand(story)].image, GROWN_UP_PICTURE_PLACES);
+}
+
+/** The measured kidsAges request with production's picture places by band (a turn that shows images). */
+export function withKidsBandImageSlots(measured: RequestText, story: Story): RequestText {
+  return swapPicturePlaces(measured, story, GROWN_UP_PICTURE_PLACES, KIDS_BAND_PICTURE_PLACES[kidsAgesBand(story)]);
 }
 
 /*
