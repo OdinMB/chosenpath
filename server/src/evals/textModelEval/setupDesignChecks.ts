@@ -1,4 +1,4 @@
-import { GameModes } from "core/types/index.js";
+import { GameModes, kidsBandOf } from "core/types/index.js";
 import type { CheckResult } from "./textChecks.js";
 import type { SetupInput } from "./variants.js";
 
@@ -414,10 +414,12 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   counts.sacrificeTextsWithBonus = withBonus;
   const visiblePlayer = stats.filter((s) => !s.shared && s.visible);
   counts.visiblePlayerStats = visiblePlayer.length;
-  // Setup round 3: a story read with a child keeps two visible stats of each kind, no hidden ones, and plain names
+  // Setup round 3: a story read with a child keeps two visible stats of each kind, no hidden ones, and plain names; the
+  // kids-ages stage (2026-10-01): a third visible player stat where the youngest child is 9 or older
   if (input.kids) {
     const visibleShared = stats.filter((s) => s.shared && s.visible).length;
-    checks.kidsStatBudget = visibleShared <= 2 && visiblePlayer.length <= 2 && stats.every((s) => s.visible);
+    const playerBudget = input.kidAges && kidsBandOf(input.kidAges) === "9-12" ? 3 : 2;
+    checks.kidsStatBudget = visibleShared <= 2 && visiblePlayer.length <= playerBudget && stats.every((s) => s.visible);
     counts.kidsLongStatNames = stats.filter((s) => longestSideWords(s.name) > 2).length;
     checks.kidsPlainStatNames = counts.kidsLongStatNames === 0;
   }

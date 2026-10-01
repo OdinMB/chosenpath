@@ -112,6 +112,8 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "money-adds-up": "Money and counts that add up in a learning story (moneyAddsUp beside production's turn under adopted14, --role beat)",
   "late-pacing":
     "Pacing that leaves the last chapter a milestone, instructions below pacing, hints paid off (latePacing beside production under adopted15: --role switch and --role beat; the short playthroughs with --late-pacing-play, listed below)",
+  "kids-ages":
+    "Read-with-kids turns and setups by the children's age band (kidsAges beside production under adopted16: --role beat, each turn with production's checked retry, and --role setup)",
 };
 
 /** Jobs by arm key, in plan order. */

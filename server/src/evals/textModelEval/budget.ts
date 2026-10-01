@@ -23,7 +23,7 @@ export { FEEDBACK_STAGES };
  * left $2.06, about $0.76 with the stalled Stage 4 calls on top). The
  * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
  * the setup rounds, the turn rounds and the migration check, and $0.10 /
- * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 / $1.20 / $0.39 / $0.26 / $0.26 / $0.195 / $0.195 / $0.195 / $0.195 / $0.78 for the feedback
+ * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 / $1.20 / $0.39 / $0.26 / $0.26 / $0.195 / $0.195 / $0.195 / $0.195 / $0.78 / $0.39 for the feedback
  * workflow's runs (STAGE_CAP_REASONS says why); a stage cap above its default needs a
  * recorded reason, and the global cap can only be lowered. The probe and case
  * building count as Stage 0. The content-filter check (--filter-check,
@@ -68,6 +68,7 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   "kids-turns": 0.195,
   "money-adds-up": 0.195,
   "late-pacing": 0.78,
+  "kids-ages": 0.39,
 };
 /**
  * The owner's hard cap: $30, raised to $33 on 2026-09-27, to $40 on 2026-09-28, to $42 on 2026-09-30 (more playthroughs)
@@ -88,6 +89,12 @@ export const LEDGER_WHEN_FEEDBACK_OPENED = 31.99;
  * $2.40; the caps fit the $42 with the stalled Stage 4 calls on top.
  */
 export const LEDGER_WHEN_REVIEW_OPENED = 37.99;
+
+/**
+ * The ledger total when the owner's decisions of 2026-10-01 opened their measurements: $39.94 of the $45 hard cap. Each
+ * stage is capped at its estimate plus 30%; the caps fit the $45 with the stalled Stage 4 calls on top.
+ */
+export const LEDGER_WHEN_DECISIONS_OPENED = 39.94;
 
 /**
  * What the ledger may not record: Stage 4's 43 hung GPT-6 calls are booked at
@@ -156,6 +163,8 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-10-01 (fix 6 of the second playthroughs' review of 2026-09-30, estimated at about $0.15 and capped 30% above it; the ledger at $38.98 of the $42 hard cap after fixes 1 to 5, and the whole review's workflow held to about $2.40): read-with-kids turns shorter and simpler for the child's age (kidsTurn: on a read-with-kids story the '5-6 paragraphs of 3-5 sentences' count and its repeats made '3-4 short paragraphs of 2-3 short sentences', and one block of rules for a child of the recorded age, options and interludes too), with production's turn beside it (adopted, under adopted13), twice on seven single-player turns (six of the second round's mouse story, read with a five-year-old, and a template tagged Kids; 28 turns, about $0.12 at the round's $0.0025-0.0062 a mouse turn), each with production's one checked retry of a one-paragraph first reply (the round's mouse story retried 2 of 11; about $0.01), a deterministic readability check (no judge calls), a smoke, and what is left for one fix-and-retest",
   "money-adds-up":
     "coordinator, 2026-10-01 (fix 7 of the second playthroughs' review of 2026-09-30, estimated at about $0.15 and capped 30% above it; the ledger at $39.05 of the $42 hard cap after fixes 1 to 6, and the whole review's workflow held to about $2.40): money and counts that add up in a learning story (moneyAddsUp: on a learn-something story that keeps a counted stat, one block at the end of the stat-changes section, every amount the text pays or earns moving its stat by that amount, a worked-out margin moving only by the sum the text shows, never as a reward, no stated total other than the stat's), with production's turn beside it (adopted, under adopted14), twice on six turns of the second round's lemonade story, the one stored learning story that counts money (24 turns, about $0.09 at the round's $0.0026-0.0042 a lemonade turn), a new judged check (the figures add up) with its calibration on hand-read stored turns and constructed failing versions (about 70 Luna low calls, about $0.035), a smoke, and what is left for one fix-and-retest",
+  "kids-ages":
+    "coordinator, 2026-10-01 (the owner's decision that a read-with-kids story's turns and stat budget depend on the children's ages, \"this should depend on the age range that should be part of kids stories settings\"; the owner's \"few bucks don't matter. I just want to make sure that we stay frugal and only run what's needed\"; the ledger at $39.94 of the $45 hard cap; estimated at about $0.30 and capped 30% above it): read-with-kids turns written for the youngest child's age band (kidsAges: 3-5 very short, 6-8 production's kids turn, 9-12 a chapter book's page, every player count, picture places by band) with production's turn beside it (adopted, under adopted16), twice on the mouse story's six frozen turns read with a child aged 4 and 10 (48 turns, about $0.13 at the kids-turns stage's $0.0025-0.003 a turn; at 7 the variant is production's request byte for byte, so none runs) and on a two-player kids story's first turn and switch turn at 4, 7 and 10 (24 group turns, about $0.14 at $0.005-0.0065 a group turn), each with production's one checked retry; the 9-12 band's setup with a third visible player stat beside production's kids setup once on two premises at 10 (4 setups, about $0.025; below 9 the variant is production's setup byte for byte); a deterministic readability check per band (no judge calls), a smoke, and what is left for one fix-and-retest",
   "late-pacing":
     "coordinator, 2026-10-01 (fix 8 of the second playthroughs' review of 2026-09-30, estimated at about $0.50-0.60 and capped 30% above its upper end; the ledger at $39.21 of the $42 hard cap after fixes 1 to 7, the whole review's workflow held to about $2.40, about $1.18 of it left): pacing that leaves the story's last chapter a milestone, story instructions ranked below pacing, hints planted early and paid off late (latePacing: the chapter planner's allowed lengths narrowed to those whose threads after it match the milestones still needed, in PACING and the plan check; the switch planner's priority step keeping a milestone for the last thread and never letting a forced situation take a thread from a player with none to spare; the turn's hint line), with production beside it (adopted, under adopted15): short playthroughs of both, twice each, from the chapter plan where the lengths decided the last chapter to the last chapter's plan, on three of the second round's stored 25-turn stories (New Avalon and the food trucks from turn 17, the estate agents from 13; about 12 runs of 5-10 turns, about $0.44 at the round's $0.0045-0.0062 a turn with its plans), both switch planners twice on five stored switches (20 plans, about $0.03), both turns twice on five stored endings (20 turns, about $0.08), a new judged check (no new mystery late, earlier ones explained at the ending) with its calibration on hand-read stored turns (about 150 Luna low calls, about $0.06), a smoke, and what is left for one fix-and-retest; the fix-and-retest (2026-10-01, after the short playthroughs: the variant's lengths left the food trucks' two players one thread for one milestone each and its switch planner gave that thread to the complete contract, the setup's final-thread rule): latePacingB (the story's SWITCH/THREAD INSTRUCTIONS named in step b as ranked below a player's needed milestones) twice on the five stored switches, and production, the variant and B four times each on the variant's own switch where it failed (22 switch plans, about $0.04), from what is left",
 };

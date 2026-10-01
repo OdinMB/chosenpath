@@ -53,6 +53,8 @@ import { judgeLeversMode } from "./leverDirectionPrep.js";
 import { buildParallelCasesMode, judgeParallelMode } from "./parallelThreadsPrep.js";
 import { buildChallengeCasesMode, judgeChallengeResultsMode } from "./challengeResultsPrep.js";
 import { buildKidsCasesMode, kidsTurnsMode } from "./kidsTurnPrep.js";
+import { buildKidsAgesCasesMode } from "./kidsAgesCases.js";
+import { kidsAgesMode } from "./kidsAgesPrep.js";
 import { buildMoneyCasesMode, judgeMoneyMode } from "./moneyAddsUpPrep.js";
 import { buildLatePacingCasesMode, judgeCluesMode, latePacingPlayMode, printLatePacingPlan } from "./latePacingPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
@@ -97,7 +99,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     resultsAsOutcomes on the second playthroughs' chapter plans, interleaved; kids-turns --role beat under adopted13:
  *     production's turn and kidsTurn on the mouse story's turns and a template tagged Kids, interleaved, each turn with
  *     production's one checked retry; money-adds-up --role beat under adopted14: production's turn and moneyAddsUp on
- *     the lemonade story's turns, interleaved)
+ *     the lemonade story's turns, interleaved; kids-ages under adopted16: --role beat, production's turn and kidsAges on
+ *     the mouse story's turns read with a child aged 4 and 10 and a two-player kids story's turns at 4, 7 and 10,
+ *     interleaved, each with production's one checked retry, and --role setup, production's setup and kidsAges at 10)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -226,6 +230,15 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-clues [--max-spend 0.06]  the stage's judged checks on planted details (cluesJudge.ts) on their calibration
  *     (two samples), the short playthroughs' late turns and the stage's endings (one sample), then judged-clues.md and
  *     .json; --cases <item or case ids> sends only those (a smoke)
+ *   Read-with-kids turns and setups by the children's age band (kidsAgesPrep.ts, 2026-10-01), in the kids-ages stage:
+ *   --build-kids-ages-cases [--rebuild-cases]  the mouse story's frozen kids turns read with a child aged 4 and 10, the
+ *     two-player animal rescue's first turn and switch turn (setup round 3's stored chain) at 4, 7 and 10, and two
+ *     setups at 10 (kidsAgesCases.ts); no calls; they then run with --run --stage kids-ages --prompt-state adopted16,
+ *     --role beat (production's turn and kidsAges, each turn with production's one checked retry) and --role setup
+ *   --kids-ages  the stage's report, no calls: each turn read whole (checkedTurns.ts), every player's kept text read for
+ *     its length and plainness against its band's limits (kidsReadability.ts), per age and player count, the variant
+ *     against production under the stop rule, the retries, the automatic checks, the waits and cost, and the setups'
+ *     stats; kids-ages.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -291,6 +304,8 @@ type Mode =
   | "build-late-pacing-cases"
   | "late-pacing-play"
   | "judge-clues"
+  | "build-kids-ages-cases"
+  | "kids-ages"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -434,6 +449,8 @@ function parseArgs(argv: string[]): Args {
       case "--build-late-pacing-cases":
       case "--late-pacing-play":
       case "--judge-clues":
+      case "--build-kids-ages-cases":
+      case "--kids-ages":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1175,6 +1192,11 @@ async function main() {
     case "judge-clues":
       // The stage's judged checks book to its own stage
       return judgeCluesMode(prepContext(args, files, "late-pacing"), { caseIds: args.caseIds });
+    case "build-kids-ages-cases":
+      return buildKidsAgesCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "kids-ages":
+      // A deterministic check: no calls, so no key and no caps
+      return kidsAgesMode({ files, log: (line) => console.log(line) });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

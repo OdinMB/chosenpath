@@ -1,8 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  KIDS_BAND_LIMITS,
   KIDS_LIMITS,
   meanWords,
   readabilityOf,
+  readsForBand,
   readsForYoungChild,
   syllables,
 } from "../../../../src/evals/textModelEval/kidsReadability.js";
@@ -91,6 +93,44 @@ describe("readsForYoungChild: short enough, and plain enough to be read aloud to
 
   it("fails an empty text", () => {
     expect(readsForYoungChild(readabilityOf(""))).toBe(false);
+  });
+});
+
+/*
+ * The kids-ages stage (2026-10-01): each band's limits, set before its run from
+ * the band's ask and the children's books it follows (storyTextRounds/kidsAges.ts).
+ */
+describe("readsForBand: within the band's length, sentence length and grade", () => {
+  const at = (overrides: Partial<ReturnType<typeof readabilityOf>>) => ({ ...readabilityOf("A cat."), ...overrides });
+
+  it("has the limits set before the run, the 6-8 band's those of the kids-turns stage", () => {
+    expect(KIDS_BAND_LIMITS).toEqual({
+      "3-5": { minWords: 30, maxWords: 100, wordsPerSentence: 9, grade: 3 },
+      "6-8": { minWords: 1, maxWords: 160, wordsPerSentence: 12, grade: 4 },
+      "9-12": { minWords: 130, maxWords: 260, wordsPerSentence: 15, grade: 6 },
+    });
+    expect(KIDS_BAND_LIMITS["6-8"]).toMatchObject({ maxWords: KIDS_LIMITS.words, wordsPerSentence: KIDS_LIMITS.wordsPerSentence, grade: KIDS_LIMITS.grade });
+  });
+
+  it.each([
+    ["3-5", { words: 80, wordsPerSentence: 8, grade: 2.5 }, true],
+    ["3-5", { words: 120, wordsPerSentence: 8, grade: 2.5 }, false],
+    ["3-5", { words: 80, wordsPerSentence: 11, grade: 2.5 }, false],
+    ["3-5", { words: 80, wordsPerSentence: 8, grade: 3.5 }, false],
+    ["3-5", { words: 20, wordsPerSentence: 6, grade: 1 }, false],
+    ["6-8", { words: 160, wordsPerSentence: 12, grade: 4 }, true],
+    ["6-8", { words: 161, wordsPerSentence: 12, grade: 4 }, false],
+    ["9-12", { words: 200, wordsPerSentence: 13, grade: 5.5 }, true],
+    ["9-12", { words: 100, wordsPerSentence: 13, grade: 5.5 }, false],
+    ["9-12", { words: 270, wordsPerSentence: 13, grade: 5.5 }, false],
+    ["9-12", { words: 200, wordsPerSentence: 16, grade: 5.5 }, false],
+    ["9-12", { words: 200, wordsPerSentence: 13, grade: 6.5 }, false],
+  ] as const)("%s, %j: %s", (band, overrides, passes) => {
+    expect(readsForBand(at(overrides), band)).toBe(passes);
+  });
+
+  it("fails an empty text in every band", () => {
+    for (const band of ["3-5", "6-8", "9-12"] as const) expect(readsForBand(readabilityOf(""), band)).toBe(false);
   });
 });
 

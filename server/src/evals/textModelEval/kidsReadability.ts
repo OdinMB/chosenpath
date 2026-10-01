@@ -1,3 +1,4 @@
+import type { KidsBand } from "core/types/index.js";
 import { paragraphsOf, sentenceCount } from "./textChecks.js";
 
 /*
@@ -75,6 +76,28 @@ export function readabilityOf(text: string): Readability {
 /** A turn short and plain enough to read aloud to a young child (KIDS_LIMITS); an empty text never is. */
 export function readsForYoungChild(r: Readability): boolean {
   return r.words > 0 && r.words <= KIDS_LIMITS.words && r.wordsPerSentence <= KIDS_LIMITS.wordsPerSentence && r.grade <= KIDS_LIMITS.grade;
+}
+
+/**
+ * The limits a turn read with a child of each band passes (the kids-ages
+ * stage, 2026-10-01; set before its run from each band's ask and the
+ * children's books it follows, storyTextRounds/kidsAges.ts): 3-5 a picture
+ * book's two spreads (30 to 100 words, at most 9 words a sentence, grade 3);
+ * 6-8 the kids-turns stage's limits (at most 160 words, 12 words a sentence,
+ * grade 4, the Common Core band for grades 2-3 reading 1.98-5.34); 9-12 a
+ * chapter book's page (130 to 260 words, at most 15 words a sentence, grade 6,
+ * inside the grades 4-5 band's 4.51-7.73).
+ */
+export const KIDS_BAND_LIMITS: Record<KidsBand, { minWords: number; maxWords: number; wordsPerSentence: number; grade: number }> = {
+  "3-5": { minWords: 30, maxWords: 100, wordsPerSentence: 9, grade: 3 },
+  "6-8": { minWords: 1, maxWords: KIDS_LIMITS.words, wordsPerSentence: KIDS_LIMITS.wordsPerSentence, grade: KIDS_LIMITS.grade },
+  "9-12": { minWords: 130, maxWords: 260, wordsPerSentence: 15, grade: 6 },
+};
+
+/** A turn within its band's limits (KIDS_BAND_LIMITS); an empty text never is. */
+export function readsForBand(r: Readability, band: KidsBand): boolean {
+  const limits = KIDS_BAND_LIMITS[band];
+  return r.words > 0 && r.words >= limits.minWords && r.words <= limits.maxWords && r.wordsPerSentence <= limits.wordsPerSentence && r.grade <= limits.grade;
 }
 
 /** The mean number of words per item (options, interludes); 0 for none. */

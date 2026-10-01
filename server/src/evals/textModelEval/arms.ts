@@ -68,7 +68,12 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * ranked below pacing and hints paid off (late-pacing: the variant's switch
  * planner beside production's on switches of the second round's stored runs,
  * its turn beside production's on their endings, and short playthroughs of
- * both from mid-story, the --late-pacing-play mode's prep calls).
+ * both from mid-story, the --late-pacing-play mode's prep calls), then
+ * read-with-kids turns and setups by the children's age band (kids-ages: the
+ * variant beside production's turn on the mouse story's turns read with a
+ * child aged 4 and 10 and a two-player kids story's turns at 4, 7 and 10, each
+ * turn with production's one checked retry, and beside production's kids setup
+ * at 10).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -96,6 +101,7 @@ export const FEEDBACK_STAGES = [
   "kids-turns",
   "money-adds-up",
   "late-pacing",
+  "kids-ages",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -287,6 +293,10 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   latePacing: "adopted",
   // Its one fix-and-retest (the story's instructions named in the switch planner's step b), against production's
   latePacingB: "adopted",
+  // The kids-ages stage (2026-10-01, the owner's decision that a kids story depends on the children's ages): turns by
+  // the youngest child's age band, every player count, and the 9-12 band's setup budget, against production's turn and
+  // setup, which run beside them
+  kidsAges: "adopted",
 };
 
 /**
@@ -624,9 +634,32 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return moneyAddsUpArms(role);
     case "late-pacing":
       return latePacingArms(role);
+    case "kids-ages":
+      return kidsAgesArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The kids-ages stage (the owner's decision of 2026-10-01): production's turn
+ * (adopted) and the variant (kidsAges) on each player count's turn model (Luna
+ * medium for one player, Luna low for groups), twice on the stage's turn
+ * cases, interleaved, under adopted16, each turn with production's one checked
+ * retry (the variant's asks for its band's count); and production's custom
+ * setup and the variant's on the setup model (Luna low), once each on the two
+ * setups at 10.
+ */
+function kidsAgesArms(role: EvalRole): ArmPlan[] {
+  const variants = ["adopted", "kidsAges"] as const;
+  if (role === "beat") {
+    return [
+      ...variants.map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: [...KIDS_AGES_CASES.single] })),
+      ...variants.map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: [...KIDS_AGES_CASES.groups] })),
+    ];
+  }
+  if (role === "setup") return variants.map((variant) => ({ arm: adoptedDefault("setup", variant), samples: 1, scope: "all" as const, caseIds: [...KIDS_AGES_CASES.setups] }));
+  return [];
 }
 
 /**
@@ -913,6 +946,47 @@ function leverDirectionArms(role: EvalRole): ArmPlan[] {
 }
 
 /**
+ * The prompt state of the kids-ages stage (2026-10-01): production's own code
+ * since the owner's decisions of that day (only what was played gets a
+ * milestone at the ending, the owner's roll, the cooperative contest, the
+ * lever-direction setup, the read-with-kids setting recorded as kidAges),
+ * under a tag no earlier stage used: its endings and setups differ from what
+ * adopted15 and earlier recorded.
+ */
+export const KIDS_AGES_PROMPT_STATE = "adopted16";
+
+/** The ages the stage reads, one per band (the youngest child's: 3-5, 6-8, 9-12). */
+export const KIDS_AGES = [4, 7, 10] as const;
+
+/** A single player's ages: at 7 (6-8) the variant is production's kids turn byte for byte, so it runs only at 4 and 10. */
+export const KIDS_AGES_SINGLE = [4, 10] as const;
+
+/** The kids-turns stage's frozen mouse turns, which the stage records at its single-player ages. */
+export const KIDS_AGES_MOUSE_SOURCES = KIDS_TURNS_CASES.mouse;
+
+/** The setups' premises (the mouse story's, and the two-player animal rescue's), read with a child aged 10. */
+export const KIDS_AGES_SETUP_SOURCES = { mouse: LEVER_MOUSE_CASE, rescue: "setup-kids-animal-rescue" } as const;
+
+/** Below 9 the variant's setup is production's kids setup byte for byte, so the setups run at 10 only. */
+export const KIDS_AGES_SETUP_AGE = 10;
+
+export const kidsAgesMouseId = (source: string, age: number) => `${source.replace("round-kids-mouse-", "round-kids-ages-mouse-")}-a${age}`;
+export const kidsAgesGroupId = (turn: "first" | "switch", age: number) => `round-kids-ages-rescue-${turn}-a${age}`;
+export const kidsAgesSetupId = (premise: keyof typeof KIDS_AGES_SETUP_SOURCES, age: number) => `round-setup-kids-ages-${premise}-a${age}`;
+
+/**
+ * The stage's cases (kidsAgesCases.ts, no calls): the mouse story's six turns
+ * read with a child aged 4 and 10; the two-player animal rescue's first turn
+ * and switch turn (setup round 3's chain) read with a child aged 4, 7 and 10;
+ * and the two setups at 10.
+ */
+export const KIDS_AGES_CASES = {
+  single: KIDS_AGES_SINGLE.flatMap((age) => KIDS_AGES_MOUSE_SOURCES.map((source) => kidsAgesMouseId(source, age))),
+  groups: KIDS_AGES.flatMap((age) => (["first", "switch"] as const).map((turn) => kidsAgesGroupId(turn, age))),
+  setups: (Object.keys(KIDS_AGES_SETUP_SOURCES) as (keyof typeof KIDS_AGES_SETUP_SOURCES)[]).map((premise) => kidsAgesSetupId(premise, KIDS_AGES_SETUP_AGE)),
+};
+
+/**
  * The prompt state of the recorded-result stage (2026-09-30, fix 2 of the
  * second playthroughs' review): production's own code, unchanged since the
  * outcome-settled stage (every turn request is adopted7's byte for byte),
@@ -1042,7 +1116,7 @@ function choiceLineSpArms(role: EvalRole): ArmPlan[] {
 export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
-const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns"];
+const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages"];
 
 export function stageChecksTurns(stage: Stage): boolean {
   return CHECKED_TURN_STAGES.includes(stage);
@@ -1360,6 +1434,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "kids-turns",
   "money-adds-up",
   "late-pacing",
+  "kids-ages",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1419,6 +1494,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The late-pacing stage's switch plans from the second playthroughs (2026-10-01), frozen after every earlier stage had
   // closed; the stored endings it reads are the outcome-settled stage's
   ...[...LATE_PACING_CASES.switches, ...LATE_PACING_CASES.retest].map((id): [string, Stage] => [id, "late-pacing"]),
+  // The kids-ages stage's turns and setups read with a child of each band's age (2026-10-01), frozen after every earlier
+  // stage had closed
+  ...[...KIDS_AGES_CASES.single, ...KIDS_AGES_CASES.groups, ...KIDS_AGES_CASES.setups].map((id): [string, Stage] => [id, "kids-ages"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

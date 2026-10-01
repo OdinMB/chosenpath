@@ -58,6 +58,7 @@ import { kidsShortTextCount, kidsTurnRequest } from "../../game/services/storyTe
 import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
 import { moneyAddsUpRequest } from "../../game/services/storyTextRounds/moneyAddsUp.js";
 import { latePacingRequest } from "../../game/services/storyTextRounds/latePacing.js";
+import { kidsAgesSetupRequest, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../game/services/storyTextRounds/kidsAges.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -319,6 +320,17 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * final thread's) as ranked below a player's needed milestones, after the
  * variant's food-trucks playthrough gave its last thread to the complete
  * contract; its chapter planner and turn are the variant's.
+ * "kidsAges" is the kids-ages stage's turn and setup (2026-10-01, the owner's
+ * decision that a read-with-kids story depends on the children's ages,
+ * storyTextRounds/kidsAges.ts): production's turn without its kids lines
+ * (the story without its category) with the youngest child's band's lines
+ * (3-5, 6-8, 9-12: the context's count, a block of rules, the shouted repeat,
+ * the text field's count and repeat, the image places) on a read-with-kids
+ * story of every player count, its retry asking for the band's count; and
+ * production's kids setup with a third visible player stat for the 9-12 band
+ * (the setup input's kidAges); production's requests byte for byte elsewhere
+ * (a single player's 6-8 or ageless kids turn included), with production's
+ * limits for the role and player count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -388,7 +400,8 @@ export type VariantId =
   | "moneyAddsUp"
   | "moneyAddsUpB"
   | "latePacing"
-  | "latePacingB";
+  | "latePacingB"
+  | "kidsAges";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -455,6 +468,7 @@ export const VARIANTS: VariantId[] = [
   "moneyAddsUpB",
   "latePacing",
   "latePacingB",
+  "kidsAges",
 ];
 
 /**
@@ -932,6 +946,18 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     if (input.role !== "beat") return { ...latePacingRequest(input.story, input.role, { b: true }), limits };
     const count = beatCheckOptions(input.story).textCount;
     return { ...latePacingRequest(input.story, "beat", { b: true }), limits, ...(count ? { shortTextCount: count } : {}) };
+  },
+  // The kids-ages stage's turn and setup: a read-with-kids story's turns written for the youngest child's age band, every
+  // player count, with a retry asking for the band's count, and the 9-12 band's setup with a third visible player stat;
+  // production's limits
+  kidsAges: (input): CheckedTextRequest => {
+    if (input.role === "setup") {
+      const { premise, playerCount, gameMode, maxTurns, kids, kidAges } = input.setup;
+      return { ...kidsAgesSetupRequest(premise, playerCount, gameMode, maxTurns, "story", { kids, kidAges }), limits: productionCallLimits("setup", playerCount) };
+    }
+    if (input.role !== "beat") throw new Error(`Variant kidsAges does not cover role ${input.role}`);
+    const count = kidsAgesShortTextCount(input.story);
+    return { ...kidsAgesTurnRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
   },
 };
 

@@ -476,6 +476,19 @@ describe("checkSetupDesign: setup round 3's checks (owner notes of 2026-09-28)",
     expect(checkSetupDesign(big, solo).counts).not.toHaveProperty("kidsLongStatNames");
   });
 
+  // The kids-ages stage (2026-10-01): the 9-12 band's budget has a third visible player stat
+  it("allows a third visible player stat where the youngest child is 9 or older, and only there", () => {
+    const three = soloSetup({
+      sharedStats: [stat("Snacks"), stat("Weather")],
+      playerStats: [stat("Courage", { id: "player_courage" }), stat("Map Skill", { id: "player_map" }), stat("Gold Coins", { id: "player_gold" })],
+    });
+    expect(checkSetupDesign(three, { ...solo, kids: true, kidAges: { min: 10, max: 12 } }).checks.kidsStatBudget).toBe(true);
+    expect(checkSetupDesign(three, { ...solo, kids: true, kidAges: { min: 7, max: 10 } }).checks.kidsStatBudget).toBe(false);
+    expect(checkSetupDesign(three, { ...solo, kids: true }).checks.kidsStatBudget).toBe(false);
+    const four = soloSetup({ sharedStats: three.sharedStats, playerStats: [...(three.playerStats as Loose[]), stat("Lantern", { id: "player_lantern" })] });
+    expect(checkSetupDesign(four, { ...solo, kids: true, kidAges: { min: 10, max: 10 } }).checks.kidsStatBudget).toBe(false);
+  });
+
   it("wants two-sided contests between two camps where three players compete, each with an opposites scoreboard", () => {
     const third = { player3: player(["Gus Pell", "Hana Voss", "Ivo Kett"], [outcome("player3_home", "Will the archivist find a home?", 2)]) };
     const camps = duelSetup(third);
