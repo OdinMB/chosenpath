@@ -62,6 +62,7 @@ import { kidsAgesSetupRequest, kidsAgesShortTextCount, kidsAgesTurnRequest } fro
 import { groupLeversRequest } from "../../game/services/storyTextRounds/groupLevers.js";
 import { shortRepliesRequest } from "../../game/services/storyTextRounds/shortReplies.js";
 import { noNewMilestonesRequest, noThreadAuditRequest } from "../../game/services/storyTextRounds/closingTurn.js";
+import { optionsO2cRequest } from "../../game/services/storyTextRounds/optionsO2c.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -368,6 +369,16 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * the milestone block (newMilestones as "", as every other turn sends it);
  * production's request byte for byte on every other turn, with production's
  * single-player turn limits and retry count. Diagnostics, not forms to adopt.
+ * "turnO2c" is option variety with fewer rewards (2026-10-01, the owner's
+ * feedback on O2b, "14 reward options in 32 choice sets is a bit too much";
+ * storyTextRounds/optionsO2c.ts): production's single-player turn with, on a
+ * rolled chapter step, O2b's stat lines and risk-only weak example and a lever
+ * line the game computes: a reward only on a chapter's first step where the
+ * player's previous chapter offered none and a stat allows one (no sacrifice
+ * there), elsewhere no reward and a sacrifice on B6's rate (a second in a
+ * chapter only for a strong reason in the option's text); production's request
+ * byte for byte elsewhere, with production's single-player turn limits and
+ * retry count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -443,7 +454,8 @@ export type VariantId =
   | "groupLeversB"
   | "shortReplies"
   | "noThreadAudit"
-  | "noNewMilestones";
+  | "noNewMilestones"
+  | "turnO2c";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -516,6 +528,7 @@ export const VARIANTS: VariantId[] = [
   "shortReplies",
   "noThreadAudit",
   "noNewMilestones",
+  "turnO2c",
 ];
 
 /**
@@ -1043,6 +1056,13 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   // without the milestone it writes; production's turn limits and production's retry count where it has its own
   noThreadAudit: closingTurnVariant("noThreadAudit", noThreadAuditRequest),
   noNewMilestones: closingTurnVariant("noNewMilestones", noNewMilestonesRequest),
+  // Option variety with fewer rewards (O2c): O2b's stat lines and a reward the game places on a chapter's first step;
+  // production's single-player turn limits and production's retry count where it has its own
+  turnO2c: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant turnO2c does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...optionsO2cRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
+  },
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

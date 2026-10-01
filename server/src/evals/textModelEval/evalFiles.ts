@@ -216,6 +216,11 @@ export function evalFiles(outDir: string) {
       writeJson(at("runaway-2.json"), json);
       fs.writeFileSync(at("runaway-2.md"), markdown);
     },
+    /** The options-o2c stage's report: each rolled step's option set against O2c's line, the odds, against production and O2b (--options-o2c, optionsO2cPrep.ts) */
+    writeOptionsO2c: (markdown: string, json: unknown) => {
+      writeJson(at("options-o2c.json"), json);
+      fs.writeFileSync(at("options-o2c.md"), markdown);
+    },
     /** The choice-line-sp stage's report: each turn read whole, production's retry in the loop (--choice-line-sp, choiceLinePrep.ts) */
     writeChoiceLine: (markdown: string, json: unknown) => {
       writeJson(at("choice-line-sp.json"), json);

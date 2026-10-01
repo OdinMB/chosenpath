@@ -58,6 +58,7 @@ import { kidsAgesMode } from "./kidsAgesPrep.js";
 import { buildGroupLeverCasesMode, groupLeversMode } from "./groupLeversPrep.js";
 import { buildShortReplyCasesMode, shortRepliesMode } from "./shortRepliesPrep.js";
 import { runaway2Mode } from "./runaway2Prep.js";
+import { optionsO2cMode } from "./optionsO2cPrep.js";
 import { buildMoneyCasesMode, judgeMoneyMode } from "./moneyAddsUpPrep.js";
 import { buildLatePacingCasesMode, judgeCluesMode, latePacingPlayMode, printLatePacingPlan } from "./latePacingPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
@@ -82,7 +83,7 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --dry-run (default) [--prompt-state <tag>, default round0]  cases, open jobs, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e|ending-state|runaway|…|short-replies|runaway-2 --prompt-state <tag> [filters]
+ *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e|ending-state|runaway|…|short-replies|runaway-2|options-o2c --prompt-state <tag> [filters]
  *     (options-continuity runs under adopted2: production's form beside the three arms, interleaved;
  *     options-o2 under adopted3: production's form beside version O2 on the stored rolled chapter steps, interleaved,
  *     then O2's retest turnO2b once on the same steps; planner-v2e under round0, beside planner v2c's and v2d's
@@ -110,7 +111,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     adopted18: production's turn and shortReplies on the second playthroughs' short turns, the stored turns that came
  *     back short most often and ordinary ones, on each player count's turn model, interleaved, each with production's
  *     one checked retry; runaway-2 --role beat under adopted19: production's closing turn, noThreadAudit and
- *     noNewMilestones sixteen times each on the switch turn that ran away most, interleaved, first tries only)
+ *     noNewMilestones sixteen times each on the switch turn that ran away most, interleaved, first tries only;
+ *     options-o2c --role beat under adopted20: production's single-player turn and turnO2c twice on the stored
+ *     rolled chapter steps, interleaved, first tries only)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -268,6 +271,12 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --runaway-2  the stage's report, no calls: each job's first try, answered or run away (cut at the output cap or by
  *     the timeout), each diagnostic against production under the stop rule, the answered replies' reasoning tokens,
  *     every runaway with its time, the answered replies' stat changes and milestones; runaway-2.md and .json
+ *   Option variety with fewer rewards (optionsO2cPrep.ts, 2026-10-01), in the options-o2c stage:
+ *   --options-o2c  the stage's report, no calls: each first reply's option set read as the game keeps it against the line
+ *     O2c's rule gives its state (the reward turn, a sacrifice that fits, a second only for a strong reason, none), its
+ *     sacrifice or reward, the variety checks and the odds (which kind of option leads), O2c against production and
+ *     against O2b's stored replies under the stop rule, every lever's text, the automatic checks, waits and cost;
+ *     options-o2c.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -340,6 +349,7 @@ type Mode =
   | "build-short-reply-cases"
   | "short-replies"
   | "runaway-2"
+  | "options-o2c"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -490,6 +500,7 @@ function parseArgs(argv: string[]): Args {
       case "--build-short-reply-cases":
       case "--short-replies":
       case "--runaway-2":
+      case "--options-o2c":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1249,6 +1260,9 @@ async function main() {
     case "runaway-2":
       // A deterministic reading: no calls, so no key and no caps
       return runaway2Mode({ files, log: (line) => console.log(line) });
+    case "options-o2c":
+      // A deterministic reading: no calls, so no key and no caps
+      return optionsO2cMode({ files, log: (line) => console.log(line) });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

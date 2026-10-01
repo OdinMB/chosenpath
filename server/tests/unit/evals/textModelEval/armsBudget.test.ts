@@ -20,6 +20,7 @@ import {
   OPTIONS_CONTINUITY_RETEST_CASES,
   OPTIONS_O2_CASES,
   OPTIONS_O2_PROMPT_STATE,
+  OPTIONS_O2C_PROMPT_STATE,
   pipelinePlans,
   PLAYTHROUGHS_2_PROMPT_STATE,
   productionArm,
@@ -447,6 +448,9 @@ describe("budget caps", () => {
       // The coordinator's brief of 2026-10-01: the runaway turn's cause, a second attempt, its estimate (with the runaways
       // and their retries, and room for one fix-and-retest) plus 30%
       "runaway-2": 0.6,
+      // The coordinator's brief of 2026-10-01: option variety with fewer rewards (O2c), its estimate (with its judged
+      // checks and room for one fix-and-retest) plus 30%
+      "options-o2c": 0.85,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -477,6 +481,7 @@ describe("budget caps", () => {
       "group-levers",
       "short-replies",
       "runaway-2",
+      "options-o2c",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -499,7 +504,7 @@ describe("budget caps", () => {
     expect(LEDGER_WHEN_REVIEW_OPENED + UNRECORDED_STAGE4_USD + capsOf(review)).toBeLessThanOrEqual(HARD_CEILING);
     // The owner's decisions of 2026-10-01 opened their measurements with the ledger at $39.94 of the $45 hard cap; their
     // caps fit with the $1.3 on top
-    expect(decisions).toEqual(["kids-ages", "group-levers", "short-replies", "runaway-2"]);
+    expect(decisions).toEqual(["kids-ages", "group-levers", "short-replies", "runaway-2", "options-o2c"]);
     expect(LEDGER_WHEN_DECISIONS_OPENED).toBe(39.94);
     expect(LEDGER_WHEN_DECISIONS_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisions)).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
@@ -737,6 +742,35 @@ describe("budget caps", () => {
     // The ledger read $40.93 when it opened: its cap fits under the $45 with the stalled Stage 4 calls on top
     expect(DEFAULT_STAGE_CAPS["runaway-2"]).toBe(0.6);
     expect(40.93 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["runaway-2"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("measures option variety with fewer rewards (options-o2c, 2026-10-01): production's turn and O2c twice on the 32 stored rolled chapter steps, interleaved, first tries, under a tag of their own", () => {
+    const arms = ["adopted", "turnO2c"].map((variant) => armKey({ model: TEXT_MODEL_GROUPS.beat.model, reasoningEffort: TEXT_MODEL_GROUPS.beat.reasoningEffort }, variant as "adopted"));
+    expect(arms).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/turnO2c"]);
+    expect(armsFor("options-o2c", "beat").map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source, p.caseIds])).toEqual(
+      arms.map((key) => [key, 1, 2, "single-player", "stored", OPTIONS_O2_CASES])
+    );
+    // The same 32 stored rolled steps version O2 and O2b ran on, the only stored single-player turns whose request O2c changes
+    expect(OPTIONS_O2_CASES).toHaveLength(32);
+    for (const role of ["setup", "switch", "thread", "iteration"] as const) expect(armsFor("options-o2c", role)).toEqual([]);
+    expect(pipelinePlans("options-o2c")).toEqual([]);
+    expect(stageInterleavesArms("options-o2c")).toBe(true);
+    // First tries, as O2 and O2b ran (their stored replies are the second reference): no checked retry
+    expect(stageChecksTurns("options-o2c")).toBe(false);
+    // Production's code since the short-replies adoption, under a tag no earlier stage used
+    expect(OPTIONS_O2C_PROMPT_STATE).toBe("adopted20");
+    expect([OPTIONS_O2_PROMPT_STATE, RUNAWAY_2_PROMPT_STATE, SHORT_REPLIES_PROMPT_STATE]).not.toContain(OPTIONS_O2C_PROMPT_STATE);
+    for (const id of OPTIONS_O2_CASES) expect(stagePlansCase("options-o2c", id)).toBe(true);
+    // Against production's turn, which runs beside it; O2b (stored, adopted3) second, and priced from O2b, the form it edits
+    expect(referenceKey(arms[1])).toBe(arms[0]);
+    expect(secondReferenceKeys(arms[1])).toEqual(["gpt-6-luna@medium/turnO2b"]);
+    expect(estimateBaseKey(arms[1])).toBe("gpt-6-luna@medium/turnO2b");
+    expect(STAGE_CAP_REASONS["options-o2c"]).toMatch(/turnO2c/);
+    expect(STAGE_CAP_REASONS["options-o2c"]).toMatch(/14 reward options in 32 choice sets/);
+    expect(STAGE_CAP_REASONS["options-o2c"]).toMatch(/2026-10-01/);
+    expect(stageRunsBaseline("options-o2c")).toBe(false);
+    // The ledger read $41.09 when it opened: its cap fits under the $45 with the stalled Stage 4 calls on top
+    expect(41.09 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["options-o2c"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("runs the choice-result stage (2026-09-30): production's turn and the exploration-order turn twice on the exploration steps, interleaved, and planner v2e and v2f on the chapter plans", () => {

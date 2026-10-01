@@ -117,6 +117,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "group-levers": "Group sacrifices, rewards and own stats (groupLevers beside production's group turn under adopted17, --role beat, each with production's checked retry)",
   "short-replies": "Turns that come back as one short paragraph (shortReplies beside production's turn under adopted18, --role beat, each with production's checked retry)",
   "runaway-2": "The runaway turn's cause again (noThreadAudit and noNewMilestones beside production's closing turn under adopted19, --role beat, on the case that ran away most)",
+  "options-o2c": "Option variety with fewer rewards (turnO2c beside production's turn under adopted20, --role beat, on the stored rolled chapter steps)",
 };
 
 /** Jobs by arm key, in plan order. */

@@ -82,7 +82,9 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * with production's one checked retry), then the runaway turn's cause again
  * (runaway-2: production's closing turn and two diagnostic variants, each
  * without one of the two blocks only a turn that closes a chapter carries, on
- * the case that ran away most).
+ * the case that ran away most), then option variety with fewer rewards
+ * (options-o2c: O2b's stat lines with a reward the game places, beside
+ * production's turn on the stored rolled chapter steps).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -114,6 +116,7 @@ export const FEEDBACK_STAGES = [
   "group-levers",
   "short-replies",
   "runaway-2",
+  "options-o2c",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -322,6 +325,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // writes, against production's closing turn, which runs beside them on the case that ran away most
   noThreadAudit: "adopted",
   noNewMilestones: "adopted",
+  // Option variety with fewer rewards (2026-10-01, the owner's feedback on O2b): O2b's stat lines and a reward the game
+  // places, against production's single-player turn, which runs beside it
+  turnO2c: "adopted",
 };
 
 /**
@@ -344,6 +350,7 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   choiceResultB: "choiceResult",
   outcomeSettledB: "outcomeSettled",
   groupLeversB: "groupLevers",
+  turnO2c: "turnO2b",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -433,6 +440,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_MEDIUM, "turnO2")]: [armKey(LUNA_MEDIUM, "turnO"), armKey(LUNA_MEDIUM, "turnOb")],
   // O2's fix-and-retest against O2, the line it changes
   [armKey(LUNA_MEDIUM, "turnO2b")]: [armKey(LUNA_MEDIUM, "turnO2")],
+  // O2c against O2b, whose stat lines it keeps and whose reward invitation it narrows (stored, adopted3)
+  [armKey(LUNA_MEDIUM, "turnO2c")]: [armKey(LUNA_MEDIUM, "turnO2b")],
   // The choice-result turn's fix-and-retest against the run's line, the sentence it changes
   [armKey(LUNA_MEDIUM, "choiceResultB")]: [armKey(LUNA_MEDIUM, "choiceResult")],
   // The outcome-settled retest against the run's lines, the sentences it changes, on both turn models
@@ -670,9 +679,39 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return shortRepliesArms(role);
     case "runaway-2":
       return runaway2Arms(role);
+    case "options-o2c":
+      return optionsO2cArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the options-o2c stage (2026-10-01): production's own
+ * code, its requests unchanged since the short-replies adoption, under a tag no
+ * earlier stage used, so production runs beside O2c in the same minutes.
+ */
+export const OPTIONS_O2C_PROMPT_STATE = "adopted20";
+
+/**
+ * Option variety with fewer rewards (the coordinator's brief of 2026-10-01,
+ * after the owner's feedback on O2b: "14 reward options in 32 choice sets is a
+ * bit too much"): production's single-player turn (adopted) and O2c (turnO2c)
+ * on Luna medium, production's single-player turn model and limits, twice on
+ * the 32 stored rolled chapter steps O2 and O2b ran on (OPTIONS_O2_CASES, the
+ * only stored single-player turns whose request O2c changes), interleaved, so
+ * both meet the same server pace. First tries, as O2 and O2b ran, so their
+ * stored replies read beside them: no checked retry.
+ */
+function optionsO2cArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return (["adopted", "turnO2c"] as const).map((variant) => ({
+    arm: adoptedDefault("beat", variant),
+    samples: 2,
+    scope: "single-player" as const,
+    source: "stored" as const,
+    caseIds: OPTIONS_O2_CASES,
+  }));
 }
 
 /**
@@ -1649,6 +1688,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "group-levers",
   "short-replies",
   "runaway-2",
+  "options-o2c",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
