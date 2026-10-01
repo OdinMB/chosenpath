@@ -18,6 +18,7 @@ import {
 import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { outcomeStateLines } from "../endingStates.js";
 import { kidsListener, kidsTurnText, takesKidsRules } from "../kidsTurnRules.js";
+import { TEXT_GOES_ON } from "../textParagraphs.js";
 
 /**
  * The scoreboard ending rule (the setup document's decision 3, question 1,
@@ -425,7 +426,10 @@ Example: If the player decided to organize a vote, describe what they do, how th
             : "") +
           "--- The goal of multiplayer games is to have an interesting interactions between players. The beat text should reflect that.\n"
         : ""
-    } 
+    }${
+      // The line before ends in a space, as it always has; then the text goes on after its first paragraph (the short-replies stage, 2026-10-01)
+      ` \n${TEXT_GOES_ON}`
+    }
 - Show, don't tell.
 --- Use the list of 'show don't tell' instructions that you generated in the plan for the beat.
 --- Right now, the most common failure mode for bad responses is that they don't follow the principle of 'show don't tell'. It's important that you don't make this mistake.${

@@ -94,9 +94,9 @@ describe("the switch configuration's reminder, as production sends it", () => {
 });
 
 describe("noSwitchReminderRequest: production's single-player turn without the reminder on a switch turn", () => {
-  it.each(SWITCH_TURNS)("%s: production's request with the reminder cut, and nothing else", (_, build) => {
+  it.each(SWITCH_TURNS)("%s: production's request with the reminder cut, and nothing else (production as it stood before the short-replies adoption of 2026-10-01)", (_, build) => {
     const story = build();
-    const [ours, production] = [noSwitchReminderRequest(story), beatStep.request(story)];
+    const [ours, production] = [noSwitchReminderRequest(story), productionThen(beatStep.request(story), story)];
     expect(ours.prompt).toBe(production.prompt.replace(SWITCH_REMINDER, ""));
     expect(ours.prompt).not.toContain("These things have not yet happened");
     expect(ours.prompt.endsWith("\n- Relationship to other switches: single-player\n")).toBe(true);
@@ -143,11 +143,11 @@ describe("noSwitchReminderRequest: production's single-player turn without the r
     expect(switchTurns).toBeGreaterThan(5);
   });
 
-  (frozen.length ? it : it.skip)("the runaway case: production's request today is the one that ran away on 30 September, byte for byte", () => {
+  (frozen.length ? it : it.skip)("the runaway case: production's request, as it stood before the short-replies adoption of 2026-10-01, is the one that ran away on 30 September, byte for byte", () => {
     const [runaway] = RUNAWAY_CASES;
     const story = caseStory(frozen.find((c) => c.id === runaway)!);
     expect(story.getCurrentBeatType()).toBe("switch");
-    expect(sha256(beatStep.request(story).prompt)).toBe("25faaf999fd9ea330a3175bb9cfcb7452afefd56328d3f01d224c21041c68b43");
+    expect(sha256(productionThen(beatStep.request(story), story).prompt)).toBe("25faaf999fd9ea330a3175bb9cfcb7452afefd56328d3f01d224c21041c68b43");
     expect(sha256(noSwitchReminderRequest(story).prompt)).not.toBe(sha256(beatStep.request(story).prompt));
   });
 });

@@ -28,7 +28,11 @@
  * A group's chapter step with a player in a challenge or contest thread is the
  * measured groupLeversB since the group-levers stage of the same day (not a
  * delta; beforeGroupLevers and productionThen give production as it stood
- * before, for the variants measured earlier).
+ * before, for the variants measured earlier). Every turn carries the
+ * short-replies stage's two lines since that stage's adoption, later that day
+ * (the text goes on after its first paragraph: withShortReplies puts them into
+ * a form measured before it, not a delta; beforeShortReplies and productionThen
+ * take them out of production for the variants measured earlier).
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
@@ -47,6 +51,7 @@ import { ENDING_STATE_TEXT } from "../../src/game/services/storyTextRounds/endin
 import { LEVER_DIRECTION_TEXT } from "../../src/game/services/storyTextRounds/leverDirection.js";
 import { KIDS_AGES_TEXT, kidsAgesBand } from "../../src/game/services/storyTextRounds/kidsAges.js";
 import { GROUP_LEVERS_TEXT, groupLeversBase, takesGroupLevers } from "../../src/game/services/storyTextRounds/groupLevers.js";
+import { SHORT_REPLIES_TEXT, shortRepliesBase, withShortRepliesLines } from "../../src/game/services/storyTextRounds/shortReplies.js";
 import { REWARD_EXCEPTION } from "../../src/game/services/optionRules.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
@@ -269,14 +274,44 @@ export function beforeGroupLevers(production: string, story: Story): string {
   return production.replace(exception, () => derailAnchor).replace(lines, () => leverAnchor);
 }
 
+/*
+ * The short-replies stage's adoption (2026-10-01): every turn, every player
+ * count and form, carries one line in its text rules (before "- Show, don't
+ * tell.") and one in each player's text field (before "- Start exactly where
+ * …"): the text never ends after its first paragraph. The measured shortReplies
+ * lines, not a delta; every form measured before it carries neither. The kept
+ * tests put them on a measured form with the variant's own edit
+ * (withShortRepliesLines in storyTextRounds/shortReplies.ts, which also gives
+ * each player's text field its own schema instance, as production's does).
+ */
+
+/** A measured request (its prompt as the other deltas leave it) with the short-replies lines, as text: prompt and JSON schema. */
+export function withShortReplies(measured: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }): RequestText {
+  const lined = withShortRepliesLines(measured as Parameters<typeof withShortRepliesLines>[0]);
+  return { prompt: lined.prompt, json: JSON.stringify(toJsonSchema(lined.schema)) };
+}
+
+/** Production's prompt as it stood before the short-replies adoption: without the text rules' line (a prompt already without it as it is). */
+export function beforeShortReplies(production: string): string {
+  const line = `${SHORT_REPLIES_TEXT.promptLine}\n`;
+  if (production.split(line).length > 2) throw new Error("Production's turn carries the short-replies line more than once");
+  return production.replace(line, "");
+}
+
+/** Production's JSON schema text as it stood before the short-replies adoption: without the text fields' line. */
+export function beforeShortRepliesJson(json: string): string {
+  return json.split(inJsonText(SHORT_REPLIES_TEXT.fieldLine)).join("");
+}
+
 /**
  * A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones
- * (beforeEndingOnlyPlayed) and before the group-levers adoption of the same day (beforeGroupLevers; a group's rolled
- * step's schema as it was built then, groupLeversBase). The variants measured before compare with it.
+ * (beforeEndingOnlyPlayed), before the group-levers adoption of the same day (beforeGroupLevers; a group's rolled
+ * step's schema as it was built then, groupLeversBase) and before the short-replies adoption later that day
+ * (beforeShortReplies; the schema as shortRepliesBase builds it). The variants measured before compare with it.
  */
 export function productionThen<R extends { prompt: string }>(request: R, story: Story): R {
-  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(request.prompt, story), story);
-  const schema = "schema" in request && takesGroupLevers(story) ? { schema: groupLeversBase(story).schema } : {};
+  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(beforeShortReplies(request.prompt), story), story);
+  const schema = "schema" in request ? { schema: takesGroupLevers(story) ? groupLeversBase(story).schema : shortRepliesBase(story).schema } : {};
   return { ...request, prompt, ...schema };
 }
 
@@ -410,7 +445,11 @@ export function withKidsBandImageSlots(measured: RequestText, story: Story): Req
  */
 /** Production's turn as it stood before the kids-ages adoption: its prompt and its JSON schema's text. */
 export function productionBeforeKidsAges(story: Story): { prompt: string; json: string } {
-  const asText = (request: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) => ({ prompt: request.prompt, json: JSON.stringify(toJsonSchema(request.schema)) });
+  // Without the short-replies stage's lines, which came later that day (groupLeversBase builds on shortRepliesBase)
+  const asText = (request: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) => ({
+    prompt: beforeShortReplies(request.prompt),
+    json: beforeShortRepliesJson(JSON.stringify(toJsonSchema(request.schema))),
+  });
   // A group's rolled step as it stood before the group-levers adoption too (groupLeversBase), which came later that day
   if (!takesKidsRules(story)) return asText(groupLeversBase(story));
   if (story.isMultiplayer()) return asText(groupLeversBase(story.clone({ category: undefined })));

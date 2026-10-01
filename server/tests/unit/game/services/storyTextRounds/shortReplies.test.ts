@@ -3,7 +3,7 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import type { StoryState } from "core/types/index.js";
-import { SHORT_REPLIES_TEXT, shortRepliesRequest } from "../../../../../src/game/services/storyTextRounds/shortReplies.js";
+import { SHORT_REPLIES_TEXT, shortRepliesBase, shortRepliesRequest } from "../../../../../src/game/services/storyTextRounds/shortReplies.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { beatCheckOptions } from "../../../../../src/game/services/kidsTurnRules.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
@@ -15,14 +15,16 @@ import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../
  * brief of 2026-10-01 after the second playthroughs: 13 of 126 first replies
  * one short paragraph, 2 of them short again after production's retry). Every
  * short text in the eval's stored replies is exactly one ordinary first
- * paragraph (147 of 147 texts, 53-96 words) and none has two to four
+ * paragraph (147 of 147 texts, 45-96 words) and none has two
  * paragraphs (18 of 4,564 texts have three or four), so the reply closes its
  * text where the first paragraph break would go; in a group the later players'
  * texts follow the first player's (31 of 34 short group replies short for
  * every player). The variant is production's turn, every turn kind and player
  * count, with one line in the text rules and one in each player's text field
  * saying the text goes on after its first paragraph, a blank line between
- * paragraphs. Production's request byte for byte otherwise.
+ * paragraphs. Production's request byte for byte otherwise. Since its adoption
+ * (2026-10-01) production prints both lines, so the variant builds on
+ * production with them taken out (shortRepliesBase), as it was measured.
  */
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -51,11 +53,25 @@ const TURNS: [string, () => Story][] = [
 const players = (schema: unknown) => Object.entries((schema as z.AnyZodObject).shape).filter(([key]) => /^player\d+$/.test(key)) as [string, z.AnyZodObject][];
 const textField = (player: z.AnyZodObject) => (player.shape.text as z.ZodString).description ?? "";
 
+describe("the base the variant builds on: production's turn as the stage measured it", () => {
+  it.each(TURNS)("%s: production's request with both lines taken out; production since the adoption is the variant byte for byte", (_, build) => {
+    const story = build();
+    const base = shortRepliesBase(story);
+    const production = beatStep.request(story);
+    expect(base.prompt).not.toContain(SHORT_REPLIES_TEXT.promptLine);
+    expect(json(base.schema)).not.toContain(inJson(SHORT_REPLIES_TEXT.fieldLine));
+    expect(base.prompt).toBe(production.prompt.split(`${SHORT_REPLIES_TEXT.promptLine}\n`).join(""));
+    expect(json(base.schema)).toBe(json(production.schema).split(inJson(SHORT_REPLIES_TEXT.fieldLine)).join(""));
+    expect(production.prompt).toBe(shortRepliesRequest(story).prompt);
+    expect(json(production.schema)).toBe(json(shortRepliesRequest(story).schema));
+  });
+});
+
 describe("the prompt: one line after the first paragraph's rules", () => {
-  it.each(TURNS)("%s: the line once, right before the text rules' show-don't-tell bullet, and production's prompt byte for byte without it", (_, build) => {
+  it.each(TURNS)("%s: the line once, right before the text rules' show-don't-tell bullet, and the base byte for byte without it", (_, build) => {
     const story = build();
     const variant = shortRepliesRequest(story).prompt;
-    const production = beatStep.request(story).prompt;
+    const production = shortRepliesBase(story).prompt;
     expect(occurrences(variant, SHORT_REPLIES_TEXT.promptLine)).toBe(1);
     expect(occurrences(variant, `\n${SHORT_REPLIES_TEXT.promptLine}\n- Show, don't tell.\n`)).toBe(1);
     // It comes after the first paragraph's rules, in the instructions before the story state
@@ -66,10 +82,10 @@ describe("the prompt: one line after the first paragraph's rules", () => {
 });
 
 describe("the reply schema: one line in each player's text field", () => {
-  it.each(TURNS)("%s: every player's text field carries it once, before its first rule after the count; production's schema byte for byte without it", (_, build) => {
+  it.each(TURNS)("%s: every player's text field carries it once, before its first rule after the count; the base's schema byte for byte without it", (_, build) => {
     const story = build();
     const variant = shortRepliesRequest(story).schema;
-    const production = beatStep.request(story).schema;
+    const production = shortRepliesBase(story).schema;
     const slots = players(variant);
     expect(slots.map(([slot]) => slot)).toEqual(players(production).map(([slot]) => slot));
     for (const [, player] of slots) {
@@ -83,7 +99,7 @@ describe("the reply schema: one line in each player's text field", () => {
   it("keeps slots that share one schema instance sharing one, as production's do", () => {
     for (const story of [firstSwitchBeat(3), threadBeat(2), endingBeat(2), laterSwitchBeat(3, kids(4))]) {
       const variant = players(shortRepliesRequest(story).schema).map(([, p]) => p);
-      const production = players(beatStep.request(story).schema).map(([, p]) => p);
+      const production = players(shortRepliesBase(story).schema).map(([, p]) => p);
       for (let i = 1; i < production.length; i++) expect(variant[i] === variant[0]).toBe(production[i] === production[0]);
     }
   });

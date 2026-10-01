@@ -183,7 +183,8 @@ describe("the fix-and-retest, moneyAddsUpB", () => {
 
   it("is production's request byte for byte where the block isn't taken, and an eval variant of turns", () => {
     const story = threadBeat(1, { ...LEARNING, category: "flexible" });
-    expect(moneyAddsUpRequest(story, { b: true }).prompt).toBe(beatStep.request(story).prompt);
+    // Production as it stood when the stage ran (since the short-replies adoption, later that day, without its lines)
+    expect(moneyAddsUpRequest(story, { b: true }).prompt).toBe(productionThen(beatStep.request(story), story).prompt);
     const switchTurn = laterSwitchBeat(1, LEARNING);
     expect(requestText(requestFor("moneyAddsUpB", { role: "beat", story: switchTurn }))).toBe(moneyAddsUpRequest(switchTurn, { b: true }).prompt);
     expect(() => requestFor("moneyAddsUpB", { role: "switch", story: switchTurn })).toThrow(/does not cover role switch/);

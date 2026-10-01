@@ -14,7 +14,7 @@ import { replaceOnce, splitAtState } from "./roundEdits.js";
  * replies, 4,564 player texts outside the kids stages; a temporary probe, no
  * calls):
  * - A short text is always exactly one paragraph, and an ordinary first
- *   paragraph: 147 of 147 short texts, 53 to 96 words, three or four
+ *   paragraph: 147 of 147 short texts, 45 to 96 words, three or four
  *   sentences, no line break at all. No text has two paragraphs, and 18 have
  *   three or four; the rest have five or six. So the reply doesn't write a
  *   shorter turn: it closes the text where its first paragraph break would go.
@@ -47,6 +47,12 @@ import { replaceOnce, splitAtState } from "./roundEdits.js";
  * 2-3, 3-4 or 4-5). Production's request byte for byte otherwise; slots that
  * share one schema instance keep sharing one. Production's retry of a short
  * reply is unchanged.
+ *
+ * Adopted after the run of 2026-10-01: production's copy is textParagraphs.ts
+ * (TEXT_GOES_ON, TEXT_GOES_ON_FIELD, beatSchemaWithTextGoesOn), and the kept
+ * tests hold production to this variant byte for byte, prompt and JSON schema.
+ * The variant builds on production with both lines taken out
+ * (shortRepliesBase), so it still builds as measured.
  */
 
 const LABEL = "Short-replies turn";
@@ -64,8 +70,8 @@ const FIELD_LINE = "- All the paragraphs go in this one text, a blank line (\\n\
 /** The passages the tests pin. */
 export const SHORT_REPLIES_TEXT = { promptAnchor: PROMPT_ANCHOR, promptLine: PROMPT_LINE, fieldAnchor: FIELD_ANCHOR, fieldLine: FIELD_LINE };
 
-/** The reply schema with every player's text field given the line; slots that share one instance keep sharing one. */
-function schemaWithLine(root: z.AnyZodObject): z.AnyZodObject {
+/** The reply schema with every player's text description edited; slots that share one instance keep sharing one. */
+function schemaWithText(root: z.AnyZodObject, edit: (description: string) => string): z.AnyZodObject {
   const edited = new Map<unknown, z.AnyZodObject>();
   const players = Object.fromEntries(
     Object.entries(root.shape)
@@ -76,7 +82,7 @@ function schemaWithLine(root: z.AnyZodObject): z.AnyZodObject {
         if (!(value instanceof z.ZodObject)) throw new Error(`${LABEL}: ${key} is not an object schema`);
         const text = value.shape.text;
         if (!(text instanceof z.ZodString) || !text.description) throw new Error(`${LABEL}: ${key}'s text has no description`);
-        const next = value.extend({ text: z.string().describe(replaceOnce(LABEL, text.description, FIELD_ANCHOR, `${FIELD_LINE}${FIELD_ANCHOR}`)) });
+        const next = value.extend({ text: z.string().describe(edit(text.description)) });
         edited.set(value, next);
         return [key, next];
       })
@@ -84,10 +90,27 @@ function schemaWithLine(root: z.AnyZodObject): z.AnyZodObject {
   return root.extend(players);
 }
 
-/** Production's turn with the line in the text rules and in each player's text field; every turn kind and player count. */
-export function shortRepliesRequest(story: Story): TextRequest<z.AnyZodObject> {
+/**
+ * Production's turn as the stage measured it beside the variant. Since the
+ * adoption (2026-10-01) production prints both lines on every turn
+ * (textParagraphs.ts), so they are taken out (the texts are the variant's,
+ * which a test holds).
+ */
+export function shortRepliesBase(story: Story): TextRequest<z.AnyZodObject> {
   const production = beatStep.request(story);
   const { instructions, state } = splitAtState(LABEL, production.prompt);
+  const prompt = replaceOnce(LABEL, instructions, `\n${PROMPT_LINE}${PROMPT_ANCHOR}`, PROMPT_ANCHOR) + state;
+  return { prompt, schema: schemaWithText(production.schema, (d) => replaceOnce(LABEL, d, `${FIELD_LINE}${FIELD_ANCHOR}`, FIELD_ANCHOR)) };
+}
+
+/** A turn request with the variant's two lines: in its text rules and in every player's text field (the kept tests put them on the forms measured before). */
+export function withShortRepliesLines(request: TextRequest<z.AnyZodObject>): TextRequest<z.AnyZodObject> {
+  const { instructions, state } = splitAtState(LABEL, request.prompt);
   const prompt = replaceOnce(LABEL, instructions, PROMPT_ANCHOR, `\n${PROMPT_LINE}${PROMPT_ANCHOR}`) + state;
-  return { prompt, schema: schemaWithLine(production.schema) };
+  return { prompt, schema: schemaWithText(request.schema, (d) => replaceOnce(LABEL, d, FIELD_ANCHOR, `${FIELD_LINE}${FIELD_ANCHOR}`)) };
+}
+
+/** Production's turn (as measured) with the line in the text rules and in each player's text field; every turn kind and player count. */
+export function shortRepliesRequest(story: Story): TextRequest<z.AnyZodObject> {
+  return withShortRepliesLines(shortRepliesBase(story));
 }

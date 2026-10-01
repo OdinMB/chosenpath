@@ -22,6 +22,7 @@ import {
   withKidsBandImageSlots,
   withKidsImageSlots,
   withKidsImageSlotsSchema,
+  withShortReplies,
 } from "../../../helpers/adoptedDeltas.js";
 import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../../../src/game/services/storyTextRounds/endingState.js";
 import { ENDING_MILESTONES_PLAYED, ENDING_OUTCOME_KINDS, SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
@@ -62,7 +63,11 @@ import { GROUP_LEVER_QUESTION, GROUP_SHARED_AND_OWN, REWARD_EXCEPTION, groupSacr
  * group's chapter step with a player in a challenge or contest thread is the
  * measured fix-and-retest groupLeversB byte for byte (B6's lever parts for
  * each such player, the plan's lever question asked from the player's line),
- * a player exploring beside them included.
+ * a player exploring beside them included. Since the short-replies stage of the
+ * same day every turn, every form, carries that stage's measured lines (the
+ * text never ends after its first paragraph: one in the text rules, one in each
+ * player's text field), which the forms measured before it never had
+ * (withShortReplies).
  */
 
 /**
@@ -170,26 +175,30 @@ function expectSame(production: Request, measured: Request | Expected) {
  */
 function kidsAdopted(story: Story): Expected {
   const measured = kidsTurnRequest(story);
-  return {
-    prompt: withEndingOnlyPlayed(withKidsImageSlots(measured.prompt, story), story),
-    json: withKidsImageSlotsSchema(json(measured.schema), story),
-  };
+  const lined = withShortReplies({ prompt: withEndingOnlyPlayed(withKidsImageSlots(measured.prompt, story), story), schema: measured.schema });
+  return { prompt: lined.prompt, json: withKidsImageSlotsSchema(lined.json, story) };
 }
 
 /**
  * A read-with-kids turn of every player count and band (the kids-ages stage of 2026-10-01): the measured kidsAges, the
  * grown-up turn (the same story without its category, which the other tests hold to its measured form) with the
  * band's kids lines, and where the turn shows images the logged picture places by band (withKidsBandImageSlots,
- * adoptedDeltas.ts: no case of the stage showed images, so none of its measured requests carried them).
+ * adoptedDeltas.ts: no case of the stage showed images, so none of its measured requests carried them). The variant
+ * is built on production's live grown-up turn, so it carries the short-replies lines production prints since that
+ * stage's adoption, later the same day.
  */
 const kidsAgesAdopted = (story: Story): Expected => {
   const variant = kidsAgesTurnRequest(story);
   return withKidsBandImageSlots(kidsAgesAsMeasured({ prompt: variant.prompt, json: json(variant.schema) }, story), story);
 };
 
-/** The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. */
+/**
+ * The measured request with the turn deltas applied (adoptedDeltas.ts) and, since the short-replies stage of
+ * 2026-10-01, that stage's measured lines in its prompt and every text field (withShortReplies): what production must
+ * send for this story.
+ */
 const asAdopted = (measured: Request, story: Story): Expected =>
-  takesKidsRules(story) ? kidsAgesAdopted(story) : { prompt: adoptedTurn(measured.prompt, story), json: json(measured.schema) };
+  takesKidsRules(story) ? kidsAgesAdopted(story) : withShortReplies({ prompt: adoptedTurn(measured.prompt, story), schema: measured.schema });
 
 describe("single-player turns: today's form with B6 as measured, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(SINGLE_PLAYER)("%s", (_, build) => {

@@ -74,6 +74,7 @@ import {
 } from "../../../helpers/promptStories.js";
 import { createMockMultiplayerStory, createMockStoryState } from "../../../helpers/testHelpers.js";
 import { outcome, threadAnalysis } from "../../../helpers/textFixtures.js";
+import { beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
 import { evalCase, record, tags } from "./fixtures.js";
 
 beforeEach(() => {
@@ -586,9 +587,10 @@ describe("planJobs: the round stages and the migration check", () => {
     // The smoke: sample 1 of each
     const smoke = planJobs(cases, { stage: "runaway", promptState: "adopted4", roles: ["beat"], mode: "isolated", subset15: false, records: [], samples: 1 });
     expect(smoke.map((j) => `${j.sample} ${j.armKey}`)).toEqual(["1 gpt-6-luna@medium/adopted", "1 gpt-6-luna@medium/noSwitchReminder"]);
-    // The two requests differ by the switch reminder alone
+    // The two requests differed by the switch reminder alone (production as it stood when the fix ran: since the
+    // short-replies adoption of 2026-10-01 production's turn carries that stage's lines too)
     const [production, fix] = jobs.slice(0, 2).map((j) => requestText(j.first.request()));
-    expect(production.replace(SWITCH_REMINDER, "")).toBe(fix);
+    expect(beforeShortReplies(production).replace(SWITCH_REMINDER, "")).toBe(fix);
     expect(production).not.toBe(fix);
     expect(planJobs(cases, { stage: "runaway", promptState: "adopted4", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
   });
@@ -628,9 +630,10 @@ describe("planJobs: the round stages and the migration check", () => {
     const onSingle = turns.filter((j) => j.caseId === single && j.sample === 1).map((j) => turns.indexOf(j));
     expect(Math.abs(onSingle[0] - onSingle[1])).toBe(1);
     // The two requests differed by the exploration line alone; since the choice-line-sp adoption (2026-09-30) production's
-    // own request (adopted) is the variant's, and what it sent then is productionTurnToday
+    // own request (adopted) is the variant's (with the short-replies lines since that stage's adoption of 2026-10-01), and
+    // what it sent then is productionTurnToday
     const [production, variant] = onSingle.map((i) => requestText(turns[i].first.request()));
-    expect(production).toBe(variant);
+    expect(beforeShortReplies(production)).toBe(variant);
     expect(variant.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(productionTurnToday(caseStory(cases[1])).prompt);
     // The planners, beside planner v2e's stored plans: v2e and v2f twice on a built plan, v2f once on a stored one
     const plans = planJobs(cases, { stage: "choice-result", promptState: "round0", roles: ["thread"], mode: "isolated", subset15: false, records: [] });
@@ -664,11 +667,12 @@ describe("planJobs: the round stages and the migration check", () => {
       [...[1, 2].flatMap((s) => [stored, single].flatMap((c) => ["adopted", "choiceResult"].map((v) => `${c} s${s} gpt-6-luna@medium/${v}`)))].sort()
     );
     // Interleaved: both arms on a case before the next case; the requests differed by the exploration line alone (since
-    // the stage's adoption, production's own request is the variant's, and what it sent at the run is productionTurnToday)
+    // the stage's adoption, production's own request is the variant's, with the short-replies lines since that stage's
+    // adoption of 2026-10-01, and what it sent at the run is productionTurnToday)
     const onSingle = turns.filter((j) => j.caseId === single && j.sample === 1);
     expect(Math.abs(turns.indexOf(onSingle[0]) - turns.indexOf(onSingle[1]))).toBe(1);
     const [production, variant] = onSingle.map((j) => requestText(j.first.request()));
-    expect(production).toBe(variant);
+    expect(beforeShortReplies(production)).toBe(variant);
     expect(variant.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(productionTurnToday(caseStory(cases[1])).prompt);
     // Production's one checked retry on every job: its check is production's, and so is the retry's request
     const reply = (paragraphs: number, options: number) => ({

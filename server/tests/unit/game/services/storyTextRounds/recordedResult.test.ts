@@ -132,8 +132,9 @@ describe("the variant on a chapter step after an exploration step", () => {
     expect(occurrences(prompt, RECORDED_RESULT_TEXT.narrateLine)).toBe(1);
     expect(prompt).toContain(`${RECORDED_RESULT_TEXT.narrateAnchor}\n${RECORDED_RESULT_TEXT.narrateLine}`);
     expect(prompt).not.toContain(RECORDED_RESULT_TEXT.milestoneLine);
-    // The exploration step carries production's exploration-order line too: the base is production's request today
-    expect(choiceResultRequest(story).prompt).toBe(beatStep.request(story).prompt);
+    // The exploration step carries production's exploration-order line too: the base is production's request as it stood
+    // when the stage ran (since the short-replies adoption of 2026-10-01, production's request without that stage's lines)
+    expect(choiceResultRequest(story).prompt).toBe(productionThen(beatStep.request(story), story).prompt);
     expectBaseAround(story);
   });
 });

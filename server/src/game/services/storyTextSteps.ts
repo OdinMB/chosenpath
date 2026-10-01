@@ -20,6 +20,7 @@ import { assembleSetupReply, iterationSchema, setupGenerationSchema } from "./se
 import { assembleSwitchPlan, assembleThreadPlan, switchReplySchema, threadReplySchema } from "./plannerReplies.js";
 import { beatSchemaWithGroupLevers, beatSchemaWithOptionRules, takesGroupLeverRules, takesOptionRules } from "./optionRules.js";
 import { beatSchemaForKids, takesKidsRules } from "./kidsTurnRules.js";
+import { beatSchemaWithTextGoesOn } from "./textParagraphs.js";
 import { paidLevers } from "./leverPayments.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
@@ -120,8 +121,9 @@ function mergeChanges(response: SetOfBeatGenerationSchema): Change[] {
 
 export const beatStep = {
   /**
-   * A turn for every player; a single player's rolled chapter step takes the option rules (B6) in its fields too, and a
-   * turn read with a child, every player count, its age band's count in its text field (the kids-turns and kids-ages stages).
+   * A turn for every player; a single player's rolled chapter step takes the option rules (B6) in its fields too, a
+   * turn read with a child, every player count, its age band's count in its text field (the kids-turns and kids-ages
+   * stages), and every turn the line that its text goes on after its first paragraph (the short-replies stage).
    */
   request(story: Story): TextRequest<z.AnyZodObject> {
     const schema = createSetOfBeatGenerationSchema(
@@ -136,7 +138,7 @@ export const beatStep = {
     const withRules = takesOptionRules(story) ? beatSchemaWithOptionRules(schema) : takesGroupLeverRules(story) ? beatSchemaWithGroupLevers(schema, story) : schema;
     return {
       prompt: BeatPromptService.createBeatPrompt(story),
-      schema: takesKidsRules(story) ? beatSchemaForKids(withRules, story) : withRules,
+      schema: beatSchemaWithTextGoesOn(takesKidsRules(story) ? beatSchemaForKids(withRules, story) : withRules),
     };
   },
 

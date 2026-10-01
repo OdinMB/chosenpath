@@ -23,7 +23,8 @@ import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { productionSends } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { sacrificeRewardLine } from "../../../../src/game/services/optionRules.js";
-import { groupLeverSlots, groupLeversBase, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
+import { groupLeverSlots, groupLeversBase, groupLeversRequest, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
+import { withShortRepliesLines } from "../../../../src/game/services/storyTextRounds/shortReplies.js";
 import { fakeCall, input } from "./playFixtures.js";
 
 /*
@@ -129,9 +130,10 @@ describe("groupLeversCases on the second round's stored playthroughs (skipped wh
     let rateNone = 0;
     for (const c of cases) {
       const story = caseStory(c);
-      // The run sent the variant's base; production today sends groupLeversB (the group-levers adoption, 2026-10-01)
+      // The run sent the variant's base; production today sends groupLeversB (the group-levers adoption, 2026-10-01) with
+      // the short-replies stage's lines, adopted later that day
       expect([c.id, sha256(groupLeversBase(story).prompt)]).toEqual([c.id, sentHashOf(c.id)]);
-      expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sha256(requestText(requestFor("groupLeversB", requestInputFor(c))))]);
+      expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sha256(withShortRepliesLines(groupLeversRequest(story, { b: true })).prompt)]);
       const slots = groupLeverSlots(story);
       expect([c.id, slots.length > 0]).toEqual([c.id, true]);
       players.add(story.getNumberOfPlayers());

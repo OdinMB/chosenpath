@@ -24,6 +24,7 @@ import {
 import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
 import { OPTIONS_O2_CASES, stagePlansCase } from "../../../../../src/evals/textModelEval/arms.js";
 import { takesKidsRules } from "../../../../../src/game/services/kidsTurnRules.js";
+import { shortRepliesBase, withShortRepliesLines } from "../../../../../src/game/services/storyTextRounds/shortReplies.js";
 import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
@@ -131,11 +132,13 @@ const SINGLE_PLAYER: [string, () => Story][] = [
  * and an exploration step, which carries the exploration-order line since the
  * choice-line-sp adoption of the same day; the arms' base keeps the turns they
  * ran beside. Nor did any turn then read a story's category: a single
- * player's read-with-kids turn takes the kids rules since 2026-10-01.
+ * player's read-with-kids turn takes the kids rules since 2026-10-01. Nor did
+ * any turn carry the short-replies stage's lines, adopted that day too
+ * (shortRepliesBase takes them out).
  */
 function productionThen(story: Story) {
   if (story.getCurrentBeatType() === "ending") return productionEndingForm(story);
-  const today = beatStep.request(takesKidsRules(story) ? story.clone({ category: undefined, readingAge: undefined }) : story);
+  const today = shortRepliesBase(takesKidsRules(story) ? story.clone({ category: undefined, readingAge: undefined }) : story);
   return takesExplorationOrder(story) ? { ...today, prompt: today.prompt.replace(EXPLORATION_ORDER, "") } : today;
 }
 
@@ -148,14 +151,15 @@ describe("the base: production's single-player turn form, built from the frozen 
     expect(optionsContinuityRequest(story, BASE).prompt).toBe(production.prompt);
   });
 
-  it("differs from today's production only at the ending, which production now tells as its milestones leave it, and on an exploration step, which now carries the exploration-order line", () => {
+  it("differs from today's production only at the ending, which production now tells as its milestones leave it, on an exploration step, which now carries the exploration-order line, and by the short-replies lines every turn carries since 2026-10-01", () => {
     const ending = endingBeat(1);
     // endingStateB with the owner's lines of 2026-10-01 on what was played (adoptedDeltas.ts)
-    expect(beatStep.request(ending).prompt).toBe(withEndingOnlyPlayed(endingStateRequest(ending).prompt, ending));
-    expect(productionTurnForm(ending).prompt).not.toBe(beatStep.request(ending).prompt);
+    expect(shortRepliesBase(ending).prompt).toBe(withEndingOnlyPlayed(endingStateRequest(ending).prompt, ending));
+    expect(productionTurnForm(ending).prompt).not.toBe(shortRepliesBase(ending).prompt);
     const exploring = chapterStep("exploration", 1);
     expect(beatStep.request(exploring).prompt.split(EXPLORATION_ORDER)).toHaveLength(2);
-    expect(productionTurnForm(exploring).prompt).toBe(beatStep.request(exploring).prompt.replace(EXPLORATION_ORDER, ""));
+    expect(productionTurnForm(exploring).prompt).toBe(shortRepliesBase(exploring).prompt.replace(EXPLORATION_ORDER, ""));
+    expect(beatStep.request(exploring).prompt).toBe(withShortRepliesLines(shortRepliesBase(exploring)).prompt);
   });
 
   (frozen.length ? it : it.skip)("every frozen single-player turn: production's request byte for byte (the ending as it stood when the arms ran)", () => {

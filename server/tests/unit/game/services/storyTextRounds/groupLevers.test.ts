@@ -7,6 +7,7 @@ import { GROUP_LEVERS_TEXT, groupLeverSlots, groupLeversBase, groupLeversRequest
 import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, sacrificeRewardLine } from "../../../../../src/game/services/optionRules.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { beatCheckOptions } from "../../../../../src/game/services/kidsTurnRules.js";
+import { shortRepliesBase, withShortRepliesLines } from "../../../../../src/game/services/storyTextRounds/shortReplies.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
@@ -108,16 +109,18 @@ describe("the base the variant builds on: production's group turn as the stage m
       expect(base.prompt.length).toBeLessThan(production.prompt.length);
       expect(json(base.schema)).toContain("(Many beats are better without any sacrifice or reward options.)");
       expect(json(base.schema)).not.toContain("a reward option is the one exception");
-      // Production since the adoption is the measured fix-and-retest byte for byte
-      expect(production.prompt).toBe(groupLeversRequest(story, { b: true }).prompt);
-      expect(json(production.schema)).toBe(json(groupLeversRequest(story, { b: true }).schema));
+      // Production since the adoption is the measured fix-and-retest byte for byte, with the short-replies stage's lines
+      // adopted later that day (withShortRepliesLines, the measured shortReplies edit)
+      const adopted = withShortRepliesLines(groupLeversRequest(story, { b: true }));
+      expect(production.prompt).toBe(adopted.prompt);
+      expect(json(production.schema)).toBe(json(adopted.schema));
     }
   });
 
-  it("is production's request byte for byte where no player is in a rolled group thread", () => {
+  it("is production's request as the stage measured it, byte for byte, where no player is in a rolled group thread (without the later short-replies lines)", () => {
     for (const story of [threadBeat(1), firstSwitchBeat(2), laterSwitchBeat(3), endingBeat(2), explorationStep(2)]) {
-      expect(groupLeversBase(story).prompt).toBe(beatStep.request(story).prompt);
-      expect(json(groupLeversBase(story).schema)).toBe(json(beatStep.request(story).schema));
+      expect(groupLeversBase(story).prompt).toBe(shortRepliesBase(story).prompt);
+      expect(json(groupLeversBase(story).schema)).toBe(json(shortRepliesBase(story).schema));
     }
   });
 });
@@ -136,12 +139,12 @@ describe("which turns take the variant", () => {
     ["a group's later switch", () => laterSwitchBeat(3)],
     ["a group's ending", () => endingBeat(2)],
     ["a group's exploration step", () => explorationStep(2)],
-  ])("none on %s, which is production's request byte for byte", (_, build) => {
+  ])("none on %s, which is production's request (as the stage measured it) byte for byte", (_, build) => {
     const story = build();
     expect(takesGroupLevers(story)).toBe(false);
     expect(groupLeverSlots(story)).toEqual([]);
     const variant = groupLeversRequest(story);
-    const production = beatStep.request(story);
+    const production = shortRepliesBase(story);
     expect(variant.prompt).toBe(production.prompt);
     expect(json(variant.schema)).toBe(json(production.schema));
   });
@@ -225,11 +228,11 @@ describe("the fix-and-retest (B): the plan's lever question follows the player's
     expect(bWithAsQuestion).toBe(json(a.schema));
   });
 
-  it("is production's request byte for byte where the variant applies to no one", () => {
+  it("is production's request (as the stage measured it) byte for byte where the variant applies to no one", () => {
     for (const story of [threadBeat(1), laterSwitchBeat(2), explorationStep(3), endingBeat(2)]) {
       const b = groupLeversRequest(story, { b: true });
-      expect(b.prompt).toBe(beatStep.request(story).prompt);
-      expect(json(b.schema)).toBe(json(beatStep.request(story).schema));
+      expect(b.prompt).toBe(shortRepliesBase(story).prompt);
+      expect(json(b.schema)).toBe(json(shortRepliesBase(story).schema));
     }
   });
 
@@ -252,7 +255,8 @@ describe("the eval's variant groupLevers", () => {
       const count = beatCheckOptions(story).textCount;
       expect("shortTextCount" in request ? request.shortTextCount : undefined).toBe(count);
     }
-    expect(requestText(requestFor("groupLevers", { role: "beat", story: threadBeat(1) }))).toBe(requestText(requestFor("adopted", { role: "beat", story: threadBeat(1) })));
+    // Production's request as the stage measured it (since the short-replies adoption, later that day, without its lines)
+    expect(requestText(requestFor("groupLevers", { role: "beat", story: threadBeat(1) }))).toBe(shortRepliesBase(threadBeat(1)).prompt);
   });
 
   it("covers turns only", () => {

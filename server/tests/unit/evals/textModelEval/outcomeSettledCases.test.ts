@@ -10,6 +10,7 @@ import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthr
 import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { outcomesCompletedThisBeat } from "../../../../src/game/services/storyTextRounds/outcomeSettled.js";
+import { beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
 import { fakeCall, input } from "./playFixtures.js";
 
 /*
@@ -35,7 +36,9 @@ describe("outcomeSettledCases on a played fake story", () => {
   it("freezes a switch turn after a chapter as its input with the switch plan as its fixed analysis, category outcome-settled", async () => {
     const { call, calls } = fakeCall(1);
     const { run } = await playStory(PLAYTHROUGHS[0], input(1), call, { sample: 1 });
-    const byId = new Map(calls.map((c: PlayCallSpec) => [c.caseId, sha256(requestText(c.request))]));
+    // The fake run plays through today's production; the stored playthroughs sent each turn before the short-replies
+    // adoption of 2026-10-01, so the run's requests are read as production sent them then
+    const byId = new Map(calls.map((c: PlayCallSpec) => [c.caseId, sha256(beforeShortReplies(requestText(c.request)))]));
     const hashOf = (outputFile: string) => byId.get(outputIdOf(outputFile));
     const switchTurn = run.turns.find((t) => t.turn > 1 && t.plan?.kind === "switch plan");
     expect(switchTurn).toBeDefined();

@@ -22,6 +22,7 @@ import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { productionSends } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { SHORT_REPLIES_TEXT } from "../../../../src/game/services/storyTextRounds/shortReplies.js";
+import { beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
 import { fakeCall, input } from "./playFixtures.js";
 
 /*
@@ -50,6 +51,9 @@ describe("shortRepliesCases on a played fake story", () => {
     const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1 });
     const byId = new Map(calls.map((c: PlayCallSpec) => [c.caseId, sha256(requestText(c.request))]));
     const hashOf = (outputFile: string) => byId.get(outputIdOf(outputFile));
+    // The same run as production sent it before this stage's adoption, as the second round's runs were
+    const thenById = new Map(calls.map((c: PlayCallSpec) => [c.caseId, sha256(beforeShortReplies(requestText(c.request)))]));
+    const hashThen = (outputFile: string) => thenById.get(outputIdOf(outputFile));
     const first = run.turns.find((t) => t.kind === "first turn");
     const step = run.turns.find((t) => t.kind === "chapter step");
     expect(first).toBeDefined();
@@ -68,7 +72,7 @@ describe("shortRepliesCases on a played fake story", () => {
     expect(caseStory(cases[0]).isFirstBeat()).toBe(true);
     expect(shortRepliesCasesToFreeze(cases, [run], hashOf, false, specs, productionSends).skipped).toEqual(["round-short-fake-t1", "round-short-fake-step"]);
     // The second round's runs sent production's group chapter step before the group levers' adoption
-    expect(shortRepliesCases([run], hashOf, specs).problems).toEqual([`round-short-fake-step: its request is not the one the run sent at turn ${step?.turn} of play-food-trucks`]);
+    expect(shortRepliesCases([run], hashThen, specs).problems).toEqual([`round-short-fake-step: its request is not the one the run sent at turn ${step?.turn} of play-food-trucks`]);
   });
 });
 
@@ -132,9 +136,11 @@ describe("shortRepliesCases on the second round's stored playthroughs (skipped w
       expect([spec.id, played?.calls.some((c) => c.retry)]).toEqual([spec.id, true]);
     }
     for (const c of cases) {
-      // The variant is production's request today, built from the same state, with its line
+      // The variant is production's request without the stage's lines, built from the same state, with them; since the
+      // adoption (2026-10-01) production sends it byte for byte
       const variant = requestText(requestFor("shortReplies", requestInputFor(c)));
-      expect(variant.split(`${SHORT_REPLIES_TEXT.promptLine}\n`).join("")).toBe(requestText(requestFor("adopted", requestInputFor(c))));
+      expect(variant.split(`${SHORT_REPLIES_TEXT.promptLine}\n`).join("")).toBe(beforeShortReplies(requestText(requestFor("adopted", requestInputFor(c)))));
+      expect(variant).toBe(requestText(requestFor("adopted", requestInputFor(c))));
     }
   });
 });

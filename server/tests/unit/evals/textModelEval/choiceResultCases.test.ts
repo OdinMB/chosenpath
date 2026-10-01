@@ -14,7 +14,7 @@ import {
 } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { CHOICE_RESULT_TEXT } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { threadBeat } from "../../../helpers/promptStories.js";
-import { beforeGroupLevers } from "../../../helpers/adoptedDeltas.js";
+import { beforeGroupLevers, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import { requestInputFor } from "../../../../src/evals/textModelEval/jobPlan.js";
 import { outputIdOf } from "../../../../src/evals/textModelEval/judgedChecks.js";
@@ -51,7 +51,10 @@ async function playedFake() {
   const byId = new Map(calls.map((c: PlayCallSpec) => [c.caseId, sha256(requestText(c.request))]));
   // fakeCall writes each call's output as outputs/<case id>.json
   const hashOf = (outputFile: string) => byId.get(outputIdOf(outputFile));
-  return { run, hashOf };
+  // The same run as production sent it before the short-replies adoption (2026-10-01), as the stored playthroughs were
+  const thenById = new Map(calls.map((c: PlayCallSpec) => [c.caseId, sha256(beforeShortReplies(requestText(c.request)))]));
+  const hashThen = (outputFile: string) => thenById.get(outputIdOf(outputFile));
+  return { run, hashOf, hashThen };
 }
 
 const SPECS: ChoiceCaseSpec[] = [
@@ -83,15 +86,16 @@ describe("playthroughsSent: what production sent in the stored playthroughs, bef
     expect(playthroughsSent(input)).not.toBe(productionSends(input));
   });
 
-  it("is a group's exploration step without the adopted exploration-order line, and production's request on every other turn", async () => {
+  it("is a group's exploration step without the adopted exploration-order line, and production's request on every other turn (as it stood before the later adoptions of 2026-10-01)", async () => {
     const group = { role: "beat" as const, story: groupExplorationStep() };
     expect(productionSends(group)).toContain(CHOICE_RESULT_TEXT.explorationOrder);
-    expect(playthroughsSent(group)).toBe(productionSends(group).replace(CHOICE_RESULT_TEXT.explorationOrder, ""));
-    // A group's challenge step as production sent it before the group-levers adoption (2026-10-01, beforeGroupLevers)
-    for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) expect(playthroughsSent({ role: "beat", story })).toBe(beforeGroupLevers(productionSends({ role: "beat", story }), story));
+    expect(playthroughsSent(group)).toBe(beforeShortReplies(productionSends(group)).replace(CHOICE_RESULT_TEXT.explorationOrder, ""));
+    // A group's challenge step as production sent it before the group-levers adoption (2026-10-01, beforeGroupLevers),
+    // every turn before the short-replies adoption later that day (beforeShortReplies)
+    for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) expect(playthroughsSent({ role: "beat", story })).toBe(beforeGroupLevers(beforeShortReplies(productionSends({ role: "beat", story })), story));
     const { run, hashOf } = await playedFake();
     const [opening, step] = choiceResultCases([run], hashOf, SPECS, productionSends).cases;
-    for (const c of [opening, step]) expect(playthroughsSent(requestInputFor(c))).toBe(productionSends(requestInputFor(c)));
+    for (const c of [opening, step]) expect(playthroughsSent(requestInputFor(c))).toBe(beforeShortReplies(productionSends(requestInputFor(c))));
   });
 });
 
@@ -144,8 +148,10 @@ describe("choiceResultCases: turns and plans of a stored playthrough, frozen as 
     expect(again.cases).toEqual([]);
     expect(again.skipped).toEqual(SPECS.map((s) => s.id));
     expect(choiceResultCasesToFreeze(first.cases, [run], hashOf, true, SPECS, productionSends).cases).toHaveLength(3);
-    // By default a case is built only where it is what the stored playthroughs sent: the fake run's plan is today's
-    expect(choiceResultCasesToFreeze([], [run], hashOf, false, SPECS).problems).toEqual([expect.stringMatching(/^round-choice-plan-fake-t2: its request is not the one the run sent/)]);
+    // By default a case is built only where it is what the stored playthroughs sent: the fake run's plan is today's (its
+    // turns read as production sent them before the short-replies adoption, as the stored playthroughs were)
+    const { hashThen } = await playedFake();
+    expect(choiceResultCasesToFreeze([], [run], hashThen, false, SPECS).problems).toEqual([expect.stringMatching(/^round-choice-plan-fake-t2: its request is not the one the run sent/)]);
   });
 
   it("names the stage's own cases, each once, as the stage plans them", () => {

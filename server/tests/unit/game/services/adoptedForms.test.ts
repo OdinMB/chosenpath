@@ -20,6 +20,7 @@ import {
   withLeverDirectionSchema,
   withResultsAsOutcomes,
   withResultsAsOutcomesSchema,
+  withShortReplies,
   withThreadsThatFit,
 } from "../../../helpers/adoptedDeltas.js";
 import { kidsBandOf } from "core/types/index.js";
@@ -45,7 +46,9 @@ import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
  * milestones leave it (endingStateB, 2026-09-30), a turn read with a child,
  * every player count, and a kids setup for a child of 9 or older by the
  * children's age band (kidsAges, 2026-10-01; a single player's 6-8 turn is
- * the kids-turns stage's kidsTurn, which adoptedTurns.test.ts holds), and AI
+ * the kids-turns stage's kidsTurn, which adoptedTurns.test.ts holds), every
+ * turn with the short-replies stage's two lines (shortReplies, 2026-10-01; a
+ * kids turn's kidsAges carries them, built on production's live turn), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -116,8 +119,11 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     case "switch":
       // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured
       return { prompt: withContestLastStage(withThreadsThatFit(prompt, input.story), input.story), schema: json(measured) };
-    case "beat":
-      return { prompt: adoptedTurn(prompt, input.story), schema: json(measured) };
+    case "beat": {
+      // Since the short-replies stage (2026-10-01): every turn's text goes on after its first paragraph, as measured
+      const lined = withShortReplies({ prompt: adoptedTurn(prompt, input.story), schema: (measured as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
+      return { prompt: lined.prompt, schema: lined.json };
+    }
   }
 }
 

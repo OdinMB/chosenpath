@@ -4,8 +4,9 @@ import { getThreadType } from "core/types/index.js";
 import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
 import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, sacrificeRewardLine } from "../optionRules.js";
 import { beatSchemaForKids, takesKidsRules } from "../kidsTurnRules.js";
-import { beatStep, canAddMilestones, type TextRequest } from "../storyTextSteps.js";
+import { canAddMilestones, type TextRequest } from "../storyTextSteps.js";
 import { replaceOnce, splitAtState } from "./roundEdits.js";
+import { shortRepliesBase } from "./shortReplies.js";
 
 /*
  * Group sacrifices, rewards and players' own stats (eval only; the
@@ -182,11 +183,12 @@ function schemaWithLevers(root: z.AnyZodObject, slots: string[], form: GroupLeve
  * and lever fields on a rolled group step, so the prompt's are taken out (the
  * texts are the variant's, which a test holds), and the schema is built as
  * production built it before: core's set schema, with the band's kids text
- * where the story is read with a child. Production's request byte for byte on
- * every other turn.
+ * where the story is read with a child. Since the short-replies adoption of the
+ * same day, later, production's turn without that stage's lines
+ * (shortRepliesBase) on every turn, as the stage measured it.
  */
 export function groupLeversBase(story: Story): TextRequest<z.AnyZodObject> {
-  const production = beatStep.request(story);
+  const production = shortRepliesBase(story);
   if (groupLeverSlots(story).length === 0) return production;
   const prompt = production.prompt.split(`${DERAIL_ANCHOR} ${REWARD_EXCEPTION}`).join(DERAIL_ANCHOR).split(`${LEVER_ANCHOR}${leverBlock(story)}`).join(LEVER_ANCHOR);
   const raw = createSetOfBeatGenerationSchema(story.getNumberOfPlayers(), canAddMilestones(story), story.isMultiplayer(), story.generatesImages(), story.hasImages());
