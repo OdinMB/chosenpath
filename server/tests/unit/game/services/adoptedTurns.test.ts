@@ -153,10 +153,24 @@ function groupStep(players: number, kind: "exploration" | "mixed"): Story {
   return story.clone({ storyPhases: state.storyPhases });
 }
 
+/**
+ * A group's chapter step (threadBeat) on player2's own outcome, every player holding an own outcome: only player2's roll
+ * decides it (the owner's decision of 2026-10-01), so the others get no lever (withOwnersRollLevers, adoptedDeltas.ts).
+ */
+function ownOutcomeStep(players: number): Story {
+  const story = threadBeat(players);
+  const state = structuredClone(story.getState());
+  const analysis = state.storyPhases[1] as ThreadAnalysis;
+  analysis.threads = analysis.threads.map((t) => ({ ...t, outcomeId: "player2_own" }));
+  const withOutcomes = Object.fromEntries(Object.entries(state.players).map(([slot, player]) => [slot, { ...player, outcomes: [outcome(`${slot}_own`)] }]));
+  return story.clone({ storyPhases: state.storyPhases, players: withOutcomes });
+}
+
 const GROUPS: [string, () => Story][] = [2, 3].flatMap((players): [string, () => Story][] => [
   [`the first switch, ${players} players`, () => firstSwitchBeat(players)],
   [`a later switch, ${players} players`, () => laterSwitchBeat(players)],
   [`a chapter step, ${players} players`, () => threadBeat(players)],
+  [`a chapter step on player2's own outcome, ${players} players`, () => ownOutcomeStep(players)],
   [`an exploration step, ${players} players`, () => groupStep(players, "exploration")],
   [`one player exploring beside a challenge, ${players} players`, () => groupStep(players, "mixed")],
   [`the ending, ${players} players`, () => endingBeat(players)],
@@ -471,6 +485,20 @@ describe("group turns: today's form, a rolled chapter step as groupLeversB, an e
     for (const story of [firstSwitchBeat(2), laterSwitchBeat(3), groupStep(2, "exploration"), endingBeat(3), threadBeat(1)]) {
       expect(beatStep.request(story).prompt).not.toContain(GROUP_SHARED_AND_OWN);
       expect(json(beatStep.request(story).schema)).not.toContain("this player's sacrifice-or-reward line");
+    }
+  });
+
+  it("gives no lever to a player whose roll the step discards, on a step on another player's own outcome: the one logged difference from groupLeversB (the review of 2026-10-01)", () => {
+    for (const players of [2, 3]) {
+      const story = ownOutcomeStep(players);
+      const prompt = beatStep.request(story).prompt;
+      const others = ["player1", "player3"].slice(0, players - 1);
+      for (const slot of others) expect(prompt).toContain(`----- ${slot} (Test Player ${slot.slice(-1)}): none this turn.\n`);
+      expect(prompt).toContain("----- player2 (Test Player 2): one fits this turn if a stat allows it.\n");
+      // As measured, every rolled player had the rate line; the delta is that line's own "none" for the others
+      expect(groupLeversRequest(story, { b: true }).prompt).toContain("----- player1 (Test Player 1): one fits this turn if a stat allows it.\n");
+      // Their fields still ask the plan's lever question from the line
+      expect(json(beatStep.request(story).schema).split(JSON.stringify(GROUP_LEVER_QUESTION).slice(1, -1)).length - 1).toBeGreaterThan(0);
     }
   });
 

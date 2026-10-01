@@ -14,7 +14,10 @@ import { isLatePart } from "./pacing.js";
  * earlier one where it fits) and the interludes' examples are followed by
  * their late line. Read blind in the stage's short playthroughs: player turns
  * with no new unexplained detail 68 of 73 -> 80 of 80; the clue judge (v2,
- * reliable on its calibration) 46 of 80 -> 72 of 80. Measured on grown-up
+ * reliable on its calibration) 46 of 80 -> 72 of 80, a second reading that
+ * agrees on the direction only: on the stage's own turns it agreed with the
+ * hand 121 of 153, not reliable there, every disagreement the judge reading a
+ * new detail the hand didn't (8 on the variant's turns). Measured on grown-up
  * stories of one to three players; a read-with-kids turn carries the lines
  * too, unmeasured there.
  */

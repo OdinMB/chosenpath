@@ -19,6 +19,8 @@ import {
   clueComparison,
   clueItems,
   clueJudgeTargets,
+  handJudgeAgreement,
+  handJudgeSection,
   handRows,
   mergePacingCluesRuns,
   pacingCluesCall,
@@ -189,6 +191,76 @@ describe("the clue readings", () => {
     expect([c.production, c.variant, c.noise]).toEqual([{ hits: 1, n: 4 }, { hits: 3, n: 3 }, 0.5]);
     expect(c.move).toEqual(rateMove({ hits: 1, n: 4 }, { hits: 3, n: 3 }, 0.5));
     expect(c.unread).toEqual({ production: 1, variant: 0 });
+  });
+
+  /*
+   * The review of 2026-10-01: the judge v2 read reliable on its 21 calibration
+   * items (20 agree), and the stage reported its reading beside the hand's as a
+   * second confirmation; on the stage's own turns the two disagreed on 32. The
+   * report sets them side by side turn by turn, with the eval's own rule.
+   */
+  const read = (variant: "adopted" | "pacingClues", sample: number, turn: number, pass?: boolean, words?: { note?: string; evidence?: string }): ClueRow => ({
+    story: "s",
+    variant,
+    sample,
+    turn,
+    slot: "player1",
+    ...(pass !== undefined ? { pass } : {}),
+    ...words,
+  });
+
+  it("set the hand against the judge turn by turn: agreement per arm and pooled, partial items apart, each disagreement listed", () => {
+    const hand = [
+      read("adopted", 1, 17, true),
+      read("adopted", 1, 18, true),
+      read("adopted", 1, 19, false, { note: "New: a bell" }),
+      read("adopted", 1, 20, undefined, { note: "either way" }),
+      read("adopted", 2, 17),
+      read("pacingClues", 1, 17, true, { note: "recalls the chime" }),
+      read("pacingClues", 1, 18, true),
+      read("pacingClues", 1, 19, true),
+    ];
+    const judged = [
+      read("adopted", 1, 17, false, { evidence: "a phone rings twice" }),
+      read("adopted", 1, 18, true),
+      read("adopted", 1, 19, false),
+      read("adopted", 1, 20, false),
+      read("adopted", 2, 17, true),
+      read("pacingClues", 1, 17, false, { evidence: "a tremor in the cradle" }),
+      read("pacingClues", 1, 18, true),
+      read("pacingClues", 1, 19),
+    ];
+    const a = handJudgeAgreement(hand, judged);
+    expect(a.byArm.adopted).toEqual({ decided: 3, agree: 2, handPasses: 2, handFails: 1, falseFails: 1, falsePasses: 0, partial: { yes: 0, no: 1 } });
+    expect(a.byArm.pacingClues).toEqual({ decided: 2, agree: 1, handPasses: 2, handFails: 0, falseFails: 1, falsePasses: 0, partial: { yes: 0, no: 0 } });
+    expect(a.all).toEqual({ decided: 5, agree: 3, handPasses: 4, handFails: 1, falseFails: 2, falsePasses: 0, partial: { yes: 0, no: 1 }, reliable: false });
+    expect(a.disagreements.map((d) => [d.hand.variant, d.hand.turn, d.hand.pass, d.judged.pass, d.hand.note, d.judged.evidence])).toEqual([
+      ["adopted", 17, true, false, undefined, "a phone rings twice"],
+      ["pacingClues", 17, true, false, "recalls the chime", "a tremor in the cradle"],
+    ]);
+  });
+
+  it("read the judge reliable on the stage's own turns only where the eval's rule holds on each side (85%, at least 3 a side)", () => {
+    const turns = Array.from({ length: 20 }, (_, i) => 17 + i);
+    const agreeing = (misses: number) => {
+      const hand = [...turns.map((t) => read("adopted", 1, t, true)), ...[40, 41, 42].map((t) => read("adopted", 1, t, false))];
+      const judged = [...turns.map((t, i) => read("adopted", 1, t, i >= misses)), ...[40, 41, 42].map((t) => read("adopted", 1, t, false))];
+      return handJudgeAgreement(hand, judged).all.reliable;
+    };
+    expect(agreeing(3)).toBe(true); // 17 of 20 on the yes side
+    expect(agreeing(4)).toBe(false); // 16 of 20
+  });
+
+  it("print that table, the reading by the rule and each disagreement in the report", () => {
+    const hand = [read("adopted", 1, 17, true), read("adopted", 1, 18, false), read("pacingClues", 1, 17, true, { note: "recalls the chime" })];
+    const judged = [read("adopted", 1, 17, true), read("adopted", 1, 18, false), read("pacingClues", 1, 17, false, { evidence: "a tremor in the cradle" })];
+    const md = handJudgeSection(hand, judged).join("\n");
+    expect(md).toContain("| production (adopted) | 2 | 2 of 2 (100%) | 1 / 1 | 0 | 0 | 0 / 0 |");
+    expect(md).toContain("| the variant (pacingClues) | 1 | 0 of 1 (0%) | 1 / 0 | 1 | 0 | 0 / 0 |");
+    expect(md).toContain("**not reliable on the stage's own turns**");
+    expect(md).toContain("Every disagreement is the judge reading a new unexplained detail where the hand read none (1).");
+    expect(md).toContain('- s, pacingClues, sample 1, turn 17, player1: hand no new detail ("recalls the chime"); judged a new detail: a tremor in the cradle');
+    expect(handJudgeSection([], [])).toContain("Not both read yet.");
   });
 
   it("unblind the hand verdicts through the key, a code read nowhere left unread", async () => {

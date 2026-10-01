@@ -130,19 +130,31 @@ export class ThreadResolutionService {
   }
 
   /**
+   * The player whose roll alone decides a challenge or contest step of this
+   * thread: the owner of the thread's outcome, when it is one player's own and
+   * that owner is in the thread; undefined where every roll in the thread
+   * pools (a shared outcome, an id no player holds, an owner elsewhere). Read
+   * before anyone rolls, so the group's lever lines (optionRules.ts) give no
+   * lever to a player whose roll the step will discard.
+   */
+  static rollingOwner(thread: Thread, story: Story): string | undefined {
+    const owner = this.outcomeOwner(story, thread.outcomeId);
+    return owner !== undefined && (thread.playersSideA.includes(owner) || thread.playersSideB.includes(owner)) ? owner : undefined;
+  }
+
+  /**
    * Whose rolls decide a challenge or contest step: on one player's own
    * outcome, only that owner's, when the owner is in the thread and their step
    * has a result (the owner's decision of 2026-10-01: "Yes, only count the
-   * owner's roll."); otherwise every player's in the thread, pooled. The second
-   * playthroughs' estate agents, chapter 6: a group challenge on Nia's own
-   * protégé outcome, her roll unfavorable and Rory's favorable, pooled into the
-   * mixed result her milestone records. A single player is always the owner of
-   * their outcomes, so their result is unchanged.
+   * owner's roll."; rollingOwner); otherwise every player's in the thread,
+   * pooled. The second playthroughs' estate agents, chapter 6: a group
+   * challenge on Nia's own protégé outcome, her roll unfavorable and Rory's
+   * favorable, pooled into the mixed result her milestone records. A single
+   * player is always the owner of their outcomes, so their result is unchanged.
    */
   private static rollingSides(thread: Thread, story: Story): { sideA: string[]; sideB: string[] } {
-    const owner = this.outcomeOwner(story, thread.outcomeId);
-    const inThread = owner !== undefined && (thread.playersSideA.includes(owner) || thread.playersSideB.includes(owner));
-    if (!owner || !inThread || (story.getCurrentBeat(owner)?.resolution ?? null) === null) {
+    const owner = this.rollingOwner(thread, story);
+    if (!owner || (story.getCurrentBeat(owner)?.resolution ?? null) === null) {
       return { sideA: thread.playersSideA, sideB: thread.playersSideB };
     }
     return thread.playersSideA.includes(owner) ? { sideA: [owner], sideB: [] } : { sideA: [], sideB: [owner] };

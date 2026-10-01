@@ -5,6 +5,7 @@ import {
   GROUP_SHARED_AND_OWN,
   NO_DOUBLE_SACRIFICE,
   THREE_WAYS,
+  groupLeverLine,
   groupLeverSlots,
   groupSacrificeRewardLines,
   optionLeverLine,
@@ -15,9 +16,9 @@ import {
 } from "../../../../src/game/services/optionRules.js";
 import { OPTIONS_CONTINUITY_TEXT } from "../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 import { OPTIONS_O2C_TEXT, o2cLeverLine, o2cRewardTurn } from "../../../../src/game/services/storyTextRounds/optionsO2c.js";
-import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
+import { endingBeat, firstSwitchBeat, laterSwitchBeat, slotsOf, threadBeat } from "../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
-import { beatGeneration, challengeOptions, stat, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
+import { beatGeneration, challengeOptions, stat, switchAnalysis, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
 
 /*
  * The option rules (B6) in production: which turns take them, and the lever
@@ -106,6 +107,61 @@ describe("groupLeverSlots: a group's players in a challenge or contest thread (t
         "----- player3 (Test Player 3): one fits this turn if a stat allows it.\n" +
         `--- ${GROUP_SHARED_AND_OWN}\n--- ${NO_DOUBLE_SACRIFICE}\n`
     );
+  });
+});
+
+/*
+ * A group's levers and the owner's roll (the review of 2026-10-01): on one
+ * player's own outcome, with that owner in the thread, only the owner's roll
+ * decides the step (ThreadResolutionService.rollingOwner, the owner's decision
+ * "Yes, only count the owner's roll."). Another player's lever there would
+ * move a roll the game discards: a reward a free stat gain, a sacrifice a stat
+ * paid for nothing. So that player's line says none this turn (the measured
+ * line's own wording); the owner, and every player where rolls pool, keep B6's
+ * rate line.
+ */
+describe("a group's lever lines where only the owner's roll counts", () => {
+  /** A group's step 2 of a 3-beat thread of this kind on `outcomeId`, these players on its sides, each player holding an own outcome `<slot>_own`. */
+  function ownOutcomeStep(players: number, outcomeId: string, kind: "challenge" | "contest" = "challenge", sideA = slotsOf(players), sideB: string[] = []): Story {
+    const chapter = threadAnalysis(kind, 3, 2, sideA, sideB);
+    chapter.threads[0].outcomeId = outcomeId;
+    chapter.threads[0].progression[0].resolution = kind === "contest" ? "sideAWins" : "favorable";
+    const story = threadBeat(players, { storyPhases: [switchAnalysis(slotsOf(players), 1), chapter] });
+    const withOutcomes = Object.fromEntries(Object.entries(story.getPlayers()).map(([slot, player]) => [slot, { ...player, outcomes: [outcome(`${slot}_own`)] }]));
+    return story.clone({ sharedOutcomes: [outcome("shared_sale")], players: withOutcomes });
+  }
+
+  const linesOf = (story: Story) =>
+    groupSacrificeRewardLines(story)
+      .split("\n")
+      .filter((line) => line.startsWith("----- "));
+  const FITS = "one fits this turn if a stat allows it.";
+  const NONE = "none this turn.";
+
+  it("gives a player in a thread on another player's own outcome none this turn when that owner is in it; the owner keeps the rate line", () => {
+    expect(linesOf(ownOutcomeStep(2, "player2_own"))).toEqual([`----- player1 (Test Player 1): ${NONE}`, `----- player2 (Test Player 2): ${FITS}`]);
+    expect(linesOf(ownOutcomeStep(3, "player3_own"))).toEqual([`----- player1 (Test Player 1): ${NONE}`, `----- player2 (Test Player 2): ${NONE}`, `----- player3 (Test Player 3): ${FITS}`]);
+    expect(groupLeverLine(ownOutcomeStep(2, "player2_own"), "player1")).toBe("Sacrifice or reward: none this turn.");
+    expect(groupLeverLine(ownOutcomeStep(2, "player2_own"), "player2")).toBe("Sacrifice or reward: one fits this turn if a stat allows it.");
+  });
+
+  it("does the same in a contest on one player's own outcome, on both sides", () => {
+    expect(linesOf(ownOutcomeStep(2, "player1_own", "contest", ["player1"], ["player2"]))).toEqual([`----- player1 (Test Player 1): ${FITS}`, `----- player2 (Test Player 2): ${NONE}`]);
+    expect(linesOf(ownOutcomeStep(3, "player3_own", "contest", ["player1", "player3"], ["player2"]))).toEqual([
+      `----- player1 (Test Player 1): ${NONE}`,
+      `----- player2 (Test Player 2): ${NONE}`,
+      `----- player3 (Test Player 3): ${FITS}`,
+    ]);
+  });
+
+  it("keeps every player's rate line where every roll pools: a shared outcome, or a player's own outcome its owner is not in", () => {
+    expect(linesOf(ownOutcomeStep(3, "shared_sale"))).toEqual([1, 2, 3].map((n) => `----- player${n} (Test Player ${n}): ${FITS}`));
+    // player3 sits in no thread here, so has no line at all
+    expect(linesOf(ownOutcomeStep(3, "player3_own", "challenge", ["player1", "player2"]))).toEqual([1, 2].map((n) => `----- player${n} (Test Player ${n}): ${FITS}`));
+  });
+
+  it("keeps such a player among the lever slots, so their fields still ask the plan's lever question from the line (which says None)", () => {
+    expect(groupLeverSlots(ownOutcomeStep(2, "player2_own"))).toEqual(["player1", "player2"]);
   });
 });
 

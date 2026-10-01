@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { getThreadType } from "core/types/index.js";
 import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
-import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, sacrificeRewardLine } from "../optionRules.js";
+import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, groupSacrificeRewardLines, sacrificeRewardLine } from "../optionRules.js";
 import { beatSchemaForKids, takesKidsRules } from "../kidsTurnRules.js";
 import { canAddMilestones, type TextRequest } from "../storyTextSteps.js";
 import { replaceOnce, splitAtState } from "./roundEdits.js";
@@ -181,16 +181,22 @@ function schemaWithLevers(root: z.AnyZodObject, slots: string[], form: GroupLeve
  * Production's group turn as the stage measured it beside the variant. Since
  * the adoption (2026-10-01, groupLeversB) production prints the variant's lines
  * and lever fields on a rolled group step, so the prompt's are taken out (the
- * texts are the variant's, which a test holds), and the schema is built as
- * production built it before: core's set schema, with the band's kids text
- * where the story is read with a child. Since the short-replies adoption of the
- * same day, later, production's turn without that stage's lines
- * (shortRepliesBase) on every turn, as the stage measured it.
+ * texts are the variant's, which a test holds; the players' lines as production
+ * prints them, which since the review of that day give a player whose roll the
+ * step discards none, groupLeverLine), and the schema is built as production
+ * built it before: core's set schema, with the band's kids text where the
+ * story is read with a child. Since the short-replies adoption of the same day,
+ * later, production's turn without that stage's lines (shortRepliesBase) on
+ * every turn, as the stage measured it.
  */
 export function groupLeversBase(story: Story): TextRequest<z.AnyZodObject> {
   const production = shortRepliesBase(story);
   if (groupLeverSlots(story).length === 0) return production;
-  const prompt = production.prompt.split(`${DERAIL_ANCHOR} ${REWARD_EXCEPTION}`).join(DERAIL_ANCHOR).split(`${LEVER_ANCHOR}${leverBlock(story)}`).join(LEVER_ANCHOR);
+  const prompt = production.prompt
+    .split(`${DERAIL_ANCHOR} ${REWARD_EXCEPTION}`)
+    .join(DERAIL_ANCHOR)
+    .split(`${LEVER_ANCHOR}${groupSacrificeRewardLines(story)}`)
+    .join(LEVER_ANCHOR);
   const raw = createSetOfBeatGenerationSchema(story.getNumberOfPlayers(), canAddMilestones(story), story.isMultiplayer(), story.generatesImages(), story.hasImages());
   return { prompt, schema: takesKidsRules(story) ? beatSchemaForKids(raw, story) : raw };
 }

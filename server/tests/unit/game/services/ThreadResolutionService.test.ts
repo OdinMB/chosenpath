@@ -211,6 +211,23 @@ describe("ThreadResolutionService: whose roll decides a group challenge or conte
     expect(firstStep(rolled.clone({ players }))).toBe("favorable");
   });
 
+  /*
+   * Whose roll can count at all, read before anyone rolls: the group's lever
+   * lines (optionRules.ts) give a player whose roll the step discards no lever,
+   * since its points would land on a roll that never counts.
+   */
+  it("names the owner whose roll alone decides a thread on their own outcome, on either side; none where every roll pools", () => {
+    const owner = (story: Story) => ThreadResolutionService.rollingOwner(story.getCurrentThreadAnalysis()!.threads[0], story);
+    expect(owner(rolledStep(2, "challenge", "player2_own"))).toBe("player2");
+    expect(owner(rolledStep(3, "challenge", "player1_own"))).toBe("player1");
+    expect(owner(rolledStep(2, "contest", "player2_own", ["player1"], ["player2"]))).toBe("player2");
+    expect(owner(rolledStep(3, "contest", "player3_own", ["player1", "player3"], ["player2"]))).toBe("player3");
+    // A shared outcome, an id no player holds, a player's own outcome its owner is not in
+    expect(owner(rolledStep(3, "challenge", "shared_sale"))).toBeUndefined();
+    expect(owner(rolledStep(2, "challenge", "outcome_nobody_holds"))).toBeUndefined();
+    expect(owner(rolledStep(3, "challenge", "player3_own", ["player1", "player2"]))).toBeUndefined();
+  });
+
   it("sets the milestone the owner's roll leads to at the thread's last step", () => {
     const afterFirst = ThreadResolutionService.resolveCurrentThreads(roll(rolledStep(2, "challenge", "player2_own"), ["favorable", "favorable"]));
     const ended = ThreadResolutionService.resolveCurrentThreads(roll(afterFirst, ["favorable", "unfavorable"])).getCurrentThreadAnalysis()?.threads[0];

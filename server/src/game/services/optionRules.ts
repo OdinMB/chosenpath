@@ -3,6 +3,7 @@ import type { Story } from "core/models/Story.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { getThreadType, type Beat } from "core/types/index.js";
 import { allowsLever } from "./leverPayments.js";
+import { ThreadResolutionService } from "./ThreadResolutionService.js";
 
 /*
  * The option rules (turn doc B6), adopted on 2026-09-28 for single-player
@@ -143,7 +144,12 @@ export function sacrificeRewardLine(story: Story, slot: string): string {
  * rolled steps beside production: rewards 10 of 64 sets (target about 4-6 per
  * 32), all on the reward turn (10 of 10) and none elsewhere (production 4 of
  * 54), sacrifices 24 -> 12, second sacrifices 18 -> 6. A group's players keep
- * B6's rate line (groupSacrificeRewardLines).
+ * B6's rate line (groupSacrificeRewardLines), so these rules are a single
+ * player's only (the review of 2026-10-01): a group's line allows a second
+ * reward at a four-step chapter's last step (it only prefers a sacrifice
+ * there) and rewards in consecutive chapters, asks no reason for a second
+ * sacrifice, and a group's sets carry none of O2b's variety lines. Unmeasured
+ * for groups; the owner's call whether to extend them.
  */
 const NONE_THIS_TURN = "Sacrifice or reward: none this turn.";
 const REWARD_TURN = "Sacrifice or reward: offer a reward this turn if a stat allows one. No sacrifice this turn.";
@@ -244,11 +250,35 @@ export function takesGroupLeverRules(story: Story): boolean {
   return groupLeverSlots(story).length > 0;
 }
 
+/*
+ * A group's levers and the owner's roll (the review of 2026-10-01). On one
+ * player's own outcome, with that owner in the thread, only the owner's roll
+ * decides a challenge or contest step (ThreadResolutionService.rollingOwner;
+ * the owner's decision of that morning, "Yes, only count the owner's roll.").
+ * The group-levers stage, later that day, gave every rolled player B6's rate
+ * line all the same, so the other players in that thread were invited to a
+ * lever whose points land on a roll the game discards: a reward a free stat
+ * gain, a sacrifice a stat paid for nothing (the payment is charged whatever
+ * the roll). Their line now says none this turn, the measured line's own
+ * wording for none (groupLeversB's replies offered no lever where it said
+ * none); they keep the lever fields, whose question then answers "None". A
+ * logged delta on groupLeversB, unmeasured: the stage's one case of that shape
+ * (the estate agents' turn 20, both agents on Nia's own protégé outcome) drew
+ * no lever in any arm.
+ */
+
+/** A rolled group player's line: B6's rate (sacrificeRewardLine) on their own history, or none where their roll doesn't count (another player's own outcome, that owner in the thread). */
+export function groupLeverLine(story: Story, slot: string): string {
+  const thread = story.getCurrentThreadAnalysis()?.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
+  const owner = thread ? ThreadResolutionService.rollingOwner(thread, story) : undefined;
+  return owner !== undefined && owner !== slot ? NONE_THIS_TURN : sacrificeRewardLine(story, slot);
+}
+
 /** The lines after the "0 or 1 sacrifice/reward option" rule on a group's rolled step: each rolled player's computed line, the group sentence, no second sacrifice. */
 export function groupSacrificeRewardLines(story: Story): string {
   const lines = groupLeverSlots(story).map((slot) => {
     const name = story.getPlayer(slot)?.name;
-    const line = sacrificeRewardLine(story, slot).replace("Sacrifice or reward: ", "");
+    const line = groupLeverLine(story, slot).replace("Sacrifice or reward: ", "");
     return `----- ${slot}${name ? ` (${name})` : ""}: ${line}\n`;
   });
   return `--- Sacrifice or reward, for each player in a Challenge or Contest thread (each player's own options):\n${lines.join("")}--- ${GROUP_SHARED_AND_OWN}\n--- ${NO_DOUBLE_SACRIFICE}\n`;

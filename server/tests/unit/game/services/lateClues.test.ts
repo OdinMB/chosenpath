@@ -15,7 +15,8 @@ import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../
  * earlier one where it fits, and its interludes recall or explain what the
  * story already has. Read blind in the stage's short playthroughs: player turns
  * with no new unexplained detail, production 68 of 73, the variant 80 of 80
- * (moved); the clue judge (v2, reliable) 46 of 80 against 72 of 80 (moved).
+ * (moved); the clue judge (v2, reliable on its calibration, not on the stage's
+ * own turns: 121 of 153 with the hand) 46 of 80 against 72 of 80 (moved).
  */
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);

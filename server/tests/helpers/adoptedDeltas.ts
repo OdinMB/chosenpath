@@ -40,13 +40,17 @@
  * turn a logged delta, withOptionsO2c, unmeasured for kids). A turn in the
  * story's late part carries the pacing-clues stage's clue lines since its
  * adoption, later still (withLateClues, not a delta; beforeLateClues and
- * productionThen take them out for the variants measured earlier).
+ * productionThen take them out for the variants measured earlier). Since the
+ * review of that day, a group's rolled step gives a player whose roll the step
+ * discards (in a thread on another player's own outcome, that owner in it) no
+ * lever: a logged delta on groupLeversB, unmeasured (withOwnersRollLevers, in
+ * adoptedTurn).
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
 import type { GameMode, KidsBand } from "core/types/index.js";
-import { GameModes } from "core/types/index.js";
+import { GameModes, getThreadType } from "core/types/index.js";
 import { beatStep } from "../../src/game/services/storyTextSteps.js";
 import { KIDS_BAND_TURNS, kidsListener, kidsTurnText, takesKidsRules } from "../../src/game/services/kidsTurnRules.js";
 import { chaptersThatFit, turnsLeft } from "../../src/game/services/pacing.js";
@@ -311,10 +315,50 @@ export function beforeEndingOnlyPlayed(production: string, story: Story): string
  */
 export function beforeGroupLevers(production: string, story: Story): string {
   if (!takesGroupLevers(story)) return production;
-  const { derailAnchor, leverAnchor, block } = GROUP_LEVERS_TEXT;
-  const [exception, lines] = [`${derailAnchor} ${REWARD_EXCEPTION}`, `${leverAnchor}${block(story)}`];
+  const { derailAnchor, leverAnchor } = GROUP_LEVERS_TEXT;
+  // The players' lines as production prints them (groupLeversB's, with the owner's-roll delta below where it acts)
+  const [exception, lines] = [`${derailAnchor} ${REWARD_EXCEPTION}`, `${leverAnchor}${withOwnersRollLevers(GROUP_LEVERS_TEXT.block(story), story)}`];
   if (production.split(exception).length !== 2 || production.split(lines).length !== 2) throw new Error("Production's group step no longer carries its lever lines once");
   return production.replace(exception, () => derailAnchor).replace(lines, () => leverAnchor);
+}
+
+/*
+ * A group's levers where only the owner's roll counts (the review of
+ * 2026-10-01). Since the owner's decision of that morning ("Yes, only count
+ * the owner's roll.") a challenge or contest step on one player's own outcome,
+ * with that owner in the thread, is decided by the owner's roll alone; the
+ * group-levers stage, later that day, gave every rolled player B6's rate line
+ * all the same. A lever there moves a roll the game discards (a reward a free
+ * stat gain, a sacrifice a stat paid for nothing), so production gives every
+ * other player in that thread "none this turn." in place of the rate line: the
+ * measured line's own wording for none, which groupLeversB's replies followed
+ * (no lever where the line said none, 0 of 2). A logged delta, unmeasured: no
+ * case of the stage put a lever there (round-levers-estate-agents-t20 has the
+ * shape, and no arm offered a lever on it).
+ */
+
+/** The rolled players of a group's step whose roll the step discards: in a thread on another player's own outcome, that owner in the thread. */
+function rollsThatDoNotCount(story: Story): string[] {
+  if (!takesGroupLevers(story)) return [];
+  const slots = story.getPlayerSlots();
+  const threads = story.getCurrentThreadAnalysis()?.threads ?? [];
+  return slots.filter((slot) => {
+    const thread = threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
+    if (!thread || getThreadType(thread) === "exploration" || story.getSharedOutcomes().some((o) => o.id === thread.outcomeId)) return false;
+    const owner = slots.find((s) => (story.getPlayer(s)?.outcomes ?? []).some((o) => o.id === thread.outcomeId));
+    return owner !== undefined && owner !== slot && [...thread.playersSideA, ...thread.playersSideB].includes(owner);
+  });
+}
+
+/** A measured group rolled step's text (prompt or the players' block) with production's "none this turn." for each player whose roll doesn't count. */
+export function withOwnersRollLevers(measured: string, story: Story): string {
+  return rollsThatDoNotCount(story).reduce((text, slot) => {
+    const name = story.getPlayer(slot)?.name;
+    const seat = `----- ${slot}${name ? ` (${name})` : ""}: `;
+    const from = `${seat}${sacrificeRewardLine(story, slot).replace("Sacrifice or reward: ", "")}\n`;
+    if (text.split(from).length !== 2) throw new Error(`The measured group step no longer carries ${slot}'s lever line once`);
+    return text.replace(from, () => `${seat}none this turn.\n`);
+  }, measured);
 }
 
 /*
@@ -435,9 +479,9 @@ export function productionThen<R extends { prompt: string }>(request: R, story: 
   return { ...request, prompt, ...schema };
 }
 
-/** Every turn delta: no chapter rules on a switch turn, and the ending's lines on what was played. */
+/** Every turn delta: no chapter rules on a switch turn, the ending's lines on what was played, and no lever line for a roll that doesn't count. */
 export function adoptedTurn(measured: string, story: Story): string {
-  return withEndingOnlyPlayed(withoutChapterRules(measured, story), story);
+  return withOwnersRollLevers(withEndingOnlyPlayed(withoutChapterRules(measured, story), story), story);
 }
 
 /*

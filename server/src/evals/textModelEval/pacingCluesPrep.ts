@@ -21,7 +21,7 @@ import {
 import type { EvalFiles } from "./evalFiles.js";
 import { sha256 } from "./executor.js";
 import { jobEstimateUsd } from "./jobPlan.js";
-import { JUDGE_ARMS, outputIdOf } from "./judgedChecks.js";
+import { JUDGE_ARMS, RELIABLE_AGREEMENT, isReliable, outputIdOf } from "./judgedChecks.js";
 import { PACING_CLUES_STARTS } from "./latePacingCases.js";
 import { latePacingComparisons, playOn, readLatePacing, renderLatePacing, type LatePacingReading, type PlayReportText } from "./latePacingPlay.js";
 import { cluesCalibrationTargets, latePacingEstimate, mergeLatePacingRuns, mergedTargets, playRunKey, type CluesCalibrationTarget, type CluesReplyTarget } from "./latePacingPrep.js";
@@ -331,6 +331,53 @@ export function clueComparison(rows: ClueRow[], candidate: VariantId = CANDIDATE
   };
 }
 
+/*
+ * The hand and the judge on the stage's own turns (the review of 2026-10-01).
+ * The judge v2 read reliable on its calibration (20 of 21 with the hand on the
+ * second round's late turns), and the stage reported its reading beside the
+ * hand's as a second confirmation; turn by turn on the stage's 160 window
+ * turns the two disagreed on 32, every one the judge reading a new detail
+ * where the hand read none. So the report sets them side by side, with the
+ * eval's own rule (isReliable: 85% on each side, at least 3 a side) on the
+ * turns both decided, and lists each disagreement with the hand's note and the
+ * judge's evidence.
+ */
+
+/** One side of the hand-against-judge table: the turns both decided, as the calibration counts them; the hand's partial items by the judge's verdict. */
+export type HandJudgeSide = Pick<CluesAgreement, "decided" | "agree" | "handPasses" | "handFails" | "falseFails" | "falsePasses" | "partial">;
+export type HandJudgeAgreement = { byArm: Record<string, HandJudgeSide>; all: HandJudgeSide & { reliable: boolean }; disagreements: { hand: ClueRow; judged: ClueRow }[] };
+
+const rowKey = (r: ClueRow) => `${r.story}|${r.variant}|${r.sample}|${r.turn}|${r.slot}`;
+const emptySide = (): HandJudgeSide => ({ decided: 0, agree: 0, handPasses: 0, handFails: 0, falseFails: 0, falsePasses: 0, partial: { yes: 0, no: 0 } });
+
+/** The hand's verdicts against the judge's, per arm and pooled; the pooled reading by the eval's reliability rule (no sample pairs: the judge ran once). */
+export function handJudgeAgreement(hand: ClueRow[], judged: ClueRow[]): HandJudgeAgreement {
+  const judgedBy = new Map(judged.map((r) => [rowKey(r), r]));
+  const byArm: Record<string, HandJudgeSide> = {};
+  const all = emptySide();
+  const disagreements: { hand: ClueRow; judged: ClueRow }[] = [];
+  for (const h of hand) {
+    const j = judgedBy.get(rowKey(h));
+    if (!j || j.pass === undefined) continue;
+    const sides = [(byArm[h.variant] ??= emptySide()), all];
+    if (h.pass === undefined) {
+      // A partial item (the hand read it, either way); an unread one has no note
+      if (h.note !== undefined) for (const side of sides) side.partial[j.pass ? "yes" : "no"]++;
+      continue;
+    }
+    for (const side of sides) {
+      side.decided++;
+      if (h.pass) side.handPasses++;
+      else side.handFails++;
+      if (h.pass === j.pass) side.agree++;
+      else if (h.pass) side.falseFails++;
+      else side.falsePasses++;
+    }
+    if (h.pass !== j.pass) disagreements.push({ hand: h, judged: j });
+  }
+  return { byArm, all: { ...all, reliable: isReliable({ ...all, pairs: 0, pairsAgree: 0 }) }, disagreements };
+}
+
 // ---------------------------------------------------------------- the report
 
 const pct = (t: Tally) => (t.n === 0 ? "–" : `${t.hits} of ${t.n} (${Math.round((100 * t.hits) / t.n)}%)`);
@@ -355,6 +402,50 @@ function clueSection(title: string, rows: ClueRow[], stories: string[]): string[
   const fails = rows.filter((r) => r.pass === false);
   lines.push("", "Each new detail read:", "", ...(fails.length ? fails.map((r) => `- ${r.story}, ${r.variant}, sample ${r.sample}, turn ${r.turn}, ${r.slot}${r.code ? ` (${r.code})` : ""}: ${(r.note ?? r.evidence ?? "").replace(/\s+/g, " ").trim()}`) : ["none"]), "");
   return lines;
+}
+
+const share = (n: number, of: number) => (of === 0 ? "–" : `${n} of ${of} (${Math.round((100 * n) / of)}%)`);
+
+/** The hand against the judge on the stage's own turns: per arm and pooled, the eval's rule, every disagreement. */
+export function handJudgeSection(hand: ClueRow[], judged: ClueRow[]): string[] {
+  const title = "## The hand and the judge (v2), turn by turn on the stage's own turns";
+  const a = handJudgeAgreement(hand, judged);
+  if (a.all.decided === 0) return [title, "", "Not both read yet.", ""];
+  const row = (label: string, s: HandJudgeSide) =>
+    `| ${label} | ${s.decided} | ${share(s.agree, s.decided)} | ${s.handPasses} / ${s.handFails} | ${s.falseFails} | ${s.falsePasses} | ${s.partial.yes} / ${s.partial.no} |`;
+  const arms = Object.entries(a.byArm).map(([variant, side]) => row(variant === "adopted" ? "production (adopted)" : `the variant (${variant})`, side));
+  const { all } = a;
+  const yesSide = share(all.handPasses - all.falseFails, all.handPasses);
+  const noSide = share(all.handFails - all.falsePasses, all.handFails);
+  const direction =
+    all.falsePasses === 0 && all.falseFails > 0
+      ? `Every disagreement is the judge reading a new unexplained detail where the hand read none (${all.falseFails}).`
+      : `The judge read a new detail where the hand read none ${all.falseFails} times, and none where the hand read one ${all.falsePasses} times.`;
+  return [
+    title,
+    "",
+    `The judge read reliable on its calibration items (above). Here it is set against the blind hand reading on the window's turns both decided, by the eval's own rule (agreement of at least ${Math.round(100 * RELIABLE_AGREEMENT)}% on each side, at least 3 items a side; the judge ran once, so no sample pairs).`,
+    "",
+    "| Arm | Turns both decided | Agree | Hand yes / no | Judged no where the hand says yes | Judged yes where the hand says no | On the hand's partial items (judged yes / no) |",
+    "|---|---|---|---|---|---|---|",
+    ...arms,
+    row("all", all),
+    "",
+    `Reading: **${all.reliable ? "reliable" : "not reliable"} on the stage's own turns** (the hand's yes side ${yesSide}, its no side ${noSide}). ${direction} ${
+      all.reliable
+        ? "The judge's counts below the calibration are a second reading that agrees with the hand turn by turn."
+        : "The judge's counts in the section above are a second reading that agrees with the hand on the direction, not a confirmation turn by turn; neither reading settles which of the turns below hold a new detail."
+    }`,
+    "",
+    "Each disagreement (the hand's note where it wrote one; the judge's evidence):",
+    "",
+    ...a.disagreements.map(({ hand: h, judged: j }) => {
+      const where = `${h.story}, ${h.variant}, sample ${h.sample}, turn ${h.turn}, ${h.slot}${h.code ? ` (${h.code})` : ""}`;
+      const handSaid = `hand ${h.pass ? "no new detail" : "a new detail"}${h.note ? ` ("${h.note.replace(/\s+/g, " ").trim()}")` : ""}`;
+      return `- ${where}: ${handSaid}; judged ${j.pass ? "no new detail" : "a new detail"}: ${(j.evidence ?? "").replace(/\s+/g, " ").trim()}`;
+    }),
+    "",
+  ];
 }
 
 /** The blind key, written once with a fresh salt; the same salt ever after, so the codes stay put. */
@@ -416,7 +507,11 @@ export function writePacingClues(ctx: Pick<PrepContext, "files" | "log">, runs: 
     "",
     "| Check | Agree (sample 1) | Hand yes / no | Judged no where the hand says yes | Judged yes where the hand says no | Samples agree | On partial items (yes / no) | Reading |",
     "|---|---|---|---|---|---|---|---|",
-    ...calibration.agreement.map((a) => `| ${a.check} | ${a.agree} of ${a.decided} | ${a.handPasses} / ${a.handFails} | ${a.falseFails} | ${a.falsePasses} | ${a.pairs ? `${a.pairsAgree} of ${a.pairs}` : "–"} | ${a.partial.yes} / ${a.partial.no} | ${a.reliable ? "reliable" : "not reliable"} |`),
+    // On the calibration's items only: the stage's own turns read apart, in the last section
+    ...calibration.agreement.map(
+      (a) =>
+        `| ${a.check} | ${a.agree} of ${a.decided} | ${a.handPasses} / ${a.handFails} | ${a.falseFails} | ${a.falsePasses} | ${a.pairs ? `${a.pairsAgree} of ${a.pairs}` : "–"} | ${a.partial.yes} / ${a.partial.no} | ${a.reliable ? "reliable on its calibration items" : "not reliable"} |`
+    ),
     "",
     ...calibration.judged.flatMap((j) => {
       const item = PACING_CLUES_CALIBRATION.find((i) => i.id === j.itemId);
@@ -426,16 +521,23 @@ export function writePacingClues(ctx: Pick<PrepContext, "files" | "log">, runs: 
     }),
     "",
     ...clueSection("New unexplained details in the late turns, the judge (v2)", judged, stories),
+    ...handJudgeSection(hand, judged),
   ];
   const spentUsd = sum(files.readPrepRecords().filter((r) => r.stage === STAGE).map((r) => r.costUsd));
   lines.push(`Spent in the stage so far: $${spentUsd.toFixed(4)}.`);
+  const handJudge = handJudgeAgreement(hand, judged);
   const json = {
     generatedAt: now.toISOString(),
     stage: STAGE,
     promptState: PACING_CLUES_PROMPT_STATE,
     runs,
     readings,
-    clues: { hand, judged, calibration: { agreement: calibration.agreement, judged: calibration.judged, problems: calibration.problems } },
+    clues: {
+      hand,
+      judged,
+      calibration: { agreement: calibration.agreement, judged: calibration.judged, problems: calibration.problems },
+      handAgainstJudge: { byArm: handJudge.byArm, all: handJudge.all, disagreements: handJudge.disagreements.length },
+    },
     spentUsd,
   };
   files.writePlaythroughs(`${lines.join("\n")}\n`, json, PLAY_FILE);

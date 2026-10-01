@@ -26,7 +26,7 @@ import { sacrificeRewardLine } from "../../../../src/game/services/optionRules.j
 import { groupLeverSlots, groupLeversBase, groupLeversRequest, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { withShortRepliesLines } from "../../../../src/game/services/storyTextRounds/shortReplies.js";
 import { fakeCall, input } from "./playFixtures.js";
-import { beforeLateClues } from "../../../helpers/adoptedDeltas.js";
+import { beforeLateClues, withOwnersRollLevers } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * The group-levers stage's cases (2026-10-01, the coordinator's brief after the
@@ -129,12 +129,16 @@ describe("groupLeversCases on the second round's stored playthroughs (skipped wh
     const kinds = new Set<string>();
     let exploringBeside = 0;
     let rateNone = 0;
+    const ownersRollCases: string[] = [];
     for (const c of cases) {
       const story = caseStory(c);
       // The run sent the variant's base; production today sends groupLeversB (the group-levers adoption, 2026-10-01) with
       // the short-replies stage's lines, adopted later that day, and on a late turn the pacing-clues stage's, later again
       expect([c.id, sha256(beforeLateClues(groupLeversBase(story).prompt, story))]).toEqual([c.id, sentHashOf(c.id)]);
-      expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sha256(withShortRepliesLines(groupLeversRequest(story, { b: true })).prompt)]);
+      // Since the review of that day, a player whose roll the step discards gets no lever (withOwnersRollLevers, logged)
+      const measured = withShortRepliesLines(groupLeversRequest(story, { b: true })).prompt;
+      expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sha256(withOwnersRollLevers(measured, story))]);
+      if (withOwnersRollLevers(measured, story) !== measured) ownersRollCases.push(c.id);
       const slots = groupLeverSlots(story);
       expect([c.id, slots.length > 0]).toEqual([c.id, true]);
       players.add(story.getNumberOfPlayers());
@@ -147,5 +151,7 @@ describe("groupLeversCases on the second round's stored playthroughs (skipped wh
     expect([...kinds].sort()).toEqual(["challenge", "contest", "exploration"]);
     expect(exploringBeside).toBeGreaterThanOrEqual(2);
     expect(rateNone).toBeGreaterThanOrEqual(1);
+    // Both agents in a challenge on Nia's own protégé outcome: Rory's roll doesn't count there, so production gives him no lever
+    expect(ownersRollCases).toContain("round-levers-estate-agents-t20");
   });
 });
