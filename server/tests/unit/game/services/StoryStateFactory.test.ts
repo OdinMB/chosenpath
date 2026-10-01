@@ -109,3 +109,24 @@ describe("createStoryStateFromTemplate background values", () => {
     expect(lines.some((line) => /converted|replaced|dropped/.test(line))).toBe(false);
   });
 });
+
+/*
+ * The read-with-kids setting on a template (the owner's decision of
+ * 2026-10-01): a template tagged Kids carries the children's ages its editor
+ * set, and its stories inherit them as a custom story records its form's.
+ */
+describe("createStoryStateFromTemplate: the read-with-kids setting", () => {
+  const kids = (overrides: Partial<StoryTemplate>) => ({ ...template([]), ...overrides }) as StoryTemplate;
+
+  it("gives a story from a template tagged Kids the template's ages", () => {
+    const state = start(kids({ tags: ["Kids"], kidAges: { min: 6, max: 8 } }));
+    expect([state.category, state.kidAges]).toEqual(["read-with-kids", { min: 6, max: 8 }]);
+  });
+
+  it("records no ages where the template has none, or isn't tagged Kids, or holds a value that isn't ages", () => {
+    expect(start(kids({ tags: ["Kids"] })).kidAges).toBeUndefined();
+    expect(start(kids({ tags: ["Fiction"], kidAges: { min: 6, max: 8 } })).kidAges).toBeUndefined();
+    expect(start(kids({ tags: ["Kids"], kidAges: { min: 9, max: 4 } })).kidAges).toBeUndefined();
+    expect(start(kids({ tags: ["Kids"], kidAges: null })).kidAges).toBeUndefined();
+  });
+});

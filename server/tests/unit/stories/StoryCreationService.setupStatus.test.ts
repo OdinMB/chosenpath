@@ -223,12 +223,16 @@ describe("StoryCreationService setup status", () => {
     expect(args[7]).toEqual({ kids });
   });
 
-  async function createWith(premise: string, category: "read-with-kids" | "enjoy-fiction"): Promise<{ storyId: string; state?: StoryState }> {
+  async function createWith(
+    premise: string,
+    category: "read-with-kids" | "enjoy-fiction",
+    kidAges?: { min: number; max: number }
+  ): Promise<{ storyId: string; state?: StoryState }> {
     createInitialState.mockResolvedValue(startableState());
     const service = new StoryCreationService();
     const { res, sent } = fakeResponse();
 
-    await service.createStory(`Create an age-appropriate story.\n\n${premise}`, false, false, 1, 10, GameModes.Cooperative, undefined, res, undefined, category);
+    await service.createStory(`Create an age-appropriate story.\n\n${premise}`, false, false, 1, 10, GameModes.Cooperative, undefined, res, undefined, category, kidAges);
     await new Promise((resolve) => setImmediate(resolve));
     await new Promise((resolve) => setImmediate(resolve));
 
@@ -236,22 +240,35 @@ describe("StoryCreationService setup status", () => {
     return { storyId: sent[0]?.body.data?.storyId ?? "", state: stored?.getState() };
   }
 
+  // A premise sent without the setting (an older client): its age line, read as readingAgeFromPremise reads it
   it.each([
-    ["read-with-kids", "How old is the child?: 5", "5"],
-    ["read-with-kids", "How old is the child?: 6 years", "6"],
-    ["read-with-kids", "How old is the child?: 5, 8", "5-8"],
+    ["read-with-kids", "How old is the child?: 5", { min: 5, max: 5 }],
+    ["read-with-kids", "How old is the child?: 6 years", { min: 6, max: 6 }],
+    ["read-with-kids", "How old is the child?: 5, 8", { min: 5, max: 8 }],
     ["read-with-kids", "A mouse story with no age", undefined],
     ["enjoy-fiction", "How old is the child?: 5", undefined],
-  ] as const)("records the story's category and, read with a child, the age its premise states (%s, %s)", async (category, premise, age) => {
+  ] as const)("records the story's category and, read with a child, the ages its premise states (%s, %s)", async (category, premise, ages) => {
     const { state } = await createWith(premise, category);
     expect(state?.category).toBe(category);
-    expect(state?.readingAge).toBe(age);
+    expect(state?.kidAges).toEqual(ages);
+    // The setting is the record now; the older field is only read back from stories saved before it
+    expect(state?.readingAge).toBeUndefined();
+  });
+
+  it("records the read-with-kids setting the request carries, over the premise's line", async () => {
+    const { state } = await createWith("How old is the child?: 5", "read-with-kids", { min: 8, max: 10 });
+    expect(state?.kidAges).toEqual({ min: 8, max: 10 });
+  });
+
+  it("records no setting on a story of another category, whatever the request carries", async () => {
+    const { state } = await createWith("A heist story", "enjoy-fiction", { min: 8, max: 10 });
+    expect(state?.kidAges).toBeUndefined();
   });
 
   it("logs a read-with-kids premise whose age answer it can't read, with the story id and never the answer", async () => {
     const { storyId, state } = await createWith("How old is the child?: a toddler named Mirabel", "read-with-kids");
 
-    expect(state?.readingAge).toBeUndefined();
+    expect(state?.kidAges).toBeUndefined();
     const ageLines = logs.filter((line) => line.includes("child's age"));
     expect(ageLines).toHaveLength(1);
     expect(ageLines[0]).toContain(storyId);
@@ -264,6 +281,11 @@ describe("StoryCreationService setup status", () => {
     ["no age line", "A mouse story with no age"],
   ])("logs nothing about the age where the premise has %s", async (_, premise) => {
     await createWith(premise, "read-with-kids");
+    expect(logs.some((line) => line.includes("child's age"))).toBe(false);
+  });
+
+  it("logs nothing about the age where the request carries the setting", async () => {
+    await createWith("How old is the child?: a toddler", "read-with-kids", { min: 3, max: 3 });
     expect(logs.some((line) => line.includes("child's age"))).toBe(false);
   });
 

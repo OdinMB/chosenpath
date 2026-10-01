@@ -6,7 +6,7 @@ import {
   DifficultyLevel,
 } from "./index.js";
 import { PublicUser } from "./user.js";
-import { GameMode, StoryCategory } from "./story.js";
+import { GameMode, KidAges, StoryCategory } from "./story.js";
 
 /*
  * Bases
@@ -93,6 +93,8 @@ export interface CreateStoryRequest extends ClientRequest {
   difficultyLevel?: DifficultyLevel;
   /** The setup category; read-with-kids stories get stricter image moderation. */
   category?: StoryCategory;
+  /** A read-with-kids story: the children's ages, one age or a range (the read-with-kids setting). */
+  kidAges?: KidAges;
 }
 export interface CreateStoryFromTemplateRequest extends ClientRequest {
   templateId: string;

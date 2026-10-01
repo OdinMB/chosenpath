@@ -1,7 +1,8 @@
 import { Story } from "core/models/Story.js";
 import {
   PLAYER_SLOTS,
-  readingAgeFromPremise,
+  kidAgesFrom,
+  kidAgesFromPremise,
   type DifficultyLevel,
   type PlayerOptionsGeneration,
   type SetOfBeatGenerationSchema,
@@ -94,7 +95,8 @@ const ALLOWED_MODIFIERS = new Set([-20, -10, 0, 10, 20]);
  * building, which is private to production's generator). A setup without a
  * shared list (one player on the new form) starts with none (setup doc B1.8).
  * No images and no pregeneration; a kids premise is a read-with-kids story,
- * with the child's age its premise states, as StoryCreationService records them.
+ * with the children's ages (the input's setting, else its premise's line), as
+ * StoryCreationService records them.
  */
 export function storyFromSetup(setup: unknown, input: SetupInput, id: string): StoryState {
   const reply = asObject(setup);
@@ -127,11 +129,14 @@ export function storyFromSetup(setup: unknown, input: SetupInput, id: string): S
     images: [],
     playerCodes: {},
     ...(input.kids ? { category: "read-with-kids" as const } : {}),
-    // The child's age as the game records it (StoryCreationService, since the kids-turns stage of 2026-10-01); the second
-    // round's stored runs predate it and recorded none
-    ...(input.kids && readingAgeFromPremise(input.premise) ? { readingAge: readingAgeFromPremise(input.premise) } : {}),
+    // The children's ages as the game records them (StoryCreationService: the read-with-kids setting, else the premise's
+    // age line, since 2026-10-01); the second round's stored runs predate them and recorded none
+    ...(input.kids && kidAgesOf(input) ? { kidAges: kidAgesOf(input) } : {}),
   };
 }
+
+/** A kids setup input's ages: the setting it carries, else its premise's age line. */
+const kidAgesOf = (input: SetupInput) => kidAgesFrom(input.kidAges) ?? kidAgesFromPremise(input.premise);
 
 // ---------------------------------------------------------------- the trigger probe
 

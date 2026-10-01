@@ -1,5 +1,16 @@
 import React, { useMemo, useState } from "react";
-import { PlayerCount, DifficultyLevel, PublicationStatus } from "core/types";
+import {
+  PlayerCount,
+  DifficultyLevel,
+  PublicationStatus,
+  KidAges,
+  categoryFromTemplateTags,
+  kidAgesText,
+} from "core/types";
+import {
+  KID_AGES_PLACEHOLDER,
+  readKidAgesField,
+} from "shared/utils/kidAgesField";
 import {
   Input,
   TextArea,
@@ -55,7 +66,57 @@ interface BasicInfoTabProps {
   onPublicationStatusChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   canPublish?: boolean;
   templateId?: string;
+  // The read-with-kids setting, on a template tagged Kids: the children's ages its stories are read with
+  kidAges?: KidAges | null;
+  handleKidAgesChange?: (kidAges: KidAges | null) => void;
 }
+
+/**
+ * The children's ages of a template tagged Kids (the read-with-kids setting,
+ * as on the setup form): one age or a range, which its stories inherit and
+ * their turns are written for. A value it can't read shows the hint and is
+ * not kept.
+ */
+const KidAgesField: React.FC<{
+  kidAges?: KidAges | null;
+  onChange?: (kidAges: KidAges | null) => void;
+}> = ({ kidAges, onChange }) => {
+  const [text, setText] = useState(kidAges ? kidAgesText(kidAges) : "");
+  const { error } = readKidAgesField(text);
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <label htmlFor="template-kid-ages" className="font-semibold whitespace-nowrap">
+          Children&apos;s ages
+        </label>
+        <InfoIcon
+          tooltipText="The age or age range this World's stories are read with. Their turns are written for the youngest child."
+          position="right"
+          className="mr-2 mt-1"
+        />
+        <Input
+          id="template-kid-ages"
+          name="template-kid-ages"
+          className="w-32"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            onChange?.(readKidAgesField(e.target.value).ages ?? null);
+          }}
+          placeholder={KID_AGES_PLACEHOLDER}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? "template-kid-ages-error" : undefined}
+          disabled={!onChange}
+        />
+      </div>
+      {error && (
+        <p id="template-kid-ages-error" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+};
 
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   title,
@@ -88,6 +149,8 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   onPublicationStatusChange,
   canPublish,
   templateId,
+  kidAges,
+  handleKidAgesChange,
 }) => {
   // Debugging TAG_CATEGORIES
   // console.log("TAG_CATEGORIES:", TAG_CATEGORIES);
@@ -581,6 +644,15 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           </div>
         )}
       />
+
+      {/* A template tagged Kids: the read-with-kids setting */}
+      {categoryFromTemplateTags(tags) === "read-with-kids" && (
+        <KidAgesField
+          key={templateId ?? "new-template"}
+          kidAges={kidAges}
+          onChange={handleKidAgesChange}
+        />
+      )}
 
       {/* Show on welcome screen */}
       {setShowOnWelcomeScreen && (

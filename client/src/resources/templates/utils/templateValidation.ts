@@ -248,6 +248,7 @@ const validateBackgroundCompleteness = (
     if (
       key.startsWith("player") &&
       typeof playerOptions === "object" &&
+      playerOptions !== null &&
       "possibleCharacterBackgrounds" in playerOptions
     ) {
       const typedPlayerOptions = playerOptions as {
@@ -328,6 +329,7 @@ const validateStatReferences = (template: StoryTemplate): ValidationIssue[] => {
     if (
       key.startsWith("player") &&
       typeof playerOptions === "object" &&
+      playerOptions !== null &&
       "possibleCharacterBackgrounds" in playerOptions
     ) {
       const typedPlayerOptions = playerOptions as {
@@ -612,6 +614,7 @@ export const autoFixTemplate = (
         if (
           key.startsWith("player") &&
           typeof playerOptions === "object" &&
+          playerOptions !== null &&
           "possibleCharacterBackgrounds" in playerOptions
         ) {
           const typedPlayerOptions = playerOptions as {
@@ -681,6 +684,7 @@ export const autoFixTemplate = (
         if (
           key.startsWith("player") &&
           typeof playerOptions === "object" &&
+          playerOptions !== null &&
           "possibleCharacterBackgrounds" in playerOptions
         ) {
           const typedPlayerOptions = playerOptions as {

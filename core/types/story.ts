@@ -105,6 +105,69 @@ export function readingAgeFromPremise(premise: string): string | undefined {
   return youngest === oldest ? `${youngest}` : `${youngest}-${oldest}`;
 }
 
+/*
+ * The read-with-kids setting (the owner's decision of 2026-10-01: "this should
+ * depend on the age range that should be part of kids stories settings"): the
+ * children's ages a story is read with, one age or a range, set on the setup
+ * form and in the template editor, recorded on the story as its youngest and
+ * oldest age. A story's turns are written for the band of its youngest child.
+ */
+
+/** The children's ages a read-with-kids story is read with, in whole years: one age (min = max) or a range. */
+export type KidAges = { min: number; max: number };
+
+/** The ages the setting accepts. */
+export const KID_AGES_MIN = 2;
+export const KID_AGES_MAX = 14;
+
+/** What the setup form and the template editor say about a value they can't read. */
+export const KID_AGES_HINT = `Enter an age like 5 or a range like 8-10, from ${KID_AGES_MIN} to ${KID_AGES_MAX}.`;
+
+const inAgeRange = (age: number) => Number.isInteger(age) && age >= KID_AGES_MIN && age <= KID_AGES_MAX;
+
+/**
+ * The setting as the form takes it: one age ("5") or a range ("8-10"; a hyphen
+ * or dash, spaces around it allowed, or "8 to 10"), whole years from 2 to 14,
+ * the youngest first. Undefined for anything else, so the form can say so.
+ */
+export function parseKidAges(text: string): KidAges | undefined {
+  const match = /^\s*(\d{1,2})(?:\s*(?:[-–—]|\bto\b)\s*(\d{1,2}))?\s*$/i.exec(text);
+  if (!match) return undefined;
+  const min = Number(match[1]);
+  const max = match[2] === undefined ? min : Number(match[2]);
+  return inAgeRange(min) && inAgeRange(max) && min <= max ? { min, max } : undefined;
+}
+
+/** A recorded or requested setting read back: whole ages from 2 to 14, the youngest first, and nothing else; undefined otherwise. */
+export function kidAgesFrom(value: unknown): KidAges | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const { min, max } = value as Record<string, unknown>;
+  if (typeof min !== "number" || typeof max !== "number") return undefined;
+  return inAgeRange(min) && inAgeRange(max) && min <= max ? { min, max } : undefined;
+}
+
+/** The ages as the form shows them and a turn names them: "5" or "8-10". */
+export function kidAgesText(ages: KidAges): string {
+  return ages.min === ages.max ? `${ages.min}` : `${ages.min}-${ages.max}`;
+}
+
+/** A premise's age line read as the setting (readingAgeFromPremise), for a premise sent without it: an older client. */
+export function kidAgesFromPremise(premise: string): KidAges | undefined {
+  const age = readingAgeFromPremise(premise);
+  return age === undefined ? undefined : parseKidAges(age);
+}
+
+/** The age bands a read-with-kids story's turns are written for. */
+export const KIDS_BANDS = ["3-5", "6-8", "9-12"] as const;
+export type KidsBand = (typeof KIDS_BANDS)[number];
+
+/** The band of the youngest child: up to 5 (two-year-olds too), 6 to 8, and 9 or older (13 and 14 too). */
+export function kidsBandOf(ages: KidAges): KidsBand {
+  if (ages.min <= 5) return "3-5";
+  if (ages.min <= 8) return "6-8";
+  return "9-12";
+}
+
 // GENERATION WITH LLM
 
 export enum GameModes {
@@ -319,6 +382,8 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   containsImages: boolean;
   // Optional app-level field to track reference images for the cover
   coverImageReferenceIds?: string[];
+  /** A template tagged Kids: the children's ages its stories are read with (the read-with-kids setting); null clears it on save. */
+  kidAges?: KidAges | null;
 };
 
 /**
@@ -392,7 +457,9 @@ export type StoryState = {
   failedImageIds?: string[];
   /** Absent on stories created before categories were recorded. */
   category?: StoryCategory;
-  /** A read-with-kids custom story: the child's age its premise states ("5", "8-10"; readingAgeFromPremise). */
+  /** A read-with-kids story: the children's ages, its setup form's or its template's setting, else its premise's age line (2026-10-01). */
+  kidAges?: KidAges;
+  /** Stories saved between the kids-turns stage and the setting (2026-10-01): the child's age the premise stated ("5", "8-10"), read only where kidAges is absent. */
   readingAge?: string;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
 };

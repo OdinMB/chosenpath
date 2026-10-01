@@ -1,3 +1,4 @@
+import { KID_AGES_HINT } from "core/types";
 import { StoryInitializer } from "../../../src/page/components/StoryInitializer";
 import { accessibleText, notesIn, renderMarkup } from "../../helpers/staticMarkup";
 
@@ -80,6 +81,49 @@ describe("StoryInitializer AI notice", () => {
 
   it("leaves template mode to the labelled AI Worldbuilding Assistant", () => {
     expect(notesIn(renderSetupStep3(true))).toEqual([]);
+  });
+});
+
+/*
+ * The read-with-kids setting (the owner's decision of 2026-10-01): the form
+ * takes one age or a range ("5" or "8-10") in a text field, and a value it
+ * can't read shows the hint and keeps the story from being created. Field
+ * values come from the query string, as the form fills them back after a
+ * reload.
+ */
+describe("StoryInitializer read-with-kids ages", () => {
+  function renderKids(query: string): string {
+    mockSearch = `step=3&category=read-with-kids${query ? `&${query}` : ""}`;
+    return renderMarkup(<StoryInitializer onBack={jest.fn()} />);
+  }
+  const ageInput = (html: string) => /<input[^>]*id="category-kidAge"[^>]*>/.exec(html)?.[0] ?? "";
+  const createButton = (html: string) => /<button[^>]*type="submit"[^>]*>/.exec(html)?.[0] ?? "";
+
+  it("takes a range in a text field, with no error and the create button enabled", () => {
+    const html = renderKids("field_kidAge=8-10");
+    expect(ageInput(html)).toContain('type="text"');
+    expect(ageInput(html)).toContain('value="8-10"');
+    expect(ageInput(html)).not.toContain('aria-invalid="true"');
+    expect(accessibleText(html)).not.toContain(KID_AGES_HINT);
+    expect(createButton(html)).not.toContain("disabled");
+  });
+
+  it("says a placeholder with both forms", () => {
+    expect(ageInput(renderKids(""))).toContain('placeholder="5 or 8-10"');
+  });
+
+  it("shows the hint and disables Create Story for a value it can't read", () => {
+    const html = renderKids("field_kidAge=five");
+    expect(ageInput(html)).toContain('aria-invalid="true"');
+    expect(ageInput(html)).toContain('aria-describedby="category-kidAge-error"');
+    expect(html).toMatch(new RegExp(`id="category-kidAge-error"[^>]*>${KID_AGES_HINT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}<`));
+    expect(createButton(html)).toContain("disabled");
+  });
+
+  it("leaves an empty field optional", () => {
+    const html = renderKids("");
+    expect(accessibleText(html)).not.toContain(KID_AGES_HINT);
+    expect(createButton(html)).not.toContain("disabled");
   });
 });
 

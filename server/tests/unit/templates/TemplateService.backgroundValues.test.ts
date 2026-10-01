@@ -129,6 +129,41 @@ describe("TemplateService background values on save", () => {
   });
 });
 
+/*
+ * The read-with-kids setting on a template (the owner's decision of
+ * 2026-10-01): the editor sets the children's ages on a template tagged Kids;
+ * the service keeps only a valid setting, and a cleared one (null) is removed.
+ */
+describe("TemplateService: the read-with-kids setting on save", () => {
+  it("keeps a new template's ages, and drops a value that isn't ages", async () => {
+    await new TemplateService().createTemplate({ id: "template-k1", tags: ["Kids"], kidAges: { min: 6, max: 8 } });
+    expect(writtenTemplate().kidAges).toEqual({ min: 6, max: 8 });
+
+    await new TemplateService().createTemplate({ id: "template-k2", tags: ["Kids"], kidAges: { min: 8, max: 6 } });
+    expect("kidAges" in writtenTemplate()).toBe(false);
+  });
+
+  it("updates the ages, keeps them where the update leaves them out, and removes them where it clears them", async () => {
+    const stored = JSON.stringify({ id: "template-k3", title: "Burrow", tags: ["Kids"], kidAges: { min: 4, max: 5 } });
+
+    readFile.mockResolvedValueOnce(stored);
+    await new TemplateService().updateTemplate("template-k3", { kidAges: { min: 9, max: 11 } });
+    expect(writtenTemplate().kidAges).toEqual({ min: 9, max: 11 });
+
+    readFile.mockResolvedValueOnce(stored);
+    await new TemplateService().updateTemplate("template-k3", { title: "Burrow" });
+    expect(writtenTemplate().kidAges).toEqual({ min: 4, max: 5 });
+
+    readFile.mockResolvedValueOnce(stored);
+    await new TemplateService().updateTemplate("template-k3", { kidAges: null });
+    expect("kidAges" in writtenTemplate()).toBe(false);
+
+    readFile.mockResolvedValueOnce(stored);
+    await new TemplateService().updateTemplate("template-k3", { kidAges: { min: 1, max: 30 } });
+    expect("kidAges" in writtenTemplate()).toBe(false);
+  });
+});
+
 describe("TemplateService AI Draft logs", () => {
   it("logs the prompt's length, never its text", async () => {
     const prompt = "A lighthouse keeper named Ottoline Brandvik hides a letter";

@@ -148,6 +148,7 @@ export function useTemplateForm({
     gameModeOptions,
     getGameModeValue,
     handleDifficultyLevelsChange,
+    handleKidAgesChange,
   } = useBasicInfoTab({
     template: formData,
     onChange: (updates) => setFormData((prev) => ({ ...prev, ...updates })),
@@ -1123,6 +1124,7 @@ export function useTemplateForm({
     handleImageInstructionsChange,
     handleCoverReferenceImagesChange,
     handleDifficultyLevelsChange,
+    handleKidAgesChange,
     // Helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,

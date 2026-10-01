@@ -22,6 +22,7 @@ import {
   DifficultyLevel,
   PlayerCount,
   GameMode,
+  KidAges,
 } from "core/types";
 import { TabType } from "../hooks/useTemplateForm";
 import { worldPlaysContests } from "../utils/outcomeResolutions";
@@ -55,6 +56,8 @@ interface TabRendererProps {
   handleTagsChange?: (tags: string[]) => void;
   handleShowOnWelcomeScreenChange?: (value: boolean) => void;
   handleDifficultyLevelsChange: (levels: DifficultyLevel[]) => void;
+  // The read-with-kids setting of a template tagged Kids
+  handleKidAgesChange: (kidAges: KidAges | null) => void;
   handlePublicationStatusChange: (
     e: React.ChangeEvent<HTMLSelectElement>
   ) => void;
@@ -143,6 +146,7 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
     handleTagsChange,
     handleShowOnWelcomeScreenChange,
     handleDifficultyLevelsChange,
+    handleKidAgesChange,
     handlePublicationStatusChange,
     setWorld,
     setRules,
@@ -223,6 +227,8 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
           }
           difficultyLevels={formData.difficultyLevels || []}
           handleDifficultyLevelsChange={handleDifficultyLevelsChange}
+          kidAges={formData.kidAges}
+          handleKidAgesChange={handleKidAgesChange}
           publicationStatus={formData.publicationStatus}
           onPublicationStatusChange={handlePublicationStatusChange}
           canPublish={canPublish}

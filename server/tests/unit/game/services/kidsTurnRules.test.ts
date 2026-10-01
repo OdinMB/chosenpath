@@ -41,6 +41,11 @@ describe("kidsListener", () => {
     expect(kidsListener(threadBeat(1, { category: "read-with-kids", readingAge: "8-10" }))).toBe("a child aged 8-10");
     expect(kidsListener(threadBeat(1, { category: "read-with-kids" }))).toBe("a young child");
   });
+
+  it("the ages the story records as the read-with-kids setting (2026-10-01), named as the recorded age was", () => {
+    expect(kidsListener(threadBeat(1, { category: "read-with-kids", kidAges: { min: 5, max: 5 } }))).toBe("a child aged 5");
+    expect(kidsListener(threadBeat(1, { category: "read-with-kids", kidAges: { min: 8, max: 10 } }))).toBe("a child aged 8-10");
+  });
 });
 
 describe("beatCheckOptions: production's check of a beat reply", () => {

@@ -1,5 +1,5 @@
 import type { Story } from "core/models/Story.js";
-import type { GameMode, PlayerCount } from "core/types/index.js";
+import type { GameMode, KidAges, PlayerCount } from "core/types/index.js";
 import type { TemplateIterationSections } from "core/types/admin.js";
 import { beatStep, iterationStep, setupStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import {
@@ -538,6 +538,8 @@ export type SetupInput = {
   maxTurns: number;
   /** A child reads along (a read-with-kids story; the case's kids tag): only setup round 3's form reads it */
   kids?: boolean;
+  /** The read-with-kids setting the case's story is set up for (the kids-ages stage); a story set up from it records it */
+  kidAges?: KidAges;
 };
 
 export type IterationInput = {

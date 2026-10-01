@@ -6,6 +6,7 @@ import {
   PlayerCount,
   Outcome,
   categoryFromTemplateTags,
+  kidAgesFrom,
 } from "core/types/index.js";
 import {
   checkStoryStateBackgrounds,
@@ -70,6 +71,9 @@ export function createStoryStateFromTemplate(
   const category = categoryFromTemplateTags(template.tags);
   if (category) {
     storyState.category = category;
+    // A template tagged Kids: the children's ages its editor set (the read-with-kids setting), as a custom story records its form's
+    const kidAges = kidAgesFrom(template.kidAges);
+    if (kidAges) storyState.kidAges = kidAges;
   }
 
   // Set up character selection options for the requested player count

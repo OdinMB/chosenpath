@@ -19,6 +19,10 @@ import {
   Thread,
   Resolution,
   StoryCategory,
+  KidAges,
+  kidAgesFrom,
+  kidAgesText,
+  parseKidAges,
 } from "../types/index.js";
 import { PlayerManager } from "./PlayerManager.js";
 import { ThreadManager } from "./ThreadManager.js";
@@ -80,9 +84,18 @@ export class Story {
     return this.state.category === "read-with-kids";
   }
 
-  /** The child's age a read-with-kids story recorded from its premise; undefined for a template or an older story. */
+  /**
+   * The children's ages a read-with-kids story records (the read-with-kids setting, 2026-10-01), else the age a story
+   * saved before it recorded from its premise, read the same way; undefined where there is neither.
+   */
+  getKidAges(): KidAges | undefined {
+    return kidAgesFrom(this.state.kidAges) ?? (this.state.readingAge === undefined ? undefined : parseKidAges(this.state.readingAge));
+  }
+
+  /** The children's ages as a turn names them ("5", "8-10"); undefined where the story records none. */
   getReadingAge(): string | undefined {
-    return this.state.readingAge;
+    const ages = this.getKidAges();
+    return ages ? kidAgesText(ages) : undefined;
   }
 
   getTitle(): string {

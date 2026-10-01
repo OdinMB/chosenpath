@@ -16,7 +16,7 @@ import {
   CreateStoryFromTemplateRequest,
   UpdateStoryStatusRequest,
 } from "core/types/api.js";
-import { PlayerCount, isStoryCategory } from "core/types/index.js";
+import { PlayerCount, isStoryCategory, kidAgesFrom } from "core/types/index.js";
 import { DEFAULT_SELECTED_DIFFICULTY_MODIFIER } from "core/config.js";
 import { verifyUser } from "../users/authMiddleware.js";
 import { v4 as uuidv4 } from "uuid";
@@ -50,6 +50,7 @@ router.post(
         gameMode,
         difficultyLevel: requestedDifficultyLevel,
         category,
+        kidAges,
       } = req.body as CreateStoryRequest;
 
       const creatorId = (req as Express.Request & { user?: { id: string } })
@@ -73,7 +74,9 @@ router.post(
         difficultyToPass,
         res,
         creatorId,
-        isStoryCategory(category) ? category : undefined
+        isStoryCategory(category) ? category : undefined,
+        // The read-with-kids setting, only as whole ages from 2 to 14; anything else is left out
+        kidAgesFrom(kidAges)
       );
     } catch (error) {
       // Also reached when the content filter is unavailable (it fails closed)

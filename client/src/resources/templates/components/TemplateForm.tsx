@@ -83,6 +83,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handleContainsImagesChange,
     handleImageInstructionsChange,
     handleDifficultyLevelsChange,
+    handleKidAgesChange,
     // New helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,
@@ -450,6 +451,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             handleTagsChange={handleTagsChange}
             handleShowOnWelcomeScreenChange={handleShowOnWelcomeScreenChange}
             handleDifficultyLevelsChange={handleDifficultyLevelsChange}
+            handleKidAgesChange={handleKidAgesChange}
             handlePublicationStatusChange={handlePublicationStatusChange}
             setWorld={setWorld}
             setRules={setRules}

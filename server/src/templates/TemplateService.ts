@@ -12,11 +12,18 @@ import {
   PublicationStatusType,
   Stat,
   TemplateIterationSections,
+  kidAgesFrom,
 } from "core/types/index.js";
 import {
   checkTemplateBackgrounds,
   describeBackgroundFixes,
 } from "core/utils/statValueCheck.js";
+
+/** A template's read-with-kids setting as it is saved: whole ages from 2 to 14, or none at all (a cleared or invalid value). */
+function withKidAges(value: unknown): Pick<StoryTemplate, "kidAges"> {
+  const kidAges = kidAgesFrom(value);
+  return kidAges ? { kidAges } : {};
+}
 import { ensureStorageDirectory, getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
@@ -163,6 +170,8 @@ export class TemplateService {
           title: "",
           text: "",
         },
+      // A template tagged Kids: the read-with-kids setting, kept only as whole ages from 2 to 14
+      ...withKidAges(baseTemplate.kidAges),
     };
 
     // Add player properties
@@ -582,11 +591,20 @@ export class TemplateService {
       }
 
       // Merge existing data with the updates, then check the backgrounds
-      // against the stats the template holds after the update
-      const mergedTemplate: StoryTemplate = this.withCheckedBackgroundValues({
+      // against the stats the template holds after the update; an update that
+      // carries the read-with-kids setting replaces it with its valid value or,
+      // cleared (null) or not ages, removes it
+      const merged: StoryTemplate = {
         ...existingTemplate,
         ...template,
         updatedAt: new Date().toISOString(),
+      };
+      delete merged.kidAges;
+      const mergedTemplate: StoryTemplate = this.withCheckedBackgroundValues({
+        ...merged,
+        ...withKidAges(
+          "kidAges" in template ? template.kidAges : existingTemplate.kidAges
+        ),
       });
 
       // Handle creator information on update

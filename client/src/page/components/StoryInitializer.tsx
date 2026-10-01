@@ -1,5 +1,16 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { PlayerCount, GameMode, GameModes, DifficultyLevel, KID_AGE_LABEL } from "core/types";
+import {
+  PlayerCount,
+  GameMode,
+  GameModes,
+  DifficultyLevel,
+  KID_AGE_LABEL,
+  kidAgesText,
+} from "core/types";
+import {
+  KID_AGES_PLACEHOLDER,
+  readKidAgesField,
+} from "shared/utils/kidAgesField";
 import {
   PrimaryButton,
   Icons,
@@ -43,7 +54,8 @@ interface CategoryConfig {
     key: string;
     label: string;
     placeholder: string;
-    type: "textarea" | "inline" | "number";
+    // "age": the read-with-kids setting, one age or a range, checked as typed
+    type: "textarea" | "inline" | "age";
   }>;
 }
 
@@ -280,10 +292,11 @@ export const StoryInitializer = ({
         fields: [
           {
             key: "kidAge",
-            // The server reads the child's age back from this line of the merged premise (readingAgeFromPremise)
+            // The read-with-kids setting: one age or a range, sent as the request's kidAges and merged into the
+            // premise as this line (which the server still reads where a request has no setting)
             label: KID_AGE_LABEL,
-            placeholder: "5, 8-10",
-            type: "number",
+            placeholder: KID_AGES_PLACEHOLDER,
+            type: "age",
           },
         ],
       },
@@ -583,6 +596,12 @@ export const StoryInitializer = ({
     updateURLParams({ [`field_${fieldKey}`]: value });
   };
 
+  // The read-with-kids setting as typed: its ages, or the hint where they can't be read (which keeps the story from being created)
+  const kidAgesField =
+    selectedCategory === "read-with-kids"
+      ? readKidAgesField(categoryFields.kidAge ?? "")
+      : {};
+
   const buildMergedPrompt = () => {
     if (selectedCategory === "flexible") {
       return prompt;
@@ -593,10 +612,14 @@ export const StoryInitializer = ({
 
     let mergedPrompt = `${instruction}\n\n`;
 
-    // Add category-specific field values
+    // Add category-specific field values; the ages as the setting reads them ("8-10")
     config.fields.forEach((field) => {
       const value = categoryFields[field.key];
-      if (value && value.trim()) {
+      if (field.type === "age") {
+        if (kidAgesField.ages) {
+          mergedPrompt += `${field.label}: ${kidAgesText(kidAgesField.ages)}\n`;
+        }
+      } else if (value && value.trim()) {
         mergedPrompt += `${field.label}: ${value}\n`;
       }
     });
@@ -618,6 +641,8 @@ export const StoryInitializer = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Ages that can't be read: the field says so, and nothing is sent
+    if (kidAgesField.error) return;
 
     const mergedPrompt = buildMergedPrompt();
     console.log("Final prompt being sent to backend:", mergedPrompt);
@@ -666,6 +691,8 @@ export const StoryInitializer = ({
           difficultyLevel: selectedDifficultyLevel,
           // Read-with-kids stories get stricter image moderation on the server
           category: selectedCategory,
+          // The read-with-kids setting, which the story records and its turns are written for
+          ...(kidAgesField.ages ? { kidAges: kidAgesField.ages } : {}),
         });
         // Navigation now happens in useEffect when storyReady becomes true
       } catch (error) {
@@ -1156,28 +1183,48 @@ export const StoryInitializer = ({
                             disabled={currentIsLoading}
                           />
                         </div>
-                      ) : field.type === "number" ? (
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                          <label
-                            htmlFor={`category-${field.key}`}
-                            className="text-sm md:text-base font-medium text-primary sm:whitespace-nowrap"
-                          >
-                            {field.label}
-                          </label>
-                          <input
-                            id={`category-${field.key}`}
-                            type="text"
-                            value={categoryFields[field.key] || ""}
-                            onChange={(e) =>
-                              handleCategoryFieldChange(
-                                field.key,
-                                e.target.value
-                              )
-                            }
-                            className="w-full sm:w-32 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent bg-white"
-                            placeholder={field.placeholder}
-                            disabled={currentIsLoading}
-                          />
+                      ) : field.type === "age" ? (
+                        <div className="space-y-1">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                            <label
+                              htmlFor={`category-${field.key}`}
+                              className="text-sm md:text-base font-medium text-primary sm:whitespace-nowrap"
+                            >
+                              {field.label}
+                            </label>
+                            <input
+                              id={`category-${field.key}`}
+                              type="text"
+                              value={categoryFields[field.key] || ""}
+                              onChange={(e) =>
+                                handleCategoryFieldChange(
+                                  field.key,
+                                  e.target.value
+                                )
+                              }
+                              aria-invalid={kidAgesField.error ? true : undefined}
+                              aria-describedby={
+                                kidAgesField.error
+                                  ? `category-${field.key}-error`
+                                  : undefined
+                              }
+                              className={`w-full sm:w-32 rounded-lg border shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent bg-white ${
+                                kidAgesField.error
+                                  ? "border-red-400"
+                                  : "border-primary-100"
+                              }`}
+                              placeholder={field.placeholder}
+                              disabled={currentIsLoading}
+                            />
+                          </div>
+                          {kidAgesField.error && (
+                            <p
+                              id={`category-${field.key}-error`}
+                              className="text-sm text-red-600"
+                            >
+                              {kidAgesField.error}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <>
@@ -1322,7 +1369,7 @@ export const StoryInitializer = ({
             type={submitButtonType}
             onClick={templateMode ? handleSubmit : undefined}
             size="lg"
-            disabled={currentIsLoading}
+            disabled={currentIsLoading || Boolean(kidAgesField.error)}
             className="font-semibold flex-1 sm:flex-none sm:min-w-[120px]"
           >
             {templateMode ? "Draft World" : "Create Story"}

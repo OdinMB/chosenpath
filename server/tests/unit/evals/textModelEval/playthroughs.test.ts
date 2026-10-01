@@ -93,11 +93,14 @@ describe("the four playthroughs", () => {
     // Neither new premise was played or set up in the eval before
     for (const p of SETUP_PREMISES) expect([agents.premise, mouse.premise]).not.toContain(p.premise);
     // A story read with a child records its category and, as the game does since the kids-turns stage (2026-10-01), the
-    // age its premise states; the second round's stored runs predate the age
+    // age its premise states, as the read-with-kids setting since the kids-ages work of the same day (a premise sent
+    // without the setting); the second round's stored runs predate the age
     const started = storyFromSetup({}, mouse, "mouse-story");
-    expect([started.category, started.readingAge]).toEqual(["read-with-kids", "5"]);
+    expect([started.category, started.kidAges, started.readingAge]).toEqual(["read-with-kids", { min: 5, max: 5 }, undefined]);
+    // A setup input that carries the setting (the kids-ages stage's setups) records it over the premise's line
+    expect(storyFromSetup({}, { ...mouse, kidAges: { min: 10, max: 10 } }, "mouse-story").kidAges).toEqual({ min: 10, max: 10 });
     const lemonade = storyFromSetup({}, playthroughSetupInput(PLAYTHROUGHS[0]), "lemonade-story");
-    expect([lemonade.category, lemonade.readingAge]).toEqual([undefined, undefined]);
+    expect([lemonade.category, lemonade.kidAges]).toEqual([undefined, undefined]);
   });
 
   it("plays every call on production's own code (adopted) and production's settings for the role and player count", () => {

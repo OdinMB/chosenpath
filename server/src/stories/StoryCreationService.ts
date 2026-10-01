@@ -6,8 +6,9 @@ import {
   ImageRequest,
   IMAGE_SIZES,
   StoryCategory,
+  KidAges,
   kidAgeAnswer,
-  readingAgeFromPremise,
+  kidAgesFromPremise,
 } from "core/types/index.js";
 import { connectionManager } from "server/game/ConnectionManager.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
@@ -128,7 +129,8 @@ export class StoryCreationService {
     difficultyLevel: DifficultyLevel | undefined,
     res: Response,
     creatorId?: string,
-    category?: StoryCategory
+    category?: StoryCategory,
+    kidAges?: KidAges
   ): Promise<void> {
     // Logged by story id and length only: premise text stays out of the logs
     const storyId = randomUUID();
@@ -194,7 +196,8 @@ export class StoryCreationService {
       gameMode,
       difficultyLevel, // Pass original difficultyLevel (could be undefined)
       playerCodes,
-      category
+      category,
+      kidAges
       // creatorId - currently unused
     ).catch(() => {
       setupStatusTracker.fail(storyId, "setup_failed");
@@ -219,7 +222,8 @@ export class StoryCreationService {
     gameMode: GameMode,
     difficultyLevel: DifficultyLevel | undefined,
     playerCodes: Record<string, string>,
-    category: StoryCategory | undefined
+    category: StoryCategory | undefined,
+    requestedKidAges: KidAges | undefined
     // creatorId is currently unused but may be needed for future features like story ownership tracking
     // creatorId?: string
   ): Promise<void> {
@@ -283,11 +287,13 @@ export class StoryCreationService {
 
       const story = Story.create(storyState);
 
-      // Add player codes, pregeneration setting and category to state; a story read with a child records the child's age
-      // its premise states, which a single player's turns are written for
-      const readingAge = category === "read-with-kids" ? readingAgeFromPremise(prompt) : undefined;
-      if (category === "read-with-kids" && !readingAge && kidAgeAnswer(prompt) !== undefined) {
-        // The form's age field is free text; an answer that isn't an age is never logged, as no premise text is
+      // Add player codes, pregeneration setting and category to state; a story read with a child records the children's
+      // ages, which its turns are written for: the form's read-with-kids setting, else (a premise sent without it, from
+      // an older client) the age line of its premise
+      const kids = category === "read-with-kids";
+      const kidAges = kids ? requestedKidAges ?? kidAgesFromPremise(prompt) : undefined;
+      if (kids && !kidAges && kidAgeAnswer(prompt) !== undefined) {
+        // The answer is never logged, as no premise text is
         Logger.Route.log(
           `Story ${storyId}: the premise's answer for the child's age is not an age or a range of ages, so its turns are written for a young child`
         );
@@ -296,7 +302,7 @@ export class StoryCreationService {
         playerCodes,
         pregenerateBeats,
         ...(category ? { category } : {}),
-        ...(readingAge ? { readingAge } : {}),
+        ...(kidAges ? { kidAges } : {}),
       });
 
       console.log(

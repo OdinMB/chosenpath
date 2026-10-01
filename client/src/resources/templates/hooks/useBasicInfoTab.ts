@@ -6,6 +6,7 @@ import {
   PlayerCount,
   PublicationStatusType,
   DifficultyLevel,
+  KidAges,
 } from "core/types";
 import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "core/config";
 
@@ -146,6 +147,9 @@ export function useBasicInfoTab({ template, onChange }: UseBasicInfoTabProps) {
     handleShowOnWelcomeScreenChange: (value: boolean) =>
       handleChange("showOnWelcomeScreen", value),
     handleDifficultyLevelsChange,
+    // The read-with-kids setting of a template tagged Kids; null clears it on save
+    handleKidAgesChange: (kidAges: KidAges | null) =>
+      handleChange("kidAges", kidAges),
     // Export UI helper functions
     getStoryLengthOptions,
     getPlayerCountOptions,
