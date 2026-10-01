@@ -519,8 +519,6 @@ describe("checkThreadPlan", () => {
 
       expect(result.problem).toBeUndefined();
       expect(getThreadType(result.plan.threads[0])).toBe("challenge");
-      // Both sides filled stays a problem there
-      expect(checkThreadPlan(story, threadPlan([contestThread(["player1"], ["player2"], "apart")])).problem).toContain("competitive");
     });
 
     it("leaves a single player's contest results a problem: a single player's outcomes are never contested", () => {
@@ -554,13 +552,97 @@ describe("checkThreadPlan", () => {
     });
   });
 
+  /*
+   * A cooperative story holding a contested outcome (a template's author can
+   * put one in a cooperative World; the editor only warns): the planner
+   * writes that outcome's chapter as a contest with players on both sides,
+   * which a cooperative game can't play. Until 2026-10-01 the check refused
+   * it, its one retry wrote the same, and the turn failed for good. Now the
+   * contest is the group's shared challenge, as a one-sided contest is that
+   * side's (PL-12): every player in it on side A, the side player1 was on (side
+   * A where player1 is elsewhere) winning as the favorable result.
+   */
+  describe("a contest in a cooperative story (PL-12)", () => {
+    const COOP = { player1: "shared_crown", player2: "shared_crown", player3: "shared_crown" };
+
+    it("makes a two-sided contest the group's shared challenge, player1's side's win the favorable result", () => {
+      const story = groupAfterPicks(GameModes.Cooperative, COOP);
+
+      const result = checkThreadPlan(story, threadPlan([contestThread(["player1", "player3"], ["player2"], "the_vote")]), { lengths: true });
+
+      expect(result.problem).toBeUndefined();
+      expect(result.lengthProblem).toBeUndefined();
+      const vote = result.plan.threads[0];
+      expect([vote.playersSideA, vote.playersSideB]).toEqual([["player1", "player3", "player2"], []]);
+      expect(vote.possibleMilestones).toEqual({ favorable: "A takes the crown", mixed: "They share it", unfavorable: "B takes the crown" });
+      expect(vote.progression.map((step) => step.possibleResolutions)).toEqual([
+        { favorable: "A leads 0", mixed: "Even 0", unfavorable: "B leads 0" },
+        { favorable: "A leads 1", mixed: "Even 1", unfavorable: "B leads 1" },
+      ]);
+      expect(getThreadType(vote)).toBe("challenge");
+      expect((vote as Thread & { kind?: string }).kind).toBe("challenge");
+      expect(result.repairs).toEqual([{ kind: "contestInCooperative", detail: "the_vote" }]);
+    });
+
+    it("takes side B's win as the favorable result where player1 is on side B, and side A's where player1 is elsewhere", () => {
+      const onB = checkThreadPlan(groupAfterPicks(GameModes.Cooperative, COOP), threadPlan([contestThread(["player2"], ["player1", "player3"], "the_vote")]));
+      expect(onB.problem).toBeUndefined();
+      expect(onB.plan.threads[0]).toMatchObject({
+        playersSideA: ["player2", "player1", "player3"],
+        playersSideB: [],
+        possibleMilestones: { favorable: "B takes the crown", mixed: "They share it", unfavorable: "A takes the crown" },
+      });
+
+      const story = groupAfterPicks(GameModes.Cooperative, { player1: "player1_trust", player2: "shared_crown", player3: "shared_crown" });
+      const elsewhere = checkThreadPlan(story, threadPlan([
+        aThread("challenge", 2, ["player1"], [], { id: "trust", outcomeId: "player1_trust" }),
+        contestThread(["player3"], ["player2"], "the_vote"),
+      ]));
+      expect(elsewhere.problem).toBeUndefined();
+      expect(elsewhere.plan.threads[1]).toMatchObject({ playersSideA: ["player3", "player2"], possibleMilestones: { favorable: "A takes the crown" } });
+    });
+
+    it("uses the first reply: no retry, so the chapter is never refused twice", async () => {
+      const story = groupAfterPicks(GameModes.Cooperative, COOP);
+      const prompts: string[] = [];
+      const invoke = async (prompt: string) => {
+        prompts.push(prompt);
+        return threadPlan([contestThread(["player1"], ["player2", "player3"], "the_vote")]);
+      };
+
+      const plan = await checkedThreadPlan(story, "PROMPT", invoke, () => undefined);
+
+      expect(prompts).toEqual(["PROMPT"]);
+      expect(plan.threads.map((t) => [t.id, t.playersSideA, getThreadType(t)])).toEqual([["the_vote", ["player1", "player2", "player3"], "challenge"]]);
+    });
+
+    it("keeps a contest in a contest game, and a cooperative thread with players on side B but no contest results a problem", () => {
+      for (const mode of [GameModes.Competitive, GameModes.CooperativeCompetitive]) {
+        const result = checkThreadPlan(groupAfterPicks(mode, COOP), threadPlan([contestThread(["player1", "player3"], ["player2"], "the_vote")]));
+        expect(result.problem).toBeUndefined();
+        expect(getThreadType(result.plan.threads[0])).toBe("contest");
+        expect(kinds(result.repairs)).toEqual([]);
+      }
+      const challengeWithSideB = aThread("challenge", 2, ["player1"], [], { outcomeId: "shared_crown", playersSideB: ["player2", "player3"] });
+      expect(checkThreadPlan(groupAfterPicks(GameModes.Cooperative, COOP), threadPlan([challengeWithSideB])).problem).toContain("competitive");
+    });
+
+    it("leaves a single player's two-sided contest a problem: a single player has no second side", () => {
+      const result = checkThreadPlan(threadStory(1, GameModes.Cooperative), threadPlan([contestThread(["player1"], ["player2"], "alone")]));
+
+      expect(result.problem).toBeDefined();
+    });
+  });
+
   describe("contests (PL-5)", () => {
     const contest = () => aThread("contest", 3, ["player1"], ["player2"], { outcomeId: "shared_crown" });
 
-    it("finds a contest in a cooperative game a problem", () => {
+    it("makes a contest in a cooperative game the group's challenge (PL-12, since 2026-10-01; a problem before)", () => {
       const result = checkThreadPlan(threadStory(2, GameModes.Cooperative), threadPlan([contest()]));
 
-      expect(result.problem).toContain("contest");
+      expect(result.problem).toBeUndefined();
+      expect(getThreadType(result.plan.threads[0])).toBe("challenge");
+      expect(result.plan.threads[0].playersSideA).toEqual(["player1", "player2"]);
     });
 
     it.each([GameModes.Competitive, GameModes.CooperativeCompetitive])("allows a contest in a %s game", (gameMode) => {

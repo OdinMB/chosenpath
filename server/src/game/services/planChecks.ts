@@ -388,17 +388,29 @@ function asChallengeResults(results: Results, won: "sideAWins" | "sideBWins"): R
  * cooperative group, which plays no contest, contest results on one side are
  * that challenge whoever is in it. A single player's outcomes are never
  * contested, so there contest results stay a problem.
+ *
+ * A contest with players on both sides in a cooperative group is the group's
+ * shared challenge the same way (since 2026-10-01, repair
+ * `contestInCooperative`): every player in it goes on side A, and the side
+ * player1 was on (side A where player1 is elsewhere, as PL-11 reads side A)
+ * wins as the favorable result. A template's author can put a contested
+ * outcome in a cooperative World (the editor only warns), and the planner
+ * writes its chapter as a contest, which a cooperative game can't play: the
+ * check refused it, its one retry wrote the same, and the turn failed for good.
  */
 function oneSidedAsChallenge(story: Story, thread: Thread, repairs: Repair[]): Thread {
   const sideA = thread.playersSideA;
   const sideB = thread.playersSideB;
-  if (!story.isMultiplayer() || sideA.length > 0 === sideB.length > 0) return thread;
+  const playsContests = CONTEST_MODES.includes(story.getGameMode());
+  const oneSided = sideA.length > 0 !== sideB.length > 0;
+  const twoSidedInCooperative = !playsContests && sideA.length > 0 && sideB.length > 0;
+  if (!story.isMultiplayer() || !(oneSided || twoSidedInCooperative)) return thread;
   const kinds = [thread.possibleMilestones, ...(thread.progression ?? []).map((step) => step.possibleResolutions)].map(resultKind);
   if (!kinds.every((kind) => kind === "contest")) return thread;
   const players = [...sideA, ...sideB];
-  if (CONTEST_MODES.includes(story.getGameMode()) && story.getPlayerSlots().every((slot) => players.includes(slot))) return thread;
-  const won = sideA.length > 0 ? "sideAWins" : "sideBWins";
-  repairs.push({ kind: "contestOneSided", detail: thread.id });
+  if (playsContests && story.getPlayerSlots().every((slot) => players.includes(slot))) return thread;
+  const won = sideA.length > 0 && !sideB.includes("player1") ? "sideAWins" : "sideBWins";
+  repairs.push({ kind: oneSided ? "contestOneSided" : "contestInCooperative", detail: thread.id });
   const stored = thread as Thread & { kind?: unknown };
   return {
     ...thread,
