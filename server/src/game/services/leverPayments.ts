@@ -19,6 +19,9 @@ import type { Repair } from "./textRepairs.js";
  * list stats and a plural name (a second contact burned or added, a second
  * item added, "Supply" for "Gilded Comet Supplies"); since decision A of the
  * same day a list's item is a payment and a plural name reads in its singular.
+ * Its review narrowed both: a singular form names its stat only as a word of
+ * its own where no stat is named by its name, and a list's or a ladder's
+ * payment is read later in the chapter only on a stat beats may not change.
  */
 
 export type Lever = "sacrifice" | "reward";
@@ -45,26 +48,38 @@ export function allowsLever(stat: Stat, kind: Lever): boolean {
 /** Words shorter than this are too common to read as a stat's name or value in an option's text. */
 const MIN_NAMED_LETTERS = 4;
 
-/**
- * A plural name's singular forms: without its "s" (as before), and since decision A (2026-10-01) "-ies" as "-y" and
- * "-ches", "-shes", "-sses", "-xes", "-zes" without "es": round 3's "gain 1 Gilded Comet Supply" names the stat "Gilded
- * Comet Supplies", which "Gilded Comet Supplie" didn't match.
- */
-function singularsOf(name: string): string[] {
-  if (name.length <= MIN_NAMED_LETTERS || !name.endsWith("s")) return [];
-  const forms = [name.slice(0, -1)];
-  if (name.endsWith("ies")) forms.push(`${name.slice(0, -3)}y`);
-  if (/(?:ch|sh|ss|x|z)es$/.test(name)) forms.push(name.slice(0, -2));
-  return forms;
+/** A stat's names, lower-cased: its name, and an opposites stat's sides. */
+function statNames(stat: Stat): string[] {
+  return [stat.name, ...(stat.type === "opposites" ? stat.name.split("|") : [])].map((name) => name.trim().toLowerCase()).filter((name) => name.length >= MIN_NAMED_LETTERS);
 }
 
-/** The words that name a stat in an option's text: its name (an opposites stat's sides too), and a plural name's singular forms. */
+/** The words that name a stat in an option's text, read anywhere in it: its names, and a plural name without its "s". */
 function statNameWords(stat: Stat): string[] {
-  const names = [stat.name, ...(stat.type === "opposites" ? stat.name.split("|") : [])]
-    .map((name) => name.trim().toLowerCase())
-    .filter((name) => name.length >= MIN_NAMED_LETTERS);
-  return [...new Set(names.flatMap((name) => [name, ...singularsOf(name)]))];
+  const names = statNames(stat);
+  return [...new Set([...names, ...names.flatMap((name) => (name.length > MIN_NAMED_LETTERS && name.endsWith("s") ? [name.slice(0, -1)] : []))])];
 }
+
+/**
+ * A plural name's other singular forms, since decision A (2026-10-01): "-ies" as "-y", and "-ches", "-shes", "-sses",
+ * "-xes", "-zes" without "es" (round 3's "gain 1 Gilded Comet Supply" names the stat "Gilded Comet Supplies", which
+ * "Gilded Comet Supplie" didn't match). Read only as words of their own, four letters or more, and only where the text
+ * names no stat by statNameWords (leverStatOf): read anywhere, "ability" (a stored setup's list "Abilities") was found
+ * inside "City Stability", which the same setup held, and two stats named left the lever unread (the review of decision
+ * A's fixes, the same day).
+ */
+function singularWords(stat: Stat): string[] {
+  const named = statNameWords(stat);
+  const forms = statNames(stat).flatMap((name) => [
+    ...(name.endsWith("ies") ? [`${name.slice(0, -3)}y`] : []),
+    ...(/(?:ch|sh|ss|x|z)es$/.test(name) ? [name.slice(0, -2)] : []),
+  ]);
+  return [...new Set(forms)].filter((form) => form.length >= MIN_NAMED_LETTERS && !named.includes(form));
+}
+
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Whether the text holds these words as words of their own ("ability", never inside "stability"). */
+const holdsWord = (lower: string, words: string) => new RegExp(String.raw`(?<![a-z])${escaped(words)}(?![a-z])`).test(lower);
 
 /** What a stat holds for this player (a shared stat's own value), as words an option's text can name: an item, a contact. */
 function heldWords(story: Story, stat: Stat, slot: string, shared: boolean): string[] {
@@ -79,10 +94,12 @@ export type LeverStat = { stat: Stat; shared: boolean };
 /**
  * The stat a sacrifice or reward option draws on. The option names none in
  * a field, only in its text (the schema asks it to), so this reads the text
- * as the eval's lever readings do: the stats it names; else those whose held
- * value it names ("Ivo Senn", an item of the crew's Dockside Favors); else
- * the one stat that allows this lever at all. Of those, the ones that allow
- * it, when any does; undefined unless exactly one is left.
+ * as the eval's lever readings do: the stats it names (statNameWords); else
+ * those it names in another singular form, as a word of its own
+ * (singularWords: "a new ability" for Abilities); else those whose held value
+ * it names ("Ivo Senn", an item of the crew's Dockside Favors); else the one
+ * stat that allows this lever at all. Of those, the ones that allow it, when
+ * any does; undefined unless exactly one is left.
  */
 export function leverStatOf(story: Story, slot: string, kind: Lever, text: string, stats: LeverStats): LeverStat | undefined {
   const lower = text.toLowerCase();
@@ -91,7 +108,8 @@ export function leverStatOf(story: Story, slot: string, kind: Lever, text: strin
     ...[...stats.playerStats.values()].map((stat) => ({ stat, shared: false })),
   ];
   const byName = all.filter(({ stat }) => statNameWords(stat).some((word) => lower.includes(word)));
-  const byValue = byName.length > 0 ? byName : all.filter(({ stat, shared }) => heldWords(story, stat, slot, shared).some((word) => lower.includes(word)));
+  const bySingular = byName.length > 0 ? byName : all.filter(({ stat }) => singularWords(stat).some((word) => holdsWord(lower, word)));
+  const byValue = bySingular.length > 0 ? bySingular : all.filter(({ stat, shared }) => heldWords(story, stat, slot, shared).some((word) => lower.includes(word)));
   const allowing = all.filter(({ stat }) => allowsLever(stat, kind));
   const candidates = byValue.length > 0 ? byValue : allowing.length === 1 ? allowing : [];
   const allowed = candidates.filter(({ stat }) => allowsLever(stat, kind));
@@ -130,13 +148,15 @@ const AMOUNT_REACH = 1;
 /** A signed amount speaks of the stat only right beside its name: "(+10% Suspicion)", "+20% in Family Pressure", "Suspicion +10". */
 const SIGN_REACH_BEFORE = 1;
 
-/** The words a stat is named by in a lever's text or rule: its names, and each word of four letters or more in them ("stability" for Timeline Stability). */
+/**
+ * The words a stat is named by in a lever's text or rule, once the stat is known: its names and singular forms, and each
+ * word of four letters or more in them ("stability" for Timeline Stability).
+ */
 function mentionWords(stat: Stat): string[] {
-  const parts = statNameWords(stat).flatMap((name) => name.split(/\s+/)).filter((part) => part.length >= MIN_NAMED_LETTERS);
-  return [...new Set([...statNameWords(stat), ...parts])];
+  const names = [...statNameWords(stat), ...singularWords(stat)];
+  const parts = names.flatMap((name) => name.split(/\s+/)).filter((part) => part.length >= MIN_NAMED_LETTERS);
+  return [...new Set([...names, ...parts])];
 }
-
-const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * The way the words of a lever's text that speak of its stat move it: 1 up,
@@ -208,7 +228,7 @@ function chosenLever(story: Story, slot: string, beat: Beat | null, stats: Lever
   return lever ? { kind, stat: lever.stat, group: lever.shared ? "shared" : slot, direction: leverDirection(lever.stat, kind, text) } : undefined;
 }
 
-/** A lever of these stat types is read, and a ladder's (ladderOf); a list's payment isn't a size a second charge could repeat. */
+/** A lever of these stat types is read by its size; a ladder's by its rungs (ladderOf) and a list's by its item (readsPayment). */
 const PAID_TYPES: Stat["type"][] = ["percentage", "number"];
 
 /**
@@ -385,19 +405,27 @@ function paymentsBefore(story: Story): Payment[] {
  * once more at 25, 45 → 35 ("your fingers tighten briefly"). A ladder's step
  * counts as a percentage's does (ladderOf: the space pirates' Pirate
  * Reputation, Known Hand → Feared Name a turn after the reward's Unproven →
- * Known Hand). Kept: a charge that a lever chosen on the last beat now owes
- * (any player's, of the same kind on the same stat), a change of another size
- * or the other way, a late payment (a last beat that recorded none), a switch
- * turn or ending's change on an earlier step's payment (it applies the stats'
- * adjustments after threads), and every turn after the chapter. A change of
- * the same size the stat's own rules happen to ask for on such a turn is
- * dropped too; the stored playthroughs show none (`playthroughReplay.test.ts`).
- * Called after the stat changes are placed.
+ * Known Hand), and so does a list's item, with one exception: on a later step
+ * of the chapter, a list's or a ladder's payment is read only where the
+ * stat's rules keep a beat from changing it (canBeChangedInBeatResolutions
+ * false; the review of decision A's fixes, 2026-10-01). Its step is one item
+ * or one rung, which every story move on such a stat shares, so a contact the
+ * story adds later in the chapter would go as a repeat; the stored repeats on
+ * lists and ladders all came on the turn after the payment. Kept: a charge
+ * that a lever chosen on the last beat now owes (any player's, of the same
+ * kind on the same stat), a change of another size or the other way, a late
+ * payment (a last beat that recorded none), a switch turn or ending's change
+ * on an earlier step's payment (it applies the stats' adjustments after
+ * threads), and every turn after the chapter. A change of the same size the
+ * stat's own rules happen to ask for on such a turn is dropped too (on a list
+ * or a ladder, any item or rung the turn after the payment); the stored
+ * playthroughs show none (`playthroughReplay.test.ts`). Called after the stat
+ * changes are placed.
  */
 export function dropLeversChargedAgain(story: Story, changes: Change[], repairs: Repair[]): Change[] {
   const stats = leverStatsOf(story);
   const owed = owedLevers(story, stats);
-  const records = paymentsBefore(story).filter(({ paid }) => !owed.has(leverKey(paid)));
+  const records = paymentsBefore(story).filter(({ paid, last }) => !owed.has(leverKey(paid)) && (last || readLaterInChapter(stats, paid)));
   const pending = [...new Map(records.map((payment) => [`${leverKey(payment.paid)}|${payment.paid.step}|${payment.turn}`, payment])).values()];
   if (pending.length === 0) return changes;
 
@@ -415,6 +443,16 @@ export function dropLeversChargedAgain(story: Story, changes: Change[], repairs:
     repairs.push({ kind: "leverChargedAgain", detail: `${paid.group}/${paid.stat}: ${signed(paid.step)}, the ${paid.kind} ${when}` });
     return false;
   });
+}
+
+/**
+ * Whether a payment is read on a later step of its chapter: a percentage's or a number's, whose step size tells a repeat
+ * from most story moves; a list's or a ladder's only where the stat's rules keep a beat from changing it.
+ */
+function readLaterInChapter(stats: LeverStats, paid: PaidLever): boolean {
+  const stat = paid.group === "shared" ? stats.sharedStats.get(paid.stat) : stats.playerStats.get(paid.stat);
+  if (!stat || (stat.type !== "string[]" && ladderOf(stat) === undefined)) return true;
+  return stat.canBeChangedInBeatResolutions === false;
 }
 
 /** The levers chosen on the last beat, by kind, group and stat: their payment is due this turn. */

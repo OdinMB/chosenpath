@@ -1336,6 +1336,66 @@ describe("repairBeatReply: a sacrifice or reward charged again on the turn after
       expect(result.statChanges).toEqual([]);
       expect(result.repairs).toEqual([{ kind: "leverChargedAgain", detail: "shared/shared_supplies: +1, the reward the previous turn paid" }]);
     });
+
+    /*
+     * The review of decision A's fixes (2026-10-01): the singular forms fix 4 added ("-ies" as "-y", "-ches" and the like
+     * without "es") were read anywhere in the text, so "ability" (a stored setup's list "Abilities") was found inside "City
+     * Stability", which the same setup held, and in "your ability" beside a stat the option names: two stats allowing the
+     * lever, so it went unread, its repeat charge undropped; and "stability" alone read as Abilities.
+     */
+    it("reads a singular form only as a word of its own, and only where the text names no stat by its name", () => {
+      const CITY = stat("shared_city_stability", { name: "City Stability", optionsToSacrifice: "Risk 10% City Stability to force a breakthrough.", optionsToGainAsReward: "Restore 10% City Stability by calming the districts." });
+      const ABILITIES = stat("player_abilities", { type: "string[]", name: "Abilities", optionsToSacrifice: "Can risk losing access to an ability for a +30 bonus.", optionsToGainAsReward: "Can gain a new ability." });
+      const chose = (text: string, kind: "sacrifice" | "reward" = "sacrifice") => {
+        const story = avalon({ lastChoice: lever(text, kind) });
+        const players = Object.fromEntries(Object.entries(story.getPlayers()).map(([slot, player]) => [slot, { ...player, statValues: [...player.statValues, { statId: ABILITIES.id, value: ["Wall-running"] }] }]));
+        return story.clone({ playerStats: [RESERVE, ABILITIES], sharedStats: [CRUMBS, CITY], sharedStatValues: [{ statId: CRUMBS.id, value: 2 }, { statId: CITY.id, value: 60 }], players });
+      };
+      // "ability" inside "City Stability" names no second stat
+      const risked = paidLevers(chose("Risk 10% City Stability to grab the clue."), [statChange("shared", CITY.id, "subtractNumber", 10)]);
+      expect(risked).toEqual({ player1: { kind: "sacrifice", group: "shared", stat: CITY.id, step: -10 } });
+      // Nor does "your ability" beside a stat the text names by its name
+      expect(paidLevers(chose("Push past your ability: spend 15% Personal Reserve."), [statChange("player1", RESERVE.id, "subtractNumber", 15)])).toEqual({ player1: reservePaid() });
+      // "stability" alone names neither stat
+      expect(paidLevers(chose("Risk 10% stability to force the seal."), [statChange("player1", ABILITIES.id, "removeElement", "Wall-running")])).toEqual({});
+      // A singular form as a word of its own, where no stat is named by its name, still names its stat
+      const learned = paidLevers(chose("Train with the dock crews and gain a new ability.", "reward"), [statChange("player1", ABILITIES.id, "addElement", "Knot-reading")]);
+      expect(learned).toEqual({ player1: { kind: "reward", group: "player1", stat: ABILITIES.id, step: 1 } });
+    });
+
+    /*
+     * The same review: a list's payment is one item, so every item added after a list reward (or removed after a
+     * sacrifice) has its step, whatever caused it. A list whose rules let a beat change it (round 3's contact lists and
+     * Presentation Kit) can gain an item from the story on a later step of the chapter; its repeats came on the turn after
+     * the payment (3 → 4, 8 → 9, 23 → 24), so a later step reads a list's (or a ladder's) payment only where the stat's
+     * rules keep a beat from changing it.
+     */
+    it("reads a list's payment on a later step of the chapter only where the stat's rules keep a beat from changing it", () => {
+      const atLaterStep = (contacts: Stat) => {
+        // Step 4 of a four-step chapter from history index 2: the reward taken on its first step, paid on its second (+1)
+        const chapter = threadAnalysis("challenge", 4, 2, ["player1"]);
+        chapter.threads[0].progression.slice(0, 3).forEach((step) => (step.resolution = "favorable"));
+        const base = threadBeat(1);
+        const players = Object.fromEntries(
+          Object.entries(base.getPlayers()).map(([slot, player]) => {
+            const beats: Beat[] = [...player.beatHistory, player.beatHistory[0], player.beatHistory[0]].map((beat) => ({ ...beat, options: challengeOptions(), choice: 0 }));
+            beats[2] = { ...beats[2], options: withLever(lever("Make time for introductions at the guild; add one contact to your Trusted Contacts.", "reward")), choice: 2 };
+            beats[3] = { ...beats[3], paidLever: { kind: "reward", group: "player1", stat: contacts.id, step: 1 } };
+            return [slot, { ...player, beatHistory: beats, statValues: [{ statId: RESERVE.id, value: 45 }, { statId: contacts.id, value: ["Niko Ren"] }] }];
+          })
+        );
+        return base.clone({ storyPhases: [switchAnalysis(["player1"], 1), chapter], playerStats: [RESERVE, contacts], sharedStats: [CRUMBS], sharedStatValues: [{ statId: CRUMBS.id, value: 2 }], players });
+      };
+      const supplier = [statChange("player1", CONTACTS.id, "addElement", "A dairy supplier")];
+      const story = atLaterStep(CONTACTS);
+      expect(story.getCurrentBeatType()).toBe("thread");
+      // The stat's rules let a beat add a contact: the story's new contact stays
+      expect(repaired(story, supplier)).toEqual({ statChanges: supplier, repairs: [] });
+      // Rules that keep a beat from changing it: a second contact there is the reward charged again
+      const result = repaired(atLaterStep({ ...CONTACTS, canBeChangedInBeatResolutions: false }), supplier);
+      expect(result.statChanges).toEqual([]);
+      expect(result.repairs).toEqual([{ kind: "leverChargedAgain", detail: "player1/player_trusted_contacts: +1, the reward turn 4 paid, earlier in this chapter" }]);
+    });
   });
 });
 
