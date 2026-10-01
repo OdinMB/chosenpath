@@ -56,6 +56,7 @@ import { parallelThreadsRequest } from "../../game/services/storyTextRounds/para
 import { resultsAsOutcomesRequest } from "../../game/services/storyTextRounds/resultsAsOutcomes.js";
 import { kidsShortTextCount, kidsTurnRequest } from "../../game/services/storyTextRounds/kidsTurn.js";
 import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
+import { moneyAddsUpRequest } from "../../game/services/storyTextRounds/moneyAddsUp.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -286,6 +287,20 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * retry of a one-paragraph reply asks for (shortTextCount), which the eval's
  * checked retry sends; production's request byte for byte elsewhere, with
  * production's turn limits for the player count.
+ * "moneyAddsUp" is the money-adds-up stage's turn (2026-10-01, fix 7 of the
+ * second playthroughs' review, storyTextRounds/moneyAddsUp.ts): production's
+ * turn, every player count, with, on a learning story (learn-something) that
+ * keeps a counted (number) stat, one block at the end of the stat-changes
+ * section: every amount of a counted stat the text pays, spends, uses up,
+ * sells or earns moves that stat by that amount in the reply's stat changes,
+ * a quote or plan moves nothing, a lever is paid once, a stat worked out from
+ * other figures (a margin) moves only by the sum the text shows, never as a
+ * reward, and no stated total differs from its stat; production's request
+ * byte for byte elsewhere, with production's turn limits and retry count.
+ * "moneyAddsUpB" is its one fix-and-retest: every amount the text pays or
+ * earns named ("two coins", never a handful), and on a switch turn and the
+ * ending the worked-out stat's exception right after the thread-resolution
+ * line that sends the turn to each stat's adjustments after threads.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -351,7 +366,9 @@ export type VariantId =
   | "leverDirection"
   | "parallelThreads"
   | "resultsAsOutcomes"
-  | "kidsTurn";
+  | "kidsTurn"
+  | "moneyAddsUp"
+  | "moneyAddsUpB";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -414,6 +431,8 @@ export const VARIANTS: VariantId[] = [
   "parallelThreads",
   "resultsAsOutcomes",
   "kidsTurn",
+  "moneyAddsUp",
+  "moneyAddsUpB",
 ];
 
 /**
@@ -857,6 +876,19 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     if (input.role !== "beat") throw new Error(`Variant kidsTurn does not cover role ${input.role}`);
     const count = kidsShortTextCount(input.story);
     return { ...kidsTurnRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // The money-adds-up stage's turn: on a learning story that counts, the money the text pays and earns moves its stat,
+  // and a worked-out figure only by its sum; production's turn limits, and production's retry count where it has its own
+  moneyAddsUp: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant moneyAddsUp does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...moneyAddsUpRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // Its one fix-and-retest: every amount named, and a worked-out stat's exception in the thread-resolution lines
+  moneyAddsUpB: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant moneyAddsUpB does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...moneyAddsUpRequest(input.story, { b: true }), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()), ...(count ? { shortTextCount: count } : {}) };
   },
 };
 

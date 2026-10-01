@@ -53,6 +53,7 @@ import { judgeLeversMode } from "./leverDirectionPrep.js";
 import { buildParallelCasesMode, judgeParallelMode } from "./parallelThreadsPrep.js";
 import { buildChallengeCasesMode, judgeChallengeResultsMode } from "./challengeResultsPrep.js";
 import { buildKidsCasesMode, kidsTurnsMode } from "./kidsTurnPrep.js";
+import { buildMoneyCasesMode, judgeMoneyMode } from "./moneyAddsUpPrep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
@@ -94,7 +95,8 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     own group turn, interleaved; challenge-results --role thread under adopted12: production's chapter planner and
  *     resultsAsOutcomes on the second playthroughs' chapter plans, interleaved; kids-turns --role beat under adopted13:
  *     production's turn and kidsTurn on the mouse story's turns and a template tagged Kids, interleaved, each turn with
- *     production's one checked retry)
+ *     production's one checked retry; money-adds-up --role beat under adopted14: production's turn and moneyAddsUp on
+ *     the lemonade story's turns, interleaved)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -202,6 +204,13 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --kids-turns  the stage's report, no calls: each turn read whole (checkedTurns.ts), the reply kept read for its
  *     length and plainness (kidsReadability.ts), per arm and the variant against production, the retries, the
  *     automatic checks, the waits including the retry and cost; kids-turns.md and .json
+ *   Money and counts that add up in a learning story (moneyAddsUpPrep.ts, 2026-10-01), in the money-adds-up stage:
+ *   --build-money-cases [--rebuild-cases]  turns of the second round's lemonade story (moneyAddsUpCases.ts, replayed),
+ *     each only where its request is the one production sent, recorded as a learning story; no calls; they then run
+ *     with --run --stage money-adds-up --role beat --prompt-state adopted14 (production's turn and moneyAddsUp)
+ *   --judge-money [--max-spend 0.05]  the stage's judged check figuresAddUp on its calibration (two samples) and every
+ *     reply of the stage's arms (one call per player, one sample), then judged-money.md and .json, every reply listed
+ *     with its stat changes; --cases <item or case ids> sends only those (a smoke)
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -262,6 +271,8 @@ type Mode =
   | "judge-challenge-results"
   | "build-kids-cases"
   | "kids-turns"
+  | "build-money-cases"
+  | "judge-money"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -400,6 +411,8 @@ function parseArgs(argv: string[]): Args {
       case "--judge-challenge-results":
       case "--build-kids-cases":
       case "--kids-turns":
+      case "--build-money-cases":
+      case "--judge-money":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -1121,6 +1134,11 @@ async function main() {
     case "kids-turns":
       // A deterministic check: no calls, so no key and no caps
       return kidsTurnsMode({ files, log: (line) => console.log(line) });
+    case "build-money-cases":
+      return buildMoneyCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "judge-money":
+      // The stage's judged check books to its own stage
+      return judgeMoneyMode(prepContext(args, files, "money-adds-up"), { caseIds: args.caseIds });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

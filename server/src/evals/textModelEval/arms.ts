@@ -61,7 +61,9 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * production's on chapter plans of the second round's stored runs), then
  * read-with-kids turns shorter and simpler for the child's age (kids-turns:
  * the variant beside production's turn on the mouse story's turns and a
- * template tagged Kids, each turn with production's one checked retry).
+ * template tagged Kids, each turn with production's one checked retry), then
+ * money and counts that add up in a learning story (money-adds-up: the
+ * variant beside production's turn on the lemonade story's turns).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -87,6 +89,7 @@ export const FEEDBACK_STAGES = [
   "parallel-threads",
   "challenge-results",
   "kids-turns",
+  "money-adds-up",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -267,6 +270,11 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // The kids-turns stage (2026-10-01, fix 6 of the review): a read-with-kids story's turns short and plain for the
   // child's age, against production's turn, which runs beside it
   kidsTurn: "adopted",
+  // The money-adds-up stage (2026-10-01, fix 7 of the review): a learning story's money and counts moved by what the
+  // text pays and earns, against production's turn, which runs beside it
+  moneyAddsUp: "adopted",
+  // Its one fix-and-retest, against production's turn
+  moneyAddsUpB: "adopted",
 };
 
 /**
@@ -600,9 +608,62 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return challengeResultsArms(role);
     case "kids-turns":
       return kidsTurnsArms(role);
+    case "money-adds-up":
+      return moneyAddsUpArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the money-adds-up stage (2026-10-01, fix 7 of the second
+ * playthroughs' review): production's own code since the kids-turns stage's
+ * adoption (a single player's read-with-kids turn; every other turn request is
+ * adopted13's byte for byte), under a tag of its own so production's turn runs
+ * beside the variant in the same minutes.
+ */
+export const MONEY_ADDS_UP_PROMPT_STATE = "adopted14";
+
+/**
+ * The stage's cases: turns of the second round's lemonade story, the one
+ * stored learning story that counts money (moneyAddsUpCases.ts, no calls), each
+ * recorded as a story from the learn-something form. Where its ledger broke:
+ * the step after the fruit sacrifice (turn 3: the sleeves and the sales never
+ * reached the cashbox), the switch turn after (turn 4: the margin raised as a
+ * reward) and the ending (turn 11); beside them the turns where money was only
+ * quoted (2, 6) or paid and counted (8).
+ */
+export const MONEY_ADDS_UP_CASES = [
+  "round-money-lemonade-t2",
+  "round-money-lemonade-t3",
+  "round-money-lemonade-t4",
+  "round-money-lemonade-t6",
+  "round-money-lemonade-t8",
+  "round-money-lemonade-t11",
+] as const;
+
+/**
+ * The cases where production's ledger broke in the run (the step after the
+ * fruit sacrifice, sales never counted; the switch turn after, the margin
+ * raised by its after-chapter step), which the fix-and-retest plays twice.
+ */
+export const MONEY_ADDS_UP_RETEST_CASES = ["round-money-lemonade-t3", "round-money-lemonade-t4"] as const;
+
+/**
+ * The money-adds-up stage (the coordinator's fix 7 after the second
+ * playthroughs' review): production's turn (adopted) and the variant
+ * (moneyAddsUp) on the single-player turn model (Luna medium), twice on the
+ * stage's cases, interleaved, under adopted14; then its one fix-and-retest
+ * (moneyAddsUpB) twice where production's ledger broke and once on the rest.
+ */
+function moneyAddsUpArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  const rest = MONEY_ADDS_UP_CASES.filter((id) => !(MONEY_ADDS_UP_RETEST_CASES as readonly string[]).includes(id));
+  return [
+    ...(["adopted", "moneyAddsUp"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: [...MONEY_ADDS_UP_CASES] })),
+    { arm: adoptedDefault("beat", "moneyAddsUpB"), samples: 2, scope: "single-player" as const, caseIds: [...MONEY_ADDS_UP_RETEST_CASES] },
+    { arm: adoptedDefault("beat", "moneyAddsUpB"), samples: 1, scope: "single-player" as const, caseIds: rest },
+  ];
 }
 
 /**
@@ -1221,6 +1282,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "parallel-threads",
   "challenge-results",
   "kids-turns",
+  "money-adds-up",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1274,6 +1336,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The kids-turns stage's mouse turns from the second playthroughs (2026-10-01), frozen after every earlier stage had
   // closed; the template's first turn it runs beside was frozen long before and stays plannable
   ...KIDS_TURNS_CASES.mouse.map((id): [string, Stage] => [id, "kids-turns"]),
+  // The money-adds-up stage's lemonade turns from the second playthroughs (2026-10-01), frozen after every earlier stage
+  // had closed
+  ...MONEY_ADDS_UP_CASES.map((id): [string, Stage] => [id, "money-adds-up"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

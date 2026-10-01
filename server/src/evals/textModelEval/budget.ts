@@ -18,7 +18,7 @@ export { FEEDBACK_STAGES };
  * $40 left $2.76, about $1.46 with the stalled Stage 4 calls on top). The
  * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
  * the setup rounds, the turn rounds and the migration check, and $0.10 /
- * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 / $1.20 / $0.39 / $0.26 / $0.26 / $0.195 / $0.195 / $0.195 for the feedback
+ * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 / $1.20 / $0.39 / $0.26 / $0.26 / $0.195 / $0.195 / $0.195 / $0.195 for the feedback
  * workflow's runs (STAGE_CAP_REASONS says why); a stage cap above its default needs a
  * recorded reason, and the global cap can only be lowered. The probe and case
  * building count as Stage 0. The content-filter check (--filter-check,
@@ -61,6 +61,7 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   "parallel-threads": 0.195,
   "challenge-results": 0.195,
   "kids-turns": 0.195,
+  "money-adds-up": 0.195,
 };
 /** The owner's hard cap: $30, raised to $33 on 2026-09-27, to $40 on 2026-09-28 and to $42 on 2026-09-30 (more playthroughs). */
 export const HARD_CEILING = 42;
@@ -144,6 +145,8 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-10-01 (fix 5 of the second playthroughs' review of 2026-09-30, estimated at about $0.15 and capped 30% above it; the ledger at $38.84 of the $42 hard cap after fixes 1 to 4, and the whole review's workflow held to about $2.40): challenge and contest results that tell how the attempt turns out, not the player's approach (resultsAsOutcomes: one sentence after the results rule, the switch's approach and a step's question are where a thread starts and no result restates them; the flavor pick's line in PLAYER DECISIONS worded the same way; the challenge and contest milestone fields' 'naming who did what' narrowed to what was won or lost), with production's chapter planner beside it (adopted, under adopted12), twice on 15 chapter plans of the second round's stored runs (11 whose results failed the calibrated resultsFitKind check, 4 that passed; 60 plans, about $0.11 at the round's $0.0011-0.0016 a single-player and $0.0016-0.0025 a group plan), the calibrated resultsFitKind judge on every plan (60 Luna low calls, about $0.03), a smoke, and what is left for one fix-and-retest",
   "kids-turns":
     "coordinator, 2026-10-01 (fix 6 of the second playthroughs' review of 2026-09-30, estimated at about $0.15 and capped 30% above it; the ledger at $38.98 of the $42 hard cap after fixes 1 to 5, and the whole review's workflow held to about $2.40): read-with-kids turns shorter and simpler for the child's age (kidsTurn: on a read-with-kids story the '5-6 paragraphs of 3-5 sentences' count and its repeats made '3-4 short paragraphs of 2-3 short sentences', and one block of rules for a child of the recorded age, options and interludes too), with production's turn beside it (adopted, under adopted13), twice on seven single-player turns (six of the second round's mouse story, read with a five-year-old, and a template tagged Kids; 28 turns, about $0.12 at the round's $0.0025-0.0062 a mouse turn), each with production's one checked retry of a one-paragraph first reply (the round's mouse story retried 2 of 11; about $0.01), a deterministic readability check (no judge calls), a smoke, and what is left for one fix-and-retest",
+  "money-adds-up":
+    "coordinator, 2026-10-01 (fix 7 of the second playthroughs' review of 2026-09-30, estimated at about $0.15 and capped 30% above it; the ledger at $39.05 of the $42 hard cap after fixes 1 to 6, and the whole review's workflow held to about $2.40): money and counts that add up in a learning story (moneyAddsUp: on a learn-something story that keeps a counted stat, one block at the end of the stat-changes section, every amount the text pays or earns moving its stat by that amount, a worked-out margin moving only by the sum the text shows, never as a reward, no stated total other than the stat's), with production's turn beside it (adopted, under adopted14), twice on six turns of the second round's lemonade story, the one stored learning story that counts money (24 turns, about $0.09 at the round's $0.0026-0.0042 a lemonade turn), a new judged check (the figures add up) with its calibration on hand-read stored turns and constructed failing versions (about 70 Luna low calls, about $0.035), a smoke, and what is left for one fix-and-retest",
 };
 
 export type Caps = {

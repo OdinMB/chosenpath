@@ -42,6 +42,7 @@ import type { CallRecord } from "./runner.js";
  *   judged-parallel.md|json  the parallel-threads stage's judged check and plan readings, people and places across the players' texts (--judge-parallel)
  *   judged-challenge-results.md|json  the challenge-results stage's judged check, results against their kind, and the second round's stored readings against the hand (--judge-challenge-results)
  *   kids-turns.md|json     the kids-turns stage's report, each turn read whole with production's retry in the loop, its length and plainness (--kids-turns)
+ *   judged-money.md|json   the money-adds-up stage's judged check, the figures adding up, and every reply with its stat changes (--judge-money)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  *   playthroughs.md|json   the whole-story playthroughs on production's own code (--playthroughs)
  *   stories/<id>.html, stories/index.html  each played story as a page for the owner (--playthroughs)
@@ -180,6 +181,11 @@ export function evalFiles(outDir: string) {
     writeJudgedChallengeResults: (markdown: string, json: unknown) => {
       writeJson(at("judged-challenge-results.json"), json);
       fs.writeFileSync(at("judged-challenge-results.md"), markdown);
+    },
+    /** The money-adds-up stage's judged check, the figures adding up, and every reply with its stat changes (--judge-money, moneyAddsUpPrep.ts) */
+    writeJudgedMoney: (markdown: string, json: unknown) => {
+      writeJson(at("judged-money.json"), json);
+      fs.writeFileSync(at("judged-money.md"), markdown);
     },
     /** The kids-turns stage's report: each turn read whole, production's retry in the loop, its length and plainness (--kids-turns, kidsTurnPrep.ts) */
     writeKidsTurns: (markdown: string, json: unknown) => {
