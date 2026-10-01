@@ -15,7 +15,10 @@ import type { Repair } from "./textRepairs.js";
  * mouse story's ending, 2 → 1). The third (2026-10-01) showed three more the
  * repair missed: a repeat two turns after the payment, a ladder stat's step,
  * and a charge in the reply that offers the lever, before it was chosen; the
- * first two are dropped since, the third noted.
+ * first two are dropped since, the third noted. Four more went through on
+ * list stats and a plural name (a second contact burned or added, a second
+ * item added, "Supply" for "Gilded Comet Supplies"); since decision A of the
+ * same day a list's item is a payment and a plural name reads in its singular.
  */
 
 export type Lever = "sacrifice" | "reward";
@@ -42,12 +45,25 @@ export function allowsLever(stat: Stat, kind: Lever): boolean {
 /** Words shorter than this are too common to read as a stat's name or value in an option's text. */
 const MIN_NAMED_LETTERS = 4;
 
-/** The words that name a stat in an option's text: its name (an opposites stat's sides too), and a plural name without its "s". */
+/**
+ * A plural name's singular forms: without its "s" (as before), and since decision A (2026-10-01) "-ies" as "-y" and
+ * "-ches", "-shes", "-sses", "-xes", "-zes" without "es": round 3's "gain 1 Gilded Comet Supply" names the stat "Gilded
+ * Comet Supplies", which "Gilded Comet Supplie" didn't match.
+ */
+function singularsOf(name: string): string[] {
+  if (name.length <= MIN_NAMED_LETTERS || !name.endsWith("s")) return [];
+  const forms = [name.slice(0, -1)];
+  if (name.endsWith("ies")) forms.push(`${name.slice(0, -3)}y`);
+  if (/(?:ch|sh|ss|x|z)es$/.test(name)) forms.push(name.slice(0, -2));
+  return forms;
+}
+
+/** The words that name a stat in an option's text: its name (an opposites stat's sides too), and a plural name's singular forms. */
 function statNameWords(stat: Stat): string[] {
   const names = [stat.name, ...(stat.type === "opposites" ? stat.name.split("|") : [])]
     .map((name) => name.trim().toLowerCase())
     .filter((name) => name.length >= MIN_NAMED_LETTERS);
-  return [...new Set(names.flatMap((name) => (name.length > MIN_NAMED_LETTERS && name.endsWith("s") ? [name, name.slice(0, -1)] : [name])))];
+  return [...new Set(names.flatMap((name) => [name, ...singularsOf(name)]))];
 }
 
 /** What a stat holds for this player (a shared stat's own value), as words an option's text can name: an item, a contact. */
@@ -209,32 +225,65 @@ export function ladderOf(stat: Stat): string[] | undefined {
   return new Set(steps).size >= 2 ? steps : undefined;
 }
 
-/** Whether a lever on this stat has a payment the repair can read: a percentage or number stat's change, or a ladder's step (since the review of the third playthroughs, 2026-10-01). */
-const readsPayment = (stat: Stat) => PAID_TYPES.includes(stat.type) || ladderOf(stat) !== undefined;
+/**
+ * Whether a lever on this stat has a payment the repair can read: a percentage or number stat's change, a ladder's step
+ * (since the review of the third playthroughs, 2026-10-01), or a list's item removed or added (since decision A of the same
+ * day: one item a payment).
+ */
+const readsPayment = (stat: Stat) => PAID_TYPES.includes(stat.type) || stat.type === "string[]" || ladderOf(stat) !== undefined;
+
+const keyOf = (change: StatChange) => `${change.group}|${change.stat}`;
+const isStatChange = (change: Change): change is StatChange => change.type === "statChange";
 
 /** The values the stat changes move, each as the changes before it leave it (ChangeService's clamp included). */
 class WorkingValues {
   private readonly values = new Map<string, unknown>();
+  /** The lists the changes both remove an item from and add one to: a replacement, which moves no count */
+  private readonly replaced: Set<string>;
 
-  constructor(private readonly story: Story, private readonly stats: LeverStats) {}
+  constructor(
+    private readonly story: Story,
+    private readonly stats: LeverStats,
+    changes: Change[]
+  ) {
+    const statChanges = changes.filter(isStatChange);
+    const removed = new Set(statChanges.filter((c) => c.change === "removeElement").map(keyOf));
+    this.replaced = new Set(statChanges.filter((c) => c.change === "addElement" && removed.has(keyOf(c))).map(keyOf));
+  }
 
   private definition(change: StatChange): Stat | undefined {
     return change.group === "shared" ? this.stats.sharedStats.get(change.stat) : this.stats.playerStats.get(change.stat);
   }
 
   private current(change: StatChange): unknown {
-    const key = `${change.group}|${change.stat}`;
+    const key = keyOf(change);
     if (this.values.has(key)) return this.values.get(key);
     const entries = change.group === "shared" ? this.story.getState().sharedStatValues : this.story.getPlayer(change.group)?.statValues ?? [];
     return entries.find((entry) => entry.statId === change.stat)?.value;
   }
 
   /**
+   * A list's change, as one item: +1 for an item added that it doesn't hold, -1 for one removed that it holds (as
+   * ChangeService applies them, by the exact text); undefined for anything that changes nothing, and for a list the
+   * changes both remove from and add to (a replacement: "apply both a removeElement and addElement change").
+   */
+  private listStep(change: StatChange): number | undefined {
+    if (this.replaced.has(keyOf(change)) || typeof change.value !== "string") return undefined;
+    const before = this.current(change);
+    const held = Array.isArray(before) ? (before as unknown[]) : [];
+    if (change.change === "addElement") return held.includes(change.value) ? undefined : 1;
+    if (change.change === "removeElement") return held.includes(change.value) ? -1 : undefined;
+    return undefined;
+  }
+
+  /**
    * By how much the change moves a percentage or number stat: an addition or subtraction by its value, a value set by the
-   * difference; a ladder's value set, by the steps between its values (both on the ladder); undefined for anything else.
+   * difference; a ladder's value set, by the steps between its values (both on the ladder); a list's, by the item
+   * (listStep); undefined for anything else.
    */
   step(change: StatChange): number | undefined {
     const definition = this.definition(change);
+    if (definition?.type === "string[]") return this.listStep(change);
     const before = this.current(change);
     const ladder = definition ? ladderOf(definition) : undefined;
     if (ladder) {
@@ -249,10 +298,16 @@ class WorkingValues {
     return undefined;
   }
 
-  /** Applies a change's step: a number by its step (a percentage stays within 0 to 100), a ladder's value as set. */
+  /** Applies a change's step: a number by its step (a percentage stays within 0 to 100), a ladder's value as set, a list's item added or removed. */
   apply(change: StatChange, step: number | undefined): void {
     const before = this.current(change);
-    const key = `${change.group}|${change.stat}`;
+    const key = keyOf(change);
+    if (this.definition(change)?.type === "string[]") {
+      const held = Array.isArray(before) ? (before as unknown[]) : [];
+      if (change.change === "addElement" && !held.includes(change.value)) this.values.set(key, [...held, change.value]);
+      if (change.change === "removeElement") this.values.set(key, held.filter((item) => item !== change.value));
+      return;
+    }
     if (step === undefined) return;
     if (typeof before === "string") {
       this.values.set(key, change.value);
@@ -264,8 +319,6 @@ class WorkingValues {
   }
 }
 
-const isStatChange = (change: Change): change is StatChange => change.type === "statChange";
-
 /**
  * The levers these stat changes pay, by the slot that chose them on the
  * story's current beat: the first change in order that moves the lever's stat
@@ -273,7 +326,8 @@ const isStatChange = (change: Change): change is StatChange => change.type === "
  * words about the stat say otherwise, as on a stat where more is worse), with the step it
  * made. Percentage and number stats, and since the review of the third playthroughs
  * (2026-10-01) a ladder's step (ladderOf: up its possible values for a reward unless its
- * words say otherwise, +1 for Unproven → Known Hand).
+ * words say otherwise, +1 for Unproven → Known Hand), and since decision A of the same
+ * day a list's item (-1 for a contact burned, +1 for an item added; no replacement).
  */
 export function paidLevers(story: Story, changes: Change[]): Record<string, PaidLever> {
   const stats = leverStatsOf(story);
@@ -281,7 +335,7 @@ export function paidLevers(story: Story, changes: Change[]): Record<string, Paid
   for (const slot of story.getPlayerSlots()) {
     const lever = chosenLever(story, slot, story.getCurrentBeat(slot as PlayerSlot), stats);
     if (!lever || !readsPayment(lever.stat)) continue;
-    const working = new WorkingValues(story, stats);
+    const working = new WorkingValues(story, stats, changes);
     for (const change of changes.filter(isStatChange)) {
       const step = working.step(change);
       working.apply(change, step);
@@ -347,7 +401,7 @@ export function dropLeversChargedAgain(story: Story, changes: Change[], repairs:
   const pending = [...new Map(records.map((payment) => [`${leverKey(payment.paid)}|${payment.paid.step}|${payment.turn}`, payment])).values()];
   if (pending.length === 0) return changes;
 
-  const working = new WorkingValues(story, stats);
+  const working = new WorkingValues(story, stats, changes);
   return changes.filter((change) => {
     if (!isStatChange(change)) return true;
     const step = working.step(change);
@@ -396,7 +450,7 @@ function amountNamed(text: string): number | undefined {
 export function noteLeversChargedOnOffer(story: Story, reply: SetOfBeatGenerationSchema, changes: Change[], repairs: Repair[]): void {
   const stats = leverStatsOf(story);
   const owed = owedLevers(story, stats);
-  const working = new WorkingValues(story, stats);
+  const working = new WorkingValues(story, stats, changes);
   const moves = changes.filter(isStatChange).map((change) => {
     const step = working.step(change);
     working.apply(change, step);
@@ -414,7 +468,8 @@ export function noteLeversChargedOnOffer(story: Story, reply: SetOfBeatGeneratio
       const group = lever.shared ? "shared" : slot;
       if (owed.has(leverKey({ kind, group, stat: lever.stat.id })) || noted.has(lever.stat.id)) continue;
       const direction = leverDirection(lever.stat, kind, text);
-      const amount = ladderOf(lever.stat) ? undefined : amountNamed(text);
+      // A ladder's and a list's payment is a step or an item, whatever number the text names
+      const amount = ladderOf(lever.stat) || lever.stat.type === "string[]" ? undefined : amountNamed(text);
       const move = moves.find(({ change, step }) => change.group === group && change.stat === lever.stat.id && step !== undefined && Math.sign(step) === direction && (amount === undefined || Math.abs(step) === amount));
       if (!move?.step) continue;
       noted.add(lever.stat.id);

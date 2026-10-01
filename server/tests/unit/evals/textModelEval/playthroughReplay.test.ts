@@ -350,13 +350,22 @@ function scoreboardRepairs(runs: PlayRun[], before: (run: PlayRun) => number = (
  * seven it dropped then; production now drops two more and notes the third.
  */
 describe("replayRun on the stored round 3 (skipped where the output folder is absent)", () => {
-  (stored3.length ? it : it.skip)("production now drops round 3's repeat two turns after its payment and its ladder step taken twice, and nothing else", () => {
+  (stored3.length ? it : it.skip)("production now drops round 3's repeat two turns after its payment, its ladder step taken twice, and its four list and plural double payments, and nothing else", () => {
     expect(chargedAgain(stored3)).toEqual([
-      // The space pirates: Oren's Pirate Reputation reward taken at turn 15, paid at 16 (Unproven → Known Hand), stepped
-      // again at 17 (Known Hand → Feared Name: "Your reputation now precedes you")
+      // The space pirates, decision A's fix 4: Davi's "gain 1 Gilded Comet Supply" (the stat "Gilded Comet Supplies") paid
+      // at turn 8 (4 → 5) and again at 9; Oren's Reach Contact reward paid at 8 (Niko Ren) and a second contact added at 9
+      ["play-space-pirates", 9, "shared/shared_supplies: +1, the reward the previous turn paid"],
+      ["play-space-pirates", 9, "player3/player_contacts: +1, the reward the previous turn paid"],
+      // Oren's Pirate Reputation reward taken at turn 15, paid at 16 (Unproven → Known Hand), stepped again at 17 (Known
+      // Hand → Feared Name: "Your reputation now precedes you")
       ["play-space-pirates", 17, "player3/player_reputation: +1, the reward the previous turn paid"],
-      // The estate agents: Tamsin's Composure sacrifice taken at turn 22, paid at 23 (55 → 45), its repeat dropped at 24,
-      // charged once more at 25 (45 → 35, "your fingers tighten briefly")
+      // The estate agents, decision A's fix 4: Tamsin burned one Trusted Contact for her turn-2 sacrifice at turn 3 (the
+      // surveyor) and the other at 4 (the tenants' advice worker); Rory's turn-22 reward added a caption card to his
+      // Presentation Kit at 23 and a reading lamp at 24
+      ["play-estate-agents", 4, "player2/player_trusted_contacts: -1, the sacrifice the previous turn paid"],
+      ["play-estate-agents", 24, "player1/player_presentation_kit: +1, the reward the previous turn paid"],
+      // Tamsin's Composure sacrifice taken at turn 22, paid at 23 (55 → 45), its repeat dropped at 24, charged once more at
+      // 25 (45 → 35, "your fingers tighten briefly")
       ["play-estate-agents", 25, "player2/player_composure: -10, the sacrifice turn 23 paid, earlier in this chapter"],
     ]);
   });
@@ -446,6 +455,23 @@ describe("replayRun on the stored round 3 (skipped where the output folder is ab
       [3, "play-estate-agents", 16, "kept"],
       [3, "play-estate-agents", 21, "kept"],
     ]);
+  });
+
+  (stored3.length ? it : it.skip)("the plural reading of a lever's stat ('Supply' for 'Gilded Comet Supplies') takes no further shared lever from a player in the stored rounds", () => {
+    const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 19 };
+    const dropped = (runs: PlayRun[], before: (run: PlayRun) => number = () => Number.POSITIVE_INFINITY) =>
+      runs.flatMap((run) =>
+        replayRun(run)
+          .filter((r) => r.turn < before(run) && r.played.reply)
+          .flatMap((r) => repairBeatReply(r.before, r.played.reply as SetOfBeatGenerationSchema).repairs.filter((k) => k.kind === "sharedLeverRepeated").map((k) => [run.spec.id, r.turn, k.detail]))
+      );
+    // The kept replies of rounds 2 and 3 are the ones play repaired: a drop there would be a copy the new reading finds that
+    // play kept. Round 1 was played before the repair: its one drop is the repair's own start (Ivo Senn's favor, 2026-09-30)
+    expect([
+      ...dropped(stored, (run) => firstChanged[run.spec.id] ?? Number.POSITIVE_INFINITY),
+      ...dropped(stored2, (run) => (run.spec.id === "play-estate-agents" ? 22 : Number.POSITIVE_INFINITY)),
+      ...dropped(stored3),
+    ]).toEqual([["play-space-pirates", 16, "player3: shared_dockside_favors (sacrifice) is player1's this turn"]]);
   });
 
   (stored3.length ? it : it.skip)("the earlier rounds hold no other charge in the reply that offers the lever", () => {

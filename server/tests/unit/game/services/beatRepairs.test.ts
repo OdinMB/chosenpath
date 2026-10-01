@@ -16,6 +16,7 @@ import type {
 import { GameModes } from "core/types/index.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { expectedOptionType, repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
+import { paidLevers } from "../../../../src/game/services/leverPayments.js";
 import { logRepairs, type Repair } from "../../../../src/game/services/textRepairs.js";
 import { beatStep, switchStep } from "../../../../src/game/services/storyTextSteps.js";
 import { ChangeService } from "../../../../src/game/services/ChangeService.js";
@@ -1273,6 +1274,68 @@ describe("repairBeatReply: a sacrifice or reward charged again on the turn after
     // A step the other way, or a value off the ladder, is no repeat
     const back = [statChange("player1", REPUTATION.id, "setString", "Unproven")];
     expect(repaired(onLadder, back)).toEqual({ statChanges: back, repairs: [] });
+  });
+
+  /*
+   * Decision A's fix 4 (2026-10-01): round 3's four double payments the repair, reading number, percentage and ladder
+   * stats only, let through. Lists: the estate agents' Tamsin burned one Trusted Contact for her turn-2 sacrifice at turn 3
+   * and the other at turn 4; Rory's turn-22 reward added a caption card to his Presentation Kit at turn 23 and a reading lamp
+   * at 24; the space pirates' Oren gained a Reach Contact at turn 8 and another at 9. A plural: Davi's "gain 1 Gilded Comet
+   * Supply" against the stat "Gilded Comet Supplies", paid at 8 and again at 9, which no reading matched to its stat.
+   */
+  describe("a list stat's item and a plural name (round 3's four)", () => {
+    const CONTACTS = stat("player_trusted_contacts", {
+      type: "string[]",
+      name: "Trusted Contacts",
+      optionsToSacrifice: "Burn one Trusted Contact by asking them for a favor that compromises their own standing.",
+      optionsToGainAsReward: "Add one contact by taking time to build a relationship instead of pursuing a fast sale.",
+    });
+    const SUPPLIES = stat("shared_supplies", { type: "number", name: "Gilded Comet Supplies", optionsToSacrifice: "Spend 1 Supply to equip a plan.", optionsToGainAsReward: "Gain 1 Supply by taking time to salvage or barter instead of pressing on." });
+    const BURN = "Ask your building surveyor contact for an urgent personal favor, burning that Trusted Contact to get their attention now.";
+    const SALVAGE = "Spend the narrowing sensor interval salvaging a spare timing regulator instead of pressing the test; gain 1 Gilded Comet Supply.";
+
+    /** The list held after the payment, and the supplies at 5. */
+    const withList = (story: Story, held: string[]) => {
+      const players = Object.fromEntries(Object.entries(story.getPlayers()).map(([slot, player]) => [slot, { ...player, statValues: [...player.statValues, { statId: CONTACTS.id, value: held }] }]));
+      return story.clone({ playerStats: [RESERVE, CONTACTS], sharedStats: [CRUMBS, SUPPLIES], sharedStatValues: [{ statId: CRUMBS.id, value: 2 }, { statId: SUPPLIES.id, value: 5 }], players });
+    };
+    const burnPaid: PaidLever = { kind: "sacrifice", group: "player1", stat: CONTACTS.id, step: -1 };
+    const contactsAfterBurn = () => withList(avalon({ tookLever: lever(BURN), paidLever: burnPaid }), ["A tenants' advice worker"]);
+
+    it("records a list lever's payment as one item removed or added (Beat.paidLever)", () => {
+      const chose = withList(avalon({ lastChoice: lever(BURN) }), ["A building surveyor", "A tenants' advice worker"]);
+      expect(paidLevers(chose, [statChange("player1", CONTACTS.id, "removeElement", "A building surveyor")])).toEqual({ player1: burnPaid });
+      const gained = withList(avalon({ lastChoice: lever("Make time for introductions at the guild; add one contact to your Trusted Contacts.", "reward") }), []);
+      expect(paidLevers(gained, [statChange("player1", CONTACTS.id, "addElement", "Niko Ren")])).toEqual({ player1: { kind: "reward", group: "player1", stat: CONTACTS.id, step: 1 } });
+    });
+
+    it("drops a second item removed after a list sacrifice's payment (the estate agents' turn 4), and a second item added after a reward's", () => {
+      const result = repaired(contactsAfterBurn(), [statChange("player1", CONTACTS.id, "removeElement", "A tenants' advice worker")]);
+      expect(result.statChanges).toEqual([]);
+      expect(result.repairs).toEqual([{ kind: "leverChargedAgain", detail: "player1/player_trusted_contacts: -1, the sacrifice the previous turn paid" }]);
+      const kit = withList(avalon({ tookLever: lever("Prepare a caption card; add one contact to your Trusted Contacts.", "reward"), paidLever: { ...burnPaid, kind: "reward", step: 1 } }), ["Niko Ren"]);
+      expect(repaired(kit, [statChange("player1", CONTACTS.id, "addElement", "Black Tide beacon keeper")]).statChanges).toEqual([]);
+    });
+
+    it("keeps a removal of an item not held, an item added that is already held, and a replacement (one removed, one added in the same reply)", () => {
+      const notHeld = [statChange("player1", CONTACTS.id, "removeElement", "A building surveyor")];
+      expect(repaired(contactsAfterBurn(), notHeld)).toEqual({ statChanges: notHeld, repairs: [] });
+      const kit = withList(avalon({ tookLever: lever("Add one contact to your Trusted Contacts.", "reward"), paidLever: { ...burnPaid, kind: "reward", step: 1 } }), ["Niko Ren"]);
+      const held = [statChange("player1", CONTACTS.id, "addElement", "Niko Ren")];
+      expect(repaired(kit, held)).toEqual({ statChanges: held, repairs: [] });
+      const replaced = [statChange("player1", CONTACTS.id, "removeElement", "Niko Ren"), statChange("player1", CONTACTS.id, "addElement", "Mara Venn")];
+      expect(repaired(kit, replaced)).toEqual({ statChanges: replaced, repairs: [] });
+    });
+
+    it("reads 'Supply' as the stat 'Gilded Comet Supplies': the payment is recorded and its repeat dropped (the space pirates' turn 9)", () => {
+      const chose = withList(avalon({ lastChoice: lever(SALVAGE, "reward") }), []);
+      const paid = paidLevers(chose, [statChange("shared", SUPPLIES.id, "addNumber", 1)]);
+      expect(paid).toEqual({ player1: { kind: "reward", group: "shared", stat: SUPPLIES.id, step: 1 } });
+      const again = withList(avalon({ tookLever: lever(SALVAGE, "reward"), paidLever: paid.player1 }), []);
+      const result = repaired(again, [statChange("shared", SUPPLIES.id, "addNumber", 1)]);
+      expect(result.statChanges).toEqual([]);
+      expect(result.repairs).toEqual([{ kind: "leverChargedAgain", detail: "shared/shared_supplies: +1, the reward the previous turn paid" }]);
+    });
   });
 });
 

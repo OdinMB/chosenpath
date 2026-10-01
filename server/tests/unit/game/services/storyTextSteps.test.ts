@@ -163,7 +163,7 @@ describe("beatStep.apply records the lever a turn paid on its new beat (for the 
     );
     return base.clone({ sharedStats: [CRUMBS], sharedStatValues: [{ statId: CRUMBS.id, value: 3 }], playerStats: [RESERVE, CONTACTS], players });
   }
-  const change = (group: string, id: string, kind: "addNumber" | "subtractNumber" | "setNumber" | "removeElement", value: number | string): Change => ({ type: "statChange", group, stat: id, change: kind, value });
+  const change = (group: string, id: string, kind: "addNumber" | "subtractNumber" | "setNumber" | "removeElement" | "addElement", value: number | string): Change => ({ type: "statChange", group, stat: id, change: kind, value });
   const paidOn = (story: Story, statChanges: Change[], slot = "player1") =>
     beatStep.apply(story, beatSet(story.getPlayerSlots().length, { statChanges }))[0].getCurrentBeat(slot as "player1")?.paidLever;
 
@@ -173,13 +173,23 @@ describe("beatStep.apply records the lever a turn paid on its new beat (for the 
     expect(paidOn(story, [change("player1", RESERVE.id, "setNumber", 45)])).toEqual({ kind: "sacrifice", group: "player1", stat: RESERVE.id, step: -15 });
   });
 
-  it("records nothing for a lever the turn left unpaid or paid the other way, for a normal choice, or for a list stat", () => {
+  it("records nothing for a lever the turn left unpaid or paid the other way, or for a normal choice", () => {
     const story = chose(threadBeat(1), { player1: BRACE });
     expect(paidOn(story, [])).toBeUndefined();
     expect(paidOn(story, [change("player1", RESERVE.id, "addNumber", 15)])).toBeUndefined();
     expect(paidOn(chose(threadBeat(1), {}), [change("player1", RESERVE.id, "subtractNumber", 15)])).toBeUndefined();
+  });
+
+  /*
+   * Decision A's fix 4 (2026-10-01): a list's payment is an item, recorded since then (until then a list stat's lever
+   * recorded nothing, so round 3's second contacts burned or added went through); a replacement in the same reply, an
+   * item not held removed or an item held added, records nothing.
+   */
+  it("records a list lever's payment as one item, and nothing for a replacement or a change that changes nothing", () => {
     const contact = chose(threadBeat(1), { player1: "Call in Tavi Renn from your City Contacts." });
-    expect(paidOn(contact, [change("player1", CONTACTS.id, "removeElement", "Tavi Renn")])).toBeUndefined();
+    expect(paidOn(contact, [change("player1", CONTACTS.id, "removeElement", "Tavi Renn")])).toEqual({ kind: "sacrifice", group: "player1", stat: CONTACTS.id, step: -1 });
+    expect(paidOn(contact, [change("player1", CONTACTS.id, "removeElement", "Ivo Senn")])).toBeUndefined();
+    expect(paidOn(contact, [change("player1", CONTACTS.id, "removeElement", "Tavi Renn"), change("player1", CONTACTS.id, "addElement", "Ivo Senn")])).toBeUndefined();
   });
 
   it("records a shared stat's payment on the beat of the player who chose it", () => {
