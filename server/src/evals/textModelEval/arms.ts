@@ -93,7 +93,11 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * (playthroughs-3: no --run arms, the --playthroughs --round 3 mode's prep
  * calls), then the owner's option rules for group turns (group-options: the
  * variant beside production's group turn on group chapter steps of the third
- * round's stored runs, each turn with production's one checked retry).
+ * round's stored runs, each turn with production's one checked retry), then
+ * shared scenes in group stories (scenes: the variant beside production's group
+ * turn on later chapter steps of the third round's stored runs, each turn with
+ * production's one checked retry, and its chapter planner into its group turn
+ * beside production's chains on that round's chapter openings).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -129,6 +133,7 @@ export const FEEDBACK_STAGES = [
   "pacing-clues",
   "playthroughs-3",
   "group-options",
+  "scenes",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -348,6 +353,11 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // The owner's option rules for group turns (decision A, 2026-10-01 evening): per player and chapter lines, O2b's stat
   // lines, against production's group turn, which runs beside it
   groupOptions: "adopted",
+  // Shared scenes in group stories (decision A's retest of the parallel-thread lines, 2026-10-01 evening): the chapter
+  // planner's line and scenes, the group turn's where-everyone-is block, against production's, which run beside them
+  sharedScenes: "adopted",
+  // Its one fix-and-retest (one person or group in one thread's scene), against production's, the run's variant second
+  sharedScenesB: "adopted",
 };
 
 /**
@@ -374,6 +384,9 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   pacingCluesB: "pacingClues",
   // Priced from the group levers' measured form, whose group turns it edits
   groupOptions: "groupLeversB",
+  // Priced from fix 4's measured form, whose chapter planner and group turn lines it rewords
+  sharedScenes: "parallelThreads",
+  sharedScenesB: "sharedScenes",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -706,9 +719,45 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return optionsO2cArms(role);
     case "group-options":
       return groupOptionsArms(role);
+    case "scenes":
+      return scenesArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the scenes stage (decision A's retest of the
+ * parallel-thread lines, the evening of 2026-10-01): production's own code
+ * since the group-options adoption, under a tag no earlier stage used, so
+ * production runs beside the variant in the same minutes.
+ */
+export const SCENES_PROMPT_STATE = "adopted24";
+
+/**
+ * The stage's cases (sharedScenesCases.ts, no calls), from the third round's
+ * stored runs. Chains, each side's chapter planner into its own group turn:
+ * the chapter openings where a person came to be in two places (the estate
+ * agents' 6 and 17, the food trucks' 12, the space pirates' 6) and an ordinary
+ * one (the food trucks' 9). Turns on the plans the round stored: later steps
+ * of those chapters (the estate agents' 10 and 18, the food trucks' 14, the
+ * space pirates' 9) and an ordinary one (the space pirates' 16).
+ */
+export const SCENES_CASES = {
+  chains: ["round-scenes-plan-estate-agents-t6", "round-scenes-plan-estate-agents-t17", "round-scenes-plan-food-trucks-t12", "round-scenes-plan-space-pirates-t6", "round-scenes-plan-food-trucks-t9"],
+  turns: ["round-scenes-estate-agents-t10", "round-scenes-estate-agents-t18", "round-scenes-food-trucks-t14", "round-scenes-space-pirates-t9", "round-scenes-space-pirates-t16"],
+} as const;
+
+/**
+ * Shared scenes in group stories (decision A, the coordinator's brief of the
+ * evening of 2026-10-01): production's group turn (adopted) and the variant
+ * (sharedScenes) on the group turn model (Luna low), twice on the stage's
+ * chapter steps, interleaved, under adopted24, each turn with production's one
+ * checked retry. Its chapter openings run as chains (pipelinePlans).
+ */
+function scenesArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return (["adopted", "sharedScenes"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: [...SCENES_CASES.turns] }));
 }
 
 /**
@@ -1455,7 +1504,7 @@ export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
 export const PLAYTHROUGHS_3_PROMPT_STATE = "adopted22";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
-const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies", "group-options"];
+const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies", "group-options", "scenes"];
 
 export function stageChecksTurns(stage: Stage): boolean {
   return CHECKED_TURN_STAGES.includes(stage);
@@ -1779,6 +1828,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "runaway-2",
   "options-o2c",
   "group-options",
+  "scenes",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1850,6 +1900,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The group-options stage's group chapter steps from the third playthroughs (2026-10-01, decision A), frozen after every
   // earlier stage had closed
   ...GROUP_OPTIONS_CASES.map((id): [string, Stage] => [id, "group-options"]),
+  // The scenes stage's chapter openings and steps from the third playthroughs (2026-10-01, decision A), frozen after every
+  // earlier stage had closed
+  ...[...SCENES_CASES.chains, ...SCENES_CASES.turns].map((id): [string, Stage] => [id, "scenes"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */
@@ -2497,6 +2550,18 @@ export function pipelinePlans(stage: Stage): PipelinePlan[] {
         scope: "multiplayer" as const,
         roles: ["thread" as const],
         caseIds: [...PARALLEL_THREADS_CASES.chapters],
+      }));
+    case "scenes":
+      // Decision A's split-scene retest (2026-10-01 evening): each side's group chapter planner into its own group turn,
+      // twice on the stage's chapter openings, interleaved (planJobs), production's chains beside the variant's; then its
+      // one fix-and-retest's chains (sharedScenesB, run with --arms), read against production's recorded chains
+      return (["adopted", "sharedScenes", "sharedScenesB"] as const).map((variant) => ({
+        analysis: adoptedDefault("multiplayerAnalysis", variant),
+        beats: [adoptedDefault("multiplayerBeat", variant)],
+        samples: 2,
+        scope: "multiplayer" as const,
+        roles: ["thread" as const],
+        caseIds: [...SCENES_CASES.chains],
       }));
     default:
       return [];

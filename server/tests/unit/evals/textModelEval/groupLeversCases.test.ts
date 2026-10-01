@@ -26,7 +26,7 @@ import { sacrificeRewardLine } from "../../../../src/game/services/optionRules.j
 import { groupLeverSlots, groupLeversBase, groupLeversRequest, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { withShortRepliesLines } from "../../../../src/game/services/storyTextRounds/shortReplies.js";
 import { fakeCall, input } from "./playFixtures.js";
-import { beforeGroupOptions, beforeLateClues, withOwnersRollLevers } from "../../../helpers/adoptedDeltas.js";
+import { beforeGroupOptions, beforeLateClues, beforeSharedScenes, withOwnersRollLevers } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * The group-levers stage's cases (2026-10-01, the coordinator's brief after the
@@ -136,10 +136,11 @@ describe("groupLeversCases on the second round's stored playthroughs (skipped wh
       // the short-replies stage's lines, adopted later that day, and on a late turn the pacing-clues stage's, later again
       expect([c.id, sha256(beforeLateClues(groupLeversBase(story).prompt, story))]).toEqual([c.id, sentHashOf(c.id)]);
       // Since the review of that day, a player whose roll the step discards gets no lever (withOwnersRollLevers, logged);
-      // since the group-options adoption that evening production prints that stage's lines on top (beforeGroupOptions)
+      // since the group-options adoption that evening production prints that stage's lines on top (beforeGroupOptions),
+      // and since the scenes adoption after it, on a step with several threads, where everyone is (beforeSharedScenes)
       const measured = withShortRepliesLines(groupLeversRequest(story, { b: true })).prompt;
       const production = requestText(requestFor("adopted", requestInputFor(c)));
-      expect([c.id, sha256(beforeGroupOptions(production, story))]).toEqual([c.id, sha256(withOwnersRollLevers(measured, story))]);
+      expect([c.id, sha256(beforeGroupOptions(beforeSharedScenes(production, story), story))]).toEqual([c.id, sha256(withOwnersRollLevers(measured, story))]);
       expect([c.id, production === beforeGroupOptions(production, story)]).toEqual([c.id, false]);
       if (withOwnersRollLevers(measured, story) !== measured) ownersRollCases.push(c.id);
       const slots = groupLeverSlots(story);

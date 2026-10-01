@@ -49,7 +49,13 @@
  * rules, that "none" included and measured, O2b's stat lines, the plan's lever
  * question from the lines): not a delta; groupOptionsBase is groupLeversB with
  * the deltas as before, and beforeGroupOptions and productionThen take the new
- * lines out for the variants measured earlier.
+ * lines out for the variants measured earlier. Since the scenes stage, later
+ * that evening, the chapter planner where a group's picks split the players and
+ * a group chapter's opening step with several threads are the measured
+ * sharedScenesB (the scene line and field; where everyone is and the
+ * consistency line): not
+ * a delta; withSharedScenes and withSharedScenesSchema put them on the forms
+ * measured before, beforeSharedScenes and productionThen take them out.
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
@@ -75,6 +81,8 @@ import { OPTIONS_CONTINUITY_TEXT } from "../../src/game/services/storyTextRounds
 import { LATE_CLUES_TEXT, takesLateClues } from "../../src/game/services/lateClues.js";
 import { LATE_PACING_TEXT, pacedLengthsEdit } from "../../src/game/services/storyTextRounds/latePacing.js";
 import { withoutGroupOptions } from "../../src/game/services/storyTextRounds/groupOptions.js";
+import { SHARED_SCENES, takesScenesBlock as productionTakesScenesBlock, takesScenesPlanner } from "../../src/game/services/sharedScenes.js";
+import { withSharedScenesLines, withoutSharedScenes } from "../../src/game/services/storyTextRounds/sharedScenes.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -487,17 +495,63 @@ export function beforeGroupOptions(production: string, story: Story): string {
   return withoutGroupOptions(production, story);
 }
 
+/*
+ * The scenes stage's adoption (decision A, later that evening): where a group's
+ * picks set more than one outcome, the chapter planner carries the shared-scenes
+ * line (its fix-and-retest's, with the one-scene bullet) after the player
+ * configurations and asks each thread for its scene, right after its players;
+ * a group chapter's opening step whose chapter has more than one thread carries
+ * WHERE EVERYONE IS THIS TURN before the thread configuration and the
+ * consistency line. The measured sharedScenesB, not a delta, where its chains
+ * measured it (the planner and the chapter's opening; sharedScenes.test.ts
+ * holds production to it on every frozen case); a later chapter step keeps
+ * production's turn, where the variant's turn alone did not pass: withSharedScenes and
+ * withSharedScenesSchema put them on the forms measured before, and
+ * beforeSharedScenes and productionThen take them out for the variants
+ * measured earlier. A read-with-kids group's chapter step carries them too
+ * (kidsAges is built on production's live turn), unmeasured for kids.
+ */
+
+/** Production's chapter planner or group turn prompt as it stood before the scenes adoption (a prompt without the insertions as it is). */
+export function beforeSharedScenes(production: string, story: Story): string {
+  return withoutSharedScenes(production, story);
+}
+
+/** A form measured before the scenes stage with sharedScenesB's insertions where production prints them (a turn: a chapter's opening step only): what production sends since. */
+export function withSharedScenes(measured: string, story: Story, role: "beat" | "thread"): string {
+  if (role === "beat" && !productionTakesScenesBlock(story)) return measured;
+  return withSharedScenesLines(measured, story, role, { b: true });
+}
+
+/** A chapter planner's JSON schema text measured before the scenes stage with each thread's scene right after its players, where the picks split the players. */
+export function withSharedScenesSchema(measuredJson: string, story: Story): string {
+  if (!takesScenesPlanner(story)) return measuredJson;
+  const schema = JSON.parse(measuredJson) as { properties: { threads: { items: { properties: Record<string, unknown>; required?: string[] } } } };
+  const thread = schema.properties.threads.items;
+  if (!("playersSideB" in thread.properties)) throw new Error("The measured chapter planner's threads have no playersSideB");
+  thread.properties = Object.fromEntries(
+    Object.entries(thread.properties).flatMap(([key, field]): [string, unknown][] => (key === "playersSideB" ? [[key, field], ["scene", { type: "string", description: SHARED_SCENES.sceneField }]] : [[key, field]]))
+  );
+  if (thread.required) thread.required = thread.required.flatMap((key) => (key === "playersSideB" ? [key, "scene"] : [key]));
+  return JSON.stringify(schema);
+}
+
 /**
  * A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones
  * (beforeEndingOnlyPlayed), before the group-levers adoption of the same day (beforeGroupLevers; a group's rolled
  * step's schema as it was built then, groupLeversBase) and before the short-replies adoption later that day
  * (beforeShortReplies; the schema as shortRepliesBase builds it), before the options-o2c adoption after it
  * (beforeOptionsO2c; a single player's rolled step, prompt only), before the pacing-clues adoption after that
- * (beforeLateClues; a late turn, prompt only), and before the group-options adoption that evening (beforeGroupOptions;
- * a group's rolled step, prompt; its schema is groupLeversBase's). The variants measured before compare with it.
+ * (beforeLateClues; a late turn, prompt only), before the group-options adoption that evening (beforeGroupOptions;
+ * a group's rolled step, prompt; its schema is groupLeversBase's) and before the scenes adoption after it
+ * (beforeSharedScenes; a group chapter's opening step with several threads, prompt only). The variants measured before compare
+ * with it.
  */
 export function productionThen<R extends { prompt: string }>(request: R, story: Story): R {
-  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeGroupOptions(request.prompt, story), story), story)), story), story);
+  const prompt = beforeGroupLevers(
+    beforeEndingOnlyPlayed(beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeGroupOptions(beforeSharedScenes(request.prompt, story), story), story), story)), story),
+    story
+  );
   const schema = "schema" in request ? { schema: takesGroupLevers(story) ? groupLeversBase(story).schema : shortRepliesBase(story).schema } : {};
   return { ...request, prompt, ...schema };
 }
@@ -634,9 +688,9 @@ export function withKidsBandImageSlots(measured: RequestText, story: Story): Req
 export function productionBeforeKidsAges(story: Story): { prompt: string; json: string } {
   // Without the short-replies stage's lines, which came later that day (groupLeversBase builds on shortRepliesBase)
   // ... and without the options-o2c stage's lines on a single player's rolled step, which came later still, nor the
-  // pacing-clues stage's late lines, later again
+  // pacing-clues stage's late lines, later again, nor the scenes stage's insertions on a group chapter's opening, later still
   const asText = (request: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) => ({
-    prompt: beforeShortReplies(beforeOptionsO2c(beforeLateClues(request.prompt, story), story)),
+    prompt: beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeSharedScenes(request.prompt, story), story), story)),
     json: beforeShortRepliesJson(JSON.stringify(toJsonSchema(request.schema))),
   });
   // A group's rolled step as it stood before the group-levers adoption too (groupLeversBase), which came later that day

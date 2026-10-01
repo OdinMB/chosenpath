@@ -16,7 +16,16 @@ import {
   switchAnalysisAfterThread,
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
-import { withContestLastStage, withPacedLengths, withPacingStepB, withResultsAsOutcomes, withResultsAsOutcomesSchema, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
+import {
+  withContestLastStage,
+  withPacedLengths,
+  withPacingStepB,
+  withResultsAsOutcomes,
+  withResultsAsOutcomesSchema,
+  withSharedScenes,
+  withSharedScenesSchema,
+  withThreadsThatFit,
+} from "../../../helpers/adoptedDeltas.js";
 import { CONTEST_LAST_STAGE_LINE, PRIORITY_STEP } from "../../../../src/game/services/prompts/SwitchPromptService.js";
 import { PACED_LENGTHS_TEXT, pacedLengths, threadPacingBlock } from "../../../../src/game/services/pacing.js";
 import { LATE_PACING_TEXT, pacingCluesBase, pacingCluesRequest } from "../../../../src/game/services/storyTextRounds/latePacing.js";
@@ -48,7 +57,10 @@ import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "..
  * switch and the one a step's question names are where a thread starts, and
  * no result restates it; the flavor pick's line; the milestone fields'
  * "naming who did what" narrowed to what was won or lost: withResultsAsOutcomes
- * and withResultsAsOutcomesSchema). The same prompt and JSON schema, byte for byte, on every story
+ * and withResultsAsOutcomesSchema); and, since the scenes stage of that
+ * evening, where a group's picks split the players, the measured shared-scenes
+ * line and each thread's scene (sharedScenesB: withSharedScenes and
+ * withSharedScenesSchema). The same prompt and JSON schema, byte for byte, on every story
  * the tests build and on every frozen planning case; and a reply is assembled
  * into today's stored plan the way the eval assembles it.
  */
@@ -175,9 +187,11 @@ const planV2f = (story: Story) => plannerV2ThreadRequest(story, false, { twoSide
 function expectThreadLikeMeasured(story: Story) {
   const production = threadStep.request(story);
   const measured = planV2f(story);
-  // Since the pacing-clues adoption (2026-10-01): the paced lengths where they narrow, as pacingCluesB measured them
-  expect(production.prompt).toBe(withPacedLengths(withResultsAsOutcomes(measured.prompt, story), story));
-  expect(json(production.schema)).toBe(withResultsAsOutcomesSchema(json(measured.schema), story));
+  // Since the pacing-clues adoption (2026-10-01): the paced lengths where they narrow, as pacingCluesB measured them; since
+  // the scenes adoption that evening, where a group's picks split the players, the shared-scenes line and each thread's
+  // scene, as sharedScenesB measured them
+  expect(production.prompt).toBe(withSharedScenes(withPacedLengths(withResultsAsOutcomes(measured.prompt, story), story), story, "thread"));
+  expect(json(production.schema)).toBe(withSharedScenesSchema(withResultsAsOutcomesSchema(json(measured.schema), story), story));
 }
 
 describe("the switch planner: planner v2 as measured", () => {

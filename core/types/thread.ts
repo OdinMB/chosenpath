@@ -224,6 +224,12 @@ export type Thread = Omit<z.infer<typeof threadSchema>, "progression"> & {
    * one whose players' camp the check can't tell (three players, player1 elsewhere, no camp recorded or played).
    */
   favorableSide?: "sideA" | "sideB";
+  /**
+   * Where the thread's beats happen and who and what is there besides its players, as the chapter planner wrote it
+   * where a group's picks split the players (shared scenes, the server's sharedScenes.ts, since the scenes stage of
+   * 2026-10-01); the group turn prints it in "WHERE EVERYONE IS THIS TURN". Absent elsewhere and on older plans.
+   */
+  scene?: string;
 };
 
 export type ThreadAnalysis = Omit<

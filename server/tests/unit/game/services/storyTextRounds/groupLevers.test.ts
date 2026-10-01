@@ -13,6 +13,7 @@ import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { beatGeneration, challengeOptions } from "../../../../helpers/textFixtures.js";
+import { withSharedScenes } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * Group sacrifices, rewards and players' own stats (eval only; the
@@ -112,10 +113,11 @@ describe("the base the variant builds on: production's group turn as the stage m
       expect(json(base.schema)).not.toContain("a reward option is the one exception");
       // Production since the adoption was the measured fix-and-retest byte for byte, with the short-replies stage's lines
       // adopted later that day (withShortRepliesLines, the measured shortReplies edit), until the group-options stage's
-      // adoption that evening: production with that stage's lines taken out (groupOptionsBase) still is
+      // adoption that evening: production with that stage's lines taken out (groupOptionsBase) still is, but for the scenes
+      // stage's insertions on a step with several threads, adopted after it (the base takes them out: withSharedScenes)
       const adopted = withShortRepliesLines(groupLeversRequest(story, { b: true }));
       const beforeGroupOptions = groupOptionsBase(story);
-      expect(beforeGroupOptions.prompt).toBe(adopted.prompt);
+      expect(beforeGroupOptions.prompt).toBe(withSharedScenes(adopted.prompt, story, "beat"));
       expect(json(beforeGroupOptions.schema)).toBe(json(adopted.schema));
       expect(production.prompt).not.toBe(adopted.prompt);
     }

@@ -7,6 +7,7 @@ import { beatSchemaForKids, takesKidsRules } from "../kidsTurnRules.js";
 import { canAddMilestones, type TextRequest } from "../storyTextSteps.js";
 import { replaceOnce, splitAtState } from "./roundEdits.js";
 import { shortRepliesBase } from "./shortReplies.js";
+import { withoutSharedScenes } from "./sharedScenes.js";
 
 /*
  * Group sacrifices, rewards and players' own stats (eval only; the
@@ -191,12 +192,16 @@ function schemaWithLevers(root: z.AnyZodObject, slots: string[], form: GroupLeve
  * same evening) production's players' lines follow the owner's rules
  * (groupSacrificeRewardLines prints them, so they are taken out as before) and
  * the option examples are followed by O2b's stat lines for a group's rolled
- * players (GROUP_OPTION_VARIETY), taken out too.
+ * players (GROUP_OPTION_VARIETY), taken out too. Since the scenes adoption,
+ * later that evening, a group chapter's opening step with several threads
+ * carries where everyone is and a consistency line (sharedScenesB), taken out
+ * too, on a rolled step (withoutSharedScenes; the forms measured on the others
+ * put them back in the kept tests).
  */
 export function groupLeversBase(story: Story): TextRequest<z.AnyZodObject> {
   const production = shortRepliesBase(story);
   if (groupLeverSlots(story).length === 0) return production;
-  const prompt = production.prompt
+  const prompt = withoutSharedScenes(production.prompt, story)
     .split(`${DERAIL_ANCHOR} ${REWARD_EXCEPTION}`)
     .join(DERAIL_ANCHOR)
     .split(`${LEVER_ANCHOR}${groupSacrificeRewardLines(story)}`)

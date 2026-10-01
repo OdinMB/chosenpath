@@ -57,6 +57,7 @@ import { buildKidsAgesCasesMode } from "./kidsAgesCases.js";
 import { kidsAgesMode } from "./kidsAgesPrep.js";
 import { buildGroupLeverCasesMode, groupLeversMode } from "./groupLeversPrep.js";
 import { buildGroupOptionsCasesMode, groupOptionsMode } from "./groupOptionsPrep.js";
+import { buildScenesCasesMode, judgeScenesMode, writeJudgedScenes } from "./sharedScenesPrep.js";
 import { buildShortReplyCasesMode, shortRepliesMode } from "./shortRepliesPrep.js";
 import { runaway2Mode } from "./runaway2Prep.js";
 import { optionsO2cMode } from "./optionsO2cPrep.js";
@@ -85,7 +86,7 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --dry-run (default) [--prompt-state <tag>, default round0]  cases, open jobs, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e|ending-state|runaway|…|short-replies|runaway-2|options-o2c|group-options --prompt-state <tag> [filters]
+ *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping|options-continuity|options-o2|planner-v2e|ending-state|runaway|…|short-replies|runaway-2|options-o2c|group-options|scenes --prompt-state <tag> [filters]
  *     (options-continuity runs under adopted2: production's form beside the three arms, interleaved;
  *     options-o2 under adopted3: production's form beside version O2 on the stored rolled chapter steps, interleaved,
  *     then O2's retest turnO2b once on the same steps; planner-v2e under round0, beside planner v2c's and v2d's
@@ -117,7 +118,10 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     options-o2c --role beat under adopted20: production's single-player turn and turnO2c twice on the stored
  *     rolled chapter steps, interleaved, first tries only; group-options --role beat under adopted23: production's group
  *     turn and groupOptions twice on group chapter steps of the third playthroughs, interleaved, each with production's
- *     one checked retry)
+ *     one checked retry; scenes under adopted24: --role beat, production's group turn and sharedScenes twice on later
+ *     chapter steps of the third playthroughs on their stored plans, interleaved, each with production's one checked
+ *     retry, and --role thread --mode pipeline, each side's chapter planner into its own group turn on that round's
+ *     chapter openings, interleaved)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -291,6 +295,17 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     against the owner's rules and B6's rate for that player, its sacrifice or reward and that lever's stat, a second
  *     sacrifice in the chapter, the variety and the odds for that player, the variant against production under the stop
  *     rule, every lever's text, the retries, the automatic checks, the waits and cost; group-options.md and .json
+ *   Shared scenes in group stories (sharedScenesPrep.ts, 2026-10-01 evening, decision A), in the scenes stage:
+ *   --build-scenes-cases [--rebuild-cases]  the third playthroughs' group chapter openings and later chapter steps
+ *     where a person came to be in two places, and an ordinary one of each (sharedScenesCases.ts); no calls; they then
+ *     run with --run --stage scenes --prompt-state adopted24, --role beat (each with production's checked retry) and
+ *     --role thread --mode pipeline
+ *   --judge-scenes [--cases <item or case ids>] [--max-spend 0.05]  placesConsistent (prompt v2) on round 3's hand-read
+ *     turns (two samples; round 2's items read from their stored verdicts) and once on every turn of the stage's arms
+ *     under adopted24 (prep-calls.jsonl, booked to the stage), then judged-scenes.md and .json: the calibration, the
+ *     variant against production per kind and pooled, every judged turn, the chains' plans, the turns' waits, cost and
+ *     automatic checks; --cases sends only those (a smoke)
+ *   --scenes  judged-scenes.md and .json again from what is recorded; no calls
  *   Fix 8's retest in whole short playthroughs (pacingCluesPrep.ts, 2026-10-01), in the pacing-clues stage:
  *   --pacing-clues-play [--cases <story ids>] [--samples N] [--turns N] [--arms pacingCluesB] [--max-spend 0.50]
  *     [--report-only]  production's code and pacingClues (the late-pacing fix-and-retest's planners and the late part's
@@ -378,6 +393,9 @@ type Mode =
   | "options-o2c"
   | "build-group-options-cases"
   | "group-options"
+  | "build-scenes-cases"
+  | "judge-scenes"
+  | "scenes"
   | "pacing-clues-play"
   | "pacing-clues-blind"
   | "judge-pacing-clues"
@@ -534,6 +552,9 @@ function parseArgs(argv: string[]): Args {
       case "--options-o2c":
       case "--build-group-options-cases":
       case "--group-options":
+      case "--build-scenes-cases":
+      case "--judge-scenes":
+      case "--scenes":
       case "--pacing-clues-play":
       case "--pacing-clues-blind":
       case "--judge-pacing-clues":
@@ -1306,6 +1327,14 @@ async function main() {
     case "group-options":
       // A deterministic reading: no calls, so no key and no caps
       return groupOptionsMode({ files, log: (line) => console.log(line) });
+    case "build-scenes-cases":
+      return buildScenesCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "judge-scenes":
+      // The stage's judged check books to its own stage
+      return judgeScenesMode(prepContext(args, files, "scenes"), { caseIds: args.caseIds });
+    case "scenes":
+      // The report again from what is recorded: no calls, so no key and no caps
+      return writeJudgedScenes({ files, log: (line) => console.log(line) });
     case "pacing-clues-play":
       // The short playthroughs book to the stage, one invocation at most the stage's cap unless --max-spend says less
       return pacingCluesPlayMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "pacing-clues", DEFAULT_STAGE_CAPS["pacing-clues"]), {

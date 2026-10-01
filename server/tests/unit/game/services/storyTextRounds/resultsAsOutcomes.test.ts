@@ -14,7 +14,7 @@ import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js
 import { plannerV2ThreadRequest } from "../../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
 import { threadAnalysisAfterSwitch, firstThreadAnalysis } from "../../../../helpers/promptStories.js";
 import { outcome } from "../../../../helpers/textFixtures.js";
-import { withPacedLengths } from "../../../../helpers/adoptedDeltas.js";
+import { withPacedLengths, withSharedScenes, withSharedScenesSchema } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * Challenge and contest results say how the attempt turns out, not the
@@ -88,13 +88,14 @@ const measuredBase = (story: Story) => plannerV2ThreadRequest(story, false, { tw
 function expectedPrompt(story: Story): string {
   const base = measuredBase(story).prompt;
   const which = countOf(story);
-  return withPacedLengths(base.replace(rule[which], `${rule[which]}${approachLine[which]}`).split(flavorAnchor).join(flavorLine), story);
+  // The variant builds on production's live planner: since the scenes adoption (2026-10-01, evening) with the shared-scenes line where a group's picks split the players
+  return withSharedScenes(withPacedLengths(base.replace(rule[which], `${rule[which]}${approachLine[which]}`).split(flavorAnchor).join(flavorLine), story), story, "thread");
 }
 
-/** The measured base's JSON schema with the milestone descriptions reworded by hand. */
+/** The measured base's JSON schema with the milestone descriptions reworded by hand (and, since the scenes adoption, each thread's scene where the picks split the players). */
 function expectedSchema(story: Story): string {
   const which = countOf(story);
-  return milestones[which].reduce((text, edit) => text.split(inJson(edit.from)).join(inJson(edit.to)), json(measuredBase(story).schema));
+  return withSharedScenesSchema(milestones[which].reduce((text, edit) => text.split(inJson(edit.from)).join(inJson(edit.to)), json(measuredBase(story).schema)), story);
 }
 
 describe("the results-as-outcomes chapter planner", () => {

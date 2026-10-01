@@ -64,6 +64,7 @@ import { shortRepliesRequest } from "../../game/services/storyTextRounds/shortRe
 import { noNewMilestonesRequest, noThreadAuditRequest } from "../../game/services/storyTextRounds/closingTurn.js";
 import { optionsO2cRequest } from "../../game/services/storyTextRounds/optionsO2c.js";
 import { groupOptionsRequest } from "../../game/services/storyTextRounds/groupOptions.js";
+import { sharedScenesRequest } from "../../game/services/storyTextRounds/sharedScenes.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -403,6 +404,20 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * O2b's stat lines and risk-only weak example for each player's options, and the
  * plan's lever question asked from those lines; production's request byte for
  * byte elsewhere, with production's turn limits and retry count.
+ * "sharedScenes" is decision A's retest of the parallel-thread lines (the
+ * evening of 2026-10-01, the scenes stage; storyTextRounds/sharedScenes.ts):
+ * production's group chapter planner, where the picks set more than one
+ * outcome, with a line that every player is in one thread even where a pick
+ * names another player, everyone else and every key object in one thread's
+ * scene, and a scene for each thread in its reply that the plan keeps; and
+ * production's group turn on a chapter step with several threads, with where
+ * everyone is this turn (each thread's players and scene) and a consistency
+ * line; production's request byte for byte elsewhere, with production's limits
+ * for the role and player count and production's turn retry count.
+ * "sharedScenesB" is its one fix-and-retest: the chapter planner's line with one
+ * more bullet (where two threads would need the same person, crew, vehicle or
+ * object, only one thread's scene has them; a contest only one side chose
+ * stands no one in for the absent side), the turn the variant's.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -482,7 +497,9 @@ export type VariantId =
   | "turnO2c"
   | "pacingClues"
   | "pacingCluesB"
-  | "groupOptions";
+  | "groupOptions"
+  | "sharedScenes"
+  | "sharedScenesB";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -559,6 +576,8 @@ export const VARIANTS: VariantId[] = [
   "pacingClues",
   "pacingCluesB",
   "groupOptions",
+  "sharedScenes",
+  "sharedScenesB",
 ];
 
 /**
@@ -1109,7 +1128,22 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     const count = beatCheckOptions(input.story).textCount;
     return { ...groupOptionsRequest(input.story), limits: beatCallLimits(input.story), ...(count ? { shortTextCount: count } : {}) };
   },
+  // Shared scenes in group stories: the chapter planner's line and scenes, the group turn's where-everyone-is block and
+  // line; production's limits for the role and player count, production's turn limits and retry count
+  sharedScenes: (input) => sharedScenesBuild(input, "sharedScenes"),
+  // Its one fix-and-retest: one more planner bullet, one person or group in one thread's scene and no stand-in for a
+  // contest's absent side; the turn the variant's
+  sharedScenesB: (input) => sharedScenesBuild(input, "sharedScenesB"),
 };
+
+/** The scenes stage's requests (its variant's and its fix-and-retest's): production's limits for the role and player count, production's turn limits and retry count. */
+function sharedScenesBuild(input: RequestInput, variant: "sharedScenes" | "sharedScenesB"): CheckedTextRequest {
+  if (input.role !== "beat" && input.role !== "switch" && input.role !== "thread") throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+  const b = variant === "sharedScenesB";
+  if (input.role !== "beat") return { ...sharedScenesRequest(input.story, input.role, { b }), limits: productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers()) };
+  const count = beatCheckOptions(input.story).textCount;
+  return { ...sharedScenesRequest(input.story, "beat", { b }), limits: beatCallLimits(input.story), ...(count ? { shortTextCount: count } : {}) };
+}
 
 /** The pacing-clues stage's requests (its variant's and its fix-and-retest's): B's planners and the late part's clue lines; production's limits and retry count. */
 function pacingCluesBuild(input: RequestInput, variant: VariantId): CheckedTextRequest {

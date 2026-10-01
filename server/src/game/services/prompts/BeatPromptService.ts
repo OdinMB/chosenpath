@@ -21,6 +21,7 @@ import { outcomeStateLines } from "../endingStates.js";
 import { kidsListener, kidsTurnText, takesKidsRules } from "../kidsTurnRules.js";
 import { LATE_CLUES_TEXT, takesLateClues } from "../lateClues.js";
 import { TEXT_GOES_ON } from "../textParagraphs.js";
+import { SHARED_SCENES, scenesBlock, takesScenesBlock } from "../sharedScenes.js";
 
 /**
  * The scoreboard ending rule (the setup document's decision 3, question 1,
@@ -133,6 +134,8 @@ export class BeatPromptService {
       "\n\n======= CURRENT GAME STATE =======\n\n" +
       StoryStatePromptService.createStoryStatePrompt(story, sections) +
       "\n\n" +
+      // Where everyone is, each thread's players and scene, before the thread configuration (shared scenes, the scenes stage)
+      (takesScenesBlock(story) ? scenesBlock(story) : "") +
       StoryStatePromptService.createStoryStatePrompt(
         story,
         this.getSectionsForContext(story)
@@ -305,7 +308,10 @@ ${
 Which information from other beats that you already created in this turn do we need to consider for this beat?
 Create a bullet list of things that happened in other beats that you already created in this turn that we should consider for this beat.
 - This is particularly important if several players are in the same thread or switch (so the beats for the different players are consistent with each other).
-- If this is the first beat you are creating in this turn (for player1), there is nothing to consider.
+${
+        // Players in different threads: everyone in one place across the beats (shared scenes, the scenes stage)
+        takesScenesBlock(story) ? SHARED_SCENES.turnLine : ""
+      }- If this is the first beat you are creating in this turn (for player1), there is nothing to consider.
 `
     : ""
 }

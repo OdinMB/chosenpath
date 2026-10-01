@@ -25,6 +25,7 @@ import { groupLeverSlots } from "../../../../src/game/services/optionRules.js";
 import { chapterLevers } from "../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
 import { groupOptionsBase, groupOptionsRequest, groupOptionsRule, groupRateLine } from "../../../../src/game/services/storyTextRounds/groupOptions.js";
 import { fakeCall, input } from "./playFixtures.js";
+import { beforeSharedScenes } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * The group-options stage's cases (decision A, the evening of 2026-10-01): group
@@ -116,8 +117,9 @@ describe("groupOptionsCases on the third round's stored playthroughs (skipped wh
     let earlierSacrifice = 0;
     for (const c of cases) {
       const story = caseStory(c);
-      // The run sent the variant's base (production before the adoption); production today sends the measured variant
-      expect([c.id, sha256(playthroughs3Sent(requestInputFor(c)))]).toEqual([c.id, sha256(groupOptionsBase(story).prompt)]);
+      // The run sent the variant's base (production before the adoption; since the scenes adoption after it, without that
+      // stage's insertions on a step with several threads); production today sends the measured variant
+      expect([c.id, sha256(playthroughs3Sent(requestInputFor(c)))]).toEqual([c.id, sha256(beforeSharedScenes(groupOptionsBase(story).prompt, story))]);
       expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sha256(groupOptionsRequest(story).prompt)]);
       for (const slot of groupLeverSlots(story)) {
         const rule = groupOptionsRule(story, slot);

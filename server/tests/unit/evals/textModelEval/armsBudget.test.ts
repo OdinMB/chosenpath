@@ -464,6 +464,9 @@ describe("budget caps", () => {
       "playthroughs-3": 1,
       // Decision A of 2026-10-01 (evening): the owner's option rules for group turns, the status note's estimate's cap
       "group-options": 0.35,
+      // Decision A of 2026-10-01 (evening): shared scenes in group stories, round-3 chains and turns twice, its estimate
+      // plus 30% ($0.36), raised to $0.40 for its fix-and-retest (sharedScenesB's chains)
+      scenes: 0.4,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -498,6 +501,7 @@ describe("budget caps", () => {
       "pacing-clues",
       "playthroughs-3",
       "group-options",
+      "scenes",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -534,7 +538,7 @@ describe("budget caps", () => {
     expect(42.87 + DEFAULT_STAGE_CAPS["playthroughs-3"]).toBeLessThanOrEqual(HARD_CEILING);
     // Decision A (the evening of 2026-10-01) opened its measurements with the ledger at $43.61 of the $48 hard cap: their
     // caps fit with the $1.3 on top
-    expect(decisionA).toEqual(["group-options"]);
+    expect(decisionA).toEqual(["group-options", "scenes"]);
     expect(LEDGER_WHEN_DECISION_A_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisionA)).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -870,8 +874,8 @@ describe("budget caps", () => {
     expect(stageInterleavesArms("choice-line-sp")).toBe(true);
     // Its turns carry production's one retry of a short or option-less reply; no earlier stage's do
     expect(stageChecksTurns("choice-line-sp")).toBe(true);
-    // The kids-turns, kids-ages, group-levers, short-replies and group-options stages (2026-10-01) carry it too
-    for (const stage of STAGES.filter((s) => s !== "choice-line-sp" && s !== "kids-turns" && s !== "kids-ages" && s !== "group-levers" && s !== "short-replies" && s !== "group-options")) {
+    // The kids-turns, kids-ages, group-levers, short-replies, group-options and scenes stages (2026-10-01) carry it too
+    for (const stage of STAGES.filter((s) => s !== "choice-line-sp" && s !== "kids-turns" && s !== "kids-ages" && s !== "group-levers" && s !== "short-replies" && s !== "group-options" && s !== "scenes")) {
       expect(stageChecksTurns(stage)).toBe(false);
     }
     // Production beside the variant under a tag of its own

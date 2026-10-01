@@ -123,6 +123,8 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "playthroughs-3": "Whole-story playthroughs, round 3, on production's code after the fixes of 2026-10-01 (no --run jobs: --playthroughs --round 3 plays them, listed below)",
   "group-options":
     "The owner's option rules for group turns (groupOptions beside production's group turn under adopted23, --role beat, each with production's checked retry, on group steps of the third playthroughs)",
+  scenes:
+    "Shared scenes in group stories (sharedScenes beside production under adopted24: --role beat, each with production's checked retry, on chapter steps of the third playthroughs, and --role thread --mode pipeline for its chapter openings' chains)",
 };
 
 /** Jobs by arm key, in plan order. */

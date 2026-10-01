@@ -4,6 +4,7 @@ import {
   type SectionConfig,
 } from "./StoryStatePromptService.js";
 import { pickedOutcome, threadPacingBlock } from "../pacing.js";
+import { SHARED_SCENES, takesScenesPlanner } from "../sharedScenes.js";
 
 /*
  * The chapter planner (planner v2 with two-sided contests, adopted on
@@ -30,7 +31,12 @@ import { pickedOutcome, threadPacingBlock } from "../pacing.js";
  * in plannerReplies.ts). Today's form before the adoption is kept for the
  * eval in storyTextRound0/; adoptedPlanners.test.ts holds this equal to the
  * eval's planner v2f with that stage's measured edits (its variant
- * resultsAsOutcomes, byte for byte).
+ * resultsAsOutcomes, byte for byte). Since the scenes stage of 2026-10-01
+ * (evening), where a group's picks set more than one outcome, the player
+ * configurations are followed by the shared-scenes line (sharedScenes.ts:
+ * every player in one thread even where a pick names another, one person or
+ * group in one thread's scene) and each thread writes its scene: the eval's
+ * sharedScenesB, byte for byte.
  */
 
 /** A4's length rule. */
@@ -294,7 +300,10 @@ A summary of how you want to set up the threads based on the switch configuratio
 Possible player configurations:
 - Independent threads: Each player gets their own standard thread
 - Shared threads: All players are in the same thread
-- Mixed setup: Some players are in a joint thread while others are in independent threads.`;
+- Mixed setup: Some players are in a joint thread while others are in independent threads.${
+          // Where the picks split the group, parallel threads in one world, one person or group in one scene (the scenes stage)
+          takesScenesPlanner(story) ? SHARED_SCENES.plannerLine : ""
+        }`;
       }
     } else {
       instructions += `\n\nFor single-player games, there is always only one thread.`;

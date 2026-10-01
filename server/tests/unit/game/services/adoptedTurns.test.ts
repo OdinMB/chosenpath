@@ -24,6 +24,7 @@ import {
   withKidsImageSlotsSchema,
   withLateClues,
   withOptionsO2c,
+  withSharedScenes,
   withShortReplies,
 } from "../../../helpers/adoptedDeltas.js";
 import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../../../src/game/services/storyTextRounds/endingState.js";
@@ -76,7 +77,10 @@ import { OPTIONS_CONTINUITY_TEXT } from "../../../../src/game/services/storyText
  * A, that evening), a group's rolled step is the measured groupOptions byte for
  * byte (each rolled player's line by the owner's rules per player and chapter,
  * O2b's stat lines, the plan's lever question from those lines), whose base is
- * groupLeversB as before (expectGroup).
+ * groupLeversB as before (expectGroup). Since the scenes stage of that evening,
+ * a group's chapter step with several threads carries where everyone is and the
+ * consistency line, as sharedScenesB measured them (withSharedScenes in
+ * asAdopted; sharedScenes.test.ts holds production to sharedScenesB).
  */
 
 /**
@@ -219,11 +223,14 @@ const kidsAgesAdopted = (story: Story): Expected => {
 
 /**
  * The measured request with the turn deltas applied (adoptedDeltas.ts) and, since the short-replies stage of
- * 2026-10-01, that stage's measured lines in its prompt and every text field (withShortReplies): what production must
- * send for this story.
+ * 2026-10-01, that stage's measured lines in its prompt and every text field (withShortReplies); since the scenes stage
+ * that evening, on a group's chapter step with several threads, where everyone is and the consistency line as
+ * sharedScenesB measured them (withSharedScenes): what production must send for this story.
  */
 const asAdopted = (measured: Request, story: Story): Expected =>
-  takesKidsRules(story) ? kidsAgesAdopted(story) : withShortReplies({ prompt: withLateClues(adoptedTurn(measured.prompt, story), story), schema: measured.schema });
+  takesKidsRules(story)
+    ? kidsAgesAdopted(story)
+    : withShortReplies({ prompt: withSharedScenes(withLateClues(adoptedTurn(measured.prompt, story), story), story, "beat"), schema: measured.schema });
 
 /**
  * A single player's turn as production must send it. Since the options-o2c stage of 2026-10-01 a rolled chapter step

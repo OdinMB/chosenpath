@@ -23,6 +23,8 @@ import {
   withPacingStepB,
   withResultsAsOutcomes,
   withResultsAsOutcomesSchema,
+  withSharedScenes,
+  withSharedScenesSchema,
   withShortReplies,
   withThreadsThatFit,
 } from "../../../helpers/adoptedDeltas.js";
@@ -60,7 +62,11 @@ import { groupOptionsBase } from "../../../../src/game/services/storyTextRounds/
  * single player's rolled chapter step with O2b's stat lines and the reward the
  * game places (turnO2c, the options-o2c stage of 2026-10-01), a late turn
  * with the late part's clue lines (pacingClues, the pacing-clues stage of
- * 2026-10-01; withLateClues puts them on the forms measured before), and AI
+ * 2026-10-01; withLateClues puts them on the forms measured before), the
+ * chapter planner where a group's picks split the players and a group's
+ * chapter step with several threads with the shared-scenes insertions
+ * (sharedScenesB, the scenes stage of 2026-10-01; withSharedScenes and
+ * withSharedScenesSchema put them on the forms measured before), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -137,7 +143,11 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
   // production's live turn, carries the late clue lines already)
   if (variant === "groupOptions" && input.role === "beat") {
     const before = requestFor("groupLeversB", input);
-    const lined = withShortReplies({ prompt: withLateClues(adoptedTurn(requestText(before), input.story), input.story), schema: (before as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
+    // ... and, since the scenes stage, where everyone is and the consistency line on a step with several threads
+    const lined = withShortReplies({
+      prompt: withSharedScenes(withLateClues(adoptedTurn(requestText(before), input.story), input.story), input.story, "beat"),
+      schema: (before as { schema: Parameters<typeof toJsonSchema>[0] }).schema,
+    });
     const base = groupOptionsBase(input.story);
     expect({ prompt: base.prompt === lined.prompt, schema: JSON.stringify(toJsonSchema(base.schema)) === lined.json }).toEqual({ prompt: true, schema: true });
     return { prompt, schema: json(measured) };
@@ -150,8 +160,13 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
       return { prompt: adoptedSetupPrompt(prompt, input.iteration.playerCount, input.iteration.gameMode), schema: withLeverDirectionSchema(json(measured)) };
     case "thread":
       // Since the challenge-results stage (2026-10-01): results and milestones that never restate the approach, as measured;
-      // since the pacing-clues stage the same day, the paced lengths where they narrow, as pacingCluesB measured them
-      return { prompt: withPacedLengths(withResultsAsOutcomes(prompt, input.story), input.story), schema: withResultsAsOutcomesSchema(json(measured), input.story) };
+      // since the pacing-clues stage the same day, the paced lengths where they narrow, as pacingCluesB measured them; since
+      // the scenes stage that evening, where a group's picks split the players, the shared-scenes line and each thread's
+      // scene, as sharedScenesB measured them
+      return {
+        prompt: withSharedScenes(withPacedLengths(withResultsAsOutcomes(prompt, input.story), input.story), input.story, "thread"),
+        schema: withSharedScenesSchema(withResultsAsOutcomesSchema(json(measured), input.story), input.story),
+      };
     case "switch":
       // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured;
       // since the pacing-clues stage the same day, step b as pacingCluesB measured it
@@ -159,8 +174,13 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     case "beat": {
       // Since the short-replies stage (2026-10-01): every turn's text goes on after its first paragraph, as measured; since
       // the pacing-clues stage the same day, a late turn carries the late part's clue lines as pacingClues measured them
-      // (groupLeversB, built on production's live turn, carries them already)
-      const lined = withShortReplies({ prompt: withLateClues(adoptedTurn(prompt, input.story), input.story), schema: (measured as { schema: Parameters<typeof toJsonSchema>[0] }).schema });
+      // (groupLeversB, built on production's live turn, carries them already); since the scenes stage that evening, a
+      // group's chapter step with several threads carries where everyone is and the consistency line, as sharedScenesB
+      // measured them
+      const lined = withShortReplies({
+        prompt: withSharedScenes(withLateClues(adoptedTurn(prompt, input.story), input.story), input.story, "beat"),
+        schema: (measured as { schema: Parameters<typeof toJsonSchema>[0] }).schema,
+      });
       return { prompt: lined.prompt, schema: lined.json };
     }
   }

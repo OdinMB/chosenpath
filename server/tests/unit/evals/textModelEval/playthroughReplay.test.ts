@@ -19,7 +19,7 @@ import { playthroughsSent } from "../../../../src/evals/textModelEval/choiceResu
 import { playthroughs2Sent } from "../../../../src/evals/textModelEval/parallelThreadsCases.js";
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
-import { beforeEndingOnlyPlayed, beforeGroupLevers, beforeGroupOptions, beforeLateClues, beforeOptionsO2c, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
+import { beforeEndingOnlyPlayed, beforeGroupLevers, beforeGroupOptions, beforeLateClues, beforeOptionsO2c, beforeSharedScenes, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
 import { takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
@@ -214,9 +214,10 @@ describe("replayRun on the stored round 2 (skipped where the output folder is ab
         // adoption of the same day), and every turn's short-replies lines (that stage's adoption, later that day), and a
         // single player's rolled step's O2c lines (the options-o2c adoption, later still), and a late turn's clue lines (the
         // pacing-clues adoption, later again), and a group's rolled step's group-options lines (that stage's adoption, that
-        // evening, beforeGroupOptions)
+        // evening, beforeGroupOptions), and a group's chapter step with several threads' shared-scenes insertions (the scenes
+        // adoption, after it, beforeSharedScenes)
         expect([run.spec.id, r.turn, sha256(playthroughs2Sent({ role: "beat", story: r.before }))]).toEqual([run.spec.id, r.turn, sentHash]);
-        const withLines = beforeGroupOptions(requestText(requestFor("adopted", { role: "beat", story: r.before })), r.before);
+        const withLines = beforeGroupOptions(beforeSharedScenes(requestText(requestFor("adopted", { role: "beat", story: r.before })), r.before), r.before);
         expect([run.spec.id, r.turn, sha256(withLines) === sentHash]).toEqual([run.spec.id, r.turn, false]);
         const today = beforeShortReplies(beforeOptionsO2c(beforeLateClues(withLines, r.before), r.before));
         const ending = r.before.getCurrentBeatType() === "ending";

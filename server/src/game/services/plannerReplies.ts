@@ -11,6 +11,7 @@ import {
   type ThreadAnalysis,
 } from "core/types/index.js";
 import { fallbackOutcomeId, outcomesFor, pickedOutcome } from "./pacing.js";
+import { sceneOf, takesScenesPlanner, withSceneField } from "./sharedScenes.js";
 
 /*
  * The planners' replies, adopted with planner v2 on 2026-09-28 (turn doc A2,
@@ -279,7 +280,9 @@ export function threadReplySchema(story: Story): z.AnyZodObject {
   const ids = storyOutcomeIds(story);
   const sides = { playersSideA: threadSchema.shape.playersSideA, playersSideB: threadSchema.shape.playersSideB };
   const { kind, ...rest } = threadFields(true);
-  return z.object({
+  // Where the picks split the group, each thread's scene right after its players (shared scenes, the scenes stage)
+  const withScenes = takesScenesPlanner(story) ? withSceneField : (schema: z.AnyZodObject) => schema;
+  return withScenes(z.object({
     grouping: z.string().describe("Which players share which thread, and why, in one or two sentences."),
     duration: z.number().describe("Two, three or four beats, the same for every thread in this batch: each thread's steps plus its final step make exactly this many."),
     threads: z
@@ -293,7 +296,7 @@ export function threadReplySchema(story: Story): z.AnyZodObject {
       )
       .max(PLAYER_SLOTS.length)
       .describe(`The next thread or set of threads, in parallel. Every player is in exactly one thread. ${NO_BLANK_ITEMS}`),
-  });
+  }));
 }
 
 /**
@@ -328,6 +331,8 @@ function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB:
     question,
     plan: asString(written.plan),
     ...(Array.isArray(written.outcomeStages) ? { outcomeStages: written.outcomeStages.map(asString) } : {}),
+    // Where the thread happens and who is there (shared scenes, where the picks split a group), read by the group turn
+    ...(sceneOf(written) ? { scene: sceneOf(written) } : {}),
   };
 }
 
