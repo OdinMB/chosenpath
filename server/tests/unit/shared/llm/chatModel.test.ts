@@ -2,6 +2,7 @@ import { jest } from "@jest/globals";
 import { z } from "zod";
 import {
   assertSupportedSettings,
+  CLOSING_TURN_CAP,
   createChatModel,
   modelFamily,
   productionCallLimits,
@@ -182,6 +183,23 @@ describe("productionCallLimits", () => {
     expect(productionCallLimits("beat", 1)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
     expect(productionCallLimits("beat", 2)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 14_000 });
     expect(productionCallLimits("beat", 3)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 16_000 });
+  });
+
+  /*
+   * Decision B (2026-10-01): a single player's turn that closes a chapter (a switch after a chapter, or the ending) now
+   * and then reasons to the 12,000-token cap and writes nothing (19 cut first tries stored, every one a closing turn, 18
+   * since 29 September; never a group turn). The 445 clean answered single-player closing turns stored (Luna medium, every
+   * form, 2026-09-26 to 10-01) used median 3,442 tokens with reasoning, p99 4,994, at most 5,853: the cap is 7,500, 28% over
+   * the longest, so a runaway is cut about 4,500 tokens (about 26 s) sooner and no answered closing turn would have been.
+   */
+  it("caps a single player's turn that closes a chapter at 7,500, and no other turn", () => {
+    expect(CLOSING_TURN_CAP).toBe(7_500);
+    expect(productionCallLimits("beat", 1, { closingTurn: true })).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 7_500 });
+    expect(productionCallLimits("beat", 1, { closingTurn: false })).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    // Group turns keep theirs: none of the closing turns ever sent on Luna low ran away
+    expect(productionCallLimits("beat", 2, { closingTurn: true })).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 14_000 });
+    expect(productionCallLimits("beat", 3, { closingTurn: true })).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 16_000 });
+    expect(productionCallLimits("switchAnalysis", 1, { closingTurn: true })).toEqual({ timeoutMs: 30_000, maxCompletionTokens: 4_000 });
   });
 
   it("gives setup and the template editor room above their slowest replies, and analysis and the filter short limits", () => {

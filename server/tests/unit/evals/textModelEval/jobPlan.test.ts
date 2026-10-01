@@ -42,7 +42,7 @@ import {
   STAGES,
   chainSides,
 } from "../../../../src/evals/textModelEval/arms.js";
-import { productionCallLimits } from "../../../../src/shared/llm/chatModel.js";
+import { CLOSING_TURN_CAP, productionCallLimits } from "../../../../src/shared/llm/chatModel.js";
 import { SWITCH_REMINDER } from "../../../../src/game/services/storyTextRounds/switchReminder.js";
 import { CLOSING_TURN_TEXT } from "../../../../src/game/services/storyTextRounds/closingTurn.js";
 import { CHOICE_RESULT_TEXT, productionTurnToday } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
@@ -567,7 +567,10 @@ describe("planJobs: the round stages and the migration check", () => {
     );
     for (const job of jobs) {
       const players = job.caseId === group ? 2 : 1;
-      expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: players === 1 ? 12_000 : 14_000 });
+      // Production's arm carries production's limits: since decision B (2026-10-01) a single player's ending has the
+      // closing turn's cap (CLOSING_TURN_CAP); the variant keeps the cap it was measured with
+      const production = job.armKey.endsWith("/adopted");
+      expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: players === 1 ? (production ? CLOSING_TURN_CAP : 12_000) : 14_000 });
     }
     // Interleaved: both arms on a case before the next case
     const onSingle = jobs.filter((j) => j.caseId === single && j.sample === 1).map((j) => jobs.indexOf(j));
@@ -586,7 +589,8 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(jobs.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`)).toEqual(
       [1, 2, 3].flatMap((s) => ["adopted", "noSwitchReminder"].map((v) => `${runaway} s${s} gpt-6-luna@medium/${v}`))
     );
-    for (const job of jobs) expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    // The stage ran both at 12,000 tokens; production's arm now carries the closing turn's cap (decision B, 2026-10-01)
+    for (const job of jobs) expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: job.armKey.endsWith("/adopted") ? CLOSING_TURN_CAP : 12_000 });
     // The smoke: sample 1 of each
     const smoke = planJobs(cases, { stage: "runaway", promptState: "adopted4", roles: ["beat"], mode: "isolated", subset15: false, records: [], samples: 1 });
     expect(smoke.map((j) => `${j.sample} ${j.armKey}`)).toEqual(["1 gpt-6-luna@medium/adopted", "1 gpt-6-luna@medium/noSwitchReminder"]);
@@ -613,7 +617,8 @@ describe("planJobs: the round stages and the migration check", () => {
       Array.from({ length: RUNAWAY_2_SAMPLES }, (_, i) => i + 1).flatMap((s) => variants.map((v) => `${runaway} s${s} gpt-6-luna@medium/${v}`))
     );
     for (const job of jobs) {
-      expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+      // The stage ran every arm at 12,000 tokens; production's arm now carries the closing turn's cap (decision B, 2026-10-01)
+      expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: job.armKey.endsWith("/adopted") ? CLOSING_TURN_CAP : 12_000 });
       // First tries are what the stage counts: no checked retry
       expect(job.retry).toBeUndefined();
     }

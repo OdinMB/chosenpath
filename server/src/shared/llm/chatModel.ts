@@ -205,13 +205,28 @@ export type CallLimits = { timeoutMs: number; maxCompletionTokens: number };
  */
 const TURN_CAP_BY_PLAYERS: Record<1 | 2 | 3, number> = { 1: 12_000, 2: 14_000, 3: 16_000 };
 
-export function productionCallLimits(role: TextRole, players: number): CallLimits {
+/**
+ * A single player's turn that closes a chapter (a switch turn after a chapter, or the ending): its own lower cap, since
+ * decision B of 2026-10-01. Such a turn now and then reasons to the cap and writes nothing (the eval's 19 cut first tries,
+ * every one a single player's closing turn on Luna medium, 18 of them since 29 September; never a group turn, never on
+ * Luna low), and the game's retry costs the player the time the runaway took, 56-89 s at 12,000 tokens. The 445 clean
+ * answered single-player closing turns stored (Luna medium, every form, 26 September to 1 October; reasoning included)
+ * used median 3,442 tokens, p95 4,656, p99 4,994, at most 5,853 (reasoning alone at most 3,774). 7,500 is 28% over the
+ * longest and 50% over the p99, so no answered closing turn would have been cut; a runaway is cut 4,500 tokens sooner,
+ * about 26 s at the runaways' median 173 tokens a second (21-34 s over their range).
+ */
+export const CLOSING_TURN_CAP = 7_500;
+
+/** What a call's limits depend on beyond its role and player count: a turn that closes a chapter (beats only). */
+export type CallScope = { closingTurn?: boolean };
+
+export function productionCallLimits(role: TextRole, players: number, scope: CallScope = {}): CallLimits {
   if (players !== 1 && players !== 2 && players !== 3) {
     throw new Error(`Unsupported player count ${players} for ${role} limits (1 to 3)`);
   }
   switch (role) {
     case "beat":
-      return { timeoutMs: 90_000, maxCompletionTokens: TURN_CAP_BY_PLAYERS[players] };
+      return { timeoutMs: 90_000, maxCompletionTokens: players === 1 && scope.closingTurn ? CLOSING_TURN_CAP : TURN_CAP_BY_PLAYERS[players] };
     case "setup":
       return { timeoutMs: 120_000, maxCompletionTokens: 20_000 };
     case "templateGeneration":

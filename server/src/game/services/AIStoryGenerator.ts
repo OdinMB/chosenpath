@@ -27,6 +27,7 @@ import {
   createChatModel,
   PRODUCTION_MAX_RETRIES,
   productionCallLimits,
+  type CallLimits,
 } from "shared/llm/chatModel.js";
 import { settingsFor, type TextRole } from "shared/llm/textModelSettings.js";
 import { llmCallLogger, type CallTags } from "shared/llm/usageRecorder.js";
@@ -38,6 +39,7 @@ import { beatCheckOptions } from "./kidsTurnRules.js";
 import { checkedSwitchPlan, checkedThreadPlan } from "./planChecks.js";
 import { logRepairs } from "./textRepairs.js";
 import {
+  beatCallLimits,
   beatStep,
   setupStep,
   switchStep,
@@ -78,12 +80,14 @@ export class AIStoryGenerator {
     }
   }
 
-  /** The role's model for this many players: multiplayer settings above one, and the output cap by player count. */
-  private modelFor(role: TextRole, players: number): ChatOpenAI {
+  /**
+   * The role's model for this many players: multiplayer settings above one, and the output cap by player count, or the
+   * limits given (a turn's, beatCallLimits: a single player's turn that closes a chapter has its own lower cap).
+   */
+  private modelFor(role: TextRole, players: number, limits: CallLimits = productionCallLimits(role, players)): ChatOpenAI {
     const settings = settingsFor(productionTextModels(), role, {
       multiplayer: players > 1,
     });
-    const limits = productionCallLimits(role, players);
     const key = `${role}|${JSON.stringify(settings)}|${JSON.stringify(limits)}`;
     let model = this.models.get(key);
     if (!model) {
@@ -394,9 +398,11 @@ export class AIStoryGenerator {
     context?: GenerationContext
   ): Promise<SetOfBeatGenerationSchema> {
     const request = beatStep.request(story);
+    // A single player's turn that closes a chapter has its own lower output cap (decision B, 2026-10-01)
     const structuredModel = this.modelFor(
       "beat",
-      story.getNumberOfPlayers()
+      story.getNumberOfPlayers(),
+      beatCallLimits(story)
     ).withStructuredOutput(request.schema);
 
     Logger.Story.log(

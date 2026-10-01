@@ -15,6 +15,7 @@ import { PLAYER_SLOTS } from "core/types/index.js";
 import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
 import type { TemplateIterationSections } from "core/types/admin.js";
 import type { Story } from "core/models/Story.js";
+import { productionCallLimits, type CallLimits } from "shared/llm/chatModel.js";
 import { StorySetupPromptService, type SetupPromptOptions } from "./prompts/StorySetupPromptService.js";
 import { assembleSetupReply, iterationSchema, setupGenerationSchema } from "./setupSchema.js";
 import { assembleSwitchPlan, assembleThreadPlan, switchReplySchema, threadReplySchema } from "./plannerReplies.js";
@@ -47,6 +48,15 @@ export function isPlayerBeat(key: string): boolean {
 export function canAddMilestones(story: Story): boolean {
   const beatType = story.getCurrentBeatType();
   return beatType === "ending" || (beatType === "switch" && !story.isFirstBeat());
+}
+
+/**
+ * The turn call's timeout and output cap: production's by player count, and since decision B (2026-10-01) a single
+ * player's turn that closes a chapter (one that may add milestones, canAddMilestones) the lower CLOSING_TURN_CAP, where
+ * the runaways fall (chatModel.ts). AIStoryGenerator and the eval's production arm read it.
+ */
+export function beatCallLimits(story: Story): CallLimits {
+  return productionCallLimits("beat", story.getNumberOfPlayers(), { closingTurn: canAddMilestones(story) });
 }
 
 function applyBeats(

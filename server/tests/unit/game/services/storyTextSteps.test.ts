@@ -5,13 +5,14 @@ import { GameModes, type Beat, type ChallengeOption, type Change } from "core/ty
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import {
   analysisBefore,
+  beatCallLimits,
   beatStep,
   partialTemplateSchema,
   switchStep,
   threadStep,
 } from "../../../../src/game/services/storyTextSteps.js";
 import { createMockMultiplayerStory, createMockStory } from "../../../helpers/testHelpers.js";
-import { threadBeat } from "../../../helpers/promptStories.js";
+import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import {
   beatGeneration,
   beatSet,
@@ -372,5 +373,21 @@ describe("partialTemplateSchema", () => {
     expect(keys.sort()).toEqual(
       ["characterSelectionIntroduction", "characterSelectionPlan", "imageInstructions", "player1", "player2"].sort()
     );
+  });
+});
+
+/*
+ * Decision B (2026-10-01): a single player's turn that closes a chapter (the turns that may add milestones: a switch after
+ * the first beat, or the ending) gets the lower output cap, CLOSING_TURN_CAP; every other turn production's cap by player
+ * count. AIStoryGenerator and the eval's production arm read it here.
+ */
+describe("beatCallLimits", () => {
+  it("caps a single player's switch turn after a chapter and ending at 7,500, and every other turn as before", () => {
+    expect(beatCallLimits(laterSwitchBeat(1))).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 7_500 });
+    expect(beatCallLimits(endingBeat(1))).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 7_500 });
+    expect(beatCallLimits(firstSwitchBeat(1))).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    expect(beatCallLimits(threadBeat(1))).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    expect(beatCallLimits(laterSwitchBeat(2))).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 14_000 });
+    expect(beatCallLimits(endingBeat(3))).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 16_000 });
   });
 });

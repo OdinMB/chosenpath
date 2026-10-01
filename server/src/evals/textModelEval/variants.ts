@@ -1,7 +1,7 @@
 import type { Story } from "core/models/Story.js";
 import { kidAgesFrom, kidAgesFromPremise, type GameMode, type KidAges, type PlayerCount } from "core/types/index.js";
 import type { TemplateIterationSections } from "core/types/admin.js";
-import { beatStep, iterationStep, setupStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
+import { beatCallLimits, beatStep, iterationStep, setupStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import {
   round0BeatStep,
   round0IterationRequest,
@@ -685,7 +685,10 @@ function prodRequest(input: RequestInput): TextRequest {
 function adoptedRequest(input: RequestInput): EvalRequest {
   const players = input.role === "setup" ? input.setup.playerCount : input.role === "iteration" ? input.iteration.playerCount : input.story.getNumberOfPlayers();
   const count = input.role === "beat" ? beatCheckOptions(input.story).textCount : undefined;
-  return { ...adoptedWords(input), limits: productionCallLimits(productionRole(input.role), players), ...(count ? { shortTextCount: count } : {}) };
+  // A turn's limits as production's (beatCallLimits: since decision B of 2026-10-01 a single player's turn that closes a
+  // chapter has its own lower cap); the other variants keep the cap by player count they were measured with
+  const limits = input.role === "beat" ? beatCallLimits(input.story) : productionCallLimits(productionRole(input.role), players);
+  return { ...adoptedWords(input), limits, ...(count ? { shortTextCount: count } : {}) };
 }
 
 function adoptedWords(input: RequestInput): EvalRequest {

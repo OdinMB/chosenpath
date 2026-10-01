@@ -7,6 +7,7 @@ import type { SetOfBeatGenerationSchema, SwitchAnalysis, ThreadAnalysis } from "
 import { contestLastStageProblem, contestsAtLastStage } from "../../../../src/game/services/pacing.js";
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
 import { checkThreadPlan } from "../../../../src/game/services/planChecks.js";
+import { CLOSING_TURN_CAP } from "../../../../src/shared/llm/chatModel.js";
 import { scoreboardWinners } from "../../../../src/game/services/scoreboards.js";
 import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthroughMode.js";
@@ -472,6 +473,39 @@ describe("replayRun on the stored round 3 (skipped where the output folder is ab
       ...dropped(stored2, (run) => (run.spec.id === "play-estate-agents" ? 22 : Number.POSITIVE_INFINITY)),
       ...dropped(stored3),
     ]).toEqual([["play-space-pirates", 16, "player3: shared_dockside_favors (sacrifice) is player1's this turn"]]);
+  });
+
+  /*
+   * Decision B (2026-10-01): a single player's turn that closes a chapter gets CLOSING_TURN_CAP (7,500 tokens with
+   * reasoning) in place of 12,000. On the stored rounds no answered attempt of such a turn came near it, and the attempts
+   * that ran away would have been cut sooner (an attempt cut at 12,000 reaches 7,500 at 62.5% of its time).
+   */
+  (stored3.length ? it : it.skip)("a single player's closing turns in the stored rounds: every answered attempt under the closing cap; the runaways", () => {
+    const rounds: [number, PlayRun[]][] = [[1, stored], [2, stored2], [3, stored3]];
+    const sends = rounds.flatMap(([round, runs]) =>
+      runs
+        .filter((run) => run.input.playerCount === 1)
+        .flatMap((run) =>
+          run.turns
+            .filter((t) => t.kind === "switch turn" || t.kind === "ending")
+            .flatMap((t) => [...(t.failedSends ?? []).flatMap((f) => f.calls), ...t.calls].flatMap((c) => c.sends.map((s) => ({ round, id: run.spec.id, turn: t.turn, ...s }))))
+        )
+    );
+    const answered = sends.filter((s) => s.outcome === "valid");
+    expect(Math.max(...answered.map((s) => s.outputTokens))).toBeLessThan(CLOSING_TURN_CAP);
+    // 38 answered attempts on the six single-player stories' switch turns after a chapter and endings, the longest New Avalon's
+    // switch turn 16 of round 2 (5,853 tokens, 3,774 of them reasoning)
+    const longest = [...answered].sort((a, b) => b.outputTokens - a.outputTokens)[0];
+    expect([answered.length, longest.round, longest.id, longest.turn, longest.outputTokens, longest.reasoningTokens]).toEqual([38, 2, "play-avalon", 16, 5853, 3774]);
+    // The attempts that ran away: three cut at 12,000 tokens (7,500 at 62.5% of their time: about 30, 21 and 29 s sooner) and
+    // one that timed out at 90 s with no count, so under 12,000 tokens, slower than 133 a second: cut at 7,500 it would have
+    // stopped at 56 s or later, up to 34 s sooner, and not at all sooner below 83 tokens a second
+    expect(sends.filter((s) => s.outcome !== "valid").map((s) => [s.round, s.id, s.turn, s.outcome, s.outputTokens, s.latencyMs])).toEqual([
+      [1, "play-avalon", 5, "length", 12000, 81067],
+      [2, "play-kids-mouse", 11, "length", 12000, 56053],
+      [3, "play-avalon", 13, "timeout", 0, 90042],
+      [3, "play-avalon", 17, "length", 12000, 78496],
+    ]);
   });
 
   (stored3.length ? it : it.skip)("the earlier rounds hold no other charge in the reply that offers the lever", () => {
