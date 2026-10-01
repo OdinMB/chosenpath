@@ -15,6 +15,7 @@ import {
   adoptedSetupPrompt,
   adoptedTurn,
   withContestLastStage,
+  withEndingOnlyPlayed,
   withKidsImageSlots,
   withKidsImageSlotsSchema,
   withResultsAsOutcomes,
@@ -95,9 +96,10 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
       // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured
       return { prompt: withContestLastStage(withThreadsThatFit(prompt, input.story), input.story), schema: json(measured) };
     case "beat":
-      // kidsTurn is built on production's turn as measured: its one delta is the image places where the turn shows images
+      // kidsTurn is built on production's turn as measured: its deltas are the image places where the turn shows images,
+      // and at the ending the lines on what was played, as on every ending (the owner's decision of 2026-10-01)
       return takesKidsRules(input.story)
-        ? { prompt: withKidsImageSlots(prompt, input.story), schema: withKidsImageSlotsSchema(json(measured), input.story) }
+        ? { prompt: withEndingOnlyPlayed(withKidsImageSlots(prompt, input.story), input.story), schema: withKidsImageSlotsSchema(json(measured), input.story) }
         : { prompt: adoptedTurn(prompt, input.story), schema: json(measured) };
   }
 }

@@ -29,6 +29,7 @@ import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../../helpers/roundStories.js";
 import { beatGeneration, challengeOptions, threadAnalysis, type ThreadKind } from "../../../../helpers/textFixtures.js";
+import { withEndingOnlyPlayed } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * The owner's feedback of 2026-09-30 on options and continuity, as three eval
@@ -149,7 +150,8 @@ describe("the base: production's single-player turn form, built from the frozen 
 
   it("differs from today's production only at the ending, which production now tells as its milestones leave it, and on an exploration step, which now carries the exploration-order line", () => {
     const ending = endingBeat(1);
-    expect(beatStep.request(ending).prompt).toBe(endingStateRequest(ending).prompt);
+    // endingStateB with the owner's lines of 2026-10-01 on what was played (adoptedDeltas.ts)
+    expect(beatStep.request(ending).prompt).toBe(withEndingOnlyPlayed(endingStateRequest(ending).prompt, ending));
     expect(productionTurnForm(ending).prompt).not.toBe(beatStep.request(ending).prompt);
     const exploring = chapterStep("exploration", 1);
     expect(beatStep.request(exploring).prompt.split(EXPLORATION_ORDER)).toHaveLength(2);

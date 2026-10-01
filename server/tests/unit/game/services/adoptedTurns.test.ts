@@ -12,9 +12,9 @@ import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 import { stat, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
-import { CHAPTER_RULES_HEADING, adoptedTurn, withKidsImageSlots, withKidsImageSlotsSchema } from "../../../helpers/adoptedDeltas.js";
+import { CHAPTER_RULES_HEADING, adoptedTurn, withEndingOnlyPlayed, withKidsImageSlots, withKidsImageSlotsSchema } from "../../../helpers/adoptedDeltas.js";
 import { ENDING_STATE_TEXT, endingStateRequest, scoreboardEnding } from "../../../../src/game/services/storyTextRounds/endingState.js";
-import { SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
+import { ENDING_MILESTONES_PLAYED, ENDING_OUTCOME_KINDS, SCOREBOARD_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
 import { CHOICE_RESULT_TEXT, choiceResultRequest, takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { KIDS_TURN_TEXT, kidsTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsTurn.js";
 import { KIDS_CONTEXT, KIDS_TEXT_COUNT, kidsFieldCount, kidsRepeat, kidsRules, takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
@@ -39,7 +39,10 @@ import { KIDS_CONTEXT, KIDS_TEXT_COUNT, kidsFieldCount, kidsRepeat, kidsRules, t
  * with production's one retry of a short reply in the loop). Since the
  * kids-turns stage of 2026-10-01, a single player's turn in a story read with
  * a child is the measured variant kidsTurn byte for byte, every turn kind,
- * apart from the logged image places where it shows images.
+ * apart from the logged image places where it shows images. Since the owner's
+ * decision of 2026-10-01 every ending carries one logged delta: only what was
+ * played gets a milestone, and an unfinished outcome is told as unfinished
+ * (withEndingOnlyPlayed).
  */
 
 /**
@@ -138,11 +141,15 @@ function expectSame(production: Request, measured: Request | Expected) {
 
 /**
  * A single player's read-with-kids turn: the measured kidsTurn (the kids-turns stage of 2026-10-01; built on production's
- * turn as measured) with, where it shows images, the logged image places (withKidsImageSlots, adoptedDeltas.ts).
+ * turn as measured) with, where it shows images, the logged image places (withKidsImageSlots, adoptedDeltas.ts), and at
+ * the ending the lines on what was played (withEndingOnlyPlayed).
  */
 function kidsAdopted(story: Story): Expected {
   const measured = kidsTurnRequest(story);
-  return { prompt: withKidsImageSlots(measured.prompt, story), json: withKidsImageSlotsSchema(json(measured.schema), story) };
+  return {
+    prompt: withEndingOnlyPlayed(withKidsImageSlots(measured.prompt, story), story),
+    json: withKidsImageSlotsSchema(json(measured.schema), story),
+  };
 }
 
 /** The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. */
@@ -185,7 +192,7 @@ describe("a single player's read-with-kids turns: kidsTurn as measured", () => {
 
   it.each(SINGLE_PLAYER)("%s, read with a child aged 5", (_, build) => {
     const story = build().clone(KIDS);
-    expectSame(beatStep.request(story), kidsTurnRequest(story));
+    expectSame(beatStep.request(story), kidsAdopted(story));
     expect(beatStep.request(story).prompt).not.toContain("5-6 paragraphs");
   });
 
@@ -332,12 +339,27 @@ describe("group turns: today's form, an exploration step as choiceResult, the en
   ] as const)("the ending of a contest, %s: endingStateB, the scoreboard rule with its unfinished half once", (_, build) => {
     const story = build();
     const production = beatStep.request(story);
-    expectSame(production, endingStateRequest(story));
+    expectSame(production, asAdopted(endingStateRequest(story), story));
     expect(production.prompt.split(SCOREBOARD_ENDING_RULE)).toHaveLength(2);
     expect(SCOREBOARD_ENDING_RULE).toBe(ENDING_STATE_TEXT.contestRule);
     expect(SCOREBOARD_ENDING_RULE).toContain("While it is unfinished, no side has won yet");
     // The rule production sent until the adoption is gone
     expect(production.prompt).not.toContain(ENDING_STATE_TEXT.measuredScoreboardRule);
+  });
+
+  it("says on every ending, a group's and a single player's, a kids ending too, that only the threads that just ended get milestones and that an unfinished outcome is told as unfinished; on no other turn (the owner's decision of 2026-10-01)", () => {
+    for (const story of [endingBeat(1), endingBeat(2), endingBeat(3), contestEnding(2), endingBeat(1).clone({ category: "read-with-kids", readingAge: "5" })]) {
+      const prompt = beatStep.request(story).prompt;
+      expect(prompt.split(ENDING_MILESTONES_PLAYED)).toHaveLength(2);
+      expect(prompt).toContain(ENDING_OUTCOME_KINDS);
+      expect(prompt).toContain("--- An unfinished outcome is told as unfinished, in its current state, even if that state is inconclusive");
+      expect(prompt).not.toContain(ENDING_STATE_TEXT.unfinished);
+      // Today's current-state rule stays word for word
+      expect(prompt).toContain("what its milestones so far have settled, and what is still open. Never resolve it beyond its milestones");
+    }
+    for (const story of [laterSwitchBeat(1), laterSwitchBeat(2), threadBeat(1), firstSwitchBeat(2)]) {
+      expect(beatStep.request(story).prompt).not.toContain(ENDING_MILESTONES_PLAYED);
+    }
   });
 
   it("prints the rule on no other turn of a contest, and on no ending without one", () => {
@@ -358,7 +380,7 @@ describe("group turns: today's form, an exploration step as choiceResult, the en
     const story = build();
     expect(story.getCurrentBeatType()).toBe("ending");
     expect(scoreboardEnding(story)).toBe(false);
-    expectSame(beatStep.request(story), endingStateRequest(story));
+    expectSame(beatStep.request(story), asAdopted(endingStateRequest(story), story));
     expect(beatStep.request(story).prompt).not.toContain(SCOREBOARD_ENDING_RULE);
     expect(beatStep.request(story).prompt).toContain(ENDING_STATE_TEXT.tellAsLeft);
   });

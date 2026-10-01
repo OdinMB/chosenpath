@@ -14,6 +14,7 @@ import { sha256 } from "../../../../../src/evals/textModelEval/executor.js";
 import { callLimitsOf, requestFor } from "../../../../../src/evals/textModelEval/variants.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadAnalysisAfterSwitch, threadBeat } from "../../../../helpers/promptStories.js";
 import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "../../../../helpers/roundStories.js";
+import { productionThen } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * The runaway turn (2026-09-30): story 8988006e's switch turn after its first
@@ -102,9 +103,9 @@ describe("noSwitchReminderRequest: production's single-player turn without the r
     expect(json(ours.schema)).toBe(json(production.schema));
   });
 
-  it.each(OTHER_TURNS)("%s: production's request byte for byte", (_, build) => {
+  it.each(OTHER_TURNS)("%s: production's request byte for byte (an ending as it stood before the owner's decision of 2026-10-01 on ending milestones)", (_, build) => {
     const story = build();
-    const [ours, production] = [noSwitchReminderRequest(story), beatStep.request(story)];
+    const [ours, production] = [noSwitchReminderRequest(story), productionThen(beatStep.request(story), story)];
     expect(ours.prompt).toBe(production.prompt);
     expect(json(ours.schema)).toBe(json(production.schema));
   });
@@ -129,7 +130,8 @@ describe("noSwitchReminderRequest: production's single-player turn without the r
       // A single player's read-with-kids turn takes the kids rules since 2026-10-01, which the fix, measured before them,
       // doesn't: production as it stood then read no category
       const then = takesKidsRules(story) ? story.clone({ category: undefined, readingAge: undefined }) : story;
-      const [ours, production] = [noSwitchReminderRequest(story), beatStep.request(then)];
+      // An ending as it stood before the owner's decision of 2026-10-01 on ending milestones, which the fix ran before
+      const [ours, production] = [noSwitchReminderRequest(story), productionThen(beatStep.request(then), then)];
       // Since the choice-line-sp adoption (2026-09-30) a single player's exploration step carries the exploration-order
       // line, which the fix, measured before it, doesn't
       const sent = takesExplorationOrder(story) ? production.prompt.replace(EXPLORATION_ORDER, "") : production.prompt;

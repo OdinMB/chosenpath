@@ -13,7 +13,7 @@ import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js
 import { takesKidsRules } from "../../../../../src/game/services/kidsTurnRules.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { stat } from "../../../../helpers/textFixtures.js";
-import { withKidsImageSlots } from "../../../../helpers/adoptedDeltas.js";
+import { productionThen, withKidsImageSlots } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * Money and counts that add up in a learning story (eval only; fix 7 of the
@@ -83,8 +83,9 @@ describe("the variant on a learning story", () => {
       expect(variant.prompt).toContain(`\n${MONEY_ADDS_UP_TEXT.block}${next}`);
       expect(withoutBlock(variant.prompt)).toBe(base.prompt);
       expect(json(variant.schema)).toBe(json(base.schema));
-      // The base is production's request today
-      expect(base.prompt).toBe(beatStep.request(story).prompt);
+      // The base is production's request today (an ending as it stood before the owner's decision of 2026-10-01 on
+      // ending milestones)
+      expect(base.prompt).toBe(productionThen(beatStep.request(story), story).prompt);
       expect(json(base.schema)).toBe(json(beatStep.request(story).schema));
     }
   });
@@ -116,7 +117,7 @@ describe("production's request byte for byte everywhere else", () => {
   ] as const)("%s", (_, build) => {
     const story = build();
     expect(takesMoneyRule(story)).toBe(false);
-    const production = beatStep.request(story);
+    const production = productionThen(beatStep.request(story), story);
     expect(moneyAddsUpRequest(story).prompt).toBe(production.prompt);
     expect(json(moneyAddsUpRequest(story).schema)).toBe(json(production.schema));
   });
@@ -124,7 +125,8 @@ describe("production's request byte for byte everywhere else", () => {
   /*
    * The stage's base is production's turn as it stood then. Since the review of fix 6 (2026-10-01) a single player's
    * kids turn that shows images names other image places (withKidsImageSlots, the kept tests' logged delta), so the
-   * frozen template case with images compares with that delta on the variant's base.
+   * frozen template case with images compares with that delta on the variant's base. An ending compares with
+   * production as it stood before the owner's decision of 2026-10-01 on ending milestones (productionThen).
    */
   const asProductionNow = (prompt: string, story: Story) => (takesKidsRules(story) ? withKidsImageSlots(prompt, story) : prompt);
 
@@ -134,7 +136,7 @@ describe("production's request byte for byte everywhere else", () => {
     for (const c of turns) {
       const story = caseStory(c);
       const variant = asProductionNow(moneyAddsUpRequest(story).prompt, story);
-      const production = beatStep.request(story).prompt;
+      const production = productionThen(beatStep.request(story), story).prompt;
       expect([c.id, withoutBlock(variant) === production, variant === production]).toEqual([c.id, true, !takesMoneyRule(story)]);
     }
   });
@@ -159,7 +161,7 @@ describe("the fix-and-retest, moneyAddsUpB", () => {
       const variant = moneyAddsUpRequest(story, { b: true }).prompt;
       expect(occurrences(variant, MONEY_ADDS_UP_TEXT.blockB)).toBe(1);
       expect(variant).not.toContain(MONEY_ADDS_UP_TEXT.block);
-      expect(withoutB(variant)).toBe(beatStep.request(story).prompt);
+      expect(withoutB(variant)).toBe(productionThen(beatStep.request(story), story).prompt);
     }
   });
 

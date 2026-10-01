@@ -538,10 +538,77 @@ describe("repairBeatReply: milestones (TR-4)", () => {
     expect(applied.getPlayer("player1")?.outcomes[0].milestones).toEqual([]);
   });
 
-  it("keeps a milestone on a known outcome that no ended chapter pushed", () => {
-    const story = withOutcomes(laterSwitchBeat(1), { player1: [outcome("outcome_1"), outcome("side_quest")] });
-    const { milestones } = milestonesOf(story, [milestone("player1", "outcome_1"), milestone("player1", "side_quest")]);
-    expect(milestones).toEqual([milestone("player1", "outcome_1"), milestone("player1", "side_quest")]);
+  /*
+   * Only what was played (the owner's decision of 2026-10-01: "The idea was -not- for the engine to invent missing
+   * milestones for open outcomes. Unfinished outcomes should be narrated as unfinished. Only what was played."): a turn
+   * records the milestones of the chapter that just ended, one per thread on that thread's outcome, and none anywhere
+   * else. Until then a milestone on a known outcome no ended chapter pushed was kept (TR-4), and the second playthroughs'
+   * estate agents' ending added one to each of four outcomes beside the last chapter's.
+   */
+  it("drops a milestone on an outcome no ended chapter pushed, at a switch and at the ending (the estate agents' ending)", () => {
+    for (const build of [laterSwitchBeat, endingBeat]) {
+      const story = withOutcomes(build(1), { player1: [outcome("outcome_1"), outcome("side_quest")] });
+      const { milestones, repairs } = milestonesOf(story, [milestone("player1", "outcome_1"), milestone("player1", "side_quest", "Invented.")]);
+      expect(milestones).toEqual([milestone("player1", "outcome_1")]);
+      expect(repairs).toEqual([{ kind: "milestoneNotPlayed", detail: "player1/side_quest" }]);
+    }
+  });
+
+  it("drops it on an outcome that is still unfinished, and on one already complete", () => {
+    const open = outcome("side_quest", { milestones: ["Half done."], intendedNumberOfMilestones: 3 });
+    const done = outcome("old_quest", { milestones: ["One.", "Two."] });
+    const story = withOutcomes(endingBeat(1), { player1: [outcome("outcome_1"), open, done] });
+    const { milestones, repairs } = milestonesOf(story, [
+      milestone("player1", "side_quest", "The quest ends after all."),
+      milestone("player1", "outcome_1"),
+      milestone("player1", "old_quest", "A recap."),
+    ]);
+    expect(milestones).toEqual([milestone("player1", "outcome_1")]);
+    expect(kinds(repairs, "milestone")).toEqual(["milestoneNotPlayed", "milestoneNotPlayed"]);
+  });
+
+  it("keeps the first milestone for each ended thread on its outcome, and drops a second written for the same thread", () => {
+    const { milestones, repairs } = milestonesOf(single(), [
+      milestone("player1", "outcome_1", "The pact holds."),
+      milestone("player1", "outcome_1", "And the pact holds again."),
+    ]);
+    expect(milestones).toEqual([milestone("player1", "outcome_1", "The pact holds.")]);
+    expect(repairs).toEqual([{ kind: "milestoneNotPlayed", detail: "player1/outcome_1" }]);
+  });
+
+  it("keeps one milestone for each of two ended threads on one shared outcome", () => {
+    const ended = resolvedThread(2, 1, 2);
+    ended.threads = [
+      { ...ended.threads[0], id: "t1", outcomeId: "shared_goal", playersSideA: ["player1"] },
+      { ...ended.threads[0], id: "t2", outcomeId: "shared_goal", playersSideA: ["player2"] },
+    ];
+    const story = withOutcomes(
+      laterSwitchBeat(2, { storyPhases: [switchAnalysis(slotsOf(2), 0), ended, switchAnalysis(slotsOf(2), 3)] }),
+      { shared: [outcome("shared_goal", { intendedNumberOfMilestones: 3 })] }
+    );
+    const written = [milestone("shared", "shared_goal", "One."), milestone("shared", "shared_goal", "Two."), milestone("shared", "shared_goal", "Three.")];
+    const { milestones, repairs } = milestonesOf(story, written);
+    expect(milestones).toEqual(written.slice(0, 2));
+    expect(kinds(repairs, "milestone")).toEqual(["milestoneNotPlayed"]);
+  });
+
+  it("drops every milestone on a turn that ends no chapter: the first switch and a chapter's step", () => {
+    const first = withOutcomes(firstSwitchBeat(1), { player1: [outcome("outcome_1")] });
+    expect(milestonesOf(first, [milestone("player1", "outcome_1")])).toEqual({
+      milestones: [],
+      repairs: [{ kind: "milestoneNotPlayed", detail: "player1/outcome_1" }],
+    });
+    const step = withOutcomes(threadBeat(1), { player1: [outcome("outcome_1")] });
+    expect(milestonesOf(step, [milestone("player1", "outcome_1")]).milestones).toEqual([]);
+  });
+
+  it("applies no dropped milestone: the outcome keeps what play gave it", () => {
+    const open = outcome("side_quest", { milestones: ["Half done."], intendedNumberOfMilestones: 3 });
+    const story = withOutcomes(endingBeat(1), { player1: [outcome("outcome_1"), open] });
+    const { milestones } = milestonesOf(story, [milestone("player1", "outcome_1", "The last chapter."), milestone("player1", "side_quest", "Invented.")]);
+    const [updated, changes] = beatStep.apply(story, { ...beatSet(1), newMilestones: milestones });
+    const applied = new ChangeService().applyChanges(updated, changes);
+    expect(applied.getPlayer("player1")?.outcomes.map((o) => o.milestones)).toEqual([["The last chapter."], ["Half done."]]);
   });
 });
 

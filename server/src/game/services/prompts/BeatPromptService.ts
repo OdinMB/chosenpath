@@ -42,10 +42,22 @@ export const SCOREBOARD_ENDING_RULE =
  * "milestone" and "favorable outcome" into it).
  */
 export const ENDING_OUTCOME_RULE = "- Tell each outcome as its milestones leave it, counting the milestones this beat adds.\n";
+/*
+ * Since the owner's decision of 2026-10-01 ("The idea was -not- for the engine
+ * to invent missing milestones for open outcomes. Unfinished outcomes should be
+ * narrated as unfinished. Only what was played."): an unfinished outcome is
+ * told as unfinished and the story ends with it open (the current-state rule
+ * kept word for word), and the ending's milestone lines say that only the
+ * threads that just ended get milestones (ENDING_MILESTONES_PLAYED); the beat
+ * repairs drop a milestone written anywhere else (milestoneNotPlayed). A
+ * settled decision, unmeasured; the kept tests log it (withEndingOnlyPlayed).
+ */
 export const ENDING_OUTCOME_KINDS =
   "--- A complete outcome is resolved: narrate the possible resolution its milestones point to.\n" +
-  "--- An unfinished outcome is told in its current state, even if that state is inconclusive: what its milestones so far have settled, and what is still open. Never resolve it beyond its milestones: none of its possible resolutions has been reached yet.\n" +
+  "--- An unfinished outcome is told as unfinished, in its current state, even if that state is inconclusive: what its milestones so far have settled, and what is still open. Never resolve it beyond its milestones: none of its possible resolutions has been reached yet, and the story ends with it still open.\n" +
   "--- Either way, tell it in the story's own words: the text never mentions milestones, outcomes or resolutions.\n";
+export const ENDING_MILESTONES_PLAYED =
+  "- Only the threads that just ended get milestones: one for each thread, on that thread's outcome. Add none to any other outcome, unfinished or complete: every other outcome ends with the milestones play gave it.\n";
 
 /**
  * Whether a story's ending takes the scoreboard rule: it plays contests (two
@@ -210,7 +222,9 @@ ${
           "- Stats define how they should be adjusted after threads. Consider the 'Adjustments after threads' parameter in the stat definitions.\n" +
           "- Because it's the end of a thread, all stats can change, not just the ones that are marked as 'Can be adjusted anytime'.\n" +
           "\nNEW MILESTONES: To resolve the previous set of threads, for each outcome associated with these resolved threads, add a milestone based on the thread's resolution with a newMilestone change.\n" +
-          "- Take the threads' resolution text as a baseline. Adjust it based on the thread's narrative text to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n"
+          "- Take the threads' resolution text as a baseline. Adjust it based on the thread's narrative text to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n" +
+          // At the ending only what was played gets a milestone (the owner's decision of 2026-10-01)
+          (story.getCurrentBeatType() === "ending" ? ENDING_MILESTONES_PLAYED : "")
         : "- Only stats that are marked as 'Can be adjusted anytime' can be changed (except for rewards and sacrifices). Even then, keep the changes minor.\n")
 }${
       story.isMultiplayer()

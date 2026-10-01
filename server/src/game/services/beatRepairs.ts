@@ -22,7 +22,8 @@ import type { Repair } from "./textRepairs.js";
  * stat bonus in doubled seat form, a fact filed under a stat, a milestone in
  * the wrong group, an option of the wrong type) is put where the game reads
  * it, and what cannot be placed is dropped; so is a lever charged again on
- * the turn after its payment (leverPayments.ts). Every change is recorded as
+ * the turn after its payment (leverPayments.ts), and a milestone on an outcome
+ * the chapter that just ended didn't push (only what was played). Every change is recorded as
  * a Repair; ChangeService keeps applying exact ids.
  */
 
@@ -319,6 +320,34 @@ function uncoveredThreads(story: Story, ended: Thread[], milestones: NewMileston
   });
 }
 
+/**
+ * Only what was played (the owner's decision of 2026-10-01: "The idea was
+ * -not- for the engine to invent missing milestones for open outcomes.
+ * Unfinished outcomes should be narrated as unfinished. Only what was
+ * played."): each outcome keeps as many of the reply's milestones, the first
+ * written, as threads of the chapter that just ended pushed it, and no outcome
+ * gets one otherwise, so a turn that ends no chapter keeps none. Until then a
+ * milestone on a known outcome no ended chapter pushed was kept (TR-4), and the
+ * second playthroughs' estate agents' ending added one to each of four
+ * outcomes beside the last chapter's.
+ */
+function onlyPlayed(ended: Thread[], milestones: Change[], repairs: Repair[]): Change[] {
+  const allowed = new Map<string, number>();
+  for (const thread of ended) {
+    allowed.set(thread.outcomeId, (allowed.get(thread.outcomeId) ?? 0) + 1);
+  }
+  return milestones.filter((change) => {
+    if (change.type !== "newMilestone") return true;
+    const left = allowed.get(change.outcome) ?? 0;
+    if (left === 0) {
+      repairs.push({ kind: "milestoneNotPlayed", detail: `${change.outcomeGroup}/${change.outcome}` });
+      return false;
+    }
+    allowed.set(change.outcome, left - 1);
+    return true;
+  });
+}
+
 function repairMilestones(story: Story, milestones: Change[], repairs: Repair[]): Change[] {
   const mayAdd = canAddMilestones(story);
   const ended = mayAdd ? story.getResolvedThreadAnalysis()?.threads ?? [] : [];
@@ -341,7 +370,7 @@ function repairMilestones(story: Story, milestones: Change[], repairs: Repair[])
   const uncovered = uncoveredThreads(story, ended, knownMilestones);
   const mapTo = unknown.length === 1 && uncovered.length === 1 ? uncovered[0].outcomeId : undefined;
 
-  const kept: Change[] = placed.flatMap((entry): Change[] => {
+  const read: Change[] = placed.flatMap((entry): Change[] => {
     if (!("unknown" in entry)) return [entry];
     const written = entry.unknown;
     if (mapTo === undefined) {
@@ -351,6 +380,7 @@ function repairMilestones(story: Story, milestones: Change[], repairs: Repair[])
     repairs.push({ kind: "milestoneIdMapped", detail: `${written.outcome} -> ${mapTo}` });
     return [{ ...written, outcome: mapTo, outcomeGroup: groupOf(story, mapTo, repairs) }];
   });
+  const kept = onlyPlayed(ended, read, repairs);
   if (!mayAdd) return kept;
 
   // Safety net: an ended thread the reply wrote no milestone for gets its planned one

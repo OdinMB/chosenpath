@@ -19,6 +19,7 @@ import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../../helpers/roundStories.js";
 import { stat } from "../../../../helpers/textFixtures.js";
+import { productionThen, withEndingOnlyPlayed } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * The ending told as its milestones leave it (the owner's decision of
@@ -120,11 +121,12 @@ describe("the base: production's ending as measured", () => {
     ["one player", () => onePlayerEnding()],
     ["two players, a scored contest", () => contestEnding(2)],
     ["three players (two camps), a scored contest", () => contestEnding(3, { mode: GameModes.CooperativeCompetitive })],
-  ] as const)("%s: production's ending since the adoption of 2026-09-30 is the variant (endingStateB) byte for byte, prompt and schema", (_, build) => {
+  ] as const)("%s: production's ending since the adoption of 2026-09-30 is the variant (endingStateB) byte for byte, prompt and schema, with the owner's lines of 2026-10-01 on what was played", (_, build) => {
     const story = build();
     const production = beatStep.request(story);
     const variant = endingStateRequest(story);
-    expect(production.prompt).toBe(variant.prompt);
+    expect(production.prompt).toBe(withEndingOnlyPlayed(variant.prompt, story));
+    expect(productionThen(production, story).prompt).toBe(variant.prompt);
     expect(json(production.schema)).toBe(json(variant.schema));
     // The base stays the ending as measured before (today's form and the measured scoreboard rule)
     expect(production.prompt).not.toBe(productionEndingForm(story).prompt);

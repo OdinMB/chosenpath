@@ -12,6 +12,7 @@ import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
+import { productionThen } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * Read-with-kids turns, shorter and simpler for the reading age the setup
@@ -114,7 +115,8 @@ describe("production's request byte for byte on every other story", () => {
     const story = build({});
     const request = kidsTurnRequest(story);
     expect(request.prompt).toBe(choiceResultRequest(story).prompt);
-    expect(request.prompt).toBe(beatStep.request(story).prompt);
+    // At an ending, production as it stood before the owner's decision of 2026-10-01 on ending milestones
+    expect(request.prompt).toBe(productionThen(beatStep.request(story), story).prompt);
     expect(json(request.schema)).toBe(json(beatStep.request(story).schema));
   });
 
@@ -124,7 +126,7 @@ describe("production's request byte for byte on every other story", () => {
       const production = beatStep.request(story);
       if (story.isMultiplayer()) expect(production.prompt).toBe(beatStep.request(build({})).prompt);
       else {
-        expect(production.prompt).toBe(kidsTurnRequest(story).prompt);
+        expect(productionThen(production, story).prompt).toBe(kidsTurnRequest(story).prompt);
         expect(json(production.schema)).toBe(json(kidsTurnRequest(story).schema));
       }
     }

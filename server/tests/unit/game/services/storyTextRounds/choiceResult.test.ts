@@ -14,6 +14,7 @@ import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, slotsOf, threadBeat } from "../../../../helpers/promptStories.js";
 import { createMockMultiplayerStory, createMockStory } from "../../../../helpers/testHelpers.js";
 import { beatGeneration, switchAnalysis, thread, threadAnalysis } from "../../../../helpers/textFixtures.js";
+import { productionThen } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * The choice-result stage's turn (2026-09-30, the playthroughs' "choices that
@@ -25,7 +26,9 @@ import { beatGeneration, switchAnalysis, thread, threadAnalysis } from "../../..
  * exploration step: each option is its own result, the same action in the
  * same direction, and the text carries out none of them. Everywhere else it
  * is production's request byte for byte; the base is built from the frozen
- * copy through the measured forms, and a test holds it to production.
+ * copy through the measured forms, and a test holds it to production (at an
+ * ending, production as it stood before the owner's decision of 2026-10-01 on
+ * ending milestones: productionThen, adoptedDeltas.ts).
  */
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -94,7 +97,7 @@ const productionTakesLine = (story: Story) => takesExplorationOrder(story);
 describe("productionTurnToday: production's turn as the eval measured it before the stage, built from the frozen copy", () => {
   it.each(OTHER_TURNS)("is production's request byte for byte on %s, prompt and schema", (_, make) => {
     const story = make();
-    const [ours, production] = [productionTurnToday(story), beatStep.request(story)];
+    const [ours, production] = [productionTurnToday(story), productionThen(beatStep.request(story), story)];
     expect(ours.prompt).toBe(production.prompt);
     expect(json(ours.schema)).toBe(json(production.schema));
   });
@@ -116,7 +119,7 @@ describe("productionTurnToday: production's turn as the eval measured it before 
     for (const c of turns) {
       const story = caseStory(c);
       const measured = productionTakesLine(story) ? choiceResultRequest(story) : productionTurnToday(story);
-      const production = beatStep.request(story);
+      const production = productionThen(beatStep.request(story), story);
       expect([c.id, measured.prompt === production.prompt, json(measured.schema) === json(production.schema)]).toEqual([c.id, true, true]);
     }
   });
@@ -148,7 +151,7 @@ describe("choiceResultRequest: an exploration step's options are its results, in
 
   it.each(OTHER_TURNS)("is production's request byte for byte on %s", (_, make) => {
     const story = make();
-    const [ours, production] = [choiceResultRequest(story), beatStep.request(story)];
+    const [ours, production] = [choiceResultRequest(story), productionThen(beatStep.request(story), story)];
     expect(takesExplorationOrder(story)).toBe(false);
     expect(ours.prompt).toBe(production.prompt);
     expect(json(ours.schema)).toBe(json(production.schema));
@@ -175,7 +178,7 @@ describe("choiceResultRequest: an exploration step's options are its results, in
       expect(fixed.prompt).toBe(first.prompt.replace(explorationOrder, explorationOrderFullText));
       expect(json(fixed.schema)).toBe(json(first.schema));
     }
-    for (const [, make] of OTHER_TURNS) expect(choiceResultRequest(make(), { fullText: true }).prompt).toBe(beatStep.request(make()).prompt);
+    for (const [, make] of OTHER_TURNS) expect(choiceResultRequest(make(), { fullText: true }).prompt).toBe(productionThen(beatStep.request(make()), make()).prompt);
     const single = requestFor("choiceResultB", { role: "beat", story: chapterStep(1, ["exploration"], 0) });
     expect(requestText(single)).toBe(choiceResultRequest(chapterStep(1, ["exploration"], 0), { fullText: true }).prompt);
     expect(callLimitsOf(single)).toEqual(productionCallLimits("beat", 1));

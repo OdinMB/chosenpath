@@ -13,6 +13,7 @@ import { playthroughsSent } from "../../../../src/evals/textModelEval/choiceResu
 import { playthroughs2Sent } from "../../../../src/evals/textModelEval/parallelThreadsCases.js";
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
+import { beforeEndingOnlyPlayed } from "../../../helpers/adoptedDeltas.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
 /*
@@ -175,25 +176,55 @@ function chargedAgain(runs: PlayRun[], before: (run: PlayRun) => number = () => 
   );
 }
 
+/** The milestones production's beat repairs now drop as not played (milestoneNotPlayed), replaying each stored reply on the state its turn saw. */
+function notPlayed(runs: PlayRun[], before: (run: PlayRun) => number = () => Number.POSITIVE_INFINITY) {
+  return runs.flatMap((run) =>
+    replayRun(run)
+      .filter((r) => r.turn < before(run) && r.played.reply)
+      .flatMap((r) => repairBeatReply(r.before, r.played.reply as SetOfBeatGenerationSchema).repairs.filter((k) => k.kind === "milestoneNotPlayed").map((k) => [run.spec.id, r.turn, k.detail]))
+  );
+}
+
 describe("replayRun on the stored round 2 (skipped where the output folder is absent)", () => {
   (stored2.length ? it : it.skip)("rebuilds every turn's request byte for byte, as production sent it on 30 September", () => {
     let turns = 0;
     let kids = 0;
+    let endings = 0;
     for (const run of stored2) {
       for (const r of replayRun(run)) {
         const sentHash = promptHashes.get(outputIdOf(r.played.calls[0]?.outputFile ?? ""));
         // The turn as production sent it then (playthroughs2Sent): today's but for the kids rules, which a single player's
-        // read-with-kids turn takes since 2026-10-01 (the mouse story recorded its category)
+        // read-with-kids turn takes since 2026-10-01 (the mouse story recorded its category), and every ending's lines on
+        // what was played (the owner's decision of 2026-10-01)
         expect([run.spec.id, r.turn, sha256(playthroughs2Sent({ role: "beat", story: r.before }))]).toEqual([run.spec.id, r.turn, sentHash]);
-        const today = sha256(requestText(requestFor("adopted", { role: "beat", story: r.before })));
-        expect([run.spec.id, r.turn, today === sentHash]).toEqual([run.spec.id, r.turn, !takesKidsRules(r.before)]);
+        const today = requestText(requestFor("adopted", { role: "beat", story: r.before }));
+        const ending = r.before.getCurrentBeatType() === "ending";
+        expect([run.spec.id, r.turn, sha256(today) === sentHash]).toEqual([run.spec.id, r.turn, !takesKidsRules(r.before) && !ending]);
+        if (ending && !takesKidsRules(r.before)) {
+          expect([run.spec.id, r.turn, sha256(beforeEndingOnlyPlayed(today, r.before))]).toEqual([run.spec.id, r.turn, sentHash]);
+        }
         if (takesKidsRules(r.before)) kids++;
+        if (ending) endings++;
         turns++;
       }
     }
-    // Six stories: 11 + 26 + 26 + 26 + 26 + 11 turns, the mouse story's 11 read with a child
+    // Six stories: 11 + 26 + 26 + 26 + 26 + 11 turns, the mouse story's 11 read with a child, one ending each
     expect(turns).toBe(126);
     expect(kids).toBe(11);
+    expect(endings).toBe(6);
+  });
+
+  (stored2.length ? it : it.skip)("production now drops the estate agents' ending's milestones on outcomes the last chapter didn't push, and nothing else in either round (only what was played, 2026-10-01)", () => {
+    expect(notPlayed(stored2)).toEqual([
+      // The estate agents' ending: beside the last chapter's milestone, one on each of four outcomes already complete
+      // that no chapter which just ended pushed (the report's 6.3; the harness's noUnearnedMilestones at turn 26)
+      ["play-estate-agents", 26, "player1/player1_reputation"],
+      ["play-estate-agents", 26, "player1/player1_principle"],
+      ["play-estate-agents", 26, "player2/player2_protege"],
+      ["play-estate-agents", 26, "player2/player2_principle"],
+    ]);
+    const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 19 };
+    expect(notPlayed(stored, (run) => firstChanged[run.spec.id] ?? Number.POSITIVE_INFINITY)).toEqual([]);
   });
 
   (stored2.length ? it : it.skip)("production now drops the two levers round 2 charged twice, and nothing else in either round", () => {

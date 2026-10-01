@@ -20,6 +20,7 @@ import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { createMockMultiplayerStory, createMockStory } from "../../../../helpers/testHelpers.js";
 import { beatGeneration, switchAnalysis, thread } from "../../../../helpers/textFixtures.js";
+import { productionThen } from "../../../../helpers/adoptedDeltas.js";
 
 /*
  * The turn after an exploration step tells the result the game recorded (eval
@@ -183,7 +184,8 @@ describe("production's request byte for byte everywhere else", () => {
     const story = build();
     const [variant, base] = [recordedResultRequest(story), choiceResultRequest(story)];
     expect(variant.prompt).toBe(base.prompt);
-    expect(variant.prompt).toBe(beatStep.request(story).prompt);
+    // An ending as production sent it before the owner's decision of 2026-10-01 on ending milestones
+    expect(variant.prompt).toBe(productionThen(beatStep.request(story), story).prompt);
     expect(json(variant.schema)).toBe(json(base.schema));
   });
 

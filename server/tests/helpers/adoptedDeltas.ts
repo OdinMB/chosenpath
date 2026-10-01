@@ -17,7 +17,9 @@
  * never had (a contest's last stage offered only as a grouped thread:
  * withContestLastStage, the parallel-threads stage's variant, not a delta).
  * A single player's read-with-kids turn is kidsTurn (2026-10-01) with one
- * delta where it shows images: the image places (withKidsImageSlots).
+ * delta where it shows images: the image places (withKidsImageSlots). Every
+ * ending, a kids ending too, carries one delta since the owner's decision of
+ * 2026-10-01: only what was played gets a milestone (withEndingOnlyPlayed).
  */
 
 import type { Story } from "core/models/Story.js";
@@ -29,6 +31,7 @@ import { chaptersThatFit as measuredChaptersThatFit } from "../../src/game/servi
 import { KIDS_STATS, KIDS_STATS_VARIED } from "../../src/game/services/storyTextRounds/setupRound3Text.js";
 import { PARALLEL_THREADS_TEXT, takesLastStageLine } from "../../src/game/services/storyTextRounds/parallelThreads.js";
 import { RESULTS_AS_OUTCOMES_TEXT } from "../../src/game/services/storyTextRounds/resultsAsOutcomes.js";
+import { ENDING_STATE_TEXT } from "../../src/game/services/storyTextRounds/endingState.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -164,9 +167,57 @@ export function withoutChapterRules(measured: string, story: Story): string {
   return measured.slice(0, -tail.length);
 }
 
-/** Every turn delta: no chapter rules on a switch turn (endings are measured whole, as endingStateB). */
+/*
+ * The ending (2026-10-01, the owner's decision on ending milestones: "The idea
+ * was -not- for the engine to invent missing milestones for open outcomes.
+ * Unfinished outcomes should be narrated as unfinished. Only what was
+ * played."): after the milestone lines, that only the threads that just ended
+ * get milestones and no other outcome does; and endingStateB's unfinished line
+ * told as unfinished, the story ending with it still open (its current-state
+ * rule kept word for word). The game drops a milestone a reply writes anywhere
+ * else (milestoneNotPlayed in beatRepairs.ts). A settled decision, unmeasured.
+ */
+const ENDING_ONLY_PLAYED = {
+  milestonesAnchor:
+    "the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n",
+  milestonesLine:
+    "- Only the threads that just ended get milestones: one for each thread, on that thread's outcome. Add none to any other outcome, unfinished or complete: every other outcome ends with the milestones play gave it.\n",
+  unfinished: [
+    ENDING_STATE_TEXT.unfinished,
+    "--- An unfinished outcome is told as unfinished, in its current state, even if that state is inconclusive: what its milestones so far have settled, and what is still open. Never resolve it beyond its milestones: none of its possible resolutions has been reached yet, and the story ends with it still open.\n",
+  ],
+} as const;
+
+/** The measured ending's prompt with production's lines on what was played (an ending; any other turn as it was). */
+export function withEndingOnlyPlayed(measured: string, story: Story): string {
+  if (story.getCurrentBeatType() !== "ending") return measured;
+  const { milestonesAnchor, milestonesLine, unfinished } = ENDING_ONLY_PLAYED;
+  if (measured.split(milestonesAnchor).length !== 2) throw new Error("The measured ending no longer carries the milestone example once");
+  if (measured.split(unfinished[0]).length !== 2) throw new Error("The measured ending no longer carries the unfinished outcome's line once");
+  return measured.replace(milestonesAnchor, () => `${milestonesAnchor}${milestonesLine}`).replace(unfinished[0], () => unfinished[1]);
+}
+
+/**
+ * Production's ending as it stood before the owner's decision of 2026-10-01, which the variants measured before it
+ * compare with: production's prompt without the line on what was played, the unfinished line as measured. Any other
+ * turn as it is.
+ */
+export function beforeEndingOnlyPlayed(production: string, story: Story): string {
+  if (story.getCurrentBeatType() !== "ending") return production;
+  const { milestonesLine, unfinished } = ENDING_ONLY_PLAYED;
+  if (production.split(milestonesLine).length !== 2) throw new Error("Production's ending no longer carries the line on what was played once");
+  if (production.split(unfinished[1]).length !== 2) throw new Error("Production's ending no longer carries its unfinished outcome's line once");
+  return production.replace(milestonesLine, "").replace(unfinished[1], () => unfinished[0]);
+}
+
+/** A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones (beforeEndingOnlyPlayed). */
+export function productionThen<R extends { prompt: string }>(request: R, story: Story): R {
+  return { ...request, prompt: beforeEndingOnlyPlayed(request.prompt, story) };
+}
+
+/** Every turn delta: no chapter rules on a switch turn, and the ending's lines on what was played. */
 export function adoptedTurn(measured: string, story: Story): string {
-  return withoutChapterRules(measured, story);
+  return withEndingOnlyPlayed(withoutChapterRules(measured, story), story);
 }
 
 /*

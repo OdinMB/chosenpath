@@ -8,7 +8,10 @@ import type { Story } from "core/models/Story.js";
  * outcome, which the state's "Milestones (k / n to resolution)" leaves out, so
  * the ending's prompt states each outcome's standing. The last chapter settles
  * only its outcome's next stage (planner v2e), so an ending meets outcomes its
- * milestones haven't finished.
+ * milestones haven't finished. Since the owner's decision of 2026-10-01 ("Only
+ * what was played") the beat repairs keep no other milestone the ending writes
+ * (milestoneNotPlayed in beatRepairs.ts), so these counts are what the ending
+ * leaves.
  */
 
 /** Where an outcome stands once this beat's milestones are added: shared, or a player's own (by seat). */
