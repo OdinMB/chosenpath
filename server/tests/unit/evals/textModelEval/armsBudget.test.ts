@@ -435,8 +435,9 @@ describe("budget caps", () => {
       "late-pacing": 0.78,
       // The owner's decisions of 2026-10-01: turns and setups by the children's age band, its estimate plus 30%
       "kids-ages": 0.39,
-      // The coordinator's brief of 2026-10-01: group sacrifices, rewards and own stats, its estimate plus 30%
-      "group-levers": 0.36,
+      // The coordinator's brief of 2026-10-01: group sacrifices, rewards and own stats, its estimate plus 30% ($0.36), raised
+      // to $0.43 for its fix-and-retest's second sample (the reason recorded)
+      "group-levers": 0.43,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",

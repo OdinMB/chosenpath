@@ -3,7 +3,7 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { z } from "zod";
 import { Story } from "core/models/Story.js";
 import type { Beat, ThreadAnalysis } from "core/types/index.js";
-import { GROUP_LEVERS_TEXT, groupLeverSlots, groupLeversRequest, takesGroupLevers } from "../../../../../src/game/services/storyTextRounds/groupLevers.js";
+import { GROUP_LEVERS_TEXT, groupLeverSlots, groupLeversBase, groupLeversRequest, takesGroupLevers } from "../../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, sacrificeRewardLine } from "../../../../../src/game/services/optionRules.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { beatCheckOptions } from "../../../../../src/game/services/kidsTurnRules.js";
@@ -28,7 +28,10 @@ import { beatGeneration, challengeOptions } from "../../../../helpers/textFixtur
  * shared stats (one player a turn) and the player's own stats, no second
  * sacrifice of a stat in a thread, and in those players' fields the reward
  * exception and the plan's lever question without "(Many beats …)".
- * Production's request byte for byte everywhere else.
+ * Production's request byte for byte everywhere else. Since its
+ * fix-and-retest's adoption (groupLeversB, 2026-10-01) production prints
+ * those lines, so the variant builds on production with them taken out
+ * (groupLeversBase), as it was measured.
  */
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -95,6 +98,30 @@ const leverField = (schema: unknown, slot: string) => {
   return union.options[1].shape.upToOneSacrificeOrRewardOption.description as string;
 };
 
+describe("the base the variant builds on: production's group turn as the stage measured it", () => {
+  it("is production's request with the adopted group lines taken out (prompt and schema): what the second playthroughs' group turns carried", () => {
+    for (const story of [threadBeat(2), threadBeat(3), mixedStep(3)]) {
+      const base = groupLeversBase(story);
+      const production = beatStep.request(story);
+      expect(base.prompt).not.toContain(GROUP_LEVERS_TEXT.sharedAndOwn);
+      expect(base.prompt).not.toContain(`${GROUP_LEVERS_TEXT.derailAnchor} ${REWARD_EXCEPTION}`);
+      expect(base.prompt.length).toBeLessThan(production.prompt.length);
+      expect(json(base.schema)).toContain("(Many beats are better without any sacrifice or reward options.)");
+      expect(json(base.schema)).not.toContain("a reward option is the one exception");
+      // Production since the adoption is the measured fix-and-retest byte for byte
+      expect(production.prompt).toBe(groupLeversRequest(story, { b: true }).prompt);
+      expect(json(production.schema)).toBe(json(groupLeversRequest(story, { b: true }).schema));
+    }
+  });
+
+  it("is production's request byte for byte where no player is in a rolled group thread", () => {
+    for (const story of [threadBeat(1), firstSwitchBeat(2), laterSwitchBeat(3), endingBeat(2), explorationStep(2)]) {
+      expect(groupLeversBase(story).prompt).toBe(beatStep.request(story).prompt);
+      expect(json(groupLeversBase(story).schema)).toBe(json(beatStep.request(story).schema));
+    }
+  });
+});
+
 describe("which turns take the variant", () => {
   it("a group's challenge or contest chapter step: the players in a rolled thread", () => {
     expect(takesGroupLevers(threadBeat(2))).toBe(true);
@@ -126,7 +153,7 @@ describe("the prompt", () => {
     const prompt = groupLeversRequest(story).prompt;
     expect(occurrences(prompt, `${GROUP_LEVERS_TEXT.derailAnchor} ${REWARD_EXCEPTION}`)).toBe(1);
     expect(occurrences(prompt, `${GROUP_LEVERS_TEXT.leverAnchor}${GROUP_LEVERS_TEXT.block(story)}`)).toBe(1);
-    expect(withoutInsertions(prompt, story)).toBe(beatStep.request(story).prompt);
+    expect(withoutInsertions(prompt, story)).toBe(groupLeversBase(story).prompt);
     for (const slot of groupLeverSlots(story)) {
       const line = sacrificeRewardLine(story, slot).replace("Sacrifice or reward: ", "");
       expect(prompt).toContain(`----- ${slot} (${story.getPlayer(slot)?.name}): ${line}\n`);
@@ -151,7 +178,7 @@ describe("the prompt", () => {
     expect(block).toContain("----- player3 (Test Player 3):");
     // The exploration-order line production prints for the exploring player stays
     expect(groupLeversRequest(story).prompt).toContain("--- In an Exploration thread, a player's three options are the current step's three possible outcomes");
-    expect(withoutInsertions(groupLeversRequest(story).prompt, story)).toBe(beatStep.request(story).prompt);
+    expect(withoutInsertions(groupLeversRequest(story).prompt, story)).toBe(groupLeversBase(story).prompt);
   });
 
   it("says a shared stat's sacrifice or reward goes to one player a turn and a player's own stats come first", () => {
@@ -165,7 +192,7 @@ describe("the reply schema", () => {
   it("gives each rolled player's options field the reward exception and drops '(Many beats are better …)' from their plan's lever question", () => {
     const story = mixedStep(3);
     const variant = groupLeversRequest(story).schema;
-    const production = beatStep.request(story).schema;
+    const production = groupLeversBase(story).schema;
     for (const slot of ["player2", "player3"]) {
       expect(optionsField(variant, slot)).toBe(
         optionsField(production, slot)?.replace("derail the core theme of the switch/thread.", "derail the core theme of the switch/thread; a reward option is the one exception.")

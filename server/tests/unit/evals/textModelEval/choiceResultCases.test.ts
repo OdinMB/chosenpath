@@ -14,6 +14,7 @@ import {
 } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { CHOICE_RESULT_TEXT } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { threadBeat } from "../../../helpers/promptStories.js";
+import { beforeGroupLevers } from "../../../helpers/adoptedDeltas.js";
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import { requestInputFor } from "../../../../src/evals/textModelEval/jobPlan.js";
 import { outputIdOf } from "../../../../src/evals/textModelEval/judgedChecks.js";
@@ -86,7 +87,8 @@ describe("playthroughsSent: what production sent in the stored playthroughs, bef
     const group = { role: "beat" as const, story: groupExplorationStep() };
     expect(productionSends(group)).toContain(CHOICE_RESULT_TEXT.explorationOrder);
     expect(playthroughsSent(group)).toBe(productionSends(group).replace(CHOICE_RESULT_TEXT.explorationOrder, ""));
-    for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) expect(playthroughsSent({ role: "beat", story })).toBe(productionSends({ role: "beat", story }));
+    // A group's challenge step as production sent it before the group-levers adoption (2026-10-01, beforeGroupLevers)
+    for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) expect(playthroughsSent({ role: "beat", story })).toBe(beforeGroupLevers(productionSends({ role: "beat", story }), story));
     const { run, hashOf } = await playedFake();
     const [opening, step] = choiceResultCases([run], hashOf, SPECS, productionSends).cases;
     for (const c of [opening, step]) expect(playthroughsSent(requestInputFor(c))).toBe(productionSends(requestInputFor(c)));

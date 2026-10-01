@@ -106,7 +106,8 @@ describe("productionTurnToday: production's turn as the eval measured it before 
   // the same day): production's exploration step is the variant as measured
   it.each(EXPLORATION_STEPS)("is production's request without the adopted exploration line on %s, and production is the variant", (_, make) => {
     const story = make();
-    const [ours, variant, production] = [productionTurnToday(story), choiceResultRequest(story), beatStep.request(story)];
+    // Production as it stood before the group-levers adoption, which gives a challenge player beside an explorer its lever lines
+    const [ours, variant, production] = [productionTurnToday(story), choiceResultRequest(story), productionThen(beatStep.request(story), story)];
     expect(production.prompt).toBe(variant.prompt);
     expect(production.prompt.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(ours.prompt);
     expect(json(ours.schema)).toBe(json(production.schema));

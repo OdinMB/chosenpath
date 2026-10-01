@@ -63,9 +63,10 @@ export function groupLeversCasesToFreeze(
   runs: PlayRun[],
   promptHashOf: PromptHashOf,
   replace: boolean,
-  specs: ChoiceCaseSpec[] = GROUP_LEVERS_CASE_SPECS
+  specs: ChoiceCaseSpec[] = GROUP_LEVERS_CASE_SPECS,
+  sent: SentRequestText = playthroughs2Sent
 ): { cases: EvalCase[]; problems: string[]; skipped: string[] } {
-  const { cases, problems } = groupLeversCases(runs, promptHashOf, specs);
+  const { cases, problems } = groupLeversCases(runs, promptHashOf, specs, sent);
   const known = new Set(frozen.map((c) => c.id));
   const skipped = replace ? [] : cases.filter((c) => known.has(c.id)).map((c) => c.id);
   return { cases: cases.filter((c) => !skipped.includes(c.id)), problems, skipped };

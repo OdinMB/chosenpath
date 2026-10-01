@@ -9,8 +9,10 @@ import {
   NO_DOUBLE_SACRIFICE,
   REWARD_EXCEPTION,
   THREE_WAYS,
+  groupSacrificeRewardLines,
   sacrificeRewardLine,
   takesExplorationOrder,
+  takesGroupLeverRules,
   takesOptionRules,
 } from "../optionRules.js";
 import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadiness.js";
@@ -524,6 +526,8 @@ ${
   private static createOptionInstructions(story: Story): string {
     // The option rules (B6): a single player's rolled chapter steps only
     const rules = takesOptionRules(story);
+    // B6's lever parts for each player in a group's challenge or contest thread (the group-levers stage, 2026-10-01)
+    const groupLevers = takesGroupLeverRules(story);
     return `
 Options
 - Offer exactly 3 options.
@@ -536,7 +540,7 @@ Options
         : ""
     }
 --- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the ${story.getCurrentBeatType()} in any other way.${
-      rules ? ` ${REWARD_EXCEPTION}` : ""
+      rules || groupLevers ? ` ${REWARD_EXCEPTION}` : ""
     }${
       story.isMultiplayer()
         ? "\n- Take the multiplayer coordination for this set of beats into account. If several players are on the same side in a thread, this will ensure that their options are meaningfully different and both consistent and coordinated with each other.\n" +
@@ -560,7 +564,7 @@ ${
 - Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).
 --- You can only define sacrifice and reward options for stats that allow to be sacrificed or gained as a reward in their stat definitions.
 --- You can only generate either 0 or 1 sacrifice/reward option (total) per beat. The rest of the options must be normal.
-${rules ? `--- ${sacrificeRewardLine(story, "player1")}\n--- ${NO_DOUBLE_SACRIFICE}\n` : ""}--- Formulate the option with flavor in mind. Bad: 'Sacrifice 10% emotional stability for a higher chance of catching his attention.'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'
+${rules ? `--- ${sacrificeRewardLine(story, "player1")}\n--- ${NO_DOUBLE_SACRIFICE}\n` : ""}${groupLevers ? groupSacrificeRewardLines(story) : ""}--- Formulate the option with flavor in mind. Bad: 'Sacrifice 10% emotional stability for a higher chance of catching his attention.'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'
 ${
   story.getCurrentBeatType() === "thread"
     ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +

@@ -84,9 +84,9 @@ describe("the variant on a learning story", () => {
       expect(withoutBlock(variant.prompt)).toBe(base.prompt);
       expect(json(variant.schema)).toBe(json(base.schema));
       // The base is production's request today (an ending as it stood before the owner's decision of 2026-10-01 on
-      // ending milestones)
+      // ending milestones, a group's challenge step before the group-levers adoption of the same day)
       expect(base.prompt).toBe(productionThen(beatStep.request(story), story).prompt);
-      expect(json(base.schema)).toBe(json(beatStep.request(story).schema));
+      expect(json(base.schema)).toBe(json(productionThen(beatStep.request(story), story).schema));
     }
   });
 

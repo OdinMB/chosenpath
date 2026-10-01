@@ -1,8 +1,10 @@
 import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { getThreadType } from "core/types/index.js";
+import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
 import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, sacrificeRewardLine } from "../optionRules.js";
-import { beatStep, type TextRequest } from "../storyTextSteps.js";
+import { beatSchemaForKids, takesKidsRules } from "../kidsTurnRules.js";
+import { beatStep, canAddMilestones, type TextRequest } from "../storyTextSteps.js";
 import { replaceOnce, splitAtState } from "./roundEdits.js";
 
 /*
@@ -57,6 +59,13 @@ import { replaceOnce, splitAtState } from "./roundEdits.js";
  * two bonuses): they are about variety and odds, not levers, and would move
  * other readings in the same run. Everywhere else production's request byte
  * for byte, a player exploring beside the others included.
+ *
+ * Adopted after the run of 2026-10-01 in its fix-and-retest's form (B, below):
+ * production's copy is optionRules.ts (GROUP_SHARED_AND_OWN,
+ * GROUP_LEVER_QUESTION, groupSacrificeRewardLines, beatSchemaWithGroupLevers),
+ * and the kept tests hold production to groupLeversB byte for byte, prompt and
+ * JSON schema. The variant builds on production with those lines and fields
+ * taken out (groupLeversBase), so it still builds as measured.
  */
 
 const LABEL = "Group-levers turn";
@@ -79,15 +88,18 @@ const MANY_BEATS = " (Many beats are better without any sacrifice or reward opti
 /*
  * The fix-and-retest (B, after the run of 2026-10-01): the variant offered a
  * lever in 11 of the 48 sets its line said one fits (23%; a single player's
- * B6 turns of the second playthroughs 6 of 6), production none of 50. In 33 of
- * the 37 sets it declined, the plan's lever question did the declining in its
- * own frame: it asks whether a lever "would be sensible and interesting for
- * this beat … Otherwise, simply say 'None'", and the replies answered "No
- * sacrifice or reward is needed for this card-review contest beat", "would
- * distract from the resident's boundaries"; the plan comes before the
- * options, so the line in the option instructions reads as leave. B asks the
- * question from the player's line instead, the rest of the variant byte for
- * byte.
+ * B6 turns of the second playthroughs 6 of 6), production none of 50. Of the
+ * 37 invited sets without one, 33 plans declined in the lever question's own
+ * frame (2 cited the no-repeat rule, and 2 planned a sacrifice the options then
+ * wrote as a normal option at +30): the question asks whether a lever "would
+ * be sensible and interesting for this beat … Otherwise, simply say 'None'",
+ * and the replies answered "No sacrifice or reward is needed for this
+ * card-review contest beat", "would distract from the resident's
+ * boundaries"; the plan comes before the options, so the line in the option
+ * instructions reads as leave. B asks the question from the player's line
+ * instead, the rest of the variant byte for byte. Measured twice on the same
+ * twelve cases: levers 25 of 50 (the run's variant 11), on the player's own
+ * stat 21, rewards 8, none where the line said none.
  */
 const LEVER_QUESTION_B =
   "Based on the stats' options to sacrifice and options to gain as reward attributes, and this player's sacrifice-or-reward line in the option instructions: where the line says one fits this turn, describe exactly one sacrifice or reward option (total) for this beat, on one of this player's own stats where one allows it, and the reason this scene gives for it. Say 'None' only where the line says none this turn, or where no stat allows one.";
@@ -164,9 +176,26 @@ function schemaWithLevers(root: z.AnyZodObject, slots: string[], form: GroupLeve
   return root.extend(edited);
 }
 
-/** Production's group turn with B6's lever parts for each player in a challenge or contest thread; production's request byte for byte elsewhere. */
-export function groupLeversRequest(story: Story, form: GroupLeversForm = {}): TextRequest<z.AnyZodObject> {
+/**
+ * Production's group turn as the stage measured it beside the variant. Since
+ * the adoption (2026-10-01, groupLeversB) production prints the variant's lines
+ * and lever fields on a rolled group step, so the prompt's are taken out (the
+ * texts are the variant's, which a test holds), and the schema is built as
+ * production built it before: core's set schema, with the band's kids text
+ * where the story is read with a child. Production's request byte for byte on
+ * every other turn.
+ */
+export function groupLeversBase(story: Story): TextRequest<z.AnyZodObject> {
   const production = beatStep.request(story);
+  if (groupLeverSlots(story).length === 0) return production;
+  const prompt = production.prompt.split(`${DERAIL_ANCHOR} ${REWARD_EXCEPTION}`).join(DERAIL_ANCHOR).split(`${LEVER_ANCHOR}${leverBlock(story)}`).join(LEVER_ANCHOR);
+  const raw = createSetOfBeatGenerationSchema(story.getNumberOfPlayers(), canAddMilestones(story), story.isMultiplayer(), story.generatesImages(), story.hasImages());
+  return { prompt, schema: takesKidsRules(story) ? beatSchemaForKids(raw, story) : raw };
+}
+
+/** Production's group turn (as measured) with B6's lever parts for each player in a challenge or contest thread; production's request byte for byte elsewhere. */
+export function groupLeversRequest(story: Story, form: GroupLeversForm = {}): TextRequest<z.AnyZodObject> {
+  const production = groupLeversBase(story);
   const slots = groupLeverSlots(story);
   if (slots.length === 0) return production;
   const { instructions, state } = splitAtState(LABEL, production.prompt);

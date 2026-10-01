@@ -1,7 +1,15 @@
 import { describe, expect, it } from "@jest/globals";
 import { Story } from "core/models/Story.js";
 import type { Beat, BeatOption, ThreadAnalysis } from "core/types/index.js";
-import { sacrificeRewardLine, takesOptionRules } from "../../../../src/game/services/optionRules.js";
+import {
+  GROUP_SHARED_AND_OWN,
+  NO_DOUBLE_SACRIFICE,
+  groupLeverSlots,
+  groupSacrificeRewardLines,
+  sacrificeRewardLine,
+  takesGroupLeverRules,
+  takesOptionRules,
+} from "../../../../src/game/services/optionRules.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import { outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 import { beatGeneration, challengeOptions, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
@@ -51,6 +59,48 @@ describe("takesOptionRules: a single player's rolled chapter steps", () => {
     ["a group's chapter step", () => threadBeat(2)],
   ] as const)("leaves out %s", (_, build) => {
     expect(takesOptionRules(build())).toBe(false);
+  });
+});
+
+/** A group's step 2 of a 3-beat thread with player1 exploring beside the others' challenge. */
+function mixedGroupStep(players: number): Story {
+  const state = structuredClone(threadBeat(players).getState());
+  const analysis = state.storyPhases[1] as ThreadAnalysis;
+  const [shared] = analysis.threads;
+  const results = { resolution1: "one", resolution2: "two", resolution3: "three" };
+  analysis.threads = [
+    { ...shared, id: "explore", playersSideA: ["player1"], possibleMilestones: results, progression: shared.progression.map((s, i) => ({ ...s, possibleResolutions: results, resolution: i === 0 ? ("resolution1" as const) : null })) },
+    { ...shared, id: "fight", playersSideA: shared.playersSideA.filter((s) => s !== "player1") },
+  ];
+  return Story.create(state);
+}
+
+describe("groupLeverSlots: a group's players in a challenge or contest thread (the group-levers stage, 2026-10-01)", () => {
+  it("names every rolled player of a group's chapter step, in seat order, and not one exploring beside them", () => {
+    expect(groupLeverSlots(threadBeat(2))).toEqual(["player1", "player2"]);
+    expect(groupLeverSlots(threadBeat(3))).toEqual(["player1", "player2", "player3"]);
+    expect(groupLeverSlots(mixedGroupStep(3))).toEqual(["player2", "player3"]);
+    expect(takesGroupLeverRules(mixedGroupStep(2))).toBe(true);
+  });
+
+  it.each([
+    ["a single player's chapter step (B6's)", () => threadBeat(1)],
+    ["a group's first switch", () => firstSwitchBeat(2)],
+    ["a group's later switch", () => laterSwitchBeat(3)],
+    ["a group's ending", () => endingBeat(2)],
+  ] as const)("names none on %s", (_, build) => {
+    expect(groupLeverSlots(build())).toEqual([]);
+    expect(takesGroupLeverRules(build())).toBe(false);
+  });
+
+  it("gives each rolled player their own computed line, then the group sentence and no second sacrifice", () => {
+    const story = mixedGroupStep(3);
+    expect(groupSacrificeRewardLines(story)).toBe(
+      "--- Sacrifice or reward, for each player in a Challenge or Contest thread (each player's own options):\n" +
+        "----- player2 (Test Player 2): one fits this turn if a stat allows it.\n" +
+        "----- player3 (Test Player 3): one fits this turn if a stat allows it.\n" +
+        `--- ${GROUP_SHARED_AND_OWN}\n--- ${NO_DOUBLE_SACRIFICE}\n`
+    );
   });
 });
 

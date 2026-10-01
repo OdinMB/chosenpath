@@ -13,7 +13,8 @@ import { playthroughsSent } from "../../../../src/evals/textModelEval/choiceResu
 import { playthroughs2Sent } from "../../../../src/evals/textModelEval/parallelThreadsCases.js";
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
-import { beforeEndingOnlyPlayed } from "../../../helpers/adoptedDeltas.js";
+import { beforeEndingOnlyPlayed, beforeGroupLevers } from "../../../helpers/adoptedDeltas.js";
+import { takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
 /*
@@ -197,29 +198,35 @@ describe("replayRun on the stored round 2 (skipped where the output folder is ab
     let turns = 0;
     let kids = 0;
     let endings = 0;
+    let rolledGroupSteps = 0;
     for (const run of stored2) {
       for (const r of replayRun(run).filter((t) => t.turn < (firstChanged2[run.spec.id] ?? Number.POSITIVE_INFINITY))) {
         const sentHash = promptHashes.get(outputIdOf(r.played.calls[0]?.outputFile ?? ""));
         // The turn as production sent it then (playthroughs2Sent): today's but for the kids rules, which a single player's
-        // read-with-kids turn takes since 2026-10-01 (the mouse story recorded its category), and every ending's lines on
-        // what was played (the owner's decision of 2026-10-01)
+        // read-with-kids turn takes since 2026-10-01 (the mouse story recorded its category), every ending's lines on
+        // what was played (the owner's decision of 2026-10-01), and a group's rolled step's lever lines (the group-levers
+        // adoption of the same day)
         expect([run.spec.id, r.turn, sha256(playthroughs2Sent({ role: "beat", story: r.before }))]).toEqual([run.spec.id, r.turn, sentHash]);
         const today = requestText(requestFor("adopted", { role: "beat", story: r.before }));
         const ending = r.before.getCurrentBeatType() === "ending";
-        expect([run.spec.id, r.turn, sha256(today) === sentHash]).toEqual([run.spec.id, r.turn, !takesKidsRules(r.before) && !ending]);
-        if (ending && !takesKidsRules(r.before)) {
-          expect([run.spec.id, r.turn, sha256(beforeEndingOnlyPlayed(today, r.before))]).toEqual([run.spec.id, r.turn, sentHash]);
+        const levers = takesGroupLevers(r.before);
+        expect([run.spec.id, r.turn, sha256(today) === sentHash]).toEqual([run.spec.id, r.turn, !takesKidsRules(r.before) && !ending && !levers]);
+        if ((ending || levers) && !takesKidsRules(r.before)) {
+          expect([run.spec.id, r.turn, sha256(beforeGroupLevers(beforeEndingOnlyPlayed(today, r.before), r.before))]).toEqual([run.spec.id, r.turn, sentHash]);
         }
         if (takesKidsRules(r.before)) kids++;
         if (ending) endings++;
+        if (levers) rolledGroupSteps++;
         turns++;
       }
     }
     // Six stories: 11 + 26 + 26 + 26 + 21 + 11 turns (the estate agents' up to turn 21), the mouse story's 11 read with a
-    // child, one ending each but the estate agents'
+    // child, one ending each but the estate agents'; the group stories' chapter steps with a player in a challenge or
+    // contest thread (food trucks 18, space pirates 16, the estate agents 15 up to turn 21)
     expect(turns).toBe(121);
     expect(kids).toBe(11);
     expect(endings).toBe(5);
+    expect(rolledGroupSteps).toBe(49);
   });
 
   (stored2.length ? it : it.skip)("reads Nia's roll alone at the estate agents' turn 21, a group challenge on her own outcome: unfavorable where the pooled rolls gave mixed", () => {

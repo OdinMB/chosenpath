@@ -18,7 +18,7 @@ import type { Story } from "core/models/Story.js";
 import { StorySetupPromptService, type SetupPromptOptions } from "./prompts/StorySetupPromptService.js";
 import { assembleSetupReply, iterationSchema, setupGenerationSchema } from "./setupSchema.js";
 import { assembleSwitchPlan, assembleThreadPlan, switchReplySchema, threadReplySchema } from "./plannerReplies.js";
-import { beatSchemaWithOptionRules, takesOptionRules } from "./optionRules.js";
+import { beatSchemaWithGroupLevers, beatSchemaWithOptionRules, takesGroupLeverRules, takesOptionRules } from "./optionRules.js";
 import { beatSchemaForKids, takesKidsRules } from "./kidsTurnRules.js";
 import { paidLevers } from "./leverPayments.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
@@ -132,7 +132,8 @@ export const beatStep = {
       story.generatesImages(),
       story.hasImages()
     );
-    const withRules = takesOptionRules(story) ? beatSchemaWithOptionRules(schema) : schema;
+    // B6's fields on a single player's rolled step; a group's rolled players get its lever fields (the group-levers stage)
+    const withRules = takesOptionRules(story) ? beatSchemaWithOptionRules(schema) : takesGroupLeverRules(story) ? beatSchemaWithGroupLevers(schema, story) : schema;
     return {
       prompt: BeatPromptService.createBeatPrompt(story),
       schema: takesKidsRules(story) ? beatSchemaForKids(withRules, story) : withRules,

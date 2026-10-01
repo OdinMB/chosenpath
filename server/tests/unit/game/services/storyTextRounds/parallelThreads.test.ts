@@ -20,7 +20,7 @@ import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { plannerV2SwitchRequest } from "../../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
-import { withThreadsThatFit } from "../../../../helpers/adoptedDeltas.js";
+import { productionThen, withThreadsThatFit } from "../../../../helpers/adoptedDeltas.js";
 import { firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { createMockMultiplayerStory } from "../../../../helpers/testHelpers.js";
 import { beatGeneration, outcome, thread } from "../../../../helpers/textFixtures.js";
@@ -251,7 +251,8 @@ describe("the group turn: parallel threads keep every person and vehicle in one 
     expect(occurrences(variant.prompt, PARALLEL_THREADS_TEXT.turnLine)).toBe(1);
     expect(variant.prompt).toContain(`${PARALLEL_THREADS_TEXT.turnAnchor}${PARALLEL_THREADS_TEXT.turnLine}`);
     expect(withoutInsertions(variant.prompt)).toBe(production.prompt);
-    expect(production.prompt).toBe(beatStep.request(story).prompt);
+    // Production as it stood before the group-levers adoption (2026-10-01), which gives these challenge players their lever lines
+    expect(production.prompt).toBe(productionThen(beatStep.request(story), story).prompt);
     expect(json(variant.schema)).toBe(json(production.schema));
   });
 

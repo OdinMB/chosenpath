@@ -11,11 +11,13 @@ import { getThreadType, type Beat } from "core/types/index.js";
  * itself, the reward exception, and a lever line the game computes from the
  * player's history (a sacrifice or reward fits when none was offered in the
  * last two rolled turns, the other kind preferred). As the setup-to-play
- * chain ran them (variant turnB6, today's turn form with B6 alone); group
- * turns stay on today's form (B6 was never built or measured for groups).
- * BeatPromptService prints the lines, storyTextSteps.beatStep puts the field
- * texts in the schema; adoptedTurns.test.ts holds both equal to the measured
- * form.
+ * chain ran them (variant turnB6, today's turn form with B6 alone). Group
+ * turns stayed on today's form (B6 was never built or measured for groups)
+ * until the group-levers stage of 2026-10-01, which gave each player in a
+ * group's challenge or contest thread B6's lever parts (below,
+ * groupSacrificeRewardLines). BeatPromptService prints the lines,
+ * storyTextSteps.beatStep puts the field texts in the schema;
+ * adoptedTurns.test.ts holds both equal to the measured forms.
  */
 
 export const THREE_WAYS = `- The three options are three different ways to act, and a player can tell them apart from their words alone (players see nothing else before they choose):
@@ -102,6 +104,60 @@ export function sacrificeRewardLine(story: Story, slot: string): string {
   return `Sacrifice or reward: one fits this turn if a stat allows it (the last one offered was a ${kind}, ${ago} turn${ago === 1 ? "" : "s"} ago; prefer a ${other}).`;
 }
 
+/*
+ * A group's sacrifices and rewards (the group-levers stage of 2026-10-01,
+ * measured as the eval's groupLeversB, the stage's fix-and-retest). B6 was a
+ * single player's only, so a group's challenge or contest step had no lever
+ * line, kept the plan question's "(Many beats are better without any
+ * sacrifice or reward options.)" and had no reward exception: the second
+ * playthroughs' three group stories offered 1 lever in 105 rolled option sets
+ * (B6's line would have invited one in 103), every group plan answering
+ * "None", and the players' own stats moved only at switches. Now each player
+ * in a challenge or contest thread on a group's chapter step gets B6's lever
+ * parts: the reward exception, that player's computed line (sacrificeRewardLine
+ * on their own history), one sentence for a group (a shared stat's lever goes
+ * to one player a turn, which the sharedLeverRepeated repair enforces; the
+ * player's own stats first), NO_DOUBLE_SACRIFICE, and in that player's fields
+ * the options field's reward exception and the plan's lever question asked
+ * from the line (GROUP_LEVER_QUESTION). Measured on twelve group chapter steps
+ * of the second playthroughs, twice: sets with a lever 0 of 50 -> 25 of 50,
+ * on the player's own stat 0 -> 21, rewards 0 -> 8, none where the line said
+ * none, sets that only risk tells apart 88% -> 74%, waits level. B6's other
+ * parts (the three ways, the base-point scale, at most two bonuses) stay a
+ * single player's: they were not measured for groups.
+ */
+export const GROUP_SHARED_AND_OWN =
+  "A sacrifice or reward on one of a player's own stats is that player's alone; one on a shared stat spends or gains for the whole group, so offer it to one player at most this turn. Prefer the player's own stats where they allow one.";
+
+/** The plan's lever question for a player in a group's challenge or contest thread: asked from the player's computed line. */
+export const GROUP_LEVER_QUESTION =
+  "Based on the stats' options to sacrifice and options to gain as reward attributes, and this player's sacrifice-or-reward line in the option instructions: where the line says one fits this turn, describe exactly one sacrifice or reward option (total) for this beat, on one of this player's own stats where one allows it, and the reason this scene gives for it. Say 'None' only where the line says none this turn, or where no stat allows one.";
+
+/** The players in a challenge or contest thread on a group's chapter step, in seat order; none on any other turn, and none for a single player (B6 is theirs). */
+export function groupLeverSlots(story: Story): string[] {
+  if (!story.isMultiplayer() || story.getCurrentBeatType() !== "thread") return [];
+  const threads = story.getCurrentThreadAnalysis()?.threads ?? [];
+  return story.getPlayerSlots().filter((slot) => {
+    const thread = threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
+    return thread !== undefined && getThreadType(thread) !== "exploration";
+  });
+}
+
+/** Whether a turn takes the group's lever parts: a group's chapter step with a player in a challenge or contest thread. */
+export function takesGroupLeverRules(story: Story): boolean {
+  return groupLeverSlots(story).length > 0;
+}
+
+/** The lines after the "0 or 1 sacrifice/reward option" rule on a group's rolled step: each rolled player's computed line, the group sentence, no second sacrifice. */
+export function groupSacrificeRewardLines(story: Story): string {
+  const lines = groupLeverSlots(story).map((slot) => {
+    const name = story.getPlayer(slot)?.name;
+    const line = sacrificeRewardLine(story, slot).replace("Sacrifice or reward: ", "");
+    return `----- ${slot}${name ? ` (${name})` : ""}: ${line}\n`;
+  });
+  return `--- Sacrifice or reward, for each player in a Challenge or Contest thread (each player's own options):\n${lines.join("")}--- ${GROUP_SHARED_AND_OWN}\n--- ${NO_DOUBLE_SACRIFICE}\n`;
+}
+
 function asObject(schema: unknown, label: string): z.AnyZodObject {
   if (!(schema instanceof z.ZodObject)) throw new Error(`Option rules: ${label} is not an object schema`);
   return schema;
@@ -146,4 +202,37 @@ export function beatSchemaWithOptionRules(root: z.AnyZodObject): z.AnyZodObject 
   if (asArray(player.shape.options, "options").description !== OPTIONS_FIELD) throw new Error("Option rules: the options field's description changed");
   const player1 = player.extend({ plan: planWithRules(asObject(player.shape.plan, "plan")), options: optionsWithRules(asArray(player.shape.options, "options")) });
   return root.extend({ player1 });
+}
+
+/** A group player's plan with the lever question asked from the player's line (GROUP_LEVER_QUESTION). */
+function planWithGroupQuestion(plan: z.AnyZodObject): z.AnyZodObject {
+  const considerations = plan.shape.optionConsiderations;
+  if (!(considerations instanceof z.ZodUnion)) throw new Error("Option rules: optionConsiderations is not a union");
+  const [asText, detailed] = considerations.options as [z.ZodTypeAny, z.AnyZodObject];
+  const object = asObject(detailed, "optionConsiderations object");
+  const lever = object.shape.upToOneSacrificeOrRewardOption;
+  const union = z.union([asText, object.extend({ upToOneSacrificeOrRewardOption: lever.describe(GROUP_LEVER_QUESTION) })]);
+  return plan.extend({ optionConsiderations: considerations.description === undefined ? union : union.describe(considerations.description) });
+}
+
+/**
+ * A group's beat schema with the lever fields for each player in a challenge or contest thread: the options field's
+ * reward exception and the plan's lever question asked from the player's line; slots sharing one instance keep sharing
+ * one, as the schema builds them; the other players' fields unchanged.
+ */
+export function beatSchemaWithGroupLevers(root: z.AnyZodObject, story: Story): z.AnyZodObject {
+  const editedOf = new Map<unknown, z.AnyZodObject>();
+  const players = Object.fromEntries(
+    groupLeverSlots(story).map((slot) => {
+      const player = asObject(root.shape[slot], slot);
+      const known = editedOf.get(player);
+      if (known) return [slot, known];
+      const options = asArray(player.shape.options, "options");
+      if (options.description !== OPTIONS_FIELD) throw new Error("Option rules: the options field's description changed");
+      const edited = player.extend({ plan: planWithGroupQuestion(asObject(player.shape.plan, "plan")), options: options.describe(OPTIONS_FIELD_WITH_REWARD) });
+      editedOf.set(player, edited);
+      return [slot, edited];
+    })
+  );
+  return root.extend(players);
 }

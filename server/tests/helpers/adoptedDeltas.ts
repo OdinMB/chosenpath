@@ -25,6 +25,10 @@
  * stood before, for the variants measured earlier). Every
  * ending, a kids ending too, carries one delta since the owner's decision of
  * 2026-10-01: only what was played gets a milestone (withEndingOnlyPlayed).
+ * A group's chapter step with a player in a challenge or contest thread is the
+ * measured groupLeversB since the group-levers stage of the same day (not a
+ * delta; beforeGroupLevers and productionThen give production as it stood
+ * before, for the variants measured earlier).
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
@@ -42,6 +46,8 @@ import { RESULTS_AS_OUTCOMES_TEXT } from "../../src/game/services/storyTextRound
 import { ENDING_STATE_TEXT } from "../../src/game/services/storyTextRounds/endingState.js";
 import { LEVER_DIRECTION_TEXT } from "../../src/game/services/storyTextRounds/leverDirection.js";
 import { KIDS_AGES_TEXT, kidsAgesBand } from "../../src/game/services/storyTextRounds/kidsAges.js";
+import { GROUP_LEVERS_TEXT, groupLeversBase, takesGroupLevers } from "../../src/game/services/storyTextRounds/groupLevers.js";
+import { REWARD_EXCEPTION } from "../../src/game/services/optionRules.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -250,9 +256,28 @@ export function beforeEndingOnlyPlayed(production: string, story: Story): string
   return production.replace(milestonesLine, "").replace(unfinished[1], () => unfinished[0]);
 }
 
-/** A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones (beforeEndingOnlyPlayed). */
+/**
+ * Production's prompt as it stood before the group-levers adoption (2026-10-01): a group's rolled chapter step without
+ * the reward exception and the players' lever lines (groupLeversB's, which production prints since); any other turn as
+ * it is.
+ */
+export function beforeGroupLevers(production: string, story: Story): string {
+  if (!takesGroupLevers(story)) return production;
+  const { derailAnchor, leverAnchor, block } = GROUP_LEVERS_TEXT;
+  const [exception, lines] = [`${derailAnchor} ${REWARD_EXCEPTION}`, `${leverAnchor}${block(story)}`];
+  if (production.split(exception).length !== 2 || production.split(lines).length !== 2) throw new Error("Production's group step no longer carries its lever lines once");
+  return production.replace(exception, () => derailAnchor).replace(lines, () => leverAnchor);
+}
+
+/**
+ * A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones
+ * (beforeEndingOnlyPlayed) and before the group-levers adoption of the same day (beforeGroupLevers; a group's rolled
+ * step's schema as it was built then, groupLeversBase). The variants measured before compare with it.
+ */
 export function productionThen<R extends { prompt: string }>(request: R, story: Story): R {
-  return { ...request, prompt: beforeEndingOnlyPlayed(request.prompt, story) };
+  const prompt = beforeGroupLevers(beforeEndingOnlyPlayed(request.prompt, story), story);
+  const schema = "schema" in request && takesGroupLevers(story) ? { schema: groupLeversBase(story).schema } : {};
+  return { ...request, prompt, ...schema };
 }
 
 /** Every turn delta: no chapter rules on a switch turn, and the ending's lines on what was played. */
@@ -386,8 +411,9 @@ export function withKidsBandImageSlots(measured: RequestText, story: Story): Req
 /** Production's turn as it stood before the kids-ages adoption: its prompt and its JSON schema's text. */
 export function productionBeforeKidsAges(story: Story): { prompt: string; json: string } {
   const asText = (request: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) => ({ prompt: request.prompt, json: JSON.stringify(toJsonSchema(request.schema)) });
-  if (!takesKidsRules(story)) return asText(beatStep.request(story));
-  if (story.isMultiplayer()) return asText(beatStep.request(story.clone({ category: undefined })));
+  // A group's rolled step as it stood before the group-levers adoption too (groupLeversBase), which came later that day
+  if (!takesKidsRules(story)) return asText(groupLeversBase(story));
+  if (story.isMultiplayer()) return asText(groupLeversBase(story.clone({ category: undefined })));
   const now = asText(beatStep.request(story));
   const [band, then] = [kidsTurnText(story), KIDS_BAND_TURNS["6-8"]];
   const who = kidsListener(story);

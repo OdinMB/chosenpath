@@ -115,9 +115,10 @@ describe("production's request byte for byte on every other story", () => {
     const story = build({});
     const request = kidsTurnRequest(story);
     expect(request.prompt).toBe(choiceResultRequest(story).prompt);
-    // At an ending, production as it stood before the owner's decision of 2026-10-01 on ending milestones
+    // At an ending, production as it stood before the owner's decision of 2026-10-01 on ending milestones; a group's
+    // challenge step before the group-levers adoption of the same day
     expect(request.prompt).toBe(productionThen(beatStep.request(story), story).prompt);
-    expect(json(request.schema)).toBe(json(beatStep.request(story).schema));
+    expect(json(request.schema)).toBe(json(productionThen(beatStep.request(story), story).schema));
   });
 
   // Until the kids-ages stage's adoption later that day, which gave every kids turn its age band's text (productionBeforeKidsAges)
@@ -125,7 +126,7 @@ describe("production's request byte for byte on every other story", () => {
     for (const [, build] of TURNS) {
       const story = build(KIDS);
       const production = productionBeforeKidsAges(story);
-      if (story.isMultiplayer()) expect(production.prompt).toBe(beatStep.request(build({})).prompt);
+      if (story.isMultiplayer()) expect(production.prompt).toBe(productionThen(beatStep.request(build({})), build({})).prompt);
       else {
         expect(productionThen(production, story).prompt).toBe(kidsTurnRequest(story).prompt);
         expect(production.json).toBe(json(kidsTurnRequest(story).schema));

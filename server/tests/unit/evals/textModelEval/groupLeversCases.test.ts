@@ -21,8 +21,9 @@ import { outputIdOf } from "../../../../src/evals/textModelEval/judgedChecks.js"
 import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthroughMode.js";
 import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
+import { productionSends } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { sacrificeRewardLine } from "../../../../src/game/services/optionRules.js";
-import { groupLeverSlots, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
+import { groupLeverSlots, groupLeversBase, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { fakeCall, input } from "./playFixtures.js";
 
 /*
@@ -52,11 +53,14 @@ describe("groupLeversCases on a played fake group story", () => {
     const step = run.turns.find((t) => t.kind === "chapter step");
     expect(step).toBeDefined();
     const specs = [{ id: "round-levers-fake", story: PLAYTHROUGHS[2].id, turn: step?.turn ?? 0, role: "beat" as const, purpose: "A chapter step." }];
-    const { cases, problems } = groupLeversCases([run], hashOf, specs);
+    // A run played through today's code sent production's request as it is now
+    const { cases, problems } = groupLeversCases([run], hashOf, specs, productionSends);
     expect(problems).toEqual([]);
     expect(cases.map((c) => [c.id, c.role, c.fixedAnalysis, c.tags.source, c.tags.category, c.tags.players])).toEqual([["round-levers-fake", "beat", undefined, "round", "group-levers", 2]]);
     expect(takesGroupLevers(caseStory(cases[0]))).toBe(true);
-    expect(groupLeversCasesToFreeze(cases, [run], hashOf, false, specs).skipped).toEqual(["round-levers-fake"]);
+    expect(groupLeversCasesToFreeze(cases, [run], hashOf, false, specs, productionSends).skipped).toEqual(["round-levers-fake"]);
+    // The second round's runs sent production's group turn before the adoption
+    expect(groupLeversCases([run], hashOf, specs).problems).toEqual(["round-levers-fake: its request is not the one the run sent at turn 3 of play-food-trucks"]);
   });
 });
 
@@ -115,7 +119,7 @@ function sentHashOf(id: string): string | undefined {
 }
 
 describe("groupLeversCases on the second round's stored playthroughs (skipped where the output folder is absent)", () => {
-  (stored2.length ? it : it.skip)("builds every case, each request the one production sent and production sends today; each a group chapter step with a player in a rolled thread", () => {
+  (stored2.length ? it : it.skip)("builds every case, each request the one production sent, the base the variant builds on; production since the adoption sends the measured fix-and-retest; each a group chapter step with a player in a rolled thread", () => {
     const { cases, problems } = groupLeversCases(stored2, (file) => storedHashes.get(outputIdOf(file)));
     expect(problems).toEqual([]);
     expect(cases.map((c) => c.id)).toEqual(GROUP_LEVERS_CASE_SPECS.map((s) => s.id));
@@ -125,8 +129,9 @@ describe("groupLeversCases on the second round's stored playthroughs (skipped wh
     let rateNone = 0;
     for (const c of cases) {
       const story = caseStory(c);
-      // Production's group turn today is the request the run sent
-      expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sentHashOf(c.id)]);
+      // The run sent the variant's base; production today sends groupLeversB (the group-levers adoption, 2026-10-01)
+      expect([c.id, sha256(groupLeversBase(story).prompt)]).toEqual([c.id, sentHashOf(c.id)]);
+      expect([c.id, sha256(requestText(requestFor("adopted", requestInputFor(c))))]).toEqual([c.id, sha256(requestText(requestFor("groupLeversB", requestInputFor(c))))]);
       const slots = groupLeverSlots(story);
       expect([c.id, slots.length > 0]).toEqual([c.id, true]);
       players.add(story.getNumberOfPlayers());

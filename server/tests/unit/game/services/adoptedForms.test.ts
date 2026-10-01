@@ -24,6 +24,7 @@ import {
 } from "../../../helpers/adoptedDeltas.js";
 import { kidsBandOf } from "core/types/index.js";
 import { takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
+import { takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 
 /*
@@ -36,7 +37,9 @@ import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
  * once, and the step results' two rules, 2026-09-30) with the challenge-results
  * stage's measured edits (2026-10-01) for the chapter, today's
  * turn form with B6 alone (turnB6) for a single player and today's form
- * (prod) for groups, an exploration step with the exploration-order line
+ * (prod) for groups, a group's rolled chapter step with B6's lever parts for
+ * each rolled player (groupLeversB, the group-levers stage of 2026-10-01), an
+ * exploration step with the exploration-order line
  * (choiceResult; a group's and, since the choice-line-sp stage, a single
  * player's, 2026-09-30), every ending as the ending told as its
  * milestones leave it (endingStateB, 2026-09-30), a turn read with a child,
@@ -79,6 +82,9 @@ function measuredVariant(input: RequestInput): VariantId {
       if (takesKidsRules(input.story)) return "kidsAges";
       // Every ending since 2026-09-30: the ending told as its milestones leave it
       if (input.story.getCurrentBeatType() === "ending") return "endingStateB";
+      // A group's chapter step with a player in a challenge or contest thread since the group-levers stage (2026-10-01):
+      // B6's lever parts for each such player, the plan's lever question asked from the player's line (groupLeversB)
+      if (takesGroupLevers(input.story)) return "groupLeversB";
       // An exploration step: the exploration-order line (choiceResult as measured), a group's since the choice-result stage,
       // a single player's since the choice-line-sp stage (measured with production's one retry of a short reply in the loop)
       if (takesExplorationOrder(input.story)) return "choiceResult";

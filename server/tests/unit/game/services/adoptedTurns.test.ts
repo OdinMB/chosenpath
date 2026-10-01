@@ -29,6 +29,8 @@ import { CHOICE_RESULT_TEXT, choiceResultRequest, takesExplorationOrder } from "
 import { KIDS_TURN_TEXT, kidsTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsTurn.js";
 import { KIDS_AGES_TEXT, kidsAgesBand, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../../../src/game/services/storyTextRounds/kidsAges.js";
 import { KIDS_BAND_TURNS, beatCheckOptions, takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
+import { GROUP_LEVERS_TEXT, groupLeversBase, groupLeversRequest, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
+import { GROUP_LEVER_QUESTION, GROUP_SHARED_AND_OWN, REWARD_EXCEPTION, groupSacrificeRewardLines } from "../../../../src/game/services/optionRules.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -56,16 +58,22 @@ import { KIDS_BAND_TURNS, beatCheckOptions, takesKidsRules } from "../../../../s
  * picture places by band where it shows images. Since the owner's
  * decision of 2026-10-01 every ending carries one logged delta: only what was
  * played gets a milestone, and an unfinished outcome is told as unfinished
- * (withEndingOnlyPlayed).
+ * (withEndingOnlyPlayed). Since the group-levers stage of the same day, a
+ * group's chapter step with a player in a challenge or contest thread is the
+ * measured fix-and-retest groupLeversB byte for byte (B6's lever parts for
+ * each such player, the plan's lever question asked from the player's line),
+ * a player exploring beside them included.
  */
 
 /**
- * The measured request production must send: the ending as endingStateB, an
- * exploration step as choiceResult (every player count), else a single
- * player's turnB6 or a group's today's form.
+ * The measured request production must send: the ending as endingStateB, a
+ * group's rolled chapter step as groupLeversB, an exploration step as
+ * choiceResult (every player count), else a single player's turnB6 or a
+ * group's today's form.
  */
 function measuredTurn(story: Story): { prompt: string; schema: Parameters<typeof toJsonSchema>[0] } {
   if (story.getCurrentBeatType() === "ending") return endingStateRequest(story);
+  if (takesGroupLevers(story)) return groupLeversRequest(story, { b: true });
   if (takesExplorationOrder(story)) return choiceResultRequest(story);
   return story.isMultiplayer() ? round0BeatStep.request(story) : todaysFormWithB6Request(story);
 }
@@ -407,10 +415,28 @@ function contestEnding(players: number, mode: GameMode = GameModes.Competitive, 
   return scoreboard ? story.clone({ sharedStats: [SCOREBOARD], sharedStatValues: [{ statId: SCOREBOARD.id, value: 40 }] }) : story;
 }
 
-describe("group turns: today's form, an exploration step as choiceResult, the ending as endingStateB", () => {
+describe("group turns: today's form, a rolled chapter step as groupLeversB, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(GROUPS)("%s", (_, build) => {
     const story = build();
     expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
+  });
+
+  it("prints the measured lever parts from production's own constants on a group's rolled step, once, for each rolled player; on no other group turn (the group-levers stage, 2026-10-01)", () => {
+    expect(GROUP_SHARED_AND_OWN).toBe(GROUP_LEVERS_TEXT.sharedAndOwn);
+    expect(GROUP_LEVER_QUESTION).toBe(GROUP_LEVERS_TEXT.leverQuestionB);
+    for (const story of [threadBeat(2), threadBeat(3), groupStep(3, "mixed")]) {
+      const prompt = beatStep.request(story).prompt;
+      expect(groupSacrificeRewardLines(story)).toBe(GROUP_LEVERS_TEXT.block(story));
+      expect(prompt.split(`${GROUP_LEVERS_TEXT.leverAnchor}${GROUP_LEVERS_TEXT.block(story)}`)).toHaveLength(2);
+      expect(prompt.split(`${GROUP_LEVERS_TEXT.derailAnchor} ${REWARD_EXCEPTION}`)).toHaveLength(2);
+      // Production's group turn before the adoption, which the stage measured beside the variant
+      expect(groupLeversBase(story).prompt).not.toContain(GROUP_SHARED_AND_OWN);
+      expect(json(beatStep.request(story).schema)).toContain(JSON.stringify(GROUP_LEVER_QUESTION).slice(1, -1));
+    }
+    for (const story of [firstSwitchBeat(2), laterSwitchBeat(3), groupStep(2, "exploration"), endingBeat(3), threadBeat(1)]) {
+      expect(beatStep.request(story).prompt).not.toContain(GROUP_SHARED_AND_OWN);
+      expect(json(beatStep.request(story).schema)).not.toContain("this player's sacrifice-or-reward line");
+    }
   });
 
   it("gives every exploration step the exploration-order line, once, after the option types: a group's (the choice-result stage) and a single player's (the choice-line-sp stage); no challenge step", () => {
