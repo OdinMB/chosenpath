@@ -1,8 +1,11 @@
 import type { Story } from "core/models/Story.js";
-import type { TextRequest } from "../storyTextSteps.js";
+import { MONEY_TURN_TEXT, takesMoneyRule } from "../moneyTurns.js";
+import { beatStep, type TextRequest } from "../storyTextSteps.js";
 import { choiceResultRequest } from "./choiceResult.js";
 import { kidsTurnRequest } from "./kidsTurn.js";
 import { replaceOnce, splitAtState } from "./roundEdits.js";
+
+export { takesMoneyRule };
 
 /*
  * Money and counts that add up in a learning story (eval only; fix 7 of the
@@ -60,74 +63,127 @@ import { replaceOnce, splitAtState } from "./roundEdits.js";
  * amount the text pays or earns ("two coins", never a handful), and puts the
  * worked-out stat's exception right after that thread-resolution line (a
  * switch turn and the ending).
+ *
+ * The money-2 stage (2026-10-02) measured block B on production's turn of that
+ * day (moneyTurn) and its own fix-and-retest (moneyTurnB), which was adopted:
+ * production's copy is moneyTurns.ts (MONEY_TURN_TEXT, takesMoneyRule), which
+ * BeatPromptService prints, and the kept tests hold production to moneyTurnB
+ * byte for byte. The texts below are production's where production has them;
+ * every variant here builds on production with those lines taken out
+ * (withoutMoneyTurnLines), so each still builds as measured.
  */
 
 const LABEL = "Money-adds-up turn";
 
-const HEADING = "MONEY AND COUNTS: this story teaches with its figures, so they add up from beat to beat.";
+const { heading: HEADING, amountsNamed: AMOUNTS_NAMED, summedUp: SUMMED_UP, rest: REST, resolutionLine: RESOLUTION_LINE } = MONEY_TURN_TEXT;
 const AMOUNTS =
   "- Every amount of a counted stat (money, cups, supplies) that this beat's text pays, spends, uses up, sells or earns moves that stat by exactly that amount in these stat changes, never put off to a later beat: a purchase or a fee subtracts its price, a sale adds what the customers pay. Decide here what the text will pay and earn, apply exactly that, and let the text pay and earn nothing else. A price quoted, an estimate or a plan moves nothing.";
-/** The fix-and-retest's first line: the same, with every amount named, never "a handful of coins". */
-const AMOUNTS_NAMED =
-  '- Every amount of a counted stat (money, cups, supplies) that this beat\'s text pays, spends, uses up, sells or earns moves that stat by exactly that amount in these stat changes, never put off to a later beat: a purchase or a fee subtracts its price, a sale adds what the customers pay. Decide here what the text will pay and earn, apply exactly that, and let the text pay and earn nothing else; the text names each of those amounts ("two coins"), never a handful or a few. A price quoted, an estimate or a plan moves nothing.';
-const REST = [
-  "- The sacrifice or reward the player chose is paid once, by the amount its option names: when the text shows that payment, it is the same amount, not a second one.",
-  "- A stat worked out from other figures (a profit margin) moves only to the value the text works out from figures it shows, with the sum, or by the sacrifice or reward the player chose. It is not raised or lowered for how a thread went, whatever its adjustments after threads say.",
-  "- The text, the interludes and the facts never state a total for a stat (the money left, a count, a margin) other than its value after these changes.",
-  "- These changes are bookkeeping, so they are made in full on any stat that can be adjusted anytime. Where a counted stat can change only when a thread is resolved, the text quotes and plans its amounts until then and pays and earns none of them.",
-];
 
 const BLOCK = [HEADING, AMOUNTS, ...REST].join("\n") + "\n";
+/** The fix-and-retest's block: the first line the same, with every amount named, never "a handful of coins". */
 const BLOCK_B = [HEADING, AMOUNTS_NAMED, ...REST].join("\n") + "\n";
+
+/**
+ * The money-2 stage's fix-and-retest of the turn line (moneyTurnB, 2026-10-02),
+ * right after the amounts line: the replies that still did not add up told a
+ * stretch of sales or a fee in a summary with no figures, one subtracted an
+ * ingredient cost it only worked out, and on one step both samples kept the
+ * waiting customer from buying. Production's own since the adoption.
+ */
+const RETEST_LINE = SUMMED_UP;
 
 /**
  * The thread-resolution line that sends a switch turn or the ending to each
  * stat's adjustments after threads (the run's switch turn followed the
  * margin's own "+5 after a favorable thread" there); the fix-and-retest's
- * exception goes right after it.
+ * exception goes right after it (RESOLUTION_LINE, production's own since the
+ * money-2 adoption).
  */
 const ADJUSTMENTS_ANCHOR = "- Stats define how they should be adjusted after threads. Consider the 'Adjustments after threads' parameter in the stat definitions.\n";
-const RESOLUTION_LINE =
-  "--- In this story, a stat worked out from other figures (a profit margin) is the exception: skip its adjustments after threads, and change it only to the value the text works out from figures it shows, with the sum.\n";
 
 /** What follows the stat-changes section: a group's coordination section, else the beats. */
 const SINGLE_NEXT = "\n\n3. GENERATE ONE STORY BEAT FOR EACH PLAYER";
 const GROUP_NEXT = "\n\n3. MULTIPLAYER COORDINATION";
 
 /** The passages the tests pin. */
-export const MONEY_ADDS_UP_TEXT = { block: BLOCK, blockB: BLOCK_B, adjustmentsAnchor: ADJUSTMENTS_ANCHOR, resolutionLine: RESOLUTION_LINE, singleNext: SINGLE_NEXT, groupNext: GROUP_NEXT };
+export const MONEY_ADDS_UP_TEXT = {
+  block: BLOCK,
+  blockB: BLOCK_B,
+  adjustmentsAnchor: ADJUSTMENTS_ANCHOR,
+  resolutionLine: RESOLUTION_LINE,
+  singleNext: SINGLE_NEXT,
+  groupNext: GROUP_NEXT,
+  amountsNamed: AMOUNTS_NAMED,
+  retestLine: RETEST_LINE,
+};
 
 /** The run's form (moneyAddsUp), or its fix-and-retest (moneyAddsUpB): every amount named, and the margin's exception in the thread-resolution lines. */
 export type MoneyAddsUpForm = { b?: boolean };
 
-/** Whether the story keeps a counted stat: a number stat, shared or a player's. */
-function keepsCountedStat(story: Story): boolean {
-  const state = story.getState();
-  return [...(state.sharedStats ?? []), ...(state.playerStats ?? [])].some((stat) => stat.type === "number");
-}
-
-/** Whether a turn takes the block: a learning story's turn after the first, where the story keeps a counted stat. */
-export function takesMoneyRule(story: Story): boolean {
-  return story.getCategory() === "learn-something" && !story.isFirstBeat() && keepsCountedStat(story);
+/**
+ * A turn prompt without the money lines production prints since the money-2
+ * adoption (2026-10-02): its block and the worked-out stat's exception,
+ * wherever they stand; a prompt without them as it is.
+ */
+export function withoutMoneyTurnLines(prompt: string): string {
+  return [`\n${MONEY_TURN_TEXT.block}`, MONEY_TURN_TEXT.resolutionLine].reduce((text, passage) => text.split(passage).join(""), prompt);
 }
 
 /**
  * Production's turn today as the eval measured it: a single player's turn the
  * kids-turns stage's (kidsTurn: production's turn, with the kids rules on a
  * story read with a child), a group's the choice-result stage's (choiceResult:
- * production's turn with the exploration line, which kidsTurn builds on).
+ * production's turn with the exploration line, which kidsTurn builds on);
+ * without the money lines production prints since the money-2 adoption.
  */
 export function productionTurnMeasured(story: Story): TextRequest {
-  return story.isMultiplayer() ? choiceResultRequest(story) : kidsTurnRequest(story);
+  const request = story.isMultiplayer() ? choiceResultRequest(story) : kidsTurnRequest(story);
+  return { ...request, prompt: withoutMoneyTurnLines(request.prompt) };
+}
+
+/**
+ * Production's turn as the money-2 stage measured it beside the turn line:
+ * production's turn today with the money lines it prints since the adoption
+ * taken out (the same turn without the learning category).
+ */
+export function moneyTurnBase(story: Story): TextRequest {
+  const production = beatStep.request(story);
+  return { ...production, prompt: withoutMoneyTurnLines(production.prompt) };
+}
+
+/** A turn request with the money block (or B, with its thread-resolution line) at the end of its stat-changes section. */
+function withMoneyBlock(base: TextRequest, story: Story, b: boolean): TextRequest {
+  const { instructions, state } = splitAtState(LABEL, base.prompt);
+  const next = story.isMultiplayer() ? GROUP_NEXT : SINGLE_NEXT;
+  let edited = replaceOnce(LABEL, instructions, next, `\n${b ? BLOCK_B : BLOCK}${next}`);
+  if (b && story.getCurrentBeatType() !== "thread") edited = replaceOnce(LABEL, edited, ADJUSTMENTS_ANCHOR, `${ADJUSTMENTS_ANCHOR}${RESOLUTION_LINE}`);
+  return { ...base, prompt: edited + state };
 }
 
 /** Production's turn with the money block on a learning story that counts; production's request byte for byte elsewhere. */
 export function moneyAddsUpRequest(story: Story, form: MoneyAddsUpForm = {}): TextRequest {
   const base = productionTurnMeasured(story);
+  return takesMoneyRule(story) ? withMoneyBlock(base, story, form.b === true) : base;
+}
+
+/**
+ * Fix 7's turn line where the money-2 stage found it still needed (decision
+ * A's money fix, 2026-10-02): block B and its thread-resolution line, word for
+ * word as the money-adds-up stage measured them, on production's turn of that
+ * day (moneyTurnBase) rather than on production as it stood then; production's
+ * request byte for byte on every turn that takes no block. With the money
+ * setup's number stats moving by what the story pays and earns, production's
+ * turn still left the text's payments and sales out of the stat changes in 5
+ * of the 7 played lemonade turns whose text paid or sold: "You pay $3.55 for
+ * the supplies, add the $2 permit" with the cash unmoved, "a few more
+ * neighbors buy cups ... two more coins than before" with the cash unmoved, a
+ * 75-cent sale moving the cash by a reward's 2 coins. The fix-and-retest
+ * (retest, moneyTurnB) is production's turn since the adoption.
+ */
+export function moneyTurnRequest(story: Story, form: { retest?: boolean } = {}): TextRequest {
+  const base = moneyTurnBase(story);
   if (!takesMoneyRule(story)) return base;
-  const { instructions, state } = splitAtState(LABEL, base.prompt);
-  const next = story.isMultiplayer() ? GROUP_NEXT : SINGLE_NEXT;
-  let edited = replaceOnce(LABEL, instructions, next, `\n${form.b ? BLOCK_B : BLOCK}${next}`);
-  if (form.b && story.getCurrentBeatType() !== "thread") edited = replaceOnce(LABEL, edited, ADJUSTMENTS_ANCHOR, `${ADJUSTMENTS_ANCHOR}${RESOLUTION_LINE}`);
-  return { ...base, prompt: edited + state };
+  const request = withMoneyBlock(base, story, true);
+  // The fix-and-retest (moneyTurnB): one line right after the amounts line
+  return form.retest ? { ...request, prompt: replaceOnce(LABEL, request.prompt, `${AMOUNTS_NAMED}\n`, `${AMOUNTS_NAMED}\n${RETEST_LINE}\n`) } : request;
 }

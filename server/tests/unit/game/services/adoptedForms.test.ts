@@ -36,6 +36,8 @@ import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { takesOptionRules } from "../../../../src/game/services/optionRules.js";
 import { optionsO2cBase } from "../../../../src/game/services/storyTextRounds/optionsO2c.js";
 import { groupOptionsBase } from "../../../../src/game/services/storyTextRounds/groupOptions.js";
+import { moneyTurnBase } from "../../../../src/game/services/storyTextRounds/moneyAddsUp.js";
+import { takesMoneyRule } from "../../../../src/game/services/moneyTurns.js";
 
 /*
  * The adoption's free final test (rounds status note, section 9, step 3):
@@ -70,7 +72,9 @@ import { groupOptionsBase } from "../../../../src/game/services/storyTextRounds/
  * withSharedScenesSchema put them on the forms measured before), the chapter
  * planner where a pick sets a contested outcome at its last stage with PACING's
  * deciding-thread line (contestSettled, the contest-settled stage of
- * 2026-10-01; withContestSettled puts it on the forms measured before), and AI
+ * 2026-10-01; withContestSettled puts it on the forms measured before), a
+ * learning story's turn that counts with the money block (moneyTurnB, the
+ * money-2 stage of 2026-10-02, on the same turn without the category), and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
@@ -105,6 +109,10 @@ function measuredVariant(input: RequestInput): VariantId {
       // the children's age band reads, every turn kind, as measured (a single player's 6-8 turn is the kids-turns
       // stage's kidsTurn, which adoptedTurns.test.ts holds)
       if (takesKidsRules(input.story)) return "kidsAges";
+      // A learning story's turn that counts, every turn kind, since the money-2 stage (2026-10-02): the money block and the
+      // worked-out stat's exception, as the fix-and-retest moneyTurnB measured them (built on production with its lines
+      // taken out, which is the same turn without the category)
+      if (takesMoneyRule(input.story)) return "moneyTurnB";
       // Every ending since 2026-09-30: the ending told as its milestones leave it
       if (input.story.getCurrentBeatType() === "ending") return "endingStateB";
       // A group's chapter step with a player in a challenge or contest thread since the group-options stage (2026-10-01,
@@ -132,6 +140,14 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     if (input.role !== "beat") return { prompt, schema: json(measured) };
     const adopted = withKidsBandImageSlots(kidsAgesAsMeasured({ prompt, json: json(measured) }, input.story), input.story);
     return { prompt: adopted.prompt, schema: adopted.json };
+  }
+  // moneyTurnB is built on production's live turn with its lines taken out; that base must be the same turn without the
+  // learning category, as the other cases hold it, so the measured variant stands on the form measured before it
+  if (variant === "moneyTurnB" && input.role === "beat") {
+    const before = expected({ ...input, story: input.story.clone({ category: undefined }) });
+    const base = moneyTurnBase(input.story);
+    expect({ prompt: base.prompt === before.prompt, schema: JSON.stringify(toJsonSchema(base.schema)) === before.schema }).toEqual({ prompt: true, schema: true });
+    return { prompt, schema: json(measured) };
   }
   // turnO2c is built on production's live turn with its lines taken out; that base must be turnB6 as before, with the
   // turn deltas and the short-replies lines, so the measured variant stands on the form measured before it

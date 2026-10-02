@@ -727,7 +727,9 @@ function promptOf(request: EvalRequest): string {
  * eval variant's requests on its own arm in place of production's (the setup
  * stays production's); `planLengths` holds the chapter plans to another length
  * rule, as the variant prints it; `stopAfterLastChapterPlan` stops once the
- * story's last chapter is planned, writing no beat for it.
+ * story's last chapter is planned, writing no beat for it. The money-2
+ * stage's short playthroughs (2026-10-02): `setupVariant` sends an eval
+ * variant's setup on its own arm, the planners and turns `variant`'s.
  */
 export async function playStory(
   spec: PlaythroughSpec,
@@ -739,6 +741,8 @@ export async function playStory(
     tryAgain?: number;
     repickStuckSwitches?: boolean;
     variant?: VariantId;
+    /** An eval variant's setup on its own arm in place of production's (the money-2 stage); the planners and turns stay `variant`'s */
+    setupVariant?: VariantId;
     planLengths?: (story: Story) => number[];
     /** A pacing rule the switch plan check reads (an eval variant's: the pacing-clues stage's fix-and-retest), one retry, never failing the turn */
     switchProblem?: (story: Story, plan: SwitchAnalysis) => string | undefined;
@@ -748,6 +752,7 @@ export async function playStory(
 ): Promise<PlayResult> {
   const id = options.from?.from.seedId ?? playRunId(spec, options.sample);
   const variant = options.variant ?? "adopted";
+  const setupVariant = options.setupVariant ?? "adopted";
   const players = input.playerCount;
   const run: PlayRun = { spec, sample: options.sample, input, turns: [], stopped: "", complete: false, ...(options.from ? { from: options.from.from } : {}) };
   const judgeTargets: JudgeTarget[] = [];
@@ -756,7 +761,7 @@ export async function playStory(
 
   /** Production's invoke for one call site: each call through `call`, logged; nothing usable throws, as production's model does after its re-sends. */
   const invoker = (kind: string, role: EvalRole, base: EvalRequest, logs: PlayCallLog[], read?: (log: PlayCallLog, parsed: unknown) => void) => {
-    const arm = playthroughArm(role, players, role === "setup" ? "adopted" : variant);
+    const arm = playthroughArm(role, players, role === "setup" ? setupVariant : variant);
     return async (prompt: string): Promise<unknown> => {
       const retry = logs.length > 0;
       const log: PlayCallLog = { caseId: nextCaseId(retry ? `${kind} retry` : kind), retry, latencyMs: 0, costUsd: 0, sends: [], repairs: [] };
@@ -781,7 +786,7 @@ export async function playStory(
     policies = new Map(story.getPlayerSlots().map((slot) => [slot, from.policies[slot] ?? START_POLICY]));
   } else {
     // The setup, asked once more when the story can't start from it (StoryCreationService)
-    const setupRequest = requestFor("adopted", { role: "setup", setup: input });
+    const setupRequest = requestFor(setupVariant, { role: "setup", setup: input });
     const setupLogs: PlayCallLog[] = [];
     const invokeSetup = invoker("setup", "setup", setupRequest, setupLogs);
     let setupReply: unknown;

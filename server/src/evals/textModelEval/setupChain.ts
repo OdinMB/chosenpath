@@ -97,7 +97,8 @@ const ALLOWED_MODIFIERS = new Set([-20, -10, 0, 10, 20]);
  * shared list (one player on the new form) starts with none (setup doc B1.8).
  * No images and no pregeneration; a kids premise is a read-with-kids story,
  * with the children's ages (the input's setting, else its premise's line), as
- * StoryCreationService records them. The camps the seat roles name are kept,
+ * StoryCreationService records them, and a learning input a learn-something
+ * story, the category production records. The camps the seat roles name are kept,
  * as production keeps them since 2026-10-01 (campsOfSetup).
  */
 export function storyFromSetup(setup: unknown, input: SetupInput, id: string): StoryState {
@@ -133,6 +134,8 @@ export function storyFromSetup(setup: unknown, input: SetupInput, id: string): S
     playerCodes: {},
     ...(camps ? { camps } : {}),
     ...(input.kids ? { category: "read-with-kids" as const } : {}),
+    // A learning story as production records the setup form's learn-something category (the money-2 stage, 2026-10-02)
+    ...(input.learning ? { category: "learn-something" as const } : {}),
     // The children's ages as the game records them (StoryCreationService: the read-with-kids setting, else the premise's
     // age line, since 2026-10-01); the second round's stored runs predate them and recorded none
     ...(input.kids && kidAgesOf(input) ? { kidAges: kidAgesOf(input) } : {}),

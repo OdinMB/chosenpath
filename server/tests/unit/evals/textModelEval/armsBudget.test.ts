@@ -470,6 +470,9 @@ describe("budget caps", () => {
       // Decision A of 2026-10-01 (evening): a contest's deciding chapter that decides it (the seal), every stored contest
       // last-stage plan twice, its estimate with room for one fix-and-retest, plus 30%
       "contest-settled": 0.2,
+      // Decision A of 2026-10-01 (2026-10-02): money that moves in a learning story, the money setup on five learning
+      // premises twice and the lemonade's first chapter played on, with room for fix 7's turn line, its estimate plus 30%
+      "money-2": 0.39,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -506,12 +509,13 @@ describe("budget caps", () => {
       "group-options",
       "scenes",
       "contest-settled",
+      "money-2",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
       expect(LEDGER_STAGES).toContain(stage);
       expect(stageRunsBaseline(stage)).toBe(false);
-      expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-(09-(2[89]|30)|10-01)/);
+      expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-(09-(2[89]|30)|10-0[12])/);
     }
     // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, the sixteen caps up to
     // the second playthroughs still fit (the hard cap $42 since the second round of playthroughs)
@@ -542,7 +546,7 @@ describe("budget caps", () => {
     expect(42.87 + DEFAULT_STAGE_CAPS["playthroughs-3"]).toBeLessThanOrEqual(HARD_CEILING);
     // Decision A (the evening of 2026-10-01) opened its measurements with the ledger at $43.61 of the $48 hard cap: their
     // caps fit with the $1.3 on top
-    expect(decisionA).toEqual(["group-options", "scenes", "contest-settled"]);
+    expect(decisionA).toEqual(["group-options", "scenes", "contest-settled", "money-2"]);
     expect(LEDGER_WHEN_DECISION_A_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisionA)).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -878,8 +882,11 @@ describe("budget caps", () => {
     expect(stageInterleavesArms("choice-line-sp")).toBe(true);
     // Its turns carry production's one retry of a short or option-less reply; no earlier stage's do
     expect(stageChecksTurns("choice-line-sp")).toBe(true);
-    // The kids-turns, kids-ages, group-levers, short-replies, group-options and scenes stages (2026-10-01) carry it too
-    for (const stage of STAGES.filter((s) => s !== "choice-line-sp" && s !== "kids-turns" && s !== "kids-ages" && s !== "group-levers" && s !== "short-replies" && s !== "group-options" && s !== "scenes")) {
+    // The kids-turns, kids-ages, group-levers, short-replies, group-options and scenes stages (2026-10-01) and the money-2
+    // stage's turn line (2026-10-02) carry it too
+    for (const stage of STAGES.filter(
+      (s) => s !== "choice-line-sp" && s !== "kids-turns" && s !== "kids-ages" && s !== "group-levers" && s !== "short-replies" && s !== "group-options" && s !== "scenes" && s !== "money-2"
+    )) {
       expect(stageChecksTurns(stage)).toBe(false);
     }
     // Production beside the variant under a tag of its own

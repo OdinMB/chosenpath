@@ -65,6 +65,7 @@ import { optionsO2cMode } from "./optionsO2cPrep.js";
 import { buildMoneyCasesMode, judgeMoneyMode } from "./moneyAddsUpPrep.js";
 import { buildLatePacingCasesMode, judgeCluesMode, latePacingPlayMode, printLatePacingPlan } from "./latePacingPrep.js";
 import { judgePacingCluesMode, pacingCluesBlindMode, pacingCluesPlayMode, printPacingCluesPlan } from "./pacingCluesPrep.js";
+import { buildMoney2CasesMode, money2BlindMode, money2PlayMode, money2TurnsBlindMode, printMoney2Plan, writeMoney2 } from "./money2Prep.js";
 import { choiceLineMode } from "./choiceLinePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
@@ -123,7 +124,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     chapter steps of the third playthroughs on their stored plans, interleaved, each with production's one checked
  *     retry, and --role thread --mode pipeline, each side's chapter planner into its own group turn on that round's
  *     chapter openings, interleaved; contest-settled --role thread under adopted25: production's chapter planner and
- *     contestSettled twice on every stored plan of rounds 1-3 at a contested outcome's last stage, interleaved)
+ *     contestSettled twice on every stored plan of rounds 1-3 at a contested outcome's last stage, interleaved; money-2
+ *     --role beat under adopted26: production's turn and moneyTurn twice on eight turns of the stage's own lemonade runs,
+ *     each with production's checked retry, interleaved)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -318,6 +321,21 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --contest-settled  the stage's report, no calls: the blind hand reading unblinded, the variant against production
  *     under the stop rule, a word heuristic, the plan check, reasoning, waits and cost, the automatic checks, every
  *     plan's thread; contest-settled.md and .json
+ *   Money and counts in learning stories (money2Prep.ts, 2026-10-02, decision A's money fix), in the money-2 stage:
+ *   --money-2-play [--cases <premise ids>] [--samples N] [--turns N] [--arms adopted|moneySetup] [--max-spend 0.39]
+ *     [--report-only]  production's setup and moneySetup on five learning premises, the lemonade stand's setup then
+ *     played on through its first chapter on production's planners and turns (money2Play.ts); prep-calls.jsonl, under
+ *     adopted26; writes money-2.md and .json with the runs the file already holds (--turns caps the turns: the smoke)
+ *   --money-2-blind  no calls: each setup and played turn under its run's code, no arm named (money-2-blind.md; the key
+ *     in keys/money-2-blind.json), for the hand reading in money2Hand.ts
+ *   --build-money-2-cases [--rebuild-cases]  eight turns of the stage's own lemonade runs (money2Cases.ts), each only
+ *     where its request is the one production sent; no calls; they then run with --run --stage money-2 --prompt-state
+ *     adopted26 --role beat (production's turn and moneyTurn, fix 7's turn line, each with production's checked retry)
+ *   --money-2-turns-blind  no calls: each turn-line reply under its code, no arm named (money-2-turns-blind.md; the key
+ *     in keys/money-2-turns-blind.json), for the hand reading in money2Hand.ts
+ *   --money-2  the stage's report, no calls: the blind hand readings unblinded, the variants against production under
+ *     the stop rule, the flags, setup checks, waits, reasoning and cost, every setup's counted stats, every played turn's
+ *     and every turn-line reply's money
  *   Fix 8's retest in whole short playthroughs (pacingCluesPrep.ts, 2026-10-01), in the pacing-clues stage:
  *   --pacing-clues-play [--cases <story ids>] [--samples N] [--turns N] [--arms pacingCluesB] [--max-spend 0.50]
  *     [--report-only]  production's code and pacingClues (the late-pacing fix-and-retest's planners and the late part's
@@ -411,6 +429,11 @@ type Mode =
   | "build-contest-settled-cases"
   | "contest-settled-blind"
   | "contest-settled"
+  | "money-2-play"
+  | "money-2-blind"
+  | "build-money-2-cases"
+  | "money-2-turns-blind"
+  | "money-2"
   | "pacing-clues-play"
   | "pacing-clues-blind"
   | "judge-pacing-clues"
@@ -573,6 +596,11 @@ function parseArgs(argv: string[]): Args {
       case "--build-contest-settled-cases":
       case "--contest-settled-blind":
       case "--contest-settled":
+      case "--money-2-play":
+      case "--money-2-blind":
+      case "--build-money-2-cases":
+      case "--money-2-turns-blind":
+      case "--money-2":
       case "--pacing-clues-play":
       case "--pacing-clues-blind":
       case "--judge-pacing-clues":
@@ -834,6 +862,7 @@ async function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guar
   for (const round of Object.values(PLAYTHROUGH_ROUNDS)) printPlaythroughPlan(files, (line) => console.log(line), round);
   printLatePacingPlan(files, (line) => console.log(line));
   printPacingCluesPlan(files, (line) => console.log(line));
+  printMoney2Plan(files, (line) => console.log(line));
 }
 
 const DEFAULT_PREP_MAX_SPEND = 0.1;
@@ -1361,6 +1390,26 @@ async function main() {
     case "contest-settled":
       // The report from what is recorded: no calls, so no key and no caps
       return writeContestSettled({ files, log: (line) => console.log(line) });
+    case "money-2-play":
+      // The setups and short playthroughs book to the stage, one invocation at most the stage's cap unless --max-spend says less
+      return money2PlayMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "money-2", DEFAULT_STAGE_CAPS["money-2"]), {
+        sample: args.samples ?? 1,
+        caseIds: args.caseIds,
+        turns: args.turns,
+        reportOnly: args.reportOnly,
+        armKeys: args.armKeys,
+      });
+    case "money-2-blind":
+      // No calls: the blind reading's file and its key
+      return money2BlindMode({ files, log: (line) => console.log(line) });
+    case "build-money-2-cases":
+      return buildMoney2CasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "money-2-turns-blind":
+      // No calls: the turn line's blind reading and its key
+      return money2TurnsBlindMode({ files, log: (line) => console.log(line) });
+    case "money-2":
+      // The report from what is recorded (the play's runs and the turn line's records): no calls, so no key and no caps
+      return writeMoney2({ files, log: (line) => console.log(line) });
     case "pacing-clues-play":
       // The short playthroughs book to the stage, one invocation at most the stage's cap unless --max-spend says less
       return pacingCluesPlayMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "pacing-clues", DEFAULT_STAGE_CAPS["pacing-clues"]), {

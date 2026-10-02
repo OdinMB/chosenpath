@@ -8,6 +8,7 @@ import {
   GAME_MODES,
   INVENTORY_OUTCOMES,
   KEEP_IDS,
+  MONEY_SETUP_LINE,
   NO_BLANK_ITEMS,
   ONE_OUTCOME_LIST,
   SCOREBOARD_LINE,
@@ -36,9 +37,11 @@ type SetupMode = "story" | "template" | "iteration";
 
 /**
  * What a setup call knows beyond its premise: a child reads along (a read-with-kids story), and the children's ages,
- * where a youngest child of 9 or older gets a third visible player stat (the kids-ages stage, 2026-10-01)
+ * where a youngest child of 9 or older gets a third visible player stat (the kids-ages stage, 2026-10-01); and a learning
+ * story (the setup form's learn-something category), whose figures are counted in number stats that move by what the
+ * story pays and earns (MONEY_SETUP_LINE, the money-2 stage, 2026-10-02)
  */
-export type SetupPromptOptions = { kids?: boolean; kidAges?: KidAges };
+export type SetupPromptOptions = { kids?: boolean; kidAges?: KidAges; learning?: boolean };
 
 type SetupCall = {
   players: PlayerCount;
@@ -50,6 +53,8 @@ type SetupCall = {
   kids: boolean;
   /** A child reads along and the youngest is 9 or older: a third visible player stat */
   olderKids: boolean;
+  /** A learning story: the money line after the "This setup" block. AI Iteration never has it (iteration knows no category). */
+  learning: boolean;
 };
 
 /** Template fields that identify its creator; they never go to the model. */
@@ -86,7 +91,7 @@ export class StorySetupPromptService {
   ): string {
     const kids = options.kids ?? false;
     const olderKids = kids && takesOlderKidsBudget(options.kidAges);
-    const call: SetupCall = { players: playerCount, mode: gameMode, kind, sections: ALL_SECTIONS, maxTurns, kids, olderKids };
+    const call: SetupCall = { players: playerCount, mode: gameMode, kind, sections: ALL_SECTIONS, maxTurns, kids, olderKids, learning: options.learning ?? false };
     return this.buildPrompt(call, premise, "");
   }
 
@@ -100,7 +105,7 @@ export class StorySetupPromptService {
     template: object
   ): string {
     const templateJson = JSON.stringify(Object.fromEntries(Object.entries(template).filter(([key]) => !CREATOR_FIELDS.has(key))));
-    const call: SetupCall = { players: playerCount, mode: gameMode, kind: "iteration", sections, maxTurns, kids: false, olderKids: false };
+    const call: SetupCall = { players: playerCount, mode: gameMode, kind: "iteration", sections, maxTurns, kids: false, olderKids: false, learning: false };
     return this.buildPrompt(call, feedback, templateJson);
   }
 
@@ -334,12 +339,14 @@ Maintain consistency with the other parts of the template that you are not chang
 
 Note that the user can only accept entire sections. If you make changes to the guidelines, provide a fully generated guidelines section. Same for stats, players, etc. Don't just generate additional elements that the user asked for, or make changes to a few specific items. We always need the full, updated sections.`;
     }
+    // A learning story's figures, as the block's last line (the money-2 stage, 2026-10-02)
+    const learning = call.learning ? `\n${MONEY_SETUP_LINE}` : "";
     return `Remember: everything so far has only been general instructions and examples. The story setup that you will be creating now must be fully custimized to work for the following prompt:
 
 Number of players: ${call.players}
 Game mode: ${mode}
 
-${slate}
+${slate}${learning}
 
 <premise>
 ${prompt}

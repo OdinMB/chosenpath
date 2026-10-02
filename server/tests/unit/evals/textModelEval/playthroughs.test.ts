@@ -517,6 +517,26 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(requestText(two?.request as never)).toBe(withBeatProblem(requestText(one?.request as never), first.calls[0].problem as string));
   });
 
+  it("sends an eval setup variant on its own arm where one is asked for (the money-2 stage, 2026-10-02), production's planners and turns beside it", async () => {
+    const { call, calls } = fakeCall(1);
+    const learning = { ...input(1), learning: true };
+    const { run } = await playStory(spec, learning, call, { sample: 1, turnLimit: 1, setupVariant: "moneySetup" });
+    expect(calls[0].role).toBe("setup");
+    expect(calls[0].arm.key).toBe("gpt-6-luna@low/moneySetup");
+    expect(requestText(calls[0].request)).toBe(requestText(requestFor("moneySetup", { role: "setup", setup: learning })));
+    // Production's setup is the money setup on a learning story since the stage's adoption (2026-10-02); not so on another
+    expect(requestText(calls[0].request)).toBe(requestText(requestFor("adopted", { role: "setup", setup: learning })));
+    expect(requestText(calls[0].request)).not.toBe(requestText(requestFor("adopted", { role: "setup", setup: input(1) })));
+    expect(callLimitsOf(calls[0].request)).toEqual(callLimitsOf(requestFor("adopted", { role: "setup", setup: learning })));
+    expect(calls.slice(1).map((c) => c.arm.variant)).toEqual(["adopted", "adopted"]);
+    // The story records the learning category, as production records the form's
+    expect(run.start?.category).toBe("learn-something");
+    // With no setup variant, production's setup
+    const { call: plain, calls: plainCalls } = fakeCall(1);
+    await playStory(spec, learning, plain, { sample: 1, turnLimit: 0 });
+    expect(plainCalls.map((c) => c.arm.key)).toEqual(["gpt-6-luna@low/adopted"]);
+  });
+
   it("stops after the turns asked for (a smoke), and where a call brings nothing back", async () => {
     const { call, calls } = fakeCall(1);
     const smoke = await playStory(spec, input(1), call, { sample: 1, turnLimit: 2 });

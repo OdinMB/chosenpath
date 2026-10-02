@@ -127,6 +127,8 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
     "Shared scenes in group stories (sharedScenes beside production under adopted24: --role beat, each with production's checked retry, on chapter steps of the third playthroughs, and --role thread --mode pipeline for its chapter openings' chains)",
   "contest-settled":
     "A contest's deciding chapter decides it (contestSettled beside production's chapter planner under adopted25, --role thread, on every stored plan of rounds 1-3 at a contest's last stage)",
+  "money-2":
+    "Money that moves in a learning story (moneySetup beside production's setup under adopted26: --money-2-play, listed below, then --money-2-blind; fix 7's turn line, moneyTurn beside production's turn, --role beat on eight built lemonade turns, each with production's checked retry; then --money-2-turns-blind and --money-2)",
 };
 
 /** Jobs by arm key, in plan order. */

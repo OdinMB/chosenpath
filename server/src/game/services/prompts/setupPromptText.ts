@@ -313,6 +313,20 @@ export const OLDER_KIDS_STATS =
 /** Whether a kids setup takes the older children's budget: its youngest child is 9 or older. */
 export const takesOlderKidsBudget = (kidAges: KidAges | undefined): boolean => kidAges !== undefined && kidsBandOf(kidAges) === "9-12";
 
+/**
+ * A learning story's figures (the money-2 stage of 2026-10-02, decision A's
+ * money fix; the eval's moneySetup, storyTextRounds/moneySetup.ts, which
+ * measured it): the line after the "This setup" block of a custom story's
+ * setup whose category is learn-something. The third playthroughs' lemonade
+ * stand never sold a cup: its setup typed the cash as a percentage, and every
+ * stored lemonade setup moved its money by a fixed step for how a thread went.
+ * Read blind on five learning premises twice: setups that keep what the premise
+ * counts in number stats moving by what the story pays and earns, production 0
+ * of 7, this line 8 of 8; the control premise (peer review) 2 of 2 both.
+ */
+export const MONEY_SETUP_LINE =
+  "- This story teaches with its figures. Where the premise is about money or other things that are counted (stock, supplies, people, animals), keep each such amount in a number stat, in its own units and never as a percentage, and write its effects, thresholds, sacrifice and reward in those units ('At 5 coins or fewer: ...', 'Spend 3 coins on a faster courier'). Such a stat is adjustable anytime and moves by exactly what the story pays, spends, uses up, sells or earns, in the beat where that happens: its adjustments after threads name no fixed amount for a favorable or unfavorable thread, and no story element or instruction puts a payment off to a thread's end. A figure worked out from other figures (a profit margin, a price per item, an average) is not a stat: the story works it out from the counted stats when it matters.";
+
 const CAMPS =
   "Contests have two sides, so the three players form two camps: side A is player1's camp and side B the other, and one camp holds two players. The seat roles say which seat is in which camp.";
 

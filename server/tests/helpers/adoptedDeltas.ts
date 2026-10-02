@@ -60,7 +60,10 @@
  * a contested outcome whose thread settles its last stage is the measured
  * contestSettled (PACING's deciding-thread line): not a delta;
  * withContestSettled puts it on the forms measured before, beforeContestSettled
- * takes it out.
+ * takes it out. Since the money-2 stage of 2026-10-02, a learning story's setup
+ * is the measured moneySetup and its turn that counts the measured moneyTurnB:
+ * not deltas; beforeMoneyTurn and productionThen take the turn's lines out for
+ * the variants measured earlier.
  */
 
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
@@ -89,6 +92,7 @@ import { withoutGroupOptions } from "../../src/game/services/storyTextRounds/gro
 import { SHARED_SCENES, takesScenesBlock as productionTakesScenesBlock, takesScenesPlanner } from "../../src/game/services/sharedScenes.js";
 import { withSharedScenesLines, withoutSharedScenes } from "../../src/game/services/storyTextRounds/sharedScenes.js";
 import { withContestSettledLines, withoutContestSettledLines } from "../../src/game/services/storyTextRounds/contestSettled.js";
+import { withoutMoneyTurnLines } from "../../src/game/services/storyTextRounds/moneyAddsUp.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -562,6 +566,21 @@ export function withContestSettled(measured: string, story: Story): string {
   return withContestSettledLines(measured, story);
 }
 
+/*
+ * The money-2 stage's adoption (decision A's money fix, 2026-10-02): a learning
+ * story's turn after the first that keeps a counted stat carries the money block
+ * at the end of its stat changes and, on a switch turn and the ending, the
+ * worked-out stat's exception. The measured moneyTurnB, not a delta
+ * (adoptedTurns.test.ts and adoptedForms.test.ts hold production to it);
+ * beforeMoneyTurn and productionThen take the lines out for the variants
+ * measured before. No other turn changed.
+ */
+
+/** Production's turn prompt as it stood before the money-2 adoption (a prompt without the lines as it is). */
+export function beforeMoneyTurn(production: string): string {
+  return withoutMoneyTurnLines(production);
+}
+
 /**
  * A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones
  * (beforeEndingOnlyPlayed), before the group-levers adoption of the same day (beforeGroupLevers; a group's rolled
@@ -570,12 +589,16 @@ export function withContestSettled(measured: string, story: Story): string {
  * (beforeOptionsO2c; a single player's rolled step, prompt only), before the pacing-clues adoption after that
  * (beforeLateClues; a late turn, prompt only), before the group-options adoption that evening (beforeGroupOptions;
  * a group's rolled step, prompt; its schema is groupLeversBase's) and before the scenes adoption after it
- * (beforeSharedScenes; a group chapter's opening step with several threads, prompt only). The variants measured before compare
+ * (beforeSharedScenes; a group chapter's opening step with several threads, prompt only), and before the money-2 adoption of
+ * 2026-10-02 (beforeMoneyTurn; a learning story's turn that counts, prompt only). The variants measured before compare
  * with it.
  */
 export function productionThen<R extends { prompt: string }>(request: R, story: Story): R {
   const prompt = beforeGroupLevers(
-    beforeEndingOnlyPlayed(beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeGroupOptions(beforeSharedScenes(request.prompt, story), story), story), story)), story),
+    beforeEndingOnlyPlayed(
+      beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeGroupOptions(beforeSharedScenes(beforeMoneyTurn(request.prompt), story), story), story), story)),
+      story
+    ),
     story
   );
   const schema = "schema" in request ? { schema: takesGroupLevers(story) ? groupLeversBase(story).schema : shortRepliesBase(story).schema } : {};
@@ -714,9 +737,10 @@ export function withKidsBandImageSlots(measured: RequestText, story: Story): Req
 export function productionBeforeKidsAges(story: Story): { prompt: string; json: string } {
   // Without the short-replies stage's lines, which came later that day (groupLeversBase builds on shortRepliesBase)
   // ... and without the options-o2c stage's lines on a single player's rolled step, which came later still, nor the
-  // pacing-clues stage's late lines, later again, nor the scenes stage's insertions on a group chapter's opening, later still
+  // pacing-clues stage's late lines, later again, nor the scenes stage's insertions on a group chapter's opening, later still,
+  // nor the money-2 stage's lines on a learning story's turn that counts (2026-10-02)
   const asText = (request: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) => ({
-    prompt: beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeSharedScenes(request.prompt, story), story), story)),
+    prompt: beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeSharedScenes(beforeMoneyTurn(request.prompt), story), story), story)),
     json: beforeShortRepliesJson(JSON.stringify(toJsonSchema(request.schema))),
   });
   // A group's rolled step as it stood before the group-levers adoption too (groupLeversBase), which came later that day

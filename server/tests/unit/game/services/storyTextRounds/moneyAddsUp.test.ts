@@ -4,7 +4,15 @@ import path from "node:path";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
 import type { StoryState } from "core/types/index.js";
-import { MONEY_ADDS_UP_TEXT, moneyAddsUpRequest, productionTurnMeasured, takesMoneyRule } from "../../../../../src/game/services/storyTextRounds/moneyAddsUp.js";
+import {
+  MONEY_ADDS_UP_TEXT,
+  moneyAddsUpRequest,
+  moneyTurnBase,
+  moneyTurnRequest,
+  productionTurnMeasured,
+  takesMoneyRule,
+  withoutMoneyTurnLines,
+} from "../../../../../src/game/services/storyTextRounds/moneyAddsUp.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
 import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
@@ -188,6 +196,97 @@ describe("the fix-and-retest, moneyAddsUpB", () => {
     const switchTurn = laterSwitchBeat(1, LEARNING);
     expect(requestText(requestFor("moneyAddsUpB", { role: "beat", story: switchTurn }))).toBe(moneyAddsUpRequest(switchTurn, { b: true }).prompt);
     expect(() => requestFor("moneyAddsUpB", { role: "switch", story: switchTurn })).toThrow(/does not cover role switch/);
+  });
+});
+
+/*
+ * The money-2 stage (decision A's money fix, 2026-10-02): fix 7's turn line
+ * where it is still needed. With the money setup's number stats that move by
+ * what the story pays and earns, production's turn still left the text's
+ * payments and sales out of the stat changes in 5 of the 7 played lemonade
+ * turns whose text paid or sold. moneyTurn is block B and its
+ * thread-resolution line, word for word as the money-adds-up stage measured
+ * them, on production's turn today (moneyAddsUpB's base is production as it
+ * stood then).
+ */
+describe("the turn line on production's turn today, moneyTurn", () => {
+  const withoutB = (prompt: string) => [`\n${MONEY_ADDS_UP_TEXT.blockB}`, MONEY_ADDS_UP_TEXT.resolutionLine].reduce((text, passage) => text.split(passage).join(""), prompt);
+
+  /*
+   * Its base is production's turn as the stage measured it beside the variant. Since the adoption (2026-10-02)
+   * production prints the retest's block and exception on a learning story's turn that counts, so moneyTurnBase takes
+   * them out: the same turn without the learning category, byte for byte.
+   */
+  it.each(TURNS)("%s: block B once at the end of the stat-changes section, production's request today (its money lines out) around it, prompt and schema", (_, build) => {
+    for (const players of [1, 2, 3]) {
+      const story = build(players, LEARNING);
+      const variant = moneyTurnRequest(story);
+      const base = moneyTurnBase(story);
+      expect(occurrences(variant.prompt, MONEY_ADDS_UP_TEXT.blockB)).toBe(1);
+      const next = players > 1 ? MONEY_ADDS_UP_TEXT.groupNext : MONEY_ADDS_UP_TEXT.singleNext;
+      expect(variant.prompt).toContain(`\n${MONEY_ADDS_UP_TEXT.blockB}${next}`);
+      expect(withoutB(variant.prompt)).toBe(base.prompt);
+      expect(json(variant.schema)).toBe(json(base.schema));
+      const plain = beatStep.request(story.clone({ category: undefined }));
+      expect(base.prompt).toBe(plain.prompt);
+      expect(json(base.schema)).toBe(json(plain.schema));
+    }
+  });
+
+  it("takes production's money lines out wherever they stand, and leaves a prompt without them as it is", () => {
+    const story = laterSwitchBeat(1, LEARNING);
+    const production = beatStep.request(story).prompt;
+    expect(withoutMoneyTurnLines(production)).toBe(moneyTurnBase(story).prompt);
+    expect(withoutMoneyTurnLines(moneyTurnBase(story).prompt)).toBe(moneyTurnBase(story).prompt);
+  });
+
+  it("puts the worked-out stat's exception after the thread-resolution line on a switch turn and the ending, as B did", () => {
+    for (const story of [laterSwitchBeat(1, LEARNING), endingBeat(1, LEARNING)]) {
+      expect(moneyTurnRequest(story).prompt).toContain(`${MONEY_ADDS_UP_TEXT.adjustmentsAnchor}${MONEY_ADDS_UP_TEXT.resolutionLine}`);
+    }
+    expect(moneyTurnRequest(threadBeat(1, LEARNING)).prompt).not.toContain(MONEY_ADDS_UP_TEXT.resolutionLine);
+  });
+
+  it("is production's request today byte for byte on every turn that takes no block", () => {
+    for (const story of [firstSwitchBeat(1, LEARNING), threadBeat(1, { ...LEARNING, category: "flexible" }), laterSwitchBeat(2, { ...LEARNING, playerStats: [MARGIN] })]) {
+      expect(moneyTurnRequest(story).prompt).toBe(beatStep.request(story).prompt);
+      expect(json(moneyTurnRequest(story).schema)).toBe(json(beatStep.request(story).schema));
+    }
+  });
+
+  /*
+   * Its one fix-and-retest (moneyTurnB, after the run of 2026-10-02): the
+   * replies that still did not add up told a stretch of sales or a fee in a
+   * summary with no figures ("A few small purchases follow", "the sales have
+   * not covered the stand's costs"), one subtracted an ingredient cost it only
+   * worked out, and on one step both samples kept the waiting customer from
+   * buying. One line after the amounts line: a sale, purchase or fee told in a
+   * summary is named and counted too, a cost worked out moves nothing, and no
+   * sale is left out of the scene to keep the changes simple.
+   */
+  it("its fix-and-retest adds one line right after the amounts line, and nothing else", () => {
+    for (const build of [threadBeat, laterSwitchBeat]) {
+      const story = build(1, LEARNING);
+      const retest = moneyTurnRequest(story, { retest: true });
+      expect(occurrences(retest.prompt, MONEY_ADDS_UP_TEXT.retestLine)).toBe(1);
+      expect(retest.prompt.split(`${MONEY_ADDS_UP_TEXT.retestLine}\n`).join("")).toBe(moneyTurnRequest(story).prompt);
+      expect(retest.prompt).toContain(`never a handful or a few. A price quoted, an estimate or a plan moves nothing.\n${MONEY_ADDS_UP_TEXT.retestLine}\n`);
+      expect(json(retest.schema)).toBe(json(moneyTurnRequest(story).schema));
+    }
+    expect(moneyTurnRequest(firstSwitchBeat(1, LEARNING), { retest: true }).prompt).toBe(beatStep.request(firstSwitchBeat(1, LEARNING)).prompt);
+    expect(MONEY_ADDS_UP_TEXT.retestLine).toMatch(/even where the text sums up/);
+    expect(MONEY_ADDS_UP_TEXT.retestLine).toMatch(/A cost the text only works out .* moves nothing/);
+    expect(MONEY_ADDS_UP_TEXT.retestLine).toMatch(/never leaves a sale out of the scene/);
+    const switchTurn = laterSwitchBeat(1, LEARNING);
+    expect(requestText(requestFor("moneyTurnB", { role: "beat", story: switchTurn }))).toBe(moneyTurnRequest(switchTurn, { retest: true }).prompt);
+  });
+
+  it("is the eval's moneyTurn variant, with production's turn limits and retry count, turns only", () => {
+    const story = laterSwitchBeat(1, LEARNING);
+    const request = requestFor("moneyTurn", { role: "beat", story });
+    expect(requestText(request)).toBe(moneyTurnRequest(story).prompt);
+    expect(callLimitsOf(request)).toEqual(callLimitsOf(requestFor("adopted", { role: "beat", story })));
+    expect(() => requestFor("moneyTurn", { role: "switch", story })).toThrow(/does not cover role switch/);
   });
 });
 

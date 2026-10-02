@@ -8,7 +8,8 @@ import { assembleGenerationOrder, iterationRound2Request, setupRound2Request } f
 import { PLAYER_STATS_NAMELESS } from "../../../../src/game/services/storyTextRounds/setupRound3Text.js";
 import { KIDS_EXAMPLES, SCOREBOARD_SENTENCES, adoptedSetupPrompt, isContestSetup, withLeverDirectionSchema } from "../../../helpers/adoptedDeltas.js";
 import { LEVER_DIRECTION_TEXT, leverDirectionRequest } from "../../../../src/game/services/storyTextRounds/leverDirection.js";
-import { LEVER_DIRECTION_LINE } from "../../../../src/game/services/prompts/setupPromptText.js";
+import { LEVER_DIRECTION_LINE, MONEY_SETUP_LINE } from "../../../../src/game/services/prompts/setupPromptText.js";
+import { MONEY_SETUP_TEXT, moneySetupRequest } from "../../../../src/game/services/storyTextRounds/moneySetup.js";
 import { REWARD_FIRST_SENTENCE, SACRIFICE_FIRST_SENTENCE } from "../../../../src/game/services/setupSchema.js";
 import { KIDS_AGES_SETUP_TEXT, kidsAgesSetupRequest } from "../../../../src/game/services/storyTextRounds/kidsAges.js";
 
@@ -105,6 +106,30 @@ describe("custom-story and template setup: the measured form", () => {
       expect(json(request.schema)).toContain(JSON.stringify(sacrifice.to).slice(1, -1));
       expect(json(request.schema)).not.toContain(JSON.stringify(sacrifice.from).slice(1, -1));
     }
+  });
+
+  /*
+   * The money-2 stage (decision A's money fix, 2026-10-02): a learning story's
+   * setup (the setup form's learn-something category) is the measured
+   * moneySetup byte for byte, prompt and schema; every other setup is as
+   * before.
+   */
+  it.each(INPUTS)("%i players, %s: a learning story's setup is the measured money setup byte for byte, and only a learning story's", (players, mode) => {
+    for (const maxTurns of [10, 25]) {
+      const production = setupStep.request(PREMISE, players, mode, maxTurns, "story", { learning: true });
+      const variant = moneySetupRequest(PREMISE, players, mode, maxTurns, "story", { learning: true });
+      expect(production.prompt).toBe(variant.prompt);
+      expect(json(production.schema)).toBe(json(variant.schema));
+      expect(setupStep.request(PREMISE, players, mode, maxTurns, "story").prompt).toBe(moneySetupRequest(PREMISE, players, mode, maxTurns, "story").prompt);
+      expect(setupStep.request(PREMISE, players, mode, maxTurns, "story").prompt).not.toContain(MONEY_SETUP_TEXT.line);
+    }
+  });
+
+  it("prints the money line once, from production's own constant, as the This setup block's last line", () => {
+    expect(MONEY_SETUP_LINE).toBe(MONEY_SETUP_TEXT.line);
+    const prompt = setupStep.request(PREMISE, 1, GameModes.SinglePlayer, 10, "story", { learning: true }).prompt;
+    expect(prompt.split(MONEY_SETUP_LINE)).toHaveLength(2);
+    expect(prompt).toContain(`\n${MONEY_SETUP_LINE}\n\n<premise>\n`);
   });
 
   it("prints the kids budget only when a child reads along", () => {

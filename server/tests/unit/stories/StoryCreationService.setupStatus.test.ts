@@ -225,7 +225,7 @@ describe("StoryCreationService setup status", () => {
 
   async function createWith(
     premise: string,
-    category: "read-with-kids" | "enjoy-fiction",
+    category: "read-with-kids" | "enjoy-fiction" | "learn-something",
     kidAges?: { min: number; max: number }
   ): Promise<{ storyId: string; state?: StoryState }> {
     createInitialState.mockResolvedValue(startableState());
@@ -268,6 +268,13 @@ describe("StoryCreationService setup status", () => {
   it("tells a setup of another category no ages, whatever the request carries", async () => {
     await createWith("How old is the child?: 10", "enjoy-fiction", { min: 10, max: 10 });
     expect(createInitialState.mock.calls[0][7]).toEqual({ kids: false });
+  });
+
+  // The money-2 stage of 2026-10-02: a learning story's setup keeps money and counted things in number stats
+  it("tells a learning story's setup it is one, and records the category", async () => {
+    const { state } = await createWith("A lemonade stand that teaches profit margins", "learn-something");
+    expect(createInitialState.mock.calls[0][7]).toEqual({ kids: false, learning: true });
+    expect(state?.category).toBe("learn-something");
   });
 
   it("records the read-with-kids setting the request carries, over the premise's line", async () => {

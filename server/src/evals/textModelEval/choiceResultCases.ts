@@ -47,6 +47,8 @@ export type ChoiceCaseSpec = {
   role: "beat" | "thread" | "switch";
   /** What the case tests, first in its note */
   purpose: string;
+  /** The stored run's sample (1 where not given; the money-2 stage's cases come from both samples) */
+  sample?: number;
 };
 
 const MISMATCH = "An exploration step where production's options carried out another result than the one at their position, or none:";
@@ -115,7 +117,7 @@ export function choiceResultCases(
   for (const spec of specs) {
     let replayed;
     try {
-      replayed = replayedTurn(runs, spec.story, spec.turn);
+      replayed = replayedTurn(runs, spec.story, spec.turn, spec.sample ?? 1);
     } catch (error) {
       problems.push(`${spec.id}: ${(error as Error).message}`);
       continue;
@@ -146,7 +148,7 @@ export function choiceResultCases(
       state,
       ...(fixedAnalysis ? { fixedAnalysis } : {}),
       category,
-      note: `${spec.purpose} Built from the stored playthrough ${spec.story} (sample 1) at turn ${spec.turn}, replayed from its start with its own plans, turns and dice (playthroughReplay.ts); its request is the one production sent there, byte for byte.`,
+      note: `${spec.purpose} Built from the stored playthrough ${spec.story} (sample ${spec.sample ?? 1}) at turn ${spec.turn}, replayed from its start with its own plans, turns and dice (playthroughReplay.ts); its request is the one production sent there, byte for byte.`,
     });
     const rebuilt = sha256(sent(requestInputFor(evalCase)));
     if (!sentFile || rebuilt !== promptHashOf(sentFile)) {

@@ -235,6 +235,9 @@ export class StoryCreationService {
       // read-with-kids setting, else (a premise sent without it, from an older client) the age line of its premise
       const kids = category === "read-with-kids";
       const kidAges = kids ? requestedKidAges ?? kidAgesFromPremise(prompt) : undefined;
+      // A learning story keeps its money and counted things in number stats that move by what the story pays and earns
+      // (the money-2 stage, 2026-10-02)
+      const learning = category === "learn-something";
 
       // Create initial state. A setup the story can't start from (no
       // outcomes, or multiplayer without a shared one) is generated once more,
@@ -250,7 +253,7 @@ export class StoryCreationService {
           gameMode,
           difficultyLevel,
           // A story read with a child gets the smaller stat budget with plain names, a third player stat from age 9
-          { kids, ...(kidAges ? { kidAges } : {}) }
+          { kids, ...(kidAges ? { kidAges } : {}), ...(learning ? { learning } : {}) }
         );
       const startable = await withOneRetry(
         generate,

@@ -56,7 +56,7 @@ import { parallelThreadsRequest } from "../../game/services/storyTextRounds/para
 import { resultsAsOutcomesRequest } from "../../game/services/storyTextRounds/resultsAsOutcomes.js";
 import { kidsShortTextCount, kidsTurnRequest } from "../../game/services/storyTextRounds/kidsTurn.js";
 import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
-import { moneyAddsUpRequest } from "../../game/services/storyTextRounds/moneyAddsUp.js";
+import { moneyAddsUpRequest, moneyTurnRequest } from "../../game/services/storyTextRounds/moneyAddsUp.js";
 import { latePacingRequest, pacingCluesRequest } from "../../game/services/storyTextRounds/latePacing.js";
 import { kidsAgesSetupRequest, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../game/services/storyTextRounds/kidsAges.js";
 import { groupLeversRequest } from "../../game/services/storyTextRounds/groupLevers.js";
@@ -66,6 +66,7 @@ import { optionsO2cRequest } from "../../game/services/storyTextRounds/optionsO2
 import { groupOptionsRequest } from "../../game/services/storyTextRounds/groupOptions.js";
 import { sharedScenesRequest } from "../../game/services/storyTextRounds/sharedScenes.js";
 import { contestSettledRequest } from "../../game/services/storyTextRounds/contestSettled.js";
+import { moneySetupRequest } from "../../game/services/storyTextRounds/moneySetup.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -508,7 +509,10 @@ export type VariantId =
   | "groupOptions"
   | "sharedScenes"
   | "sharedScenesB"
-  | "contestSettled";
+  | "contestSettled"
+  | "moneySetup"
+  | "moneyTurn"
+  | "moneyTurnB";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -588,6 +592,9 @@ export const VARIANTS: VariantId[] = [
   "sharedScenes",
   "sharedScenesB",
   "contestSettled",
+  "moneySetup",
+  "moneyTurn",
+  "moneyTurnB",
 ];
 
 /**
@@ -673,6 +680,11 @@ export type SetupInput = {
   kids?: boolean;
   /** The read-with-kids setting the case's story is set up for (the kids-ages stage); a story set up from it records it */
   kidAges?: KidAges;
+  /**
+   * A learning story (the setup form's learn-something category, which production's story creation records): the
+   * money-2 stage's setup variant reads it, and a story set up from it records the category
+   */
+  learning?: boolean;
 };
 
 export type IterationInput = {
@@ -736,10 +748,11 @@ function adoptedRequest(input: RequestInput): EvalRequest {
 function adoptedWords(input: RequestInput): EvalRequest {
   switch (input.role) {
     case "setup": {
-      const { premise, playerCount, gameMode, maxTurns, kids, kidAges } = input.setup;
-      // As StoryCreationService passes them: the read-with-kids setting, else the premise's age line
+      const { premise, playerCount, gameMode, maxTurns, kids, kidAges, learning } = input.setup;
+      // As StoryCreationService passes them: the read-with-kids setting, else the premise's age line; and, since the
+      // money-2 stage's adoption (2026-10-02), a learning story's flag
       const ages = kids ? kidAgesFrom(kidAges) ?? kidAgesFromPremise(premise) : undefined;
-      return setupStep.request(premise, playerCount, gameMode, maxTurns, "story", { kids, ...(ages ? { kidAges: ages } : {}) });
+      return setupStep.request(premise, playerCount, gameMode, maxTurns, "story", { kids, ...(ages ? { kidAges: ages } : {}), ...(learning ? { learning } : {}) });
     }
     case "beat":
       return beatStep.request(input.story);
@@ -1149,6 +1162,32 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   contestSettled: (input): CheckedTextRequest => {
     if (input.role !== "thread") throw new Error(`Variant contestSettled does not cover role ${input.role}`);
     return { ...contestSettledRequest(input.story), limits: productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers()) };
+  },
+  // Money and counts in a learning story's setup: counted things in number stats in their own units, moving by what the
+  // story pays and earns; production's setup limits
+  moneySetup: (input): CheckedTextRequest => {
+    if (input.role !== "setup") throw new Error(`Variant moneySetup does not cover role ${input.role}`);
+    const { premise, playerCount, gameMode, maxTurns, kids, kidAges, learning } = input.setup;
+    // As production passes a kids setup its ages (adoptedWords)
+    const ages = kids ? kidAgesFrom(kidAges) ?? kidAgesFromPremise(premise) : undefined;
+    return {
+      ...moneySetupRequest(premise, playerCount, gameMode, maxTurns, "story", { kids, ...(ages ? { kidAges: ages } : {}), ...(learning ? { learning } : {}) }),
+      limits: productionCallLimits("setup", playerCount),
+    };
+  },
+  // Fix 7's turn line (block B) on production's turn today, where the money-2 stage found it still needed; production's
+  // turn limits and retry count
+  moneyTurn: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant moneyTurn does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...moneyTurnRequest(input.story), limits: beatCallLimits(input.story), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // Its one fix-and-retest: a sale, purchase or fee told in a summary named and counted, a cost worked out moving
+  // nothing, no sale left out of the scene
+  moneyTurnB: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant moneyTurnB does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...moneyTurnRequest(input.story, { retest: true }), limits: beatCallLimits(input.story), ...(count ? { shortTextCount: count } : {}) };
   },
 };
 

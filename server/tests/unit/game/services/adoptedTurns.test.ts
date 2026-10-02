@@ -38,6 +38,8 @@ import { GROUP_LEVER_QUESTION, GROUP_SHARED_AND_OWN, REWARD_EXCEPTION, groupLeve
 import { GROUP_OPTIONS_TEXT, groupOptionsBase, groupOptionsLine, groupOptionsRequest } from "../../../../src/game/services/storyTextRounds/groupOptions.js";
 import { o2cLeverLine, optionsO2cBase, optionsO2cRequest } from "../../../../src/game/services/storyTextRounds/optionsO2c.js";
 import { OPTIONS_CONTINUITY_TEXT } from "../../../../src/game/services/storyTextRounds/turnOptionsContinuity.js";
+import { MONEY_ADDS_UP_TEXT, moneyTurnBase, moneyTurnRequest } from "../../../../src/game/services/storyTextRounds/moneyAddsUp.js";
+import { MONEY_TURN_TEXT, takesMoneyRule } from "../../../../src/game/services/moneyTurns.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -80,7 +82,10 @@ import { OPTIONS_CONTINUITY_TEXT } from "../../../../src/game/services/storyText
  * groupLeversB as before (expectGroup). Since the scenes stage of that evening,
  * a group's chapter step with several threads carries where everyone is and the
  * consistency line, as sharedScenesB measured them (withSharedScenes in
- * asAdopted; sharedScenes.test.ts holds production to sharedScenesB).
+ * asAdopted; sharedScenes.test.ts holds production to sharedScenesB). Since the
+ * money-2 stage of 2026-10-02, a learning story's turn that counts is the
+ * measured moneyTurnB byte for byte (expectMoneyTurn), on the same turn without
+ * the category.
  */
 
 /**
@@ -239,6 +244,7 @@ const asAdopted = (measured: Request, story: Story): Expected =>
  * (asAdopted), so the measured variant stands on the form measured before it.
  */
 function expectSinglePlayer(story: Story) {
+  if (takesMoneyRule(story)) return expectMoneyTurn(story, expectSinglePlayer);
   if (!takesKidsRules(story) && takesOptionRules(story)) {
     expectSame(beatStep.request(story), optionsO2cRequest(story));
     expectSame(optionsO2cBase(story), asAdopted(measuredTurn(story), story));
@@ -246,6 +252,63 @@ function expectSinglePlayer(story: Story) {
   }
   expectSame(beatStep.request(story), asAdopted(measuredTurn(story), story));
 }
+
+/*
+ * The money-2 stage's adoption (decision A's money fix, 2026-10-02): a learning
+ * story's turn after the first, where the story keeps a counted (number) stat
+ * (takesMoneyRule), carries the money block at the end of its stat changes and,
+ * on a switch turn and the ending, the worked-out stat's exception after the
+ * adjustments line: the measured fix-and-retest moneyTurnB byte for byte,
+ * prompt and JSON schema, every turn kind and player count (measured on a
+ * single player's lemonade turns; a group's is unmeasured, logged). Its base,
+ * production with the money lines taken out (moneyTurnBase), is the same turn
+ * without the learning category, which the other expectations hold to its
+ * measured form.
+ */
+function expectMoneyTurn(story: Story, expectWithout: (story: Story) => void) {
+  expectSame(beatStep.request(story), moneyTurnRequest(story, { retest: true }));
+  const plain = story.clone({ category: undefined });
+  expectSame(moneyTurnBase(story), beatStep.request(plain));
+  expectWithout(plain);
+}
+
+/** A counted stat the learning stories keep, beside the story's own stats. */
+const SUPPLIES = stat("shared_supplies", { name: "Supplies", type: "number", initialValue: 12 });
+const learning = (story: Story): Story => story.clone({ category: "learn-something", sharedStats: [...story.getState().sharedStats, SUPPLIES] });
+
+describe("learning-story turns that count: moneyTurnB as measured, every turn kind and player count (the money-2 stage)", () => {
+  it.each(SINGLE_PLAYER)("one player, %s", (_, build) => {
+    const story = learning(build());
+    expect(takesMoneyRule(story)).toBe(!story.isFirstBeat());
+    expectSinglePlayer(story);
+    // The first turn changes no stats, so it takes no block: production's turn without the category
+    if (story.isFirstBeat()) expectSame(beatStep.request(story), beatStep.request(story.clone({ category: undefined })));
+  });
+
+  it.each(GROUPS)("%s", (_, build) => {
+    const story = learning(build());
+    expect(takesMoneyRule(story)).toBe(!story.isFirstBeat());
+    expectGroup(story);
+  });
+
+  it("prints the measured block and the worked-out stat's exception from production's own constants, once each, the exception on a switch turn and the ending only", () => {
+    const { amountsNamed, retestLine, blockB, resolutionLine, adjustmentsAnchor } = MONEY_ADDS_UP_TEXT;
+    expect(MONEY_TURN_TEXT.block).toBe(blockB.replace(`${amountsNamed}\n`, `${amountsNamed}\n${retestLine}\n`));
+    expect(MONEY_TURN_TEXT.resolutionLine).toBe(resolutionLine);
+    for (const story of [learning(threadBeat(1)), learning(laterSwitchBeat(2)), learning(endingBeat(3))]) {
+      const prompt = beatStep.request(story).prompt;
+      expect(prompt.split(MONEY_TURN_TEXT.block)).toHaveLength(2);
+      expect(prompt.split(`${adjustmentsAnchor}${MONEY_TURN_TEXT.resolutionLine}`)).toHaveLength(story.getCurrentBeatType() === "thread" ? 1 : 2);
+    }
+  });
+
+  it("prints nothing on a story of another category, or a learning story that counts nothing", () => {
+    for (const story of [threadBeat(1, { category: "enjoy-fiction", sharedStats: [SUPPLIES] }), learning(threadBeat(2)).clone({ sharedStats: [], playerStats: [] })]) {
+      expect(takesMoneyRule(story)).toBe(false);
+      expect(beatStep.request(story).prompt).not.toContain(MONEY_TURN_TEXT.block);
+    }
+  });
+});
 
 describe("single-player turns: today's form with B6 as measured, a rolled chapter step as turnO2c, an exploration step as choiceResult, the ending as endingStateB", () => {
   it.each(SINGLE_PLAYER)("%s", (_, build) => {
@@ -483,6 +546,7 @@ function contestEnding(players: number, mode: GameMode = GameModes.Competitive, 
  * short-replies lines (asAdopted), so the measured variant stands on the form measured before it.
  */
 function expectGroup(story: Story) {
+  if (takesMoneyRule(story)) return expectMoneyTurn(story, expectGroup);
   if (!takesKidsRules(story) && takesGroupLevers(story)) {
     expectSame(beatStep.request(story), groupOptionsRequest(story));
     expectSame(groupOptionsBase(story), asAdopted(measuredTurn(story), story));

@@ -146,6 +146,11 @@ describe("storyFromSetup: the story a custom setup starts (AIStoryGenerator.crea
     expect(storyFromSetup(setupReply(2), { ...input(2), kids: true }, "chain-k").category).toBe("read-with-kids");
   });
 
+  it("marks a learning story as the game records one from the learn-something form (the money-2 stage, 2026-10-02)", () => {
+    expect(storyFromSetup(setupReply(1), { ...input(1), learning: true }, "chain-l").category).toBe("learn-something");
+    expect(storyFromSetup(setupReply(1), { ...input(1), learning: false }, "chain-l").category).toBeUndefined();
+  });
+
   it("records the camps three seats' roles name, as production keeps them since 2026-10-01, and none where they name none", () => {
     const roles = ["player1: the captain (side A)", "player2: the quartermaster (side B)", "player3: the scout (side B)"];
     const reply = { ...setupReply(3), characterSelectionPlan: { ...setupReply(3).characterSelectionPlan, multiplayerCoordination: roles } };

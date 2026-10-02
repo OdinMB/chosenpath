@@ -22,6 +22,7 @@ import { kidsListener, kidsTurnText, takesKidsRules } from "../kidsTurnRules.js"
 import { LATE_CLUES_TEXT, takesLateClues } from "../lateClues.js";
 import { TEXT_GOES_ON } from "../textParagraphs.js";
 import { SHARED_SCENES, scenesBlock, takesScenesBlock } from "../sharedScenes.js";
+import { MONEY_TURN_TEXT, takesMoneyRule } from "../moneyTurns.js";
 
 /**
  * The scoreboard ending rule (the setup document's decision 3, question 1,
@@ -231,6 +232,8 @@ ${
           "- The previous thread (or set of threads) was just resolved, so some meaningful stat changes might be warrented.\n" +
           "- Consider what was at stake in the previous thread and the thread's resolution.\n" +
           "- Stats define how they should be adjusted after threads. Consider the 'Adjustments after threads' parameter in the stat definitions.\n" +
+          // A learning story that counts: a worked-out stat (a margin) skips its adjustments (the money-2 stage, 2026-10-02)
+          (takesMoneyRule(story) ? MONEY_TURN_TEXT.resolutionLine : "") +
           "- Because it's the end of a thread, all stats can change, not just the ones that are marked as 'Can be adjusted anytime'.\n" +
           "\nNEW MILESTONES: To resolve the previous set of threads, for each outcome associated with these resolved threads, add a milestone based on the thread's resolution with a newMilestone change.\n" +
           "- Take the threads' resolution text as a baseline. Adjust it based on the thread's narrative text to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n" +
@@ -238,6 +241,9 @@ ${
           (story.getCurrentBeatType() === "ending" ? ENDING_MILESTONES_PLAYED : "")
         : "- Only stats that are marked as 'Can be adjusted anytime' can be changed (except for rewards and sacrifices). Even then, keep the changes minor.\n")
 }${
+      // A learning story that counts: the money the text pays and earns moves its stat (the money-2 stage, 2026-10-02)
+      takesMoneyRule(story) ? `\n${MONEY_TURN_TEXT.block}` : ""
+    }${
       story.isMultiplayer()
         ? "\n\n3. MULTIPLAYER COORDINATION\n\n" +
           "If several players are in the same switch or thread, how do you ensure that their options are a) meaningfully different from each other, b) consistent with each other, and c) coordinated? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story.\n" +

@@ -100,7 +100,12 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * beside production's chains on that round's chapter openings), then a
  * contest's deciding chapter that decides it (contest-settled: the variant's
  * chapter planner beside production's on every stored plan of rounds 1-3 that
- * settles a contested outcome's last stage).
+ * settles a contested outcome's last stage), then money that moves in a
+ * learning story (money-2: the --money-2-play mode's prep calls, the money
+ * setup beside production's setup on learning premises, each lemonade setup
+ * played on through its first chapter on production's code; then fix 7's turn
+ * line beside production's turn on eight of those turns, each turn with
+ * production's one checked retry).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -138,6 +143,7 @@ export const FEEDBACK_STAGES = [
   "group-options",
   "scenes",
   "contest-settled",
+  "money-2",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -365,6 +371,13 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // A contest's deciding chapter decides it (decision A's seal fix, 2026-10-01 evening): the chapter planner's PACING line
   // at a contest's last stage, against production's chapter planner, which runs beside it
   contestSettled: "adopted",
+  // Money and counts in a learning story's setup (decision A's money fix, 2026-10-02): counted things in number stats in
+  // their own units, moving by what the story pays and earns, against production's setup, which plays beside it
+  moneySetup: "adopted",
+  // Its turn line (fix 7's block B on production's turn today), against production's turn, which runs beside it
+  moneyTurn: "adopted",
+  // Its one fix-and-retest, against production's turn
+  moneyTurnB: "adopted",
 };
 
 /**
@@ -730,6 +743,8 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return scenesArms(role);
     case "contest-settled":
       return contestSettledArms(role);
+    case "money-2":
+      return money2Arms(role);
     default:
       return [];
   }
@@ -743,6 +758,59 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
  * the same minutes.
  */
 export const CONTEST_SETTLED_PROMPT_STATE = "adopted25";
+
+/**
+ * The prompt state of the money-2 stage (decision A's money fix, 2026-10-02):
+ * production's own code since the contest-settled adoption (the chapter
+ * planner's deciding-thread line), under a tag no earlier stage used. Its
+ * setups and short playthroughs are the --money-2-play mode's prep calls
+ * (money2Prep.ts); its turn line runs as --run arms (money2Arms).
+ */
+export const MONEY_2_PROMPT_STATE = "adopted26";
+
+/**
+ * The money-2 stage's turn cases (money2Cases.ts, no calls): eight turns of
+ * the stage's own lemonade runs, where production's turn moved or failed to
+ * move the money its text paid and earned, each request the one production
+ * sent there.
+ */
+export const MONEY_2_TURN_CASES = [
+  "round-money2-setup-s1-t3",
+  "round-money2-setup-s1-t4",
+  "round-money2-setup-s1-t5",
+  "round-money2-setup-s2-t3",
+  "round-money2-setup-s2-t4",
+  "round-money2-setup-s2-t5",
+  "round-money2-prod-s2-t4",
+  "round-money2-prod-s2-t5",
+] as const;
+
+/**
+ * Fix 7's turn line where the money-2 stage found it still needed: production's
+ * turn (adopted) and the variant (moneyTurn) on the single-player turn model
+ * (Luna medium), twice on the stage's turn cases, interleaved, each turn with
+ * production's one checked retry, under adopted26. Its setups and short
+ * playthroughs are the --money-2-play mode's prep calls, not --run arms.
+ */
+function money2Arms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  const arms: ArmPlan[] = (["adopted", "moneyTurn"] as const).map((variant) => ({
+    arm: adoptedDefault("beat", variant),
+    samples: 2,
+    scope: "single-player" as const,
+    caseIds: [...MONEY_2_TURN_CASES],
+  }));
+  return [...arms, { arm: adoptedDefault("beat", "moneyTurnB"), samples: 2, scope: "single-player", caseIds: [...MONEY_2_RETEST_CASES] }];
+}
+
+/**
+ * The turn line's fix-and-retest cases (after the run of 2026-10-02): where its
+ * replies still did not add up or left a sale out of the scene (the fair's
+ * summary at the switch turn, the early sale's further purchases, the waiting
+ * customer who never bought), and where production's replies told sales with
+ * no figures and the line's did not (the supplies and permit paid).
+ */
+export const MONEY_2_RETEST_CASES = ["round-money2-setup-s1-t4", "round-money2-setup-s2-t3", "round-money2-setup-s2-t5", "round-money2-prod-s2-t4"];
 
 /**
  * The stage's cases (contestSettledCases.ts, no calls): the chapter planner's
@@ -1556,7 +1624,7 @@ export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
 export const PLAYTHROUGHS_3_PROMPT_STATE = "adopted22";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
-const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies", "group-options", "scenes"];
+const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies", "group-options", "scenes", "money-2"];
 
 export function stageChecksTurns(stage: Stage): boolean {
   return CHECKED_TURN_STAGES.includes(stage);
@@ -1882,6 +1950,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "group-options",
   "scenes",
   "contest-settled",
+  "money-2",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1959,6 +2028,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The contest-settled stage's chapter plans from the playthroughs of rounds 1-3 (2026-10-01, decision A), frozen after
   // every earlier stage had closed
   ...CONTEST_SETTLED_CASES.map((id): [string, Stage] => [id, "contest-settled"]),
+  // The money-2 stage's lemonade turns from its own runs (2026-10-02, decision A), frozen after every earlier stage had
+  // closed
+  ...MONEY_2_TURN_CASES.map((id): [string, Stage] => [id, "money-2"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

@@ -18,8 +18,11 @@ import type { PlayRun } from "./playthroughs.js";
  * Each is then recorded as the game records a story from the setup form's
  * learn-something category (StoryCreationService keeps the form's category),
  * which the eval's run did not record (storyFromSetup records only a
- * read-with-kids category); production's turn reads no learning category, so
- * the request is still the one the run sent, and the variant's block applies.
+ * read-with-kids category); production's turn read no learning category then,
+ * so the request is still the one the run sent (the check reads the replayed
+ * story, before the category is recorded; since the money-2 adoption of
+ * 2026-10-02 production prints the money lines on a learning story's turn that
+ * counts), and the variant's block applies.
  *
  * Where the ledger broke: turn 3 (the text paid five coins for fruit, the
  * chosen sacrifice, and one more for paper sleeves, and sold cups into the
