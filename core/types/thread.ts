@@ -218,10 +218,11 @@ export type Thread = Omit<z.infer<typeof threadSchema>, "progression"> & {
   resolution: Resolution | null;
   milestone: string | null;
   /**
-   * A contest the plan check played as one side's challenge (PL-12, the server's planChecks.ts): the contest side,
-   * on its scoreboard, whose win the challenge's favorable result is (its unfavorable result is the other side's win),
-   * so the scoreboard repair can follow it. Absent on every other thread, on one converted before 2026-10-01, and on
-   * one whose players' camp the check can't tell (three players, player1 elsewhere, no camp recorded or played).
+   * A contest the plan check played as one side's challenge (PL-12, the server's planChecks.ts), or since 2026-10-02 a
+   * challenge the planner wrote on a contested shared outcome for one camp: the contest side, on its scoreboard, whose
+   * win the challenge's favorable result is (its unfavorable result is the other side's win), so the scoreboard repair
+   * can follow it. Absent on every other thread, on one converted before 2026-10-01 or planned before 2026-10-02, and on
+   * one whose players' camp the check can't tell (three players, no camp recorded or played, or camps that differ).
    */
   favorableSide?: "sideA" | "sideB";
   /**

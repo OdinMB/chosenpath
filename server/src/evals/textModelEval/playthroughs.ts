@@ -438,8 +438,9 @@ export type FailedSend = { send: string; plan?: PlayPlan; calls: PlayCallLog[]; 
 
 /**
  * A contest step or chapter this turn follows (production's resultsFollowed): its result, its scoreboard, and whether
- * player1 is on side A (the scoreboard's first side); `converted` for a contest the plan check made one side's challenge,
- * its result in contest terms by the side it stored (boardResultOf, since 2026-10-01).
+ * player1 is on side A (the scoreboard's first side); `converted` for a challenge read by its stored side, a contest the
+ * plan check made one side's challenge or (since 2026-10-02) one the planner wrote on a contested outcome for one camp,
+ * its result in contest terms by that side (boardResultOf, since 2026-10-01).
  */
 export type ContestResult = { outcomeId: string; board?: string; result: string | null; oriented: boolean; converted?: true };
 

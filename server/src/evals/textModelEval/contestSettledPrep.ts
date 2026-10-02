@@ -61,6 +61,8 @@ export type ContestPlanRow = {
   /** The kept plan has a thread on the contest */
   found: boolean;
   kind?: "challenge" | "contest" | "exploration";
+  /** A challenge's stored scoreboard side (a converted contest's, or since 2026-10-02 the camp of one the planner wrote) */
+  favorableSide?: "sideA" | "sideB";
   sideA: string[];
   sideB: string[];
   question?: string;
@@ -114,6 +116,7 @@ export function contestPlanRows(story: Story, written: ThreadAnalysis, base: Row
       outcomeId,
       found: true,
       kind: Array.isArray(kept.progression) && kept.progression.length > 0 ? getThreadType(kept) : kept.playersSideB.length > 0 ? "contest" : undefined,
+      ...(kept.favorableSide ? { favorableSide: kept.favorableSide } : {}),
       sideA: [...kept.playersSideA],
       sideB: [...kept.playersSideB],
       ...(typeof question === "string" ? { question } : {}),
@@ -370,7 +373,7 @@ export function writeContestSettled(ctx: Pick<PrepContext, "files" | "log">): vo
     "|---|---|---|---|---|---|---|",
     ...[...read]
       .sort((a, b) => a.caseId.localeCompare(b.caseId) || a.sample - b.sample || a.armKey.localeCompare(b.armKey))
-      .map((r) => `| ${r.caseId} | ${r.sample} | ${armName(r.armKey)} | ${verdictText(r)}${r.note ? `: ${r.note.replace(/\|/g, "/")}` : ""} | ${r.found ? (r.kind ?? "?") : "none"} | ${r.deferring} | ${(r.question ?? "").replace(/\|/g, "/")} |`),
+      .map((r) => `| ${r.caseId} | ${r.sample} | ${armName(r.armKey)} | ${verdictText(r)}${r.note ? `: ${r.note.replace(/\|/g, "/")}` : ""} | ${r.found ? `${r.kind ?? "?"}${r.favorableSide ? ` (${r.favorableSide})` : ""}` : "none"} | ${r.deferring} | ${(r.question ?? "").replace(/\|/g, "/")} |`),
     "",
     "## Every plan's thread on its contest",
     "",

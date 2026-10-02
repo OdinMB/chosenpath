@@ -454,7 +454,26 @@ function oneSidedAsChallenge(story: Story, thread: Thread, repairs: Repair[]): T
   };
 }
 
-/** One thread's one-sided contest (PL-12), its contest, outcome and result kind (PL-5, PL-6, PL-8), then its contest sides (PL-11). */
+/**
+ * A challenge the planner wrote on a contested shared outcome, in a group that plays contests, stores the scoreboard side
+ * its players play for (`favorableSide`, as a converted contest's), so its favorable result is that side's win (the review
+ * of the contest-settled adoption, 2026-10-02). The deciding chapter of a contest not every player picked is written as
+ * that side's challenge by the planner itself (pacing.ts, CONTEST_DECIDED.oneSided), so PL-12 converts nothing: the
+ * stage's four one-sided plans were challenges with no side stored, and the scoreboard repair read no winner on the
+ * chapter that decides the contest (round 3's space pirates' kind of wrong-way move, 50 -> 65, would stand). Stored only
+ * where every player in it has a known camp and all share one (campOf): unlike a contest's side, nothing in a challenge
+ * says its players are one side, so player1 beside a seat of unknown camp stores none. A thread with a side already
+ * (converted by PL-12) keeps it.
+ */
+function withChallengeCamp(story: Story, thread: Thread, outcomes: StoryOutcomes): Thread {
+  if (thread.favorableSide || !story.isMultiplayer() || !CONTEST_MODES.includes(story.getGameMode())) return thread;
+  if (!outcomes.contestedShared.includes(thread.outcomeId) || thread.playersSideA.length === 0) return thread;
+  const camps = new Set(thread.playersSideA.map((slot) => campOf(story, slot)));
+  const [camp] = [...camps];
+  return camps.size === 1 && camp ? { ...thread, favorableSide: camp } : thread;
+}
+
+/** One thread's one-sided contest (PL-12), its contest, outcome and result kind (PL-5, PL-6, PL-8), then its contest sides (PL-11) or a challenge's camp. */
 function checkThread(
   story: Story,
   written: Thread,
@@ -499,6 +518,7 @@ function checkThread(
     problems.push(`${label} has players on side B, which makes it a contest, but its results are not sideAWins/mixed/sideBWins`);
     return thread;
   }
+  if (kind === "challenge") return withChallengeCamp(story, thread, outcomes);
   return sidesUsable ? withPlayer1OnSideA(thread, repairs) : thread;
 }
 

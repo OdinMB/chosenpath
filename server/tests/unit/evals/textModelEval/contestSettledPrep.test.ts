@@ -90,8 +90,15 @@ describe("contestPlanRows: a plan read after the game's plan check, at the conte
   it("reads a one-sided contest as the plan check keeps it, that side's challenge", () => {
     const story = contestPlanning([1, 0]);
     const [row] = contestPlanRows(story, salePlan(SETTLES, "contest", [], ["player2"]), base);
-    expect(row).toMatchObject({ found: true, kind: "challenge", sideA: ["player2"], sideB: [] });
+    expect(row).toMatchObject({ found: true, kind: "challenge", favorableSide: "sideB", sideA: ["player2"], sideB: [] });
     expect(row.milestones).toEqual({ favorable: SETTLES.sideBWins, mixed: SETTLES.mixed, unfavorable: SETTLES.sideAWins });
+  });
+
+  it("reads the scoreboard side of a one-sided challenge the planner wrote itself, as the plan check stores it since 2026-10-02", () => {
+    const story = contestPlanning([1, 0]);
+    const challenge = { favorable: SETTLES.sideBWins, mixed: SETTLES.mixed, unfavorable: SETTLES.sideAWins };
+    const [row] = contestPlanRows(story, salePlan(challenge, "challenge", ["player2"], []), base);
+    expect(row).toMatchObject({ found: true, kind: "challenge", favorableSide: "sideB", sideA: ["player2"], sideB: [] });
   });
 
   it("marks a plan with no thread on the decided contest, and reads nothing where no contest is decided", () => {

@@ -155,9 +155,11 @@ export function resultsFollowed(story: Story): { thread: Thread; result: Resolut
 
 /**
  * A contest's result as its scoreboard reads it: the result in contest terms, and whether side A is the board's first
- * side (player1's: a contest player1 is on side A of, or one the plan check made one side's challenge, whose stored side
- * is the board's). Undefined for a thread that is no contest: a challenge without a stored side (planned as one,
- * converted before 2026-10-01, or one whose camp nothing said) or an exploration. The eval's playthroughs record it too.
+ * side (player1's: a contest player1 is on side A of, or a challenge with a stored side, which is the board's: one the
+ * plan check made of a one-sided contest, or since 2026-10-02 one the planner wrote on a contested outcome for one camp).
+ * Undefined for a thread that is no contest: a challenge without a stored side (on another outcome, converted before
+ * 2026-10-01, planned before 2026-10-02, or one whose camp nothing said) or an exploration. The eval's playthroughs record
+ * it too.
  */
 export type BoardResult = { result: "sideAWins" | "mixed" | "sideBWins" | null; oriented: boolean; converted?: true };
 
@@ -167,7 +169,7 @@ export function boardResultOf(thread: Thread, result: Resolution | null): BoardR
     const read = result === "sideAWins" || result === "mixed" || result === "sideBWins" ? result : null;
     return { result: read, oriented: thread.playersSideA.includes("player1") };
   }
-  // A contest the plan check made one side's challenge (PL-12): its favorable result is its stored side's win
+  // A challenge with a stored side (PL-12's conversion, or the planner's own on a contested outcome): its favorable result is that side's win
   const side = type === "challenge" ? thread.favorableSide : undefined;
   if (!side) return undefined;
   const other = side === "sideA" ? "sideB" : "sideA";
@@ -186,10 +188,12 @@ function winnerOf(read: BoardResult): ScoreboardWinner | null {
  * scoreboard stat id. A mixed result names no winner, and neither does a
  * contest player1 is not on side A of (sitting out, or on side B of a plan
  * PL-11 never saw). A contest the plan check made one side's challenge is
- * read by the side it stored (`favorableSide`, since 2026-10-01): its
- * favorable result is that side's win, its unfavorable one the other's; a
- * challenge without one (planned as such, converted before then, or one whose
- * players' camp nothing said, campOf) names no winner. A scoreboard is left alone where its contests disagree or any of
+ * read by the side it stored (`favorableSide`, since 2026-10-01), and so,
+ * since 2026-10-02, is a challenge the planner wrote on a contested outcome
+ * for one camp (planChecks.ts, withChallengeCamp): its favorable result is
+ * that side's win, its unfavorable one the other's; a challenge without one
+ * (converted or planned before then, or one whose players' camp nothing said,
+ * campOf) names no winner. A scoreboard is left alone where its contests disagree or any of
  * them names no winner.
  */
 export function scoreboardWinners(story: Story): Map<string, ScoreboardWinner> {
