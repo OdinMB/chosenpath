@@ -231,11 +231,13 @@ export function productionCallLimits(role: TextRole, players: number, scope: Cal
       return { timeoutMs: 120_000, maxCompletionTokens: 20_000 };
     case "templateGeneration":
     case "templateIteration":
-      // Sol low since 2026-09-28, GPT-6.1 Sol low since 2026-10-02 (the same measured pace at low; limits kept). No player
-      // waits, so the timeout has room for a slow evening: 240 s since 2026-09-29 (was 150 s), after Sol's AI Drafts took
-      // 104 and 134 s on 2026-09-28 at about 20-24 ms a token, a pace at which Sol low's longest measured setup (8,258
-      // tokens) takes about 195 s. The cap stays 2.4x that setup.
-      return { timeoutMs: 240_000, maxCompletionTokens: 20_000 };
+      // Sol low since 2026-09-28, GPT-6.1 Sol low since 2026-10-02. No player waits, so the timeout has room for a slow
+      // evening. History: 150 s, then 240 s from 2026-09-29 after Sol's AI Drafts took 104 and 134 s on 2026-09-28 at
+      // about 20-24 ms a token (a pace at which Sol low's longest measured setup, 8,258 tokens, takes about 195 s); 360 s
+      // since 2026-10-02, after GPT-6.1 Sol's one AI Draft took 202 s (84% of 240 s) writing 7,243 tokens at about 27 ms
+      // a token, a pace at which 240 s would cut a draft at about 8,700 tokens. The cap stays 20,000 (2.4x Sol low's
+      // longest setup): at that pace it is reached around 540 s, so the timeout still binds first and cuts a runaway.
+      return { timeoutMs: 360_000, maxCompletionTokens: 20_000 };
     case "switchAnalysis":
     case "threadAnalysis":
       return { timeoutMs: 30_000, maxCompletionTokens: 4_000 };

@@ -493,7 +493,8 @@ describe("planJobs: the round stages and the migration check", () => {
         : setupStep.request(premise, playerCount, gameMode, maxTurns, "story", { kids: c.tags.kids });
       expect(requestText(request)).toBe(production.prompt);
       expect(JSON.stringify(toJsonSchema(request.schema))).toBe(JSON.stringify(toJsonSchema(production.schema)));
-      expect(callLimitsOf(request)).toEqual(template ? { timeoutMs: 240_000, maxCompletionTokens: 20_000 } : { timeoutMs: 120_000, maxCompletionTokens: 20_000 });
+      // The editor's limits as production has them now (360 s since 2026-10-02; the final check's drafts ran at 240 s)
+      expect(callLimitsOf(request)).toEqual(template ? { timeoutMs: 360_000, maxCompletionTokens: 20_000 } : { timeoutMs: 120_000, maxCompletionTokens: 20_000 });
     }
   });
 
