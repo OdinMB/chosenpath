@@ -38,7 +38,7 @@ import {
   switchPlanProblem,
   turnsLeft,
 } from "../../game/services/pacing.js";
-import { checkSwitchPlan, checkThreadPlan, checkedSwitchPlan, checkedThreadPlan } from "../../game/services/planChecks.js";
+import { PRODUCTION_THREAD_CHECK, checkSwitchPlan, checkThreadPlan, checkedSwitchPlan, checkedThreadPlan } from "../../game/services/planChecks.js";
 import { TURN_RESENDS, UnusableResultError, withOneRetry } from "../../game/services/retryOnce.js";
 import { boardResultOf, resultsFollowed, scoreboardOf } from "../../game/services/scoreboards.js";
 import { analysisBefore, beatStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
@@ -883,7 +883,7 @@ export async function playStory(
       const result =
         kind === "switch"
           ? checkSwitchPlan(before, parsed as SwitchAnalysis)
-          : checkThreadPlan(before, parsed as ThreadAnalysis, { lengths: true, ...(options.planLengths ? { allowedLengths: options.planLengths } : {}) });
+          : checkThreadPlan(before, parsed as ThreadAnalysis, { ...PRODUCTION_THREAD_CHECK, ...(options.planLengths ? { allowedLengths: options.planLengths } : {}) });
       if (result.problem) log.problem = result.problem;
       if (result.lengthProblem) log.lengthProblem = result.lengthProblem;
       // A switch plan the soft rules find wanting (a variant's, else production's own, checkedSwitchPlan's default: PACING's

@@ -6,7 +6,7 @@ import type { Story } from "core/models/Story.js";
 import type { SetOfBeatGenerationSchema, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import { contestLastStageProblem, contestsAtLastStage } from "../../../../src/game/services/pacing.js";
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
-import { checkThreadPlan } from "../../../../src/game/services/planChecks.js";
+import { PRODUCTION_THREAD_CHECK, checkThreadPlan } from "../../../../src/game/services/planChecks.js";
 import { CLOSING_TURN_CAP } from "../../../../src/shared/llm/chatModel.js";
 import { campsOfSetup, scoreboardWinners } from "../../../../src/game/services/scoreboards.js";
 import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
@@ -165,10 +165,13 @@ describe("replayRun on the stored playthroughs (skipped where the output folder 
     expect(turns).toBe(37);
   });
 
-  (stored.length ? it : it.skip)("rebuilds the group stories' turns byte for byte up to the first group exploration step the owner now decides", () => {
-    // Food trucks: chapter 7 (turns 23-25, Luz's crew promise with Jo in it) went Jo's way; space pirates: chapter 5
-    // (turns 18-19, Mika's outcome, all three in it) went Ari's way. From the step after, production's resolution differs
-    const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 19 };
+  (stored.length ? it : it.skip)("rebuilds the group stories' turns byte for byte up to the first group step production now resolves differently", () => {
+    // Food trucks: chapter 7 (turns 23-25, Luz's crew promise with Jo in it) went Jo's way; production lets the owner
+    // decide it. Space pirates: the crown's first hearing (turns 6-8, Ari alone against Juno and Mika), whose turn-7 step
+    // (Ari favorable, Juno mixed, Mika favorable) was mixed on the raw counts and is side A's since each side is read by
+    // its players' average (the review of the fourth playthroughs, 2026-10-02); before that, chapter 5 (turns 18-19, Mika's
+    // outcome) went Ari's way where the owner decides it. From the step after, production's resolution differs
+    const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 8 };
     for (const run of stored.filter((r) => r.input.playerCount > 1)) {
       const replayed = replayRun(run).filter((r) => r.turn < firstChanged[run.spec.id]);
       expect(replayed.length).toBe(firstChanged[run.spec.id] - 1);
@@ -608,5 +611,84 @@ describe("replayRun on the stored round 3 (skipped where the output folder is ab
     const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 19 };
     expect(chargedOnOffer(stored, (run) => firstChanged[run.spec.id] ?? Number.POSITIVE_INFINITY)).toEqual([]);
     expect(chargedOnOffer(stored2, (run) => (run.spec.id === "play-estate-agents" ? 22 : Number.POSITIVE_INFINITY))).toEqual([]);
+  });
+});
+
+const stored4: PlayRun[] = fs.existsSync(path.join(DIR, "playthroughs-4.json")) ? playthroughRunsFrom(JSON.parse(fs.readFileSync(path.join(DIR, "playthroughs-4.json"), "utf-8"))) : [];
+
+/** Every stored group chapter plan's calls, each reply checked again as production's planner call checks it now: the thread-names problems it finds. */
+function namedElsewhere(runs: PlayRun[], round: number) {
+  return runs
+    .filter((run) => run.input.playerCount > 1)
+    .flatMap((run) =>
+      replayRun(withCampsKept(run)).flatMap((r) => {
+        const plan = r.played.plan;
+        if (plan?.kind !== "chapter plan") return [];
+        return plan.calls.flatMap((c, n) => {
+          if (!c.outputFile) return [];
+          const parsed = (JSON.parse(fs.readFileSync(path.join(DIR, c.outputFile), "utf-8")) as { parsed?: unknown }).parsed as ThreadAnalysis;
+          const checked = checkThreadPlan(r.beforePlan, parsed, PRODUCTION_THREAD_CHECK);
+          return checked.softNotes?.includes("playerNamedElsewhere") ? [[round, run.spec.id, r.turn, n + 1, (checked.lengthProblem?.match(/\(player\d\)/g) ?? []).join(" ")]] : [];
+        });
+      })
+    );
+}
+
+/*
+ * The review of the fourth playthroughs (2026-10-02): two plan check fixes, read on every stored round. Rounds 1 and 2
+ * are read up to their owner-roll turns where their states differ from production's; round 4 was played on today's code
+ * but for these two.
+ */
+describe("replayRun on the stored round 4 (skipped where the output folder is absent)", () => {
+  (stored4.length ? it : it.skip)("production now asks once more over a chapter plan that names a player its check took out: round 4's space pirates' turn 6, and two retries of round 1", () => {
+    expect([...namedElsewhere(stored, 1), ...namedElsewhere(stored2, 2), ...namedElsewhere(stored3, 3), ...namedElsewhere(stored4, 4)]).toEqual([
+      // Round 1, before the scenes rule: each the second call, which production keeps (one retry only)
+      [1, "play-food-trucks", 6, 2, "(player1)"],
+      [1, "play-space-pirates", 6, 2, "(player2) (player3)"],
+      // Ari and Tamsin written into the Starfall contest beside Mara and into their own picks; the contest's steps, plan
+      // and scene named both after PL-4 took them out
+      [4, "play-space-pirates", 6, 1, "(player1) (player2)"],
+    ]);
+  });
+
+  (stored4.length ? it : it.skip)("a contest step read by each side's average: the space pirates' turn 13, all three unfavorable, is mixed where the run read side A's", () => {
+    const run = stored4.find((r) => r.spec.id === "play-space-pirates");
+    const at14 = run ? replayRun(withCampsKept(run)).find((r) => r.turn === 14) : undefined;
+    // As played (raw counts): side A's step, Ari alone against Tamsin and Mara
+    expect(at14?.played.contestResults?.map((c) => [c.outcomeId, c.result])).toEqual([["shared_starfall_claim", "sideAWins"]]);
+    const writ = at14?.beforePlan.getCurrentThreadAnalysis()?.threads.find((t) => t.id === "the_claimant_s_writ");
+    expect([writ?.playersSideA, writ?.playersSideB]).toEqual([["player1"], ["player2", "player3"]]);
+    const rolls = ["player1", "player2", "player3"].map((slot) => at14?.beforePlan.getPlayer(slot)?.beatHistory[12]?.resolution);
+    expect(rolls).toEqual(["unfavorable", "unfavorable", "unfavorable"]);
+    expect(writ?.progression[0].resolution).toBe("mixed");
+  });
+
+  (stored4.length ? it : it.skip)("a contest converted on an outcome already complete stores no side: the space pirates' last chapter, read by no winner at turns 24 and 25", () => {
+    // Every stored conversion and planner-written challenge of rounds 1-3 sits on an outcome still open: unchanged
+    expect([...convertedSides(stored), ...convertedSides(stored2), ...convertedSides(stored3)].map((s) => [s.id, s.turn, s.favorableSide])).toEqual([
+      ["play-space-pirates", 10, "sideB"],
+      ["play-food-trucks", 12, "sideA"],
+      ["play-space-pirates", 6, "sideB"],
+    ]);
+    // Round 4: Tamsin's beacon contest at turn 22, on the Starfall claim side A won at turn 16, stored side B when played
+    const run = stored4.find((r) => r.spec.id === "play-space-pirates");
+    const replayed = run ? replayRun(withCampsKept(run)) : [];
+    const at22 = replayed.find((r) => r.turn === 22);
+    const storedBeacon = (at22?.played.plan?.plan as ThreadAnalysis | undefined)?.threads.find((t) => t.id === "the_voice_behind_the_beacon");
+    expect([storedBeacon?.outcomeId, storedBeacon?.favorableSide]).toEqual(["shared_starfall_claim", "sideB"]);
+    const used = [...(at22?.played.plan?.calls ?? [])].reverse().find((c) => !c.problem && c.outputFile);
+    const parsed = (JSON.parse(fs.readFileSync(path.join(DIR, used?.outputFile ?? ""), "utf-8")) as { parsed?: unknown }).parsed as ThreadAnalysis;
+    const rechecked = at22 ? checkThreadPlan(at22.beforePlan, parsed).plan.threads : [];
+    expect(rechecked.map((t) => [t.id, t.favorableSide])).toEqual([
+      ["the_lien_in_public", undefined],
+      ["the_voice_behind_the_beacon", undefined],
+    ]);
+    // Still Tamsin's challenge, the stored thread but for the side
+    expect(JSON.parse(JSON.stringify(rechecked[1]))).toEqual(JSON.parse(JSON.stringify({ ...storedBeacon, favorableSide: undefined })));
+    // Replayed without the side: her favorable steps name no winner where production read side B, the camp that lost
+    const winners = (story: Story) => [...scoreboardWinners(story)];
+    const unsided = (story: Story) => withSidesStored(story, [{ id: "play-space-pirates", round: 4, turn: 22, thread: "the_voice_behind_the_beacon", recheckedEqualsStored: true }]);
+    expect([24, 25].map((turn) => winners(replayed.find((r) => r.turn === turn)?.before as Story))).toEqual([[["shared_starfall_score", "sideB"]], [["shared_starfall_score", "sideB"]]]);
+    expect([24, 25].map((turn) => winners(unsided(replayed.find((r) => r.turn === turn)?.before as Story) as Story))).toEqual([[], []]);
   });
 });

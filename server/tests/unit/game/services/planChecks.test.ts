@@ -629,6 +629,33 @@ describe("checkThreadPlan", () => {
       expect(checkThreadPlan(threadStory(1), threadPlan([challengeOn(["player1"])])).plan.threads[0]).not.toHaveProperty("favorableSide");
     });
 
+    /*
+     * The review of the fourth playthroughs (2026-10-02): the space pirates' last chapter played the Starfall claim after
+     * side A had won it at turn 16 (an aftermath). PL-12 made Tamsin's one-sided contest her challenge and stored side B,
+     * so production read her favorable steps 24 and 25 as wins for the camp that had lost, and would have turned an ending
+     * move toward side A around. A thread on a contested outcome that already holds every milestone it intends stores no
+     * side: its results replay a decided contest, and name no winner on the board.
+     */
+    const decided = (story: Story, milestones: string[] = ["A leads", "A takes the crown"]) =>
+      story.clone({ sharedOutcomes: story.getSharedOutcomes().map((o) => (o.id === "shared_crown" ? { ...o, milestones } : o)) });
+
+    it("stores no side on a contest converted, or a challenge written, on a contested outcome already complete (the space pirates' last chapter)", () => {
+      const camps = { player1: "sideA", player2: "sideB", player3: "sideB" } as const;
+      const story = decided(groupAfterPicks(GameModes.CooperativeCompetitive, THREE).clone({ camps }));
+      const converted = checkThreadPlan(story, besidePlayer1(contestThread([], ["player2"], "the_beacon")));
+      expect(converted.problem).toBeUndefined();
+      expect(converted.repairs).toContainEqual({ kind: "contestOneSided", detail: "the_beacon" });
+      expect(getThreadType(converted.plan.threads[1])).toBe("challenge");
+      expect(converted.plan.threads[1]).not.toHaveProperty("favorableSide");
+      const written = checkThreadPlan(story, besidePlayer1(challengeOn(["player2"], "the_beacon")));
+      expect(written.problem).toBeUndefined();
+      expect(written.plan.threads[1]).not.toHaveProperty("favorableSide");
+      // One milestone still to come: the chapter that decides the contest stores its side, as before
+      const open = decided(groupAfterPicks(GameModes.CooperativeCompetitive, THREE).clone({ camps }), ["A leads"]);
+      expect(checkThreadPlan(open, besidePlayer1(contestThread([], ["player2"], "the_beacon"))).plan.threads[1].favorableSide).toBe("sideB");
+      expect(checkThreadPlan(open, besidePlayer1(challengeOn(["player2"], "the_beacon"))).plan.threads[1].favorableSide).toBe("sideB");
+    });
+
     it("uses a first reply whose only fault was the one-sided contest: no retry, every player where they picked", async () => {
       // The space pirates' turn 6: Ari alone in the contest he picked, the other two in the threads they picked
       const story = groupAfterPicks(GameModes.CooperativeCompetitive, { player1: "shared_crown", player2: "player2_debt", player3: "shared_escape" });
@@ -1201,6 +1228,80 @@ describe("checked plan calls", () => {
 
       const checked = checkThreadPlan(threadStory(1), both(), { lengths: true });
       expect(prompts[1]).toBe(withPlanProblem("THE PROMPT", `${checked.problem}; ${checked.lengthProblem}`));
+    });
+  });
+
+  /*
+   * The review of the fourth playthroughs (2026-10-02), the space pirates' turn 6: the planner wrote Ari and Tamsin into
+   * the Starfall contest beside Mara and into the threads they picked. PL-4 kept each on their pick and took them out of
+   * the contest, which PL-12 then made Mara's challenge, but its steps, plan and scene still named Ari and his skiff:
+   * Mara's turns put him in the wreck lane while his own had him in the galley. A thread that names a player the check
+   * took out of it is worth the one retry, told why; like a length, it never fails the turn.
+   */
+  describe("a thread that names a player the check took out of it (production's check since the review of the fourth playthroughs)", () => {
+    const NAMES: Record<string, string> = { player1: "Ari Nox", player2: "Tamsin Quill", player3: "Mara Vale" };
+    const story = () => {
+      const picked = groupAfterPicks(GameModes.CooperativeCompetitive, { player1: "player1_trust", player2: "player2_debt", player3: "shared_crown" });
+      return picked.clone({ players: Object.fromEntries(Object.entries(picked.getPlayers()).map(([slot, player]) => [slot, { ...player, name: NAMES[slot] }])) });
+    };
+    /** Ari and Tamsin in the threads they picked and, again, in the contest Mara picked, whose text is given here. */
+    const doubleBooked = (marker: Partial<Thread> = {}) =>
+      threadPlan([
+        aThread("exploration", 2, ["player1"], [], { id: "the_watch", outcomeId: "player1_trust" }),
+        aThread("challenge", 2, ["player2"], [], { id: "the_lead", outcomeId: "player2_debt" }),
+        { ...contestThread(["player1"], ["player2", "player3"], "the_marker"), ...marker },
+      ]);
+    const lane = { scene: "The outer wreck lane; Ari's skiff and the Compact's salvage pod are there." };
+    const ARI = 'the thread "the_marker" names Ari Nox (player1), who is also written into "the_watch" and stays there: every player is in exactly one thread, so write "the_marker" without Ari Nox';
+    const TAMSIN = 'the thread "the_marker" names Tamsin Quill (player2), who is also written into "the_lead" and stays there: every player is in exactly one thread, so write "the_marker" without Tamsin Quill';
+
+    it("finds the names of the players it took out in the thread's scene, steps and results, by full name or first name", () => {
+      const result = checkThreadPlan(story(), doubleBooked(lane), { names: true });
+      expect(result.problem).toBeUndefined();
+      expect(result.plan.threads.map((t) => [t.id, t.playersSideA, t.playersSideB])).toEqual([
+        ["the_watch", ["player1"], []],
+        ["the_lead", ["player2"], []],
+        ["the_marker", ["player3"], []],
+      ]);
+      expect(result.lengthProblem).toBe(ARI);
+      expect(result.softNotes).toEqual(["playerNamedElsewhere"]);
+      const steps = doubleBooked({
+        progression: contestThread([], [], "x").progression.map((step) => ({ ...step, question: "How do Ari and Tamsin Quill and Mara position their craft?" })),
+      });
+      expect(checkThreadPlan(story(), steps, { names: true }).lengthProblem).toBe(`${ARI}; ${TAMSIN}`);
+    });
+
+    it("reads nothing where the thread doesn't name them, where a player stays in it, or without the option (the eval's readings as measured)", () => {
+      expect(checkThreadPlan(story(), doubleBooked(), { names: true }).lengthProblem).toBeUndefined();
+      expect(checkThreadPlan(story(), doubleBooked(lane)).lengthProblem).toBeUndefined();
+      // Mara named in her own thread; Ari written on both sides of one contest stays in it
+      expect(checkThreadPlan(story(), doubleBooked({ scene: "The wreck lane; Mara's pod is there." }), { names: true }).lengthProblem).toBeUndefined();
+      const bothSides = threadPlan([
+        { ...contestThread(["player1", "player2"], ["player1", "player3"], "the_marker"), scene: "Ari's skiff is there." },
+      ]);
+      const together = checkThreadPlan(story(), bothSides, { names: true });
+      expect(together.repairs).toContainEqual({ kind: "threadPlayerRepeated", detail: "the_marker: player1" });
+      expect(together.lengthProblem).toBeUndefined();
+    });
+
+    it("asks once more told why, and never fails the turn over it", async () => {
+      const clean = threadPlan([
+        aThread("exploration", 2, ["player1"], [], { id: "the_watch", outcomeId: "player1_trust" }),
+        aThread("challenge", 2, ["player2"], [], { id: "the_lead", outcomeId: "player2_debt" }),
+        { ...contestThread([], ["player3"], "the_marker"), scene: "The wreck lane; Mara's pod is there." },
+      ]);
+      expect(checkThreadPlan(story(), clean, { lengths: true, names: true }).lengthProblem).toBeUndefined();
+      const lines: string[] = [];
+      const fixed = planner(doubleBooked(lane), clean);
+      const plan = await checkedThreadPlan(story(), "THE PROMPT", fixed.invoke, (line) => lines.push(line));
+      expect(fixed.prompts).toEqual(["THE PROMPT", withPlanProblem("THE PROMPT", ARI)]);
+      expect(plan.threads[2].scene).toBe("The wreck lane; Mara's pod is there.");
+      expect(lines.join("\n")).toContain('"playerNamedElsewhere":1');
+      // The retry names them again: it is used; the retry can't be used at all: the first is
+      const again = planner(doubleBooked(lane), doubleBooked(lane));
+      expect((await checkedThreadPlan(story(), "THE PROMPT", again.invoke, () => undefined)).threads[2].playersSideA).toEqual(["player3"]);
+      const broken = planner(doubleBooked(lane), unknownOutcome());
+      expect((await checkedThreadPlan(story(), "THE PROMPT", broken.invoke, () => undefined)).threads[2].scene).toBe(lane.scene);
     });
   });
 

@@ -39,9 +39,10 @@ export type PlanCheck<P> = {
   problem?: string;
   /**
    * A chapter length PACING does not allow (only with the `lengths` option),
-   * or a switch plan that breaks PACING's arithmetic (checkedSwitchPlan's
-   * `pacing`): worth the one retry, but never a reason to fail the turn, so a
-   * plan with only this problem is still used.
+   * a thread that names a player the check took out of it (only with the
+   * `names` option), or a switch plan that breaks PACING's arithmetic
+   * (checkedSwitchPlan's `pacing`): worth the one retry, but never a reason to
+   * fail the turn, so a plan with only this problem is still used.
    */
   lengthProblem?: string;
   /** The notes the soft problem logs (checkedPlan): a thread plan's lengthNotAllowed, a switch plan's pacingNotFollowed, unless the check names its own */
@@ -53,9 +54,15 @@ export type PlanCheck<P> = {
  * (production's planner call). `allowedLengths`: another length rule to read it
  * against (an eval variant's, which prints its own lengths); production's
  * otherwise (the paced lengths since the pacing-clues stage of 2026-10-01,
- * pacedLengths; allowedLengths on the turns left before).
+ * pacedLengths; allowedLengths on the turns left before). `names`: also read a
+ * thread whose text names a player PL-4 took out of it (namedElsewhereProblems;
+ * production's planner call since the review of the fourth playthroughs,
+ * 2026-10-02).
  */
-export type ThreadCheckOptions = { lengths?: boolean; allowedLengths?: (story: Story) => number[] };
+export type ThreadCheckOptions = { lengths?: boolean; allowedLengths?: (story: Story) => number[]; names?: boolean };
+
+/** The soft rules production's planner call reads a thread plan against (checkedThreadPlan; the playthroughs log the same). */
+export const PRODUCTION_THREAD_CHECK = { lengths: true, names: true } as const satisfies ThreadCheckOptions;
 
 const OUTCOME_CHECKS_SKIPPED = "outcomeChecksSkipped";
 
@@ -86,6 +93,15 @@ function storyOutcomes(story: Story, repairs: Repair[]): StoryOutcomes {
     contestedShared: shared.filter(isContestedOutcome).map((outcome) => outcome.id),
     skip,
   };
+}
+
+/**
+ * Whether a shared outcome already holds every milestone it intends, so a thread on it is an aftermath (pacing.ts,
+ * stageOf): read before the chapter, so the chapter that settles its last stage is not one.
+ */
+function outcomeComplete(story: Story, outcomeId: string): boolean {
+  const outcome = story.getSharedOutcomes().find((o) => o.id === outcomeId);
+  return outcome !== undefined && outcome.intendedNumberOfMilestones >= 1 && (outcome.milestones?.length ?? 0) >= outcome.intendedNumberOfMilestones;
 }
 
 function unknownOutcomeProblem(what: string, outcomeId: string, known: string[]): string {
@@ -408,7 +424,11 @@ function asChallengeResults(results: Results, won: "sideAWins" | "sideBWins"): R
  * players' camp is known, so the scoreboard repair follows it: the third
  * playthroughs' space pirates' seal contest held only Oren (side B), became
  * his challenge, and the switch after his favorable result moved the score
- * toward the other camp.
+ * toward the other camp. None on an outcome already complete (since the
+ * review of the fourth playthroughs, 2026-10-02): the space pirates' last
+ * chapter replayed the Starfall claim side A had won, PL-12 made Tamsin's
+ * contest her challenge with side B stored, and production read her favorable
+ * steps as wins for the camp that had lost.
  */
 /**
  * The side on the contest's scoreboard whose win a converted contest's favorable result is (the thread's stored
@@ -442,7 +462,7 @@ function oneSidedAsChallenge(story: Story, thread: Thread, repairs: Repair[]): T
   const won = sideA.length > 0 && !sideB.includes("player1") ? "sideAWins" : "sideBWins";
   repairs.push({ kind: oneSided ? "contestOneSided" : "contestInCooperative", detail: thread.id });
   const stored = thread as Thread & { kind?: unknown };
-  const favorableSide = boardSideOf(story, won === "sideAWins" ? sideA : sideB);
+  const favorableSide = outcomeComplete(story, thread.outcomeId) ? undefined : boardSideOf(story, won === "sideAWins" ? sideA : sideB);
   return {
     ...thread,
     ...(typeof stored.kind === "string" ? { kind: "challenge" } : {}),
@@ -463,11 +483,13 @@ function oneSidedAsChallenge(story: Story, thread: Thread, repairs: Repair[]): T
  * chapter that decides the contest (round 3's space pirates' kind of wrong-way move, 50 -> 65, would stand). Stored only
  * where every player in it has a known camp and all share one (campOf): unlike a contest's side, nothing in a challenge
  * says its players are one side, so player1 beside a seat of unknown camp stores none. A thread with a side already
- * (converted by PL-12) keeps it.
+ * (converted by PL-12) keeps it. None on an outcome already complete (an aftermath, as PL-12 stores none there, since
+ * the review of the fourth playthroughs, 2026-10-02).
  */
 function withChallengeCamp(story: Story, thread: Thread, outcomes: StoryOutcomes): Thread {
   if (thread.favorableSide || !story.isMultiplayer() || !CONTEST_MODES.includes(story.getGameMode())) return thread;
   if (!outcomes.contestedShared.includes(thread.outcomeId) || thread.playersSideA.length === 0) return thread;
+  if (outcomeComplete(story, thread.outcomeId)) return thread;
   const camps = new Set(thread.playersSideA.map((slot) => campOf(story, slot)));
   const [camp] = [...camps];
   return camps.size === 1 && camp ? { ...thread, favorableSide: camp } : thread;
@@ -600,11 +622,57 @@ function threadsKept(story: Story, threads: Thread[], slots: Set<string>, repair
   return kept;
 }
 
+/** A written thread and the players PL-4 left in it. */
+type Placement = { written: Thread; inThread: string[] };
+
+const escapedPattern = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Whether a text names a character: the full name, or its first word as a word of its own ("Ari's skiff" for Ari Nox). */
+function namesCharacter(text: string, name: string): boolean {
+  const first = name.split(/\s+/)[0];
+  return text.includes(name) || (first.length > 1 && new RegExp(`(^|[^\\p{L}])${escapedPattern(first)}(?![\\p{L}])`, "u").test(text));
+}
+
+const textsIn = (value: unknown): string[] =>
+  typeof value === "string" ? [value] : value !== null && typeof value === "object" ? Object.values(value).flatMap(textsIn) : [];
+
+/** What a thread's beats are told from: its title, question, plan, scene, milestones, and its steps and their results. */
+function threadText(thread: Thread): string {
+  const loose = thread as Thread & { question?: unknown; plan?: unknown };
+  const steps = (thread.progression ?? []).map((step) => [step.title, step.question, step.possibleResolutions]);
+  return [thread.title, thread.typeOfMilestone, loose.question, loose.plan, thread.scene, thread.possibleMilestones, steps].flatMap(textsIn).join("\n");
+}
+
+/**
+ * A thread whose text names a player PL-4 took out of it, keeping them in another thread (since the review of the fourth
+ * playthroughs, 2026-10-02): the space pirates' turn 6, where the planner wrote Ari and Tamsin into the Starfall contest
+ * beside Mara and into the threads they picked. PL-4 kept each on their pick, PL-12 made the contest Mara's challenge,
+ * and its steps, plan and scene still named Ari and his skiff, so Mara's turns put him in the wreck lane while his own
+ * had him in the galley. The thread's text is the planner's, and no check can rewrite it, so it is worth the one retry
+ * (a soft problem, like a chapter length: never a reason to fail the turn). One problem per player and thread, in the
+ * reply's order; none where the player stays in the thread (written on both sides of one contest) or it was dropped.
+ */
+function namedElsewhereProblems(story: Story, placements: Placement[]): string[] {
+  const keptIn = new Map<string, string>();
+  for (const { written, inThread } of placements) for (const slot of inThread) keptIn.set(slot, written.id);
+  return placements.flatMap(({ written, inThread }) => {
+    if (inThread.length === 0) return [];
+    const text = threadText(written);
+    return [...new Set([...(written.playersSideA ?? []), ...(written.playersSideB ?? [])])].flatMap((slot) => {
+      const kept = keptIn.get(slot);
+      const name = story.getPlayer(slot)?.name?.trim();
+      if (inThread.includes(slot) || kept === undefined || !name || !namesCharacter(text, name)) return [];
+      return [`the thread "${written.id}" names ${name} (${slot}), who is also written into "${kept}" and stays there: every player is in exactly one thread, so write "${written.id}" without ${name}`];
+    });
+  });
+}
+
 /**
  * Checks a thread plan (PL-4 to PL-12): the plan with its repairs, and the
  * problem that keeps it from use, if any; with `lengths`, also a chapter
- * length PACING does not allow, apart (production's planner call reads it;
- * the eval's plan readings stay on the check as it was measured).
+ * length PACING does not allow, and with `names`, a thread that names a player
+ * PL-4 took out of it, apart (production's planner call reads both; the eval's
+ * plan readings stay on the check as it was measured).
  */
 export function checkThreadPlan(story: Story, reply: ThreadAnalysis, options: ThreadCheckOptions = {}): PlanCheck<ThreadAnalysis> {
   const repairs: Repair[] = [];
@@ -615,10 +683,12 @@ export function checkThreadPlan(story: Story, reply: ThreadAnalysis, options: Th
 
   // Every player in one thread: the one on the outcome their pick named, else the first they are in (PL-4)
   const kept = threadsKept(story, reply.threads ?? [], slots, repairs);
+  const placements: Placement[] = [];
   const placedThreads = (reply.threads ?? []).flatMap((written, index): Thread[] => {
     const elsewhere = (slot: string) => kept.has(slot) && kept.get(slot) !== index;
     const playersSideA = placePlayers(written.playersSideA ?? [], slots, placed, "thread", written.id, repairs, elsewhere);
     const playersSideB = placePlayers(written.playersSideB ?? [], slots, placed, "thread", written.id, repairs, elsewhere);
+    placements.push({ written, inThread: [...playersSideA, ...playersSideB] });
     if (playersSideA.length + playersSideB.length === 0) {
       repairs.push({ kind: "threadDropped", detail: written.id });
       return [];
@@ -638,7 +708,10 @@ export function checkThreadPlan(story: Story, reply: ThreadAnalysis, options: Th
   }
   const checked = planCheck({ ...reply, duration, threads }, repairs, problems);
   const lengthProblem = options.lengths ? chapterLengthProblem(story, duration, options.allowedLengths) : undefined;
-  return lengthProblem ? { ...checked, lengthProblem } : checked;
+  const named = options.names ? namedElsewhereProblems(story, placements) : [];
+  if (named.length === 0) return lengthProblem ? { ...checked, lengthProblem } : checked;
+  const soft = [...(lengthProblem ? [{ note: "lengthNotAllowed", problem: lengthProblem }] : []), { note: "playerNamedElsewhere", problem: named.join("; ") }];
+  return { ...checked, lengthProblem: soft.map((s) => s.problem).join("; "), softNotes: soft.map((s) => s.note) };
 }
 
 // --- Logging and the retry ---
@@ -757,9 +830,11 @@ export function checkedSwitchPlan(
 }
 
 /**
- * A thread plan call, checked with the length PACING allows: the repaired
- * plan, one retry told the problem, else an UnusableResultError (never for a
- * length alone). `allowedLengths`: another length rule (an eval variant's).
+ * A thread plan call, checked with the length PACING allows and, since the
+ * review of the fourth playthroughs (2026-10-02), for a thread that names a
+ * player PL-4 took out of it (note `playerNamedElsewhere`): the repaired plan,
+ * one retry told the problem, else an UnusableResultError (never for a length
+ * or a name alone). `allowedLengths`: another length rule (an eval variant's).
  */
 export function checkedThreadPlan(
   story: Story,
@@ -768,6 +843,6 @@ export function checkedThreadPlan(
   log?: (line: string) => void,
   allowedLengths?: (story: Story) => number[]
 ): Promise<ThreadAnalysis> {
-  const check = (checked: Story, reply: ThreadAnalysis) => checkThreadPlan(checked, reply, { lengths: true, ...(allowedLengths ? { allowedLengths } : {}) });
+  const check = (checked: Story, reply: ThreadAnalysis) => checkThreadPlan(checked, reply, { ...PRODUCTION_THREAD_CHECK, ...(allowedLengths ? { allowedLengths } : {}) });
   return checkedPlan({ what: "thread plan", role: "threadAnalysis", check }, story, prompt, invoke, log);
 }

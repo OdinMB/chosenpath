@@ -305,11 +305,15 @@ export class ThreadResolutionService {
       return "mixed";
     }
 
-    let tugOfWar: number = 0;
-    tugOfWar += sideAFavorableCount;
-    tugOfWar -= sideAUnfavorableCount;
-    tugOfWar -= sideBFavorableCount;
-    tugOfWar += sideBUnfavorableCount;
+    // Each side by its players' average result (favorable +1, unfavorable -1), compared without division: since the
+    // review of the fourth playthroughs (2026-10-02). The raw counts made the bigger camp's luck count twice: the space
+    // pirates' turn 13, Ari alone against Tamsin and Mara, all three unfavorable, went to Ari's side, and the step's
+    // winner rolls the next step on +30 (BeatResolutionService). A side with no result reads as even (its weight 1).
+    const sideASize = sideAFavorableCount + sideAMixedCount + sideAUnfavorableCount;
+    const sideBSize = sideBFavorableCount + sideBMixedCount + sideBUnfavorableCount;
+    const sideANet = sideAFavorableCount - sideAUnfavorableCount;
+    const sideBNet = sideBFavorableCount - sideBUnfavorableCount;
+    const tugOfWar = sideANet * Math.max(sideBSize, 1) - sideBNet * Math.max(sideASize, 1);
 
     let result: Resolution;
     if (tugOfWar > 0) {

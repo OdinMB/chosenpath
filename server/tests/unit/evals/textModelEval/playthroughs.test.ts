@@ -368,6 +368,30 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(run.complete).toBe(true);
   });
 
+  it("records a chapter plan production asks once more over because a thread names a player its check took out (since the review of the fourth playthroughs)", async () => {
+    // The second chapter: player1 written into the harbour thread and again into a cove thread whose scene names them
+    const { call, calls } = fakeCall(2, {
+      reply: (role, nth, spec) => {
+        if (role !== "thread" || nth !== 1) return DEFAULT;
+        const allowed = /Allowed lengths for this thread: ([^.]+) beats/.exec(requestText(spec.request));
+        const length = Math.max(...(allowed?.[1].match(/\d+/g) ?? ["3"]).map(Number));
+        const plan = threadAnalysis("challenge", length, 0, ["player1"]);
+        const harbour = { ...plan.threads[0], outcomeId: "shared_harbour", id: "the_harbour" };
+        const cove = { ...plan.threads[0], outcomeId: "shared_harbour", id: "the_cove", playersSideA: ["player2", "player1"], scene: "The cove at dusk; Ada, Bram and Cato are there." };
+        return { ...plan, threads: [harbour, cove] };
+      },
+    });
+    const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1 });
+    const planned = run.turns.filter((t) => t.plan?.kind === "chapter plan")[1]?.plan;
+    expect(planned?.calls).toHaveLength(2);
+    expect(planned?.calls[0].problem).toBeUndefined();
+    expect(planned?.calls[0].lengthProblem).toMatch(/^the thread "the_cove" names \w+ player1 \(player1\), who is also written into "the_harbour" and stays there/);
+    const retry = calls.find((c) => c.caseId === planned?.calls[1].caseId);
+    const first = calls.find((c) => c.caseId === planned?.calls[0].caseId);
+    expect(requestText(retry?.request as never)).toBe(withPlanProblem(requestText(first?.request as never), planned?.calls[0].lengthProblem as string));
+    expect(run.complete).toBe(true);
+  });
+
   it("records the paced lengths production's chapter planner is given, and the pacing problem its switch plan check asks once more over (since 2026-10-01)", async () => {
     // The last switch (turn 8, one chapter left) offers the complete main outcome while the side one still needs its milestone
     const onMain = () => {

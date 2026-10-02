@@ -203,6 +203,27 @@ describe("ThreadResolutionService: whose roll decides a group challenge or conte
     expect(firstStep(roll(rolledStep(3, "contest", "shared_sale", ["player1", "player3"], ["player2"]), ["favorable", "unfavorable", "favorable"]))).toBe("sideAWins");
   });
 
+  /*
+   * The review of the fourth playthroughs (2026-10-02): the space pirates' turn 13, Ari alone (side A) against Tamsin and
+   * Mara (side B), all three unfavorable, went to side A, since the raw counts made the bigger camp's bad luck count
+   * twice; the step's winner then rolled the next step on +30, the losers on -30. Each side is read by its players'
+   * average result now, so a camp's size never decides a step.
+   */
+  it("reads each side by its players' average result, so one player against two wins or loses on luck, not on camp size", () => {
+    const oneAgainstTwo = (rolls: Resolution[]) => firstStep(roll(rolledStep(3, "contest", "shared_sale", ["player1"], ["player2", "player3"]), rolls));
+    // Everyone fails, or everyone succeeds: no side did better
+    expect(oneAgainstTwo(["unfavorable", "unfavorable", "unfavorable"])).toBe("mixed");
+    expect(oneAgainstTwo(["favorable", "favorable", "favorable"])).toBe("mixed");
+    // The lone player succeeds where the camp half succeeds; fails where the camp half fails
+    expect(oneAgainstTwo(["favorable", "mixed", "favorable"])).toBe("sideAWins");
+    expect(oneAgainstTwo(["unfavorable", "unfavorable", "mixed"])).toBe("sideBWins");
+    // Clear wins stay wins; a camp of two on side A the same way
+    expect(oneAgainstTwo(["favorable", "unfavorable", "unfavorable"])).toBe("sideAWins");
+    expect(oneAgainstTwo(["mixed", "favorable", "favorable"])).toBe("sideBWins");
+    expect(firstStep(roll(rolledStep(3, "contest", "shared_sale", ["player1", "player3"], ["player2"]), ["unfavorable", "unfavorable", "unfavorable"]))).toBe("mixed");
+    expect(firstStep(roll(rolledStep(3, "contest", "shared_sale", ["player1", "player3"], ["player2"]), ["mixed", "unfavorable", "mixed"]))).toBe("sideAWins");
+  });
+
   it("pools the others' rolls when the owner's own step has no result", () => {
     const rolled = roll(rolledStep(2, "challenge", "player2_own"), ["favorable", "unfavorable"]);
     const players = structuredClone(rolled.getState().players);

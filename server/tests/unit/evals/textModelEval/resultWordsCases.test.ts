@@ -107,8 +107,14 @@ const storedHashes = (() => {
 describe("resultWordsCases on the stored playthroughs of rounds 2 and 3 (skipped where the output folder is absent)", () => {
   (stored[3].length ? it : it.skip)("builds every case, each request the one its round sent; each turn named a result's kind there and takes the line; production today is the variant (adopted after the run of 2026-10-02), the stage's production arm its base", () => {
     const { cases, problems } = resultWordsCases(stored, (file) => storedHashes.get(outputIdOf(file)));
-    expect(problems).toEqual([]);
-    expect(cases.map((c) => c.id)).toEqual(RESULT_WORDS_CASE_SPECS.map((s) => s.id));
+    // The replay goes through production's contest resolution, which reads each side by its players' average since the
+    // review of the fourth playthroughs (2026-10-02): round 3's space pirates' seal chapter (turns 11-13) ended on a step
+    // (Tomas alone unfavorable, against Davi unfavorable and Oren mixed) the raw counts made mixed and the averages side
+    // B's, so from turn 14 its replayed states are not the ones played, and its case at turn 14 can't be rebuilt. The
+    // stage ran on the frozen case (cases/), built before; nothing is sent again.
+    const diverged = "round-words-r3-space-pirates-t14";
+    expect(problems).toEqual([`round 3: ${diverged}: its request is not the one the run sent at turn 14 of play-space-pirates`]);
+    expect(cases.map((c) => c.id)).toEqual(RESULT_WORDS_CASE_SPECS.map((s) => s.id).filter((id) => id !== diverged));
     for (const c of cases) {
       const spec = RESULT_WORDS_CASE_SPECS.find((s) => s.id === c.id);
       const story = caseStory(c);
