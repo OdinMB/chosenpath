@@ -127,7 +127,8 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     chapter openings, interleaved; contest-settled --role thread under adopted25: production's chapter planner and
  *     contestSettled twice on every stored plan of rounds 1-3 at a contested outcome's last stage, interleaved; money-2
  *     --role beat under adopted26: production's turn and moneyTurn twice on eight turns of the stage's own lemonade runs,
- *     each with production's checked retry, interleaved; result-words --role beat under adopted27: production's group
+ *     each with production's checked retry, interleaved, then moneyTurnB and (the review of the adoption, 2026-10-02)
+ *     production's turn as measured, moneyTurnBase, fresh, twice on four of them; result-words --role beat under adopted27: production's group
  *     turn and resultWords twice on the group turns of rounds 2 and 3 whose text named a result's kind, each with
  *     production's checked retry, interleaved)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)

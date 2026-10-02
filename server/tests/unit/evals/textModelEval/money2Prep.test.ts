@@ -150,13 +150,51 @@ describe("the report", () => {
       row("moneyTurnB", "round-money2-setup-s2-t5", 1),
       row("moneyTurnB", "round-money2-setup-s2-t5", 2),
     ];
-    expect(MONEY_2_TURN_ARMS).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/moneyTurn", "gpt-6-luna@medium/moneyTurnB"]);
+    expect(MONEY_2_TURN_ARMS).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/moneyTurn", "gpt-6-luna@medium/moneyTurnB", "gpt-6-luna@medium/moneyTurnBase"]);
     const key = money2ReplyKey(rows, "salt");
     const hand = Object.fromEntries(rows.map((r) => [money2ReplyCode("salt", r), { addsUp: r.variant === "moneyTurnB" || r.caseId.endsWith("t3"), sum: false, note: "" }]));
     const c = money2ReplyComparisons(rows, key, hand, "moneyTurnB");
     // Production read on the retest's case only: 0 of 2, not 2 of 4
     expect(c.addsUp.production).toEqual({ hits: 0, n: 2 });
     expect(c.addsUp.variant).toEqual({ hits: 2, n: 2 });
+  });
+
+  /*
+   * The review of the adoption (2026-10-02): the retest's cases were chosen from production's first-run records, one of
+   * them because production failed it in both samples, and the pass was read against those same records. Production's
+   * turn as the stage measured it (moneyTurnBase) runs fresh on the retest's cases, and the retest reads against it too.
+   */
+  it("reads the fix-and-retest against production run fresh on its cases, the fresh arm's two samples the noise", () => {
+    const row = (variant: "adopted" | "moneyTurnB" | "moneyTurnBase", sample: number) => ({
+      armKey: `gpt-6-luna@medium/${variant}`,
+      variant,
+      caseId: "round-money2-setup-s2-t5",
+      sample,
+      retried: false,
+      waitMs: 1,
+      costUsd: 0.004,
+      reasoningTokens: 1,
+      chosenBefore: "",
+      counted: [],
+      changes: [],
+      text: "",
+      amounts: [],
+      interludes: [],
+    });
+    const rows = [row("adopted", 1), row("adopted", 2), row("moneyTurnB", 1), row("moneyTurnB", 2), row("moneyTurnBase", 1), row("moneyTurnBase", 2)];
+    const key = money2ReplyKey(rows, "salt");
+    expect(renderMoney2RepliesBlind(rows, "salt")).not.toMatch(/adopted|moneyTurn|fresh/);
+    // The first run's production failed both; the fresh run adds up once
+    const addsUp = (r: (typeof rows)[number]) => r.variant === "moneyTurnB" || (r.variant === "moneyTurnBase" && r.sample === 1);
+    const hand = Object.fromEntries(rows.map((r) => [money2ReplyCode("salt", r), { addsUp: addsUp(r), sum: false, note: "" }]));
+    const fresh = money2ReplyComparisons(rows, key, hand, "moneyTurnB", "moneyTurnBase");
+    expect(fresh.addsUp.production).toEqual({ hits: 1, n: 2 });
+    expect(fresh.addsUp.variant).toEqual({ hits: 2, n: 2 });
+    expect(fresh.addsUp.noise).toBe(1);
+    expect(money2ReplyComparisons(rows, key, hand, "moneyTurnB").addsUp.production).toEqual({ hits: 0, n: 2 });
+    const section = renderMoney2Replies(rows, key, hand).join("\n");
+    expect(section).toContain("Its fix-and-retest against production run fresh on the 1 cases it ran (the review of the adoption, 2026-10-02):");
+    expect(section).toContain("| round-money2-setup-s2-t5 | 1 | production, fresh |");
   });
 
   it("says where the blind key is still missing", () => {

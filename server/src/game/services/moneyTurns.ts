@@ -26,8 +26,13 @@ import type { Story } from "core/models/Story.js";
  * read blind by hand: replies whose money adds up, production 3 of 8, the
  * fix-and-retest 7 of 8 (moved higher, p 0.059), on the four cases where the
  * first form's replies still failed; the first form alone 10 of 16 -> 13 of 15
- * on eight cases (within the noise). A group's turn carries the block too,
- * unmeasured for groups.
+ * on eight cases (within the noise). Those four cases were chosen from
+ * production's records of that run, one because production failed it in both
+ * samples, so the review of the adoption (2026-10-02) ran production's turn as
+ * measured fresh on them: 2 of 7 (one partial) against the same 7 of 8, moved
+ * higher (p 0.035, noise 8 points); without the case chosen on production's
+ * failure, 2 of 5 against 5 of 6, not moved. A group's turn carries the block
+ * too, unmeasured for groups.
  */
 
 const HEADING = "MONEY AND COUNTS: this story teaches with its figures, so they add up from beat to beat.";

@@ -472,7 +472,8 @@ describe("budget caps", () => {
       "contest-settled": 0.2,
       // Decision A of 2026-10-01 (2026-10-02): money that moves in a learning story, the money setup on five learning
       // premises twice and the lemonade's first chapter played on, with room for fix 7's turn line, its estimate plus 30%
-      "money-2": 0.39,
+      // ($0.39), raised to $0.43 for production's turn run fresh on the retest's four cases (the review of the adoption)
+      "money-2": 0.43,
       // Decision A of 2026-10-01 (2026-10-02): result words in the story text, the variant beside production's group turn
       // twice on the seven group turns of rounds 2 and 3 that named a result's kind, its estimate plus 30%
       "result-words": 0.26,

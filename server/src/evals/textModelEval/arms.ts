@@ -382,6 +382,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   moneyTurn: "adopted",
   // Its one fix-and-retest, against production's turn
   moneyTurnB: "adopted",
+  // Production's turn as that stage measured it, run fresh on the retest's cases (the review of the adoption, 2026-10-02):
+  // the same requests as production's first-run records there
+  moneyTurnBase: "adopted",
   // Result words in the story text (decision A's result-words fix, 2026-10-02): each result told in the story's own words
   // on a group turn that narrates one, against production's group turn, which runs beside it
   resultWords: "adopted",
@@ -834,7 +837,13 @@ export const MONEY_2_TURN_CASES = [
  * turn (adopted) and the variant (moneyTurn) on the single-player turn model
  * (Luna medium), twice on the stage's turn cases, interleaved, each turn with
  * production's one checked retry, under adopted26. Its setups and short
- * playthroughs are the --money-2-play mode's prep calls, not --run arms.
+ * playthroughs are the --money-2-play mode's prep calls, not --run arms. The
+ * fix-and-retest (moneyTurnB) twice on its four cases; and since the review of
+ * the adoption (2026-10-02) production's turn as the stage measured it
+ * (moneyTurnBase, the requests production's arm sent in the first run) twice
+ * on the same four, fresh: the cases were chosen from production's first-run
+ * records, one because production failed it in both samples, and the retest's
+ * pass was read against those same records.
  */
 function money2Arms(role: EvalRole): ArmPlan[] {
   if (role !== "beat") return [];
@@ -844,7 +853,13 @@ function money2Arms(role: EvalRole): ArmPlan[] {
     scope: "single-player" as const,
     caseIds: [...MONEY_2_TURN_CASES],
   }));
-  return [...arms, { arm: adoptedDefault("beat", "moneyTurnB"), samples: 2, scope: "single-player", caseIds: [...MONEY_2_RETEST_CASES] }];
+  const retest: ArmPlan[] = (["moneyTurnB", "moneyTurnBase"] as const).map((variant) => ({
+    arm: adoptedDefault("beat", variant),
+    samples: 2,
+    scope: "single-player" as const,
+    caseIds: [...MONEY_2_RETEST_CASES],
+  }));
+  return [...arms, ...retest];
 }
 
 /**

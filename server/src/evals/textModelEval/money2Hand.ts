@@ -136,4 +136,16 @@ export const MONEY_2_REPLY_HAND: Record<string, Money2TurnVerdict> = {
   AC5D9: turn(true, true, "'two coins go into the stand's tin', 18 -> 20"),
   "13455": turn(false, false, "'When she compares the fair's recorded sales with the stand's costs, the sales column falls short': sales and the fee with no figures, nothing moved"),
   "1F352": turn(true, true, "ten cups at 65 cents (6.50) in, the six-coin fee out, one crate used: +0.50 and a crate; the ingredient cost only worked out, not moved"),
+  // --- The review of the adoption (2026-10-02): every reply on the retest's four cases read again blind, 32 under their
+  // codes, before this file or the key was opened; the 24 read before kept their verdicts (21 agreed on adds up; the three
+  // that did not were conventions, read as no again where the first reading had a customer kept from buying as yes twice
+  // and a cost only worked out as partial; one sum read differently). The eight new codes, verdicts as read then. ---
+  "3958E": turn(false, true, "$3.55 and the $2 permit paid, 7 -> 1.45; then 'Coins clink into the blue cashbox' from sales with no amount, unmoved"),
+  "4EC04": turn(false, true, "'$3.55 in supplies and the $2 permit' paid and 'four paid cups and $4 in sales', yet nothing moved (7 stays)"),
+  DEECF: turn(true, true, "two lemons tasted, 'the 40-cent sale', 'bringing the total to $12.40; one cup is gone, and eight lemons remain', as the stats"),
+  FBD71: turn(true, true, "two lemons tasted, 'forty cents for a full cup', 'eight lemons and eighteen cups remain', as the stats"),
+  "6B390": turn(false, false, "the test price paid with no amount (+2), then 'Nia pours another cup for a second passerby' with no payment, unmoved"),
+  B4D01: { addsUp: "partial", sum: true, note: "'holds out a coin', then 'adds the payment to the stand's count: twenty coins instead of eighteen' (+2): one coin told, two moved" },
+  "4BD96": turn(false, false, "'Fairgoers stop, buy cups ... Nia records each sale' and the six-coin fee with no amount paid; nothing moved"),
+  "847AA": turn(false, true, "the six-coin fee paid (-6), but the fair's sales ('drops the coins into the tin') with no amount, and +2 told as 'the two coins from the earlier sales'"),
 };

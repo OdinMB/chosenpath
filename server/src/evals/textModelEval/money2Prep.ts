@@ -229,8 +229,11 @@ export function renderMoney2(runs: PlayRun[], key: Money2BlindKey | undefined, h
 
 // ---------------------------------------------------------------- the turn line on the built cases
 
-/** The turn line's arms: production's turn, fix 7's block B on it, and its fix-and-retest, on the single-player turn model. */
-export const MONEY_2_TURN_VARIANTS = ["adopted", "moneyTurn", "moneyTurnB"] as const;
+/**
+ * The turn line's arms: production's turn, fix 7's block B on it, its fix-and-retest, and (the review of the adoption,
+ * 2026-10-02) production's turn as the stage measured it run fresh on the retest's cases, on the single-player turn model.
+ */
+export const MONEY_2_TURN_VARIANTS = ["adopted", "moneyTurn", "moneyTurnB", "moneyTurnBase"] as const;
 export type Money2TurnVariant = (typeof MONEY_2_TURN_VARIANTS)[number];
 export const MONEY_2_TURN_ARMS = MONEY_2_TURN_VARIANTS.map((variant) => armKey(LUNA_MEDIUM, variant));
 
@@ -319,38 +322,52 @@ export function renderMoney2RepliesBlind(rows: Money2ReplyRow[], salt: string): 
 
 /**
  * The turn line (or its fix-and-retest) against production: the hand verdicts by code, unblinded through the key,
- * production read on the cases the candidate ran only.
+ * production read on the cases the candidate ran only. `reference` is production's arm: its first-run records
+ * (adopted), or since the review of the adoption (2026-10-02) its turn run fresh on the retest's cases (moneyTurnBase),
+ * its two samples the noise either way.
  */
 export function money2ReplyComparisons(
   rows: Money2ReplyRow[],
   key: Money2ReplyKey,
   hand: Record<string, Money2TurnVerdict>,
-  candidate: Exclude<Money2TurnVariant, "adopted"> = "moneyTurn"
+  candidate: Exclude<Money2TurnVariant, "adopted" | "moneyTurnBase"> = "moneyTurn",
+  reference: "adopted" | "moneyTurnBase" = "adopted"
 ): { addsUp: Money2Comparison; sums: Money2Comparison } {
   const cases = new Set(rows.filter((r) => r.variant === candidate).map((r) => r.caseId));
   const read = rows
-    .filter((r) => cases.has(r.caseId) && (r.variant === "adopted" || r.variant === candidate))
+    .filter((r) => cases.has(r.caseId) && (r.variant === reference || r.variant === candidate))
     .map((r) => ({ r, verdict: key.replies[money2ReplyCode(key.salt, r)] ? hand[money2ReplyCode(key.salt, r)] : undefined }));
-  const items = (pick: (v: Money2TurnVerdict) => boolean | undefined) => read.map(({ r, verdict }) => ({ variant: r.variant, sample: r.sample, ...(verdict ? { read: pick(verdict) } : {}) }));
+  // compareItems reads production as "adopted"
+  const items = (pick: (v: Money2TurnVerdict) => boolean | undefined) =>
+    read.map(({ r, verdict }) => ({ variant: r.variant === reference ? ("adopted" as const) : r.variant, sample: r.sample, ...(verdict ? { read: pick(verdict) } : {}) }));
   return {
     addsUp: compareItems(items((v) => (v.addsUp === "partial" ? undefined : v.addsUp)), candidate),
     sums: compareItems(items((v) => v.sum), candidate),
   };
 }
 
+/** A turn-line arm as the report names it: production's first run, production run fresh, or the variant. */
+const turnArmName = (variant: Money2TurnVariant) => (variant === "adopted" ? "production" : variant === "moneyTurnBase" ? "production, fresh" : variant);
+
 /** The report's section on the turn line: the hand reading against production, each reply's money, waits, retries, reasoning and cost. */
 export function renderMoney2Replies(rows: Money2ReplyRow[], key: Money2ReplyKey | undefined, hand: Record<string, Money2TurnVerdict>): string[] {
   if (rows.length === 0) return [];
   const lines = ["", "## The turn line on the built cases (moneyTurn beside production's turn)", ""];
   if (key) {
-    for (const candidate of ["moneyTurn", "moneyTurnB"] as const) {
-      if (!rows.some((r) => r.variant === candidate)) continue;
-      const c = money2ReplyComparisons(rows, key, hand, candidate);
+    const readings = [
+      { candidate: "moneyTurn", reference: "adopted", title: "The turn line against production" },
+      { candidate: "moneyTurnB", reference: "adopted", title: "Its fix-and-retest against production" },
+      { candidate: "moneyTurnB", reference: "moneyTurnBase", title: "Its fix-and-retest against production run fresh" },
+    ] as const;
+    for (const { candidate, reference, title } of readings) {
+      if (!rows.some((r) => r.variant === candidate) || !rows.some((r) => r.variant === reference)) continue;
+      const c = money2ReplyComparisons(rows, key, hand, candidate, reference);
       const cases = [...new Set(rows.filter((r) => r.variant === candidate).map((r) => r.caseId))].length;
+      const fresh = reference === "moneyTurnBase";
       lines.push(
-        `${candidate === "moneyTurn" ? "The turn line" : "Its fix-and-retest"} against production on the ${cases} cases it ran:`,
+        `${title} on the ${cases} cases it ran${fresh ? " (the review of the adoption, 2026-10-02)" : ""}:`,
         "",
-        `| Reading | Production | ${candidate} | Noise | Reading |`,
+        `| Reading | ${fresh ? "Production, fresh" : "Production"} | ${candidate} | Noise | Reading |`,
         "|---|---|---|---|---|",
         row("By hand (blind): the reply's money adds up", c.addsUp),
         row("By hand (blind): the reply names a sum paid or earned", c.sums),
@@ -365,7 +382,7 @@ export function renderMoney2Replies(rows: Money2ReplyRow[], key: Money2ReplyKey 
     if (!rows.some((r) => r.variant === variant)) continue;
     const own = rows.filter((r) => r.variant === variant);
     lines.push(
-      `| ${variant === "adopted" ? "production" : variant} | ${own.length} | ${own.filter((r) => r.retried).length} | ${seconds(quantile(own.map((r) => r.waitMs), 0.5))} | ${seconds(quantile(own.map((r) => r.waitMs), 0.95))} | ${reasoning(variant).mean.toFixed(0)} | $${(sum(own.map((r) => r.costUsd)) / Math.max(1, own.length)).toFixed(4)} |`
+      `| ${turnArmName(variant)} | ${own.length} | ${own.filter((r) => r.retried).length} | ${seconds(quantile(own.map((r) => r.waitMs), 0.5))} | ${seconds(quantile(own.map((r) => r.waitMs), 0.95))} | ${reasoning(variant).mean.toFixed(0)} | $${(sum(own.map((r) => r.costUsd)) / Math.max(1, own.length)).toFixed(4)} |`
     );
   }
   lines.push("", `Reasoning tokens: ${reasoningMove.moved ? `moved ${reasoningMove.moved}` : reasoningMove.beyondNoise ? `beyond the noise, not moved (${(reasoningMove.standardErrors ?? 0).toFixed(1)} SE)` : "within the noise"}.`, "");
@@ -375,7 +392,7 @@ export function renderMoney2Replies(rows: Money2ReplyRow[], key: Money2ReplyKey 
     const v = code ? hand[code] : undefined;
     const handText = v ? `${v.addsUp === "partial" ? "partial" : v.addsUp ? "adds up" : "does not add up"}${v.sum ? ", a sum" : ""}: ${v.note}` : "unread";
     lines.push(
-      `| ${r.caseId} | ${r.sample} | ${r.variant === "adopted" ? "production" : r.variant} | ${cell(r.counted.map((c) => `${c.name} ${JSON.stringify(c.before)} -> ${JSON.stringify(c.after)}`).join("; ") || "none")} | ${cell(r.changes.join("; ") || "none")} | ${r.amounts.length} | ${cell(handText)} |`
+      `| ${r.caseId} | ${r.sample} | ${turnArmName(r.variant)} | ${cell(r.counted.map((c) => `${c.name} ${JSON.stringify(c.before)} -> ${JSON.stringify(c.after)}`).join("; ") || "none")} | ${cell(r.changes.join("; ") || "none")} | ${r.amounts.length} | ${cell(handText)} |`
     );
   }
   return lines;
@@ -398,6 +415,11 @@ export async function writeMoney2(ctx: Pick<PrepContext, "files" | "log">, runs:
   const replies = files.casesExist() ? await money2ReplyRows(files.readRecords(), files.readCases(), files.loadOutput) : [];
   const replyComparisons = replyKey && replies.length ? money2ReplyComparisons(replies, replyKey, replyHand) : undefined;
   const retestComparisons = replyKey && replies.some((r) => r.variant === "moneyTurnB") ? money2ReplyComparisons(replies, replyKey, replyHand, "moneyTurnB") : undefined;
+  // The review of the adoption (2026-10-02): the retest against production run fresh on its cases
+  const freshRetestComparisons =
+    replyKey && replies.some((r) => r.variant === "moneyTurnB") && replies.some((r) => r.variant === "moneyTurnBase")
+      ? money2ReplyComparisons(replies, replyKey, replyHand, "moneyTurnB", "moneyTurnBase")
+      : undefined;
   const json = {
     generatedAt: generatedAt.toISOString(),
     stage: STAGE,
@@ -411,6 +433,7 @@ export async function writeMoney2(ctx: Pick<PrepContext, "files" | "log">, runs:
     replies,
     ...(replyComparisons ? { replyComparisons } : {}),
     ...(retestComparisons ? { retestComparisons } : {}),
+    ...(freshRetestComparisons ? { freshRetestComparisons } : {}),
     spendUsd,
   };
   const markdown = `${renderMoney2(runs, key, hand, { spendUsd, generatedAt }).trimEnd()}\n${renderMoney2Replies(replies, replyKey, replyHand).join("\n")}\n`;
@@ -425,6 +448,11 @@ export async function writeMoney2(ctx: Pick<PrepContext, "files" | "log">, runs:
   }
   if (retestComparisons) {
     log(`Its fix-and-retest, by hand: adds up production ${tallyText(retestComparisons.addsUp.production)}, moneyTurnB ${tallyText(retestComparisons.addsUp.variant)}, ${moveText(retestComparisons.addsUp)}.`);
+  }
+  if (freshRetestComparisons) {
+    log(
+      `Its fix-and-retest against production run fresh, by hand: adds up production ${tallyText(freshRetestComparisons.addsUp.production)}, moneyTurnB ${tallyText(freshRetestComparisons.addsUp.variant)}, ${moveText(freshRetestComparisons.addsUp)}.`
+    );
   }
   log(`Wrote money-2.md and .json (${runs.length} runs, ${replies.length} turn-line replies); spent in the stage so far $${spendUsd.toFixed(4)}.`);
 }

@@ -56,7 +56,7 @@ import { parallelThreadsRequest } from "../../game/services/storyTextRounds/para
 import { resultsAsOutcomesRequest } from "../../game/services/storyTextRounds/resultsAsOutcomes.js";
 import { kidsShortTextCount, kidsTurnRequest } from "../../game/services/storyTextRounds/kidsTurn.js";
 import { beatCheckOptions } from "../../game/services/kidsTurnRules.js";
-import { moneyAddsUpRequest, moneyTurnRequest } from "../../game/services/storyTextRounds/moneyAddsUp.js";
+import { moneyAddsUpRequest, moneyTurnBase, moneyTurnRequest } from "../../game/services/storyTextRounds/moneyAddsUp.js";
 import { latePacingRequest, pacingCluesRequest } from "../../game/services/storyTextRounds/latePacing.js";
 import { kidsAgesSetupRequest, kidsAgesShortTextCount, kidsAgesTurnRequest } from "../../game/services/storyTextRounds/kidsAges.js";
 import { groupLeversRequest } from "../../game/services/storyTextRounds/groupLevers.js";
@@ -428,6 +428,13 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * its three possible milestones the outcome's three resolutions, none putting
  * the decision off; production's request byte for byte elsewhere, with
  * production's limits for the role and player count.
+ * "moneyTurnBase" is production's turn as the money-2 stage measured it beside
+ * its turn line (storyTextRounds/moneyAddsUp.ts, moneyTurnBase: today's turn
+ * without the money lines production prints since that adoption), the request
+ * production's arm sent in the stage's first run byte for byte, run fresh on
+ * the fix-and-retest's four cases (the review of the adoption, 2026-10-02:
+ * those cases were chosen from production's first-run records, one because
+ * production failed it, and the retest read against the same records).
  * "resultWords" is decision A's result-words fix (2026-10-02, the result-words
  * stage; storyTextRounds/resultWords.ts): production's group turn with one line
  * under the fourth-wall rule, each result told in the story's own words, never
@@ -521,6 +528,7 @@ export type VariantId =
   | "moneySetup"
   | "moneyTurn"
   | "moneyTurnB"
+  | "moneyTurnBase"
   | "resultWords";
 export const VARIANTS: VariantId[] = [
   "prod",
@@ -604,6 +612,7 @@ export const VARIANTS: VariantId[] = [
   "moneySetup",
   "moneyTurn",
   "moneyTurnB",
+  "moneyTurnBase",
   "resultWords",
 ];
 
@@ -1198,6 +1207,13 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     if (input.role !== "beat") throw new Error(`Variant moneyTurnB does not cover role ${input.role}`);
     const count = beatCheckOptions(input.story).textCount;
     return { ...moneyTurnRequest(input.story, { retest: true }), limits: beatCallLimits(input.story), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // Production's turn as the money-2 stage measured it beside the turn line (today's turn without the money lines), run
+  // fresh on the fix-and-retest's cases (the review of the adoption, 2026-10-02); production's turn limits and retry count
+  moneyTurnBase: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant moneyTurnBase does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...moneyTurnBase(input.story), limits: beatCallLimits(input.story), ...(count ? { shortTextCount: count } : {}) };
   },
   // Each result told in the story's own words, never by its kind, on a group turn that narrates a result; production's
   // turn limits and retry count
