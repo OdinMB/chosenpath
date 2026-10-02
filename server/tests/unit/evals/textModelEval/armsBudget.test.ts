@@ -47,6 +47,8 @@ import {
   RUNAWAY_PROMPT_STATE,
   RUNAWAY_SAMPLES,
   SHORT_REPLIES_PROMPT_STATE,
+  SOL61_SMOKE_PREMISES,
+  SOL61_SMOKE_PROMPT_STATE,
   secondReferenceKeys,
   SETUP_R3C_PREMISES,
   SETUP_R3D_PREMISES,
@@ -485,6 +487,8 @@ describe("budget caps", () => {
       "result-words": 0.26,
       // The coordinator's brief of 2026-10-02: the confirming whole-story playthroughs on production's code after decision A
       "playthroughs-4": 1,
+      // The coordinator's brief of 2026-10-02: one AI Draft on GPT-6.1 Sol before the template editor's default switches
+      "sol61-smoke": 0.25,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -524,6 +528,7 @@ describe("budget caps", () => {
       "money-2",
       "result-words",
       "playthroughs-4",
+      "sol61-smoke",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -537,9 +542,11 @@ describe("budget caps", () => {
     const review = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("outcome-settled"), FEEDBACK_STAGES.indexOf("late-pacing") + 1);
     const after = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("options-o2c") + 1, FEEDBACK_STAGES.indexOf("playthroughs-3") + 1);
     const decisionA = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("playthroughs-3") + 1, FEEDBACK_STAGES.indexOf("result-words") + 1);
-    const confirming = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("result-words") + 1);
+    const confirming = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("result-words") + 1, FEEDBACK_STAGES.indexOf("playthroughs-4") + 1);
+    const sol61 = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("playthroughs-4") + 1);
     const before = FEEDBACK_STAGES.filter(
-      (stage) => !review.includes(stage) && !decisions.includes(stage) && !after.includes(stage) && !decisionA.includes(stage) && !confirming.includes(stage)
+      (stage) =>
+        !review.includes(stage) && !decisions.includes(stage) && !after.includes(stage) && !decisionA.includes(stage) && !confirming.includes(stage) && !sol61.includes(stage)
     );
     const capsOf = (stages: readonly (typeof FEEDBACK_STAGES)[number][]) => stages.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
     expect(capsOf(before)).toBeCloseTo(7.58);
@@ -569,6 +576,10 @@ describe("budget caps", () => {
     // its cap fits the $48 on the recorded ledger, and with the $1.3 on top it would reach about $47.17 at the cap
     expect(confirming).toEqual(["playthroughs-4"]);
     expect(44.87 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["playthroughs-4"]).toBeLessThanOrEqual(HARD_CEILING);
+    // The GPT-6.1 Sol smoke opened with every stage before it closed at what it spent (the ledger at $45.64): its cap fits
+    // with the $1.3 on top
+    expect(sol61).toEqual(["sol61-smoke"]);
+    expect(45.64 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["sol61-smoke"]).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
     const { caps: defaults } = resolveCaps({});
@@ -1062,19 +1073,46 @@ describe("budget caps", () => {
     expect(standInKey("gpt-6-luna@low/planV2c")).toBeUndefined();
   });
 
-  it("runs the final check on production's own settings groups: the arms follow TEXT_MODEL_GROUPS, not a copy", () => {
+  it("runs the final check on production's own settings groups: the arms follow TEXT_MODEL_GROUPS, not a copy, but for the template editor's, kept on the Sol it ran on", () => {
     const key = (group: keyof typeof TEXT_MODEL_GROUPS, variant: "adopted" | "adoptedTemplate" = "adopted") =>
       armKey({ model: TEXT_MODEL_GROUPS[group].model, reasoningEffort: TEXT_MODEL_GROUPS[group].reasoningEffort }, variant);
     const keys = (role: Parameters<typeof armsFor>[1]) => armsFor("final-check", role).map((plan) => plan.arm.key);
-    expect(keys("setup")).toEqual([key("setup"), key("templateEditor", "adoptedTemplate")]);
+    // The stage closed with its two AI Drafts on today's Sol (2026-09-28); the editor's default moved to GPT-6.1 Sol on
+    // 2026-10-02, and the closed stage keeps the arm it ran, so its rows and records stay as they ran
+    expect(keys("setup")).toEqual([key("setup"), "gpt-6-sol@low/adoptedTemplate"]);
+    expect(key("templateEditor", "adoptedTemplate")).toBe("gpt-6.1-sol@low/adoptedTemplate");
     expect(keys("beat")).toEqual([key("beat"), key("multiplayerBeat")]);
     // Both planner groups run Luna low, so one plan covers every case
     expect(new Set([...keys("switch"), ...keys("thread")])).toEqual(new Set([key("analysis"), key("multiplayerAnalysis")]));
     expect(keys("iteration")).toEqual([]);
-    // Production's defaults as of the adoption: the template editor on Sol low, the rest on Luna
-    expect(key("templateEditor", "adoptedTemplate")).toBe("gpt-6-sol@low/adoptedTemplate");
+    // Production's defaults as of the adoption: the rest on Luna
     expect(key("beat")).toBe("gpt-6-luna@medium/adopted");
     expect(stageRunsBaseline("final-check")).toBe(false);
+  });
+
+  it("gives the template editor's switch to GPT-6.1 Sol a smoke of its own (sol61-smoke, 2026-10-02): one AI Draft through production's path on the new default, under a tag of its own", () => {
+    // One template, the final check's two-player contest premise (the larger template schema, where today's Sol drafted in
+    // the final check), once, on production's template generation (adoptedTemplate) at the editor's new default
+    const setup = armsFor("sol61-smoke", "setup");
+    expect(setup).toHaveLength(1);
+    expect(setup[0].arm.key).toBe("gpt-6.1-sol@low/adoptedTemplate");
+    expect(setup[0].samples).toBe(1);
+    expect(setup[0].caseIds).toEqual(SOL61_SMOKE_PREMISES);
+    expect(SOL61_SMOKE_PREMISES).toEqual(["setup-flexible-soul-flat"]);
+    expect(FINAL_CHECK_TEMPLATE_PREMISES).toContain(SOL61_SMOKE_PREMISES[0]);
+    for (const role of ["beat", "switch", "thread", "iteration"] as const) expect(armsFor("sol61-smoke", role)).toEqual([]);
+    expect(pipelinePlans("sol61-smoke")).toEqual([]);
+    expect(stageRunsBaseline("sol61-smoke")).toBe(false);
+    expect(stageChecksTurns("sol61-smoke")).toBe(false);
+    expect(STAGE_CAP_REASONS["sol61-smoke"]).toMatch(/2026-10-02/);
+    expect(STAGE_CAP_REASONS["sol61-smoke"]).toMatch(/confirm the request shape before the default switches/);
+    // Production's code after the fourth playthroughs' review: a tag no earlier stage used
+    expect(SOL61_SMOKE_PROMPT_STATE).toBe("adopted29");
+    expect([PLAYTHROUGHS_4_PROMPT_STATE, RESULT_WORDS_PROMPT_STATE, MONEY_2_PROMPT_STATE, "adopted1"]).not.toContain(SOL61_SMOKE_PROMPT_STATE);
+    // The coordinator's cap: $0.25 (one draft, about $0.10-0.12 at today's Sol's tokens), inside the $48 hard cap at $45.64,
+    // with the stalled Stage 4 calls' possible $1.3 on top
+    expect(DEFAULT_STAGE_CAPS["sol61-smoke"]).toBe(0.25);
+    expect(45.64 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["sol61-smoke"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("gives the final check two new setups per player count and two templates, none read with a child", () => {

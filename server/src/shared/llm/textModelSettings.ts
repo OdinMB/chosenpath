@@ -7,7 +7,7 @@ import { assertSupportedSettings, modelFamily } from "./chatModel.js";
  *
  * Seven setting groups, each read from its own prefix and nothing else:
  *   setup                 SETUP_MODEL_*                       gpt-6-luna low
- *   template editor       GENERATION_MODEL_*                  gpt-6-sol low
+ *   template editor       GENERATION_MODEL_*                  gpt-6.1-sol low
  *   beats                 TEXT_MODEL_*                        gpt-6-luna medium
  *   multiplayer beats     MULTIPLAYER_TEXT_MODEL_*            gpt-6-luna low
  *   analysis              SWITCH_THREAD_MODEL_*               gpt-6-luna low
@@ -17,8 +17,9 @@ import { assertSupportedSettings, modelFamily } from "./chatModel.js";
  * a warning. Production text calls run only on gpt-6 models: a gpt-4.x name
  * stops the server at startup with the variable and its replacement. The
  * eval's comparison arms still run gpt-4.x through the factory directly.
- * gpt-6.1-sol is accepted since 2026-09-30 (no group's default); an effort a
- * model does not take (none on gpt-6.1-sol) stops the server too.
+ * gpt-6.1-sol is accepted since 2026-09-30 and is the template editor's
+ * default since 2026-10-02; an effort a model does not take (none on
+ * gpt-6.1-sol) stops the server too.
  */
 
 export type TextRole =
@@ -92,11 +93,16 @@ type GroupDefault = { prefix: string; model: string; reasoningEffort: ReasoningE
  * the setup wait cap. The template editor (AI Draft, AI Iteration) moved to
  * Sol low on 2026-09-28 (owner, from the templates rating page: Sol better on
  * 3 items, the same on 6, worse on none, the repeat agreeing); no player waits
- * on it, and custom-story setup stays on Luna low.
+ * on it, and custom-story setup stays on Luna low. It moved to GPT-6.1 Sol low
+ * on 2026-10-02 without a rating (owner: "For Sol, let's just assume that 6.1
+ * is better than 6."), after one AI Draft through production's path on it
+ * (the eval's sol61-smoke stage); same price but for cached input, same
+ * measured pace at low (DOCS/2026-09-30_sol-6-1-assessment.md). Rollback:
+ * GENERATION_MODEL_NAME=gpt-6-sol with GENERATION_MODEL_REASONING_EFFORT=low.
  */
 export const TEXT_MODEL_GROUPS: Record<TextModelGroup, GroupDefault> = {
   setup: { prefix: "SETUP_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
-  templateEditor: { prefix: "GENERATION_MODEL", model: "gpt-6-sol", reasoningEffort: "low" },
+  templateEditor: { prefix: "GENERATION_MODEL", model: "gpt-6.1-sol", reasoningEffort: "low" },
   beat: { prefix: "TEXT_MODEL", model: "gpt-6-luna", reasoningEffort: "medium" },
   multiplayerBeat: { prefix: "MULTIPLAYER_TEXT_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
   analysis: { prefix: "SWITCH_THREAD_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },

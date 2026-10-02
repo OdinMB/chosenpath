@@ -954,8 +954,9 @@ describe("planJobs: the round stages and the migration check", () => {
       iteration: { template: { title: "T" }, feedback: "More rivalry", sections: ["stats"], playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 },
     });
     const jobs = planJobs([iteration], { stage: "migration", promptState: "round1", roles: ["iteration"], mode: "isolated", subset15: false, records: [] });
-    // Production's template-editor default: Sol low since the owner's templates decision (2026-09-28)
-    expect(jobs.map((j) => `${j.armKey} s${j.sample}`)).toEqual(["gpt-6-sol@low/prod s1", "gpt-6-sol@low/prod s2"]);
+    // Production's template-editor default: Sol low since the owner's templates decision (2026-09-28), GPT-6.1 Sol low since
+    // 2026-10-02 (AI Iteration has never run, so no stored record moves with it)
+    expect(jobs.map((j) => `${j.armKey} s${j.sample}`)).toEqual(["gpt-6.1-sol@low/prod s1", "gpt-6.1-sol@low/prod s2"]);
   });
 
   it("keeps the round cases out of the closed Stages 0 to 4, isolated and chained, and plans them in the migration check", () => {

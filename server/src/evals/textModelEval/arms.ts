@@ -111,7 +111,9 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * production's one checked retry), then a fourth round of whole-story
  * playthroughs on production's code after decision A (playthroughs-4: no --run
  * arms, the --playthroughs --round 4 mode's prep calls, and the judged places
- * check on its group turns and on round 3's for the comparison).
+ * check on its group turns and on round 3's for the comparison), then one AI
+ * Draft on GPT-6.1 Sol before the template editor's default switched to it
+ * (sol61-smoke: production's template generation once on one template).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -152,6 +154,7 @@ export const FEEDBACK_STAGES = [
   "money-2",
   "result-words",
   "playthroughs-4",
+  "sol61-smoke",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -761,10 +764,30 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return money2Arms(role);
     case "result-words":
       return resultWordsArms(role);
+    case "sol61-smoke":
+      return role === "setup" ? [{ arm: adoptedDefault("templateEditor", "adoptedTemplate"), samples: 1, scope: "all", caseIds: SOL61_SMOKE_PREMISES }] : [];
     default:
       return [];
   }
 }
+
+/**
+ * The prompt state of the GPT-6.1 Sol smoke (the coordinator's brief of
+ * 2026-10-02): production's code after the fourth playthroughs' review, under
+ * a tag no earlier stage used.
+ */
+export const SOL61_SMOKE_PROMPT_STATE = "adopted29";
+
+/**
+ * The smoke's one template (sol61-smoke): the final check's two-player
+ * cooperative-competitive premise, whose template carries a contest and so the
+ * larger template schema, and where today's Sol drafted in the final check
+ * (22,281 input and 5,661 output tokens, 134 s, on 2026-09-28 under adopted1).
+ * Once, on production's template generation at the template editor's default:
+ * strict json_schema on Chat Completions and the request shape were
+ * unconfirmed for 6.1 (DOCS/2026-09-30_sol-6-1-assessment.md, section 4).
+ */
+export const SOL61_SMOKE_PREMISES = ["setup-flexible-soul-flat"];
 
 /**
  * The prompt state of the result-words stage (decision A's result-words fix,
@@ -2174,21 +2197,29 @@ function adoptedDefault(group: TextModelGroup, variant: VariantId = "adopted"): 
 }
 
 /**
+ * The template editor's model when the final check ran (2026-09-28): today's
+ * Sol at low. The editor's default moved to GPT-6.1 Sol on 2026-10-02; the
+ * closed stage keeps the arm it ran, so its rows and records stay as they ran.
+ */
+const FINAL_CHECK_TEMPLATE_EDITOR: TextModelSettings = { model: "gpt-6-sol", reasoningEffort: "low" };
+
+/**
  * The paid final check on production's own code (the owner's feedback
  * workflow, 2026-09-28), under ADOPTED_PROMPT_STATE, on production's settings
  * groups (TEXT_MODEL_GROUPS, never env): the stored single-player turns'
  * second sample (the form gate ran the first on the same code), the 12 stored
  * group turns and both planners on every planning case once, two new
  * custom-story setups per player count on the setup group, and two templates
- * on the template editor's (the first AI Drafts on setup round 3's form).
- * AI Iteration is not a default role and has never run.
+ * on the template editor's model as it then was (FINAL_CHECK_TEMPLATE_EDITOR;
+ * the first AI Drafts on setup round 3's form). AI Iteration is not a default
+ * role and has never run.
  */
 function finalCheckArms(role: EvalRole): ArmPlan[] {
   switch (role) {
     case "setup":
       return [
         { arm: adoptedDefault("setup"), samples: 1, scope: "all", caseIds: FINAL_CHECK_SETUP_PREMISES },
-        { arm: adoptedDefault("templateEditor", "adoptedTemplate"), samples: 1, scope: "all", caseIds: FINAL_CHECK_TEMPLATE_PREMISES },
+        { arm: makeArm(FINAL_CHECK_TEMPLATE_EDITOR, "adoptedTemplate"), samples: 1, scope: "all", caseIds: FINAL_CHECK_TEMPLATE_PREMISES },
       ];
     case "beat":
       return [

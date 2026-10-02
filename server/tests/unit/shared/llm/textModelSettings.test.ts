@@ -24,9 +24,10 @@ describe("resolveTextModelConfig: the GPT-6 defaults", () => {
     const single = Object.fromEntries(ALL_ROLES.map((role) => [role, settingsFor(config, role)]));
     expect(single).toEqual({
       setup: { model: "gpt-6-luna", reasoningEffort: "low" },
-      // Templates and AI Iteration on Sol low (owner, 2026-09-28, from the templates page); custom-story setup stays on Luna
-      templateGeneration: { model: "gpt-6-sol", reasoningEffort: "low" },
-      templateIteration: { model: "gpt-6-sol", reasoningEffort: "low" },
+      // Templates and AI Iteration on Sol low (owner, 2026-09-28, from the templates page), on GPT-6.1 Sol low since 2026-10-02
+      // (owner: "For Sol, let's just assume that 6.1 is better than 6."); custom-story setup stays on Luna
+      templateGeneration: { model: "gpt-6.1-sol", reasoningEffort: "low" },
+      templateIteration: { model: "gpt-6.1-sol", reasoningEffort: "low" },
       beat: { model: "gpt-6-luna", reasoningEffort: "medium" },
       switchAnalysis: { model: "gpt-6-luna", reasoningEffort: "low" },
       threadAnalysis: { model: "gpt-6-luna", reasoningEffort: "low" },
@@ -41,7 +42,7 @@ describe("resolveTextModelConfig: the GPT-6 defaults", () => {
   it("summarises every group as model@effort for the startup log line", () => {
     expect(describeTextModels(resolveTextModelConfig({}, quiet))).toEqual({
       setup: "gpt-6-luna@low",
-      templateEditor: "gpt-6-sol@low",
+      templateEditor: "gpt-6.1-sol@low",
       beat: "gpt-6-luna@medium",
       multiplayerBeat: "gpt-6-luna@low",
       analysis: "gpt-6-luna@low",
@@ -95,8 +96,8 @@ describe("resolveTextModelConfig: env overrides", () => {
   });
 });
 
-describe("resolveTextModelConfig: GPT-6.1 Sol (accepted since 2026-09-30, no group's default)", () => {
-  it("accepts gpt-6.1-sol in a group at an effort it takes, and moves no default", () => {
+describe("resolveTextModelConfig: GPT-6.1 Sol (accepted since 2026-09-30, the template editor's default since 2026-10-02)", () => {
+  it("accepts gpt-6.1-sol in a group at an effort it takes; only the template editor's default is 6.1", () => {
     const config = resolveTextModelConfig(
       { GENERATION_MODEL_NAME: "gpt-6.1-sol", GENERATION_MODEL_REASONING_EFFORT: "low" },
       quiet
@@ -108,7 +109,24 @@ describe("resolveTextModelConfig: GPT-6.1 Sol (accepted since 2026-09-30, no gro
     expect(settingsFor(config, "setup")).toEqual({ model: "gpt-6-luna", reasoningEffort: "low" });
     const beat = resolveTextModelConfig({ TEXT_MODEL_NAME: "gpt-6.1-sol", TEXT_MODEL_REASONING_EFFORT: "high" }, quiet);
     expect(settingsFor(beat, "beat")).toEqual({ model: "gpt-6.1-sol", reasoningEffort: "high" });
-    expect(describeTextModels(resolveTextModelConfig({}, quiet)).templateEditor).toBe("gpt-6-sol@low");
+    const defaults = describeTextModels(resolveTextModelConfig({}, quiet));
+    expect(defaults.templateEditor).toBe("gpt-6.1-sol@low");
+    expect(Object.entries(defaults).filter(([, value]) => value.startsWith("gpt-6.1-")).map(([group]) => group)).toEqual(["templateEditor"]);
+  });
+
+  it("rolls the template editor back to today's Sol by env, at any effort that model takes", () => {
+    const back = resolveTextModelConfig({ GENERATION_MODEL_NAME: "gpt-6-sol", GENERATION_MODEL_REASONING_EFFORT: "low" }, quiet);
+    expect(settingsFor(back, "templateGeneration")).toEqual({ model: "gpt-6-sol", reasoningEffort: "low" });
+    expect(settingsFor(back, "templateIteration")).toEqual({ model: "gpt-6-sol", reasoningEffort: "low" });
+  });
+
+  it("stops the server on effort none with the default model, now that the default is gpt-6.1-sol", () => {
+    const none = () => resolveTextModelConfig({ GENERATION_MODEL_REASONING_EFFORT: "none" }, quiet);
+    expect(none).toThrow("GENERATION_MODEL_REASONING_EFFORT=none is not supported by gpt-6.1-sol, which takes low, medium or high");
+    expect(none).toThrow(/Set GENERATION_MODEL_REASONING_EFFORT=low/);
+    // An effort the default takes still applies to it
+    const medium = resolveTextModelConfig({ GENERATION_MODEL_REASONING_EFFORT: "medium" }, quiet);
+    expect(settingsFor(medium, "templateGeneration")).toEqual({ model: "gpt-6.1-sol", reasoningEffort: "medium" });
   });
 
   it("stops the server on effort none with gpt-6.1-sol, naming the variable, what the model takes and what to set", () => {
@@ -139,7 +157,7 @@ describe("resolveTextModelConfig: GPT-6.1 Sol (accepted since 2026-09-30, no gro
   });
 
   it("keeps none for today's Sol and Luna: the guard reads the model, not the group", () => {
-    const config = resolveTextModelConfig({ GENERATION_MODEL_REASONING_EFFORT: "none" }, quiet);
+    const config = resolveTextModelConfig({ GENERATION_MODEL_NAME: "gpt-6-sol", GENERATION_MODEL_REASONING_EFFORT: "none" }, quiet);
     expect(settingsFor(config, "templateGeneration")).toEqual({ model: "gpt-6-sol", reasoningEffort: "none" });
   });
 });
@@ -147,7 +165,7 @@ describe("resolveTextModelConfig: GPT-6.1 Sol (accepted since 2026-09-30, no gro
 describe("resolveTextModelConfig: what stops the server at startup", () => {
   it.each([
     ["SETUP_MODEL_NAME", "gpt-4.1", "SETUP_MODEL_NAME=gpt-6-luna and SETUP_MODEL_REASONING_EFFORT=low"],
-    ["GENERATION_MODEL_NAME", "gpt-4.1", "GENERATION_MODEL_NAME=gpt-6-sol and GENERATION_MODEL_REASONING_EFFORT=low"],
+    ["GENERATION_MODEL_NAME", "gpt-4.1", "GENERATION_MODEL_NAME=gpt-6.1-sol and GENERATION_MODEL_REASONING_EFFORT=low"],
     ["TEXT_MODEL_NAME", "gpt-4.1-mini", "TEXT_MODEL_NAME=gpt-6-luna and TEXT_MODEL_REASONING_EFFORT=medium"],
     ["MULTIPLAYER_TEXT_MODEL_NAME", "gpt-4.1-mini", "MULTIPLAYER_TEXT_MODEL_NAME=gpt-6-luna and MULTIPLAYER_TEXT_MODEL_REASONING_EFFORT=low"],
     ["SWITCH_THREAD_MODEL_NAME", "gpt-4o-mini", "SWITCH_THREAD_MODEL_NAME=gpt-6-luna and SWITCH_THREAD_MODEL_REASONING_EFFORT=low"],

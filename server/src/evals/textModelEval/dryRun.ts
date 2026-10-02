@@ -133,6 +133,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
     "Result words in the story text (resultWords beside production's group turn under adopted27, --role beat, each with production's checked retry, on the group turns of rounds 2 and 3 whose text named a result's kind; then --result-words-blind and --result-words)",
   "playthroughs-4":
     "Whole-story playthroughs, round 4, on production's code after decision A (no --run jobs: --playthroughs --round 4 plays them, listed below, with the places check on its group turns; --playthroughs --round 3 --judge-places judges round 3's for the comparison)",
+  "sol61-smoke": "GPT-6.1 Sol smoke (one AI Draft through production's template generation on the template editor's default under adopted29, --role setup)",
 };
 
 /** Jobs by arm key, in plan order. */
