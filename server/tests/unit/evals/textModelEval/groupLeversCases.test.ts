@@ -26,7 +26,7 @@ import { sacrificeRewardLine } from "../../../../src/game/services/optionRules.j
 import { groupLeverSlots, groupLeversBase, groupLeversRequest, takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { withShortRepliesLines } from "../../../../src/game/services/storyTextRounds/shortReplies.js";
 import { fakeCall, input } from "./playFixtures.js";
-import { beforeGroupOptions, beforeLateClues, beforeSharedScenes, withOwnersRollLevers } from "../../../helpers/adoptedDeltas.js";
+import { beforeGroupOptions, beforeLateClues, beforeResultWords, beforeSharedScenes, withOwnersRollLevers } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * The group-levers stage's cases (2026-10-01, the coordinator's brief after the
@@ -133,8 +133,9 @@ describe("groupLeversCases on the second round's stored playthroughs (skipped wh
     for (const c of cases) {
       const story = caseStory(c);
       // The run sent the variant's base; production today sends groupLeversB (the group-levers adoption, 2026-10-01) with
-      // the short-replies stage's lines, adopted later that day, and on a late turn the pacing-clues stage's, later again
-      expect([c.id, sha256(beforeLateClues(groupLeversBase(story).prompt, story))]).toEqual([c.id, sentHashOf(c.id)]);
+      // the short-replies stage's lines, adopted later that day, on a late turn the pacing-clues stage's, later again, and on a
+      // later step the result-words stage's line (2026-10-02)
+      expect([c.id, sha256(beforeResultWords(beforeLateClues(groupLeversBase(story).prompt, story), story))]).toEqual([c.id, sentHashOf(c.id)]);
       // Since the review of that day, a player whose roll the step discards gets no lever (withOwnersRollLevers, logged);
       // since the group-options adoption that evening production prints that stage's lines on top (beforeGroupOptions),
       // and since the scenes adoption after it, on a step with several threads, where everyone is (beforeSharedScenes)

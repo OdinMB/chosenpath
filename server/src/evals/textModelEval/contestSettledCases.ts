@@ -115,6 +115,26 @@ export const SENT_BY_ROUND: Record<1 | 2 | 3, SentRequestText> = { 1: playthroug
 
 export type RunsByRound = Record<1 | 2 | 3, PlayRun[]>;
 
+/** A stage's cases from the stored runs of each spec's round, each only where its request is the one the run sent, in the specs' order; and what could not be built. */
+export function casesByRound(
+  runs: RunsByRound,
+  promptHashOf: PromptHashOf,
+  specs: (ChoiceCaseSpec & { round: 1 | 2 | 3 })[],
+  sent: Record<1 | 2 | 3, SentRequestText>,
+  category: string
+): { cases: EvalCase[]; problems: string[] } {
+  const built = new Map<string, EvalCase>();
+  const problems: string[] = [];
+  for (const round of [1, 2, 3] as const) {
+    const own = specs.filter((s) => s.round === round);
+    if (own.length === 0) continue;
+    const found = choiceResultCases(runs[round], promptHashOf, own, sent[round], category);
+    for (const c of found.cases) built.set(c.id, c);
+    problems.push(...found.problems.map((p) => `round ${round}: ${p}`));
+  }
+  return { cases: specs.flatMap((s) => (built.has(s.id) ? [built.get(s.id) as EvalCase] : [])), problems };
+}
+
 /** The stage's cases from the stored runs of each spec's round, each only where its request is the one the run sent; and what could not be built. */
 export function contestSettledCases(
   runs: RunsByRound,
@@ -122,16 +142,7 @@ export function contestSettledCases(
   specs: ContestCaseSpec[] = CONTEST_SETTLED_CASE_SPECS,
   sent: Record<1 | 2 | 3, SentRequestText> = SENT_BY_ROUND
 ): { cases: EvalCase[]; problems: string[] } {
-  const built = new Map<string, EvalCase>();
-  const problems: string[] = [];
-  for (const round of [1, 2, 3] as const) {
-    const own = specs.filter((s) => s.round === round);
-    if (own.length === 0) continue;
-    const found = choiceResultCases(runs[round], promptHashOf, own, sent[round], CATEGORY);
-    for (const c of found.cases) built.set(c.id, c);
-    problems.push(...found.problems.map((p) => `round ${round}: ${p}`));
-  }
-  return { cases: specs.flatMap((s) => (built.has(s.id) ? [built.get(s.id) as EvalCase] : [])), problems };
+  return casesByRound(runs, promptHashOf, specs, sent, CATEGORY);
 }
 
 /** What --build-contest-settled-cases freezes: every built case not frozen yet (all of them when rebuilding), and what was left as frozen. */

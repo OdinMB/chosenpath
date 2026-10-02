@@ -4,6 +4,7 @@ import type { PlayRun } from "./playthroughs.js";
 import { groupOptionsBase } from "../../game/services/storyTextRounds/groupOptions.js";
 import { withoutSharedScenes } from "../../game/services/storyTextRounds/sharedScenes.js";
 import { withoutContestSettledLines } from "../../game/services/storyTextRounds/contestSettled.js";
+import { withoutResultWordsLine } from "../../game/services/storyTextRounds/resultWords.js";
 
 /*
  * The group-options stage's cases (decision A, the evening of 2026-10-01; no
@@ -132,10 +133,12 @@ const CATEGORY = "group-options";
  * threads, whose shared-scenes insertions production prints since the scenes stage's adoption (later that evening):
  * without them (withoutSharedScenes; the scene field is in the schema, not the prompt); and for a chapter planner
  * where a pick sets a contest at its last stage, whose PACING line production prints since the contest-settled stage's
- * adoption (later still): without it (withoutContestSettledLines).
+ * adoption (later still): without it (withoutContestSettledLines); and for a group turn that narrates a result, whose
+ * result-words line production prints since the result-words stage's adoption (2026-10-02): without it
+ * (withoutResultWordsLine).
  */
 export const playthroughs3Sent: SentRequestText = (input) => {
-  if (input.role === "beat") return withoutSharedScenes(groupOptionsBase(input.story).prompt, input.story);
+  if (input.role === "beat") return withoutResultWordsLine(withoutSharedScenes(groupOptionsBase(input.story).prompt, input.story), input.story);
   const sent = productionSends(input);
   return input.role === "thread" ? withoutContestSettledLines(withoutSharedScenes(sent, input.story), input.story) : sent;
 };

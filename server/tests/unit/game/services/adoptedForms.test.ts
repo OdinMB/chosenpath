@@ -22,6 +22,7 @@ import {
   withLeverDirectionSchema,
   withPacedLengths,
   withPacingStepB,
+  withResultWords,
   withResultsAsOutcomes,
   withResultsAsOutcomesSchema,
   withSharedScenes,
@@ -74,8 +75,10 @@ import { takesMoneyRule } from "../../../../src/game/services/moneyTurns.js";
  * deciding-thread line (contestSettled, the contest-settled stage of
  * 2026-10-01; withContestSettled puts it on the forms measured before), a
  * learning story's turn that counts with the money block (moneyTurnB, the
- * money-2 stage of 2026-10-02, on the same turn without the category), and AI
- * Iteration on setup round 3's text. The only differences are the logged
+ * money-2 stage of 2026-10-02, on the same turn without the category), a
+ * group turn that narrates a result with the line under the fourth-wall rule
+ * (resultWords, the result-words stage of 2026-10-02; withResultWords puts it on
+ * the forms measured before), and AI Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
  * folder (DOCS/, not in git), so this suite runs where they exist; the
  * adoptedSetup, adoptedPlanners and adoptedTurns tests hold the same on
@@ -196,9 +199,10 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
       // the pacing-clues stage the same day, a late turn carries the late part's clue lines as pacingClues measured them
       // (groupLeversB, built on production's live turn, carries them already); since the scenes stage that evening, a
       // group's chapter step with several threads carries where everyone is and the consistency line, as sharedScenesB
-      // measured them
+      // measured them; since the result-words stage (2026-10-02), a group turn that narrates a result carries the line under
+      // the fourth-wall rule, as resultWords measured it (resultWords.test.ts holds production to it)
       const lined = withShortReplies({
-        prompt: withSharedScenes(withLateClues(adoptedTurn(prompt, input.story), input.story), input.story, "beat"),
+        prompt: withResultWords(withSharedScenes(withLateClues(adoptedTurn(prompt, input.story), input.story), input.story, "beat"), input.story),
         schema: (measured as { schema: Parameters<typeof toJsonSchema>[0] }).schema,
       });
       return { prompt: lined.prompt, schema: lined.json };

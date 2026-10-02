@@ -23,6 +23,7 @@ import { LATE_CLUES_TEXT, takesLateClues } from "../lateClues.js";
 import { TEXT_GOES_ON } from "../textParagraphs.js";
 import { SHARED_SCENES, scenesBlock, takesScenesBlock } from "../sharedScenes.js";
 import { MONEY_TURN_TEXT, takesMoneyRule } from "../moneyTurns.js";
+import { RESULT_LABELS_TEXT, takesResultLabels } from "../resultLabels.js";
 
 /**
  * The scoreboard ending rule (the setup document's decision 3, question 1,
@@ -461,7 +462,10 @@ Example: If the player decided to organize a vote, describe what they do, how th
     }
 - Don't break the fourth wall
 --- Don't use terms like 'NPC', 'player character', 'stat', 'story beat', etc. in the beat text.
-- Story elements
+${
+  // A group turn that narrates a result: no result's kind in the text (the result-words stage, 2026-10-02)
+  takesResultLabels(story) ? RESULT_LABELS_TEXT.line : ""
+}- Story elements
 --- If a player encounters a story element for the first time, introduce it properly.
 --- If a player encounters a story element when they already encountered it before, don't introduce it again. Just refer to it assuming that the player knows what it is.
 - The last paragraph

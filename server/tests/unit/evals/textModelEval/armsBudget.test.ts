@@ -473,6 +473,9 @@ describe("budget caps", () => {
       // Decision A of 2026-10-01 (2026-10-02): money that moves in a learning story, the money setup on five learning
       // premises twice and the lemonade's first chapter played on, with room for fix 7's turn line, its estimate plus 30%
       "money-2": 0.39,
+      // Decision A of 2026-10-01 (2026-10-02): result words in the story text, the variant beside production's group turn
+      // twice on the seven group turns of rounds 2 and 3 that named a result's kind, its estimate plus 30%
+      "result-words": 0.26,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -510,6 +513,7 @@ describe("budget caps", () => {
       "scenes",
       "contest-settled",
       "money-2",
+      "result-words",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -546,7 +550,7 @@ describe("budget caps", () => {
     expect(42.87 + DEFAULT_STAGE_CAPS["playthroughs-3"]).toBeLessThanOrEqual(HARD_CEILING);
     // Decision A (the evening of 2026-10-01) opened its measurements with the ledger at $43.61 of the $48 hard cap: their
     // caps fit with the $1.3 on top
-    expect(decisionA).toEqual(["group-options", "scenes", "contest-settled", "money-2"]);
+    expect(decisionA).toEqual(["group-options", "scenes", "contest-settled", "money-2", "result-words"]);
     expect(LEDGER_WHEN_DECISION_A_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisionA)).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -882,10 +886,19 @@ describe("budget caps", () => {
     expect(stageInterleavesArms("choice-line-sp")).toBe(true);
     // Its turns carry production's one retry of a short or option-less reply; no earlier stage's do
     expect(stageChecksTurns("choice-line-sp")).toBe(true);
-    // The kids-turns, kids-ages, group-levers, short-replies, group-options and scenes stages (2026-10-01) and the money-2
-    // stage's turn line (2026-10-02) carry it too
+    // The kids-turns, kids-ages, group-levers, short-replies, group-options and scenes stages (2026-10-01), the money-2
+    // stage's turn line and the result-words stage (2026-10-02) carry it too
     for (const stage of STAGES.filter(
-      (s) => s !== "choice-line-sp" && s !== "kids-turns" && s !== "kids-ages" && s !== "group-levers" && s !== "short-replies" && s !== "group-options" && s !== "scenes" && s !== "money-2"
+      (s) =>
+        s !== "choice-line-sp" &&
+        s !== "kids-turns" &&
+        s !== "kids-ages" &&
+        s !== "group-levers" &&
+        s !== "short-replies" &&
+        s !== "group-options" &&
+        s !== "scenes" &&
+        s !== "money-2" &&
+        s !== "result-words"
     )) {
       expect(stageChecksTurns(stage)).toBe(false);
     }

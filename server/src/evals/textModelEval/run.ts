@@ -59,6 +59,7 @@ import { buildGroupLeverCasesMode, groupLeversMode } from "./groupLeversPrep.js"
 import { buildGroupOptionsCasesMode, groupOptionsMode } from "./groupOptionsPrep.js";
 import { buildScenesCasesMode, judgeScenesMode, writeJudgedScenes } from "./sharedScenesPrep.js";
 import { buildContestSettledCasesMode, contestSettledBlindMode, writeContestSettled } from "./contestSettledPrep.js";
+import { buildResultWordsCasesMode, resultWordsBlindMode, writeResultWords } from "./resultWordsPrep.js";
 import { buildShortReplyCasesMode, shortRepliesMode } from "./shortRepliesPrep.js";
 import { runaway2Mode } from "./runaway2Prep.js";
 import { optionsO2cMode } from "./optionsO2cPrep.js";
@@ -126,7 +127,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     chapter openings, interleaved; contest-settled --role thread under adopted25: production's chapter planner and
  *     contestSettled twice on every stored plan of rounds 1-3 at a contested outcome's last stage, interleaved; money-2
  *     --role beat under adopted26: production's turn and moneyTurn twice on eight turns of the stage's own lemonade runs,
- *     each with production's checked retry, interleaved)
+ *     each with production's checked retry, interleaved; result-words --role beat under adopted27: production's group
+ *     turn and resultWords twice on the group turns of rounds 2 and 3 whose text named a result's kind, each with
+ *     production's checked retry, interleaved)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -336,6 +339,17 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --money-2  the stage's report, no calls: the blind hand readings unblinded, the variants against production under
  *     the stop rule, the flags, setup checks, waits, reasoning and cost, every setup's counted stats, every played turn's
  *     and every turn-line reply's money
+ *   Result words in the story text (resultWordsPrep.ts, 2026-10-02, decision A's result-words fix), in the result-words
+ *   stage:
+ *   --build-result-words-cases [--rebuild-cases]  the group turns of rounds 2 and 3 whose text named a result's kind
+ *     (resultWordsCases.ts); no calls; they then run with --run --stage result-words --prompt-state adopted27 --role beat
+ *     (production's group turn and resultWords, each with production's checked retry)
+ *   --result-words-blind  no calls: every sentence of the kept turns that holds a word that can name a result's kind,
+ *     coded, no arm named (result-words-blind.md; the key in keys/result-words-blind.json), for the hand reading in
+ *     resultWordsHand.ts
+ *   --result-words  the stage's report, no calls: turns and player texts naming a result's kind by production's note and
+ *     by the blind hand reading unblinded, the variant against production under the stop rule, reasoning, the retries,
+ *     waits and cost, the automatic checks, every coded sentence; result-words.md and .json
  *   Fix 8's retest in whole short playthroughs (pacingCluesPrep.ts, 2026-10-01), in the pacing-clues stage:
  *   --pacing-clues-play [--cases <story ids>] [--samples N] [--turns N] [--arms pacingCluesB] [--max-spend 0.50]
  *     [--report-only]  production's code and pacingClues (the late-pacing fix-and-retest's planners and the late part's
@@ -429,6 +443,9 @@ type Mode =
   | "build-contest-settled-cases"
   | "contest-settled-blind"
   | "contest-settled"
+  | "build-result-words-cases"
+  | "result-words-blind"
+  | "result-words"
   | "money-2-play"
   | "money-2-blind"
   | "build-money-2-cases"
@@ -596,6 +613,9 @@ function parseArgs(argv: string[]): Args {
       case "--build-contest-settled-cases":
       case "--contest-settled-blind":
       case "--contest-settled":
+      case "--build-result-words-cases":
+      case "--result-words-blind":
+      case "--result-words":
       case "--money-2-play":
       case "--money-2-blind":
       case "--build-money-2-cases":
@@ -1390,6 +1410,14 @@ async function main() {
     case "contest-settled":
       // The report from what is recorded: no calls, so no key and no caps
       return writeContestSettled({ files, log: (line) => console.log(line) });
+    case "build-result-words-cases":
+      return buildResultWordsCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "result-words-blind":
+      // No calls: the blind reading's file and its key
+      return resultWordsBlindMode({ files, log: (line) => console.log(line) });
+    case "result-words":
+      // The report from what is recorded: no calls, so no key and no caps
+      return writeResultWords({ files, log: (line) => console.log(line) });
     case "money-2-play":
       // The setups and short playthroughs book to the stage, one invocation at most the stage's cap unless --max-spend says less
       return money2PlayMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "money-2", DEFAULT_STAGE_CAPS["money-2"]), {

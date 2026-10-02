@@ -105,8 +105,10 @@ export function resultWordsIn(text: string): string[] {
  * result remains plain in the room", "The unfavorable outcome hangs between
  * you", as round 2's had ("The mixed result is plain in the readings"). The
  * turn's request names the kinds ("resolved to end in a favorable/mixed/
- * unfavorable result") and bans none of them; removing them would be a
- * measured turn line, so the game notes them for the log and the eval.
+ * unfavorable result") and bans none of them, so the game notes them for the
+ * log and the eval. Since the result-words stage of 2026-10-02 a group turn
+ * that narrates a result is told to name no kind (resultLabels.ts); the note
+ * stays, to show what still gets through.
  */
 function noteResultWords(slot: string, beat: BeatGeneration | undefined, repairs: Repair[]): void {
   const words = resultWordsOfBeat(beat);

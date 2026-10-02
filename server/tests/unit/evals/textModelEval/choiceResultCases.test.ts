@@ -14,7 +14,7 @@ import {
 } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { CHOICE_RESULT_TEXT } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { threadBeat } from "../../../helpers/promptStories.js";
-import { beforeGroupLevers, beforeGroupOptions, beforeOptionsO2c, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
+import { beforeGroupLevers, beforeGroupOptions, beforeOptionsO2c, beforeResultWords, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
 import { replayRun } from "../../../../src/evals/textModelEval/playthroughReplay.js";
 import { takesOptionRules } from "../../../../src/game/services/optionRules.js";
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
@@ -97,13 +97,16 @@ describe("playthroughsSent: what production sent in the stored playthroughs, bef
   it("is a group's exploration step without the adopted exploration-order line, and production's request on every other turn (as it stood before the later adoptions of 2026-10-01)", async () => {
     const group = { role: "beat" as const, story: groupExplorationStep() };
     expect(productionSends(group)).toContain(CHOICE_RESULT_TEXT.explorationOrder);
-    expect(playthroughsSent(group)).toBe(beforeShortReplies(productionSends(group)).replace(CHOICE_RESULT_TEXT.explorationOrder, ""));
+    // ... and before the result-words adoption of 2026-10-02 (beforeResultWords: a group turn that narrates a result)
+    expect(playthroughsSent(group)).toBe(beforeShortReplies(beforeResultWords(productionSends(group), group.story)).replace(CHOICE_RESULT_TEXT.explorationOrder, ""));
     // A group's challenge step as production sent it before the group-levers adoption (2026-10-01, beforeGroupLevers),
     // every turn before the short-replies adoption later that day (beforeShortReplies)
     // and a single player's rolled step before the options-o2c adoption after it (beforeOptionsO2c), a group's challenge
     // step before the group-options adoption that evening (beforeGroupOptions)
     for (const story of [threadBeat(1), threadBeat(2), threadBeat(3)]) {
-      expect(playthroughsSent({ role: "beat", story })).toBe(beforeGroupLevers(beforeShortReplies(beforeOptionsO2c(beforeGroupOptions(productionSends({ role: "beat", story }), story), story)), story));
+      expect(playthroughsSent({ role: "beat", story })).toBe(
+        beforeResultWords(beforeGroupLevers(beforeShortReplies(beforeOptionsO2c(beforeGroupOptions(productionSends({ role: "beat", story }), story), story)), story), story)
+      );
     }
     const { run, hashOf } = await playedFake();
     const [opening, step] = choiceResultCases([run], hashOf, SPECS, productionSends).cases;

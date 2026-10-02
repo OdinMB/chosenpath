@@ -19,7 +19,16 @@ import { playthroughsSent } from "../../../../src/evals/textModelEval/choiceResu
 import { playthroughs2Sent } from "../../../../src/evals/textModelEval/parallelThreadsCases.js";
 import { takesKidsRules } from "../../../../src/game/services/kidsTurnRules.js";
 import { switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
-import { beforeEndingOnlyPlayed, beforeGroupLevers, beforeGroupOptions, beforeLateClues, beforeOptionsO2c, beforeSharedScenes, beforeShortReplies } from "../../../helpers/adoptedDeltas.js";
+import {
+  beforeEndingOnlyPlayed,
+  beforeGroupLevers,
+  beforeGroupOptions,
+  beforeLateClues,
+  beforeOptionsO2c,
+  beforeResultWords,
+  beforeSharedScenes,
+  beforeShortReplies,
+} from "../../../helpers/adoptedDeltas.js";
 import { takesGroupLevers } from "../../../../src/game/services/storyTextRounds/groupLevers.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
@@ -215,9 +224,10 @@ describe("replayRun on the stored round 2 (skipped where the output folder is ab
         // single player's rolled step's O2c lines (the options-o2c adoption, later still), and a late turn's clue lines (the
         // pacing-clues adoption, later again), and a group's rolled step's group-options lines (that stage's adoption, that
         // evening, beforeGroupOptions), and a group's chapter step with several threads' shared-scenes insertions (the scenes
-        // adoption, after it, beforeSharedScenes)
+        // adoption, after it, beforeSharedScenes), and a group turn that narrates a result's result-words line (that stage's
+        // adoption, 2026-10-02, beforeResultWords)
         expect([run.spec.id, r.turn, sha256(playthroughs2Sent({ role: "beat", story: r.before }))]).toEqual([run.spec.id, r.turn, sentHash]);
-        const withLines = beforeGroupOptions(beforeSharedScenes(requestText(requestFor("adopted", { role: "beat", story: r.before })), r.before), r.before);
+        const withLines = beforeGroupOptions(beforeSharedScenes(beforeResultWords(requestText(requestFor("adopted", { role: "beat", story: r.before })), r.before), r.before), r.before);
         expect([run.spec.id, r.turn, sha256(withLines) === sentHash]).toEqual([run.spec.id, r.turn, false]);
         const today = beforeShortReplies(beforeOptionsO2c(beforeLateClues(withLines, r.before), r.before));
         const ending = r.before.getCurrentBeatType() === "ending";

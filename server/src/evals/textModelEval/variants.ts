@@ -67,6 +67,7 @@ import { groupOptionsRequest } from "../../game/services/storyTextRounds/groupOp
 import { sharedScenesRequest } from "../../game/services/storyTextRounds/sharedScenes.js";
 import { contestSettledRequest } from "../../game/services/storyTextRounds/contestSettled.js";
 import { moneySetupRequest } from "../../game/services/storyTextRounds/moneySetup.js";
+import { resultWordsRequest } from "../../game/services/storyTextRounds/resultWords.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -427,6 +428,13 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * its three possible milestones the outcome's three resolutions, none putting
  * the decision off; production's request byte for byte elsewhere, with
  * production's limits for the role and player count.
+ * "resultWords" is decision A's result-words fix (2026-10-02, the result-words
+ * stage; storyTextRounds/resultWords.ts): production's group turn with one line
+ * under the fourth-wall rule, each result told in the story's own words, never
+ * by its kind (favorable, mixed, unfavorable, Side A or Side B), on a group
+ * turn that narrates a result (a later chapter step, a switch after the story's
+ * first beat); production's request byte for byte elsewhere, with production's
+ * turn limits and retry count.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -512,7 +520,8 @@ export type VariantId =
   | "contestSettled"
   | "moneySetup"
   | "moneyTurn"
-  | "moneyTurnB";
+  | "moneyTurnB"
+  | "resultWords";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -595,6 +604,7 @@ export const VARIANTS: VariantId[] = [
   "moneySetup",
   "moneyTurn",
   "moneyTurnB",
+  "resultWords",
 ];
 
 /**
@@ -1188,6 +1198,13 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     if (input.role !== "beat") throw new Error(`Variant moneyTurnB does not cover role ${input.role}`);
     const count = beatCheckOptions(input.story).textCount;
     return { ...moneyTurnRequest(input.story, { retest: true }), limits: beatCallLimits(input.story), ...(count ? { shortTextCount: count } : {}) };
+  },
+  // Each result told in the story's own words, never by its kind, on a group turn that narrates a result; production's
+  // turn limits and retry count
+  resultWords: (input): CheckedTextRequest => {
+    if (input.role !== "beat") throw new Error(`Variant resultWords does not cover role ${input.role}`);
+    const count = beatCheckOptions(input.story).textCount;
+    return { ...resultWordsRequest(input.story), limits: beatCallLimits(input.story), ...(count ? { shortTextCount: count } : {}) };
   },
 };
 

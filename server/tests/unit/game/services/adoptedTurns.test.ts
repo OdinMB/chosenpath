@@ -24,6 +24,7 @@ import {
   withKidsImageSlotsSchema,
   withLateClues,
   withOptionsO2c,
+  withResultWords,
   withSharedScenes,
   withShortReplies,
 } from "../../../helpers/adoptedDeltas.js";
@@ -235,7 +236,7 @@ const kidsAgesAdopted = (story: Story): Expected => {
 const asAdopted = (measured: Request, story: Story): Expected =>
   takesKidsRules(story)
     ? kidsAgesAdopted(story)
-    : withShortReplies({ prompt: withSharedScenes(withLateClues(adoptedTurn(measured.prompt, story), story), story, "beat"), schema: measured.schema });
+    : withShortReplies({ prompt: withResultWords(withSharedScenes(withLateClues(adoptedTurn(measured.prompt, story), story), story, "beat"), story), schema: measured.schema });
 
 /**
  * A single player's turn as production must send it. Since the options-o2c stage of 2026-10-01 a rolled chapter step

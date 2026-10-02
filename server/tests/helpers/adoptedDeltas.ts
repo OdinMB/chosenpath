@@ -93,6 +93,7 @@ import { SHARED_SCENES, takesScenesBlock as productionTakesScenesBlock, takesSce
 import { withSharedScenesLines, withoutSharedScenes } from "../../src/game/services/storyTextRounds/sharedScenes.js";
 import { withContestSettledLines, withoutContestSettledLines } from "../../src/game/services/storyTextRounds/contestSettled.js";
 import { withoutMoneyTurnLines } from "../../src/game/services/storyTextRounds/moneyAddsUp.js";
+import { withResultWordsLine, withoutResultWordsLine } from "../../src/game/services/storyTextRounds/resultWords.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -581,6 +582,31 @@ export function beforeMoneyTurn(production: string): string {
   return withoutMoneyTurnLines(production);
 }
 
+/*
+ * The result-words stage's adoption (decision A's result-words fix,
+ * 2026-10-02): a group turn that narrates a result (a later chapter step, a
+ * switch after the story's first beat) carries one line under the fourth-wall
+ * rule, each result told in the story's own words, never by its kind. The
+ * measured resultWords, not a delta (resultWords.test.ts holds production to
+ * it): withResultWords puts it on the forms measured before, beforeResultWords
+ * and productionThen take it out for the variants measured earlier. A
+ * read-with-kids group's turn carries it too (kidsAges is built on production's
+ * live turn), unmeasured for kids.
+ */
+
+/** Production's turn prompt as it stood before the result-words adoption (a prompt without the line as it is). */
+export function beforeResultWords(production: string, story: Story): string {
+  return withoutResultWordsLine(production, story);
+}
+
+/**
+ * A turn form measured before the result-words stage with the line where production prints it. A form the eval builds on
+ * production's live turn (groupLeversB, groupOptions, kidsAges, moneyTurnB) carries it already, and stays as it is.
+ */
+export function withResultWords(measured: string, story: Story): string {
+  return measured === withoutResultWordsLine(measured, story) ? withResultWordsLine(measured, story) : measured;
+}
+
 /**
  * A request of production's as it stood before the owner's decision of 2026-10-01 on ending milestones
  * (beforeEndingOnlyPlayed), before the group-levers adoption of the same day (beforeGroupLevers; a group's rolled
@@ -589,14 +615,17 @@ export function beforeMoneyTurn(production: string): string {
  * (beforeOptionsO2c; a single player's rolled step, prompt only), before the pacing-clues adoption after that
  * (beforeLateClues; a late turn, prompt only), before the group-options adoption that evening (beforeGroupOptions;
  * a group's rolled step, prompt; its schema is groupLeversBase's) and before the scenes adoption after it
- * (beforeSharedScenes; a group chapter's opening step with several threads, prompt only), and before the money-2 adoption of
- * 2026-10-02 (beforeMoneyTurn; a learning story's turn that counts, prompt only). The variants measured before compare
+ * (beforeSharedScenes; a group chapter's opening step with several threads, prompt only), before the money-2 adoption of
+ * 2026-10-02 (beforeMoneyTurn; a learning story's turn that counts, prompt only) and before the result-words adoption
+ * after it (beforeResultWords; a group turn that narrates a result, prompt only). The variants measured before compare
  * with it.
  */
 export function productionThen<R extends { prompt: string }>(request: R, story: Story): R {
   const prompt = beforeGroupLevers(
     beforeEndingOnlyPlayed(
-      beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeGroupOptions(beforeSharedScenes(beforeMoneyTurn(request.prompt), story), story), story), story)),
+      beforeShortReplies(
+        beforeOptionsO2c(beforeLateClues(beforeGroupOptions(beforeSharedScenes(beforeMoneyTurn(beforeResultWords(request.prompt, story)), story), story), story), story)
+      ),
       story
     ),
     story
@@ -738,9 +767,10 @@ export function productionBeforeKidsAges(story: Story): { prompt: string; json: 
   // Without the short-replies stage's lines, which came later that day (groupLeversBase builds on shortRepliesBase)
   // ... and without the options-o2c stage's lines on a single player's rolled step, which came later still, nor the
   // pacing-clues stage's late lines, later again, nor the scenes stage's insertions on a group chapter's opening, later still,
-  // nor the money-2 stage's lines on a learning story's turn that counts (2026-10-02)
+  // nor the money-2 stage's lines on a learning story's turn that counts (2026-10-02), nor the result-words line on a
+  // group turn that narrates a result (later that day)
   const asText = (request: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }) => ({
-    prompt: beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeSharedScenes(beforeMoneyTurn(request.prompt), story), story), story)),
+    prompt: beforeShortReplies(beforeOptionsO2c(beforeLateClues(beforeSharedScenes(beforeMoneyTurn(beforeResultWords(request.prompt, story)), story), story), story)),
     json: beforeShortRepliesJson(JSON.stringify(toJsonSchema(request.schema))),
   });
   // A group's rolled step as it stood before the group-levers adoption too (groupLeversBase), which came later that day

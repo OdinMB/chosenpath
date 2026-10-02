@@ -105,6 +105,9 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * setup beside production's setup on learning premises, each lemonade setup
  * played on through its first chapter on production's code; then fix 7's turn
  * line beside production's turn on eight of those turns, each turn with
+ * production's one checked retry), then result words in the story text
+ * (result-words: the variant beside production's group turn on the group turns
+ * of rounds 2 and 3 whose text named a result's kind, each turn with
  * production's one checked retry).
  * Their caps and reasons are in budget.ts.
  */
@@ -144,6 +147,7 @@ export const FEEDBACK_STAGES = [
   "scenes",
   "contest-settled",
   "money-2",
+  "result-words",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -378,6 +382,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   moneyTurn: "adopted",
   // Its one fix-and-retest, against production's turn
   moneyTurnB: "adopted",
+  // Result words in the story text (decision A's result-words fix, 2026-10-02): each result told in the story's own words
+  // on a group turn that narrates one, against production's group turn, which runs beside it
+  resultWords: "adopted",
 };
 
 /**
@@ -745,9 +752,46 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return contestSettledArms(role);
     case "money-2":
       return money2Arms(role);
+    case "result-words":
+      return resultWordsArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the result-words stage (decision A's result-words fix,
+ * 2026-10-02): production's own code since the money-2 adoption (a learning
+ * story's setup line and turn block), under a tag no earlier stage used, so
+ * production runs beside the variant in the same minutes.
+ */
+export const RESULT_WORDS_PROMPT_STATE = "adopted27";
+
+/**
+ * The stage's cases (resultWordsCases.ts, no calls): every group turn of the
+ * stored playthroughs whose text named a result's kind (production's note
+ * resultWordsInText), each request the one its round sent: five later chapter
+ * steps and two switches, two and three players.
+ */
+export const RESULT_WORDS_CASES = [
+  "round-words-r2-space-pirates-t8",
+  "round-words-r2-space-pirates-t18",
+  "round-words-r3-food-trucks-t14",
+  "round-words-r3-space-pirates-t3",
+  "round-words-r3-space-pirates-t13",
+  "round-words-r3-space-pirates-t14",
+  "round-words-r3-space-pirates-t16",
+] as const;
+
+/**
+ * Result words in the story text (decision A, the coordinator's brief of
+ * 2026-10-02): production's group turn (adopted) and the variant (resultWords)
+ * on the group turn model (Luna low), twice on the stage's cases, interleaved,
+ * under adopted27, each turn with production's one checked retry.
+ */
+function resultWordsArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return (["adopted", "resultWords"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: [...RESULT_WORDS_CASES] }));
 }
 
 /**
@@ -1624,7 +1668,7 @@ export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
 export const PLAYTHROUGHS_3_PROMPT_STATE = "adopted22";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
-const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies", "group-options", "scenes", "money-2"];
+const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies", "group-options", "scenes", "money-2", "result-words"];
 
 export function stageChecksTurns(stage: Stage): boolean {
   return CHECKED_TURN_STAGES.includes(stage);
@@ -1951,6 +1995,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "scenes",
   "contest-settled",
   "money-2",
+  "result-words",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -2031,6 +2076,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The money-2 stage's lemonade turns from its own runs (2026-10-02, decision A), frozen after every earlier stage had
   // closed
   ...MONEY_2_TURN_CASES.map((id): [string, Stage] => [id, "money-2"]),
+  // The result-words stage's group turns from the playthroughs of rounds 2 and 3 (2026-10-02, decision A), frozen after
+  // every earlier stage had closed
+  ...RESULT_WORDS_CASES.map((id): [string, Stage] => [id, "result-words"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

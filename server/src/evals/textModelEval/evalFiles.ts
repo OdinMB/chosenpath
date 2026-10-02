@@ -223,6 +223,11 @@ export function evalFiles(outDir: string) {
       writeJson(at("contest-settled.json"), json);
       fs.writeFileSync(at("contest-settled.md"), markdown);
     },
+    /** The result-words stage's report: each kept group turn's result words, production's note and the blind hand reading unblinded (--result-words, resultWordsPrep.ts) */
+    writeResultWords: (markdown: string, json: unknown) => {
+      writeJson(at("result-words.json"), json);
+      fs.writeFileSync(at("result-words.md"), markdown);
+    },
     /** The scenes stage's judged check, its calibration and the chains' plans (--judge-scenes, sharedScenesPrep.ts) */
     writeJudgedScenes: (markdown: string, json: unknown) => {
       writeJson(at("judged-scenes.json"), json);
