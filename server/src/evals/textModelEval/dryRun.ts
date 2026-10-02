@@ -131,6 +131,8 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
     "Money that moves in a learning story (moneySetup beside production's setup under adopted26: --money-2-play, listed below, then --money-2-blind; fix 7's turn line, moneyTurn beside production's turn, --role beat on eight built lemonade turns, each with production's checked retry, its fix-and-retest moneyTurnB on four of them and, since the review of the adoption, production's turn as measured (moneyTurnBase) fresh on those four; then --money-2-turns-blind and --money-2)",
   "result-words":
     "Result words in the story text (resultWords beside production's group turn under adopted27, --role beat, each with production's checked retry, on the group turns of rounds 2 and 3 whose text named a result's kind; then --result-words-blind and --result-words)",
+  "playthroughs-4":
+    "Whole-story playthroughs, round 4, on production's code after decision A (no --run jobs: --playthroughs --round 4 plays them, listed below, with the places check on its group turns; --playthroughs --round 3 --judge-places judges round 3's for the comparison)",
 };
 
 /** Jobs by arm key, in plan order. */

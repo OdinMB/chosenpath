@@ -10,6 +10,7 @@ import {
   PLAYTHROUGHS,
   PLAYTHROUGHS_2,
   PLAYTHROUGHS_3,
+  PLAYTHROUGHS_4,
   START_POLICY,
   countedBonus,
   nextPolicy,
@@ -121,6 +122,21 @@ describe("the four playthroughs", () => {
     expect(mouse.premise).toBe(then[5].premise);
     // The story records the setting, as StoryCreationService does
     expect(storyFromSetup({}, mouse, "mouse-story").kidAges).toEqual({ min: 5, max: 5 });
+  });
+
+  it("plays round 4 on round 3's six premises, the lemonade as the learning story it is (the setup form's learn-something category, since the money-2 adoption)", () => {
+    expect(PLAYTHROUGHS_4.map((p) => [p.id, p.maxTurns])).toEqual(PLAYTHROUGHS_3.map((p) => [p.id, p.maxTurns]));
+    const now = PLAYTHROUGHS_4.map((p) => playthroughSetupInput(p));
+    const then = PLAYTHROUGHS_3.map((p) => playthroughSetupInput(p));
+    // The lemonade's frozen premise is a learn-something one: production's story creation records it, and its setup and turns
+    // read it (the money setup line, the money turn line)
+    expect(SETUP_PREMISES.find((p) => p.id === "setup-learn-lemonade")?.category).toBe("learn-something");
+    expect(PLAYTHROUGHS_4[0].learning).toBe(true);
+    expect(now[0]).toEqual({ ...then[0], learning: true });
+    expect(storyFromSetup({}, now[0], "lemonade").category).toBe("learn-something");
+    // Every other input is round 3's; no earlier round played a learning story
+    expect(now.slice(1)).toEqual(then.slice(1));
+    for (const spec of [...PLAYTHROUGHS, ...PLAYTHROUGHS_2, ...PLAYTHROUGHS_3]) expect(playthroughSetupInput(spec).learning).toBeUndefined();
   });
 
   it("plays every call on production's own code (adopted) and production's settings for the role and player count", () => {
@@ -589,6 +605,23 @@ describe("playStory: a whole story as the game plays it", () => {
       [6, "play-lemonade-s1-t6"],
       [9, "play-lemonade-s1-t9"],
     ]);
+  });
+
+  it("hands the judged places check every group chapter turn where asked (round 4: placesConsistent v2 on all players' texts of the turn), and none otherwise", async () => {
+    const group = PLAYTHROUGHS[2];
+    const { judgeTargets } = await playStory(group, input(2), fakeCall(2).call, { sample: 1, judgePlaces: true });
+    const { run } = await playStory(group, input(2), fakeCall(2).call, { sample: 1, judgePlaces: true });
+    const chapterTurns = run.turns.filter((t) => t.kind === "chapter opening" || t.kind === "chapter step").map((t) => t.turn);
+    expect(chapterTurns.length).toBeGreaterThan(3);
+    const places = judgeTargets.filter((t) => t.kind === "places");
+    expect(places.map((t) => [t.turn, t.label, t.key])).toEqual(chapterTurns.map((turn) => [turn, "places", `play-food-trucks-s1-t${turn}`]));
+    expect(places[0].request.prompt).toContain("placesConsistent");
+    expect(places[0].request.prompt).toContain(`${run.start?.players.player2.name}'s text (player2):`);
+    // Not asked: none; a single player: none
+    const plain = await playStory(group, input(2), fakeCall(2).call, { sample: 1 });
+    expect(plain.judgeTargets.some((t) => t.kind === "places")).toBe(false);
+    const single = await playStory(spec, input(1), fakeCall(1).call, { sample: 1, judgePlaces: true });
+    expect(single.judgeTargets.some((t) => t.kind === "places")).toBe(false);
   });
 
   it("records, on each turn after a contest step or chapter, its result on the contest's scoreboard", async () => {

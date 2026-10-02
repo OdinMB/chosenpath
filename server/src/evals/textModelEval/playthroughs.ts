@@ -48,6 +48,7 @@ import { makeArm, productionRole, type Arm, type EvalRole } from "./arms.js";
 import { selectCharacters } from "./caseBuilder.js";
 import { optionsJudgeRequest, resultsJudgeRequest } from "./choiceResultJudge.js";
 import { endingJudgeRequest } from "./endingJudge.js";
+import { placesJudgeRequest } from "./parallelThreadsJudge.js";
 import { sha256 } from "./executor.js";
 import type { ContextLine } from "./ratingContext.js";
 import { turnMechanics, type LeverReading } from "./ratingMechanics.js";
@@ -122,6 +123,11 @@ export type PlaythroughSpec = {
    * 2026-10-01 (StoryInitializer, as the request's kidAges; it still merges the age line into the premise too)
    */
   premise?: { text: string; playerCount: PlayerCount; gameMode: GameMode; source: string; category?: Category; fields?: Record<string, string>; kidAges?: KidAges };
+  /**
+   * A learning story: the setup form's learn-something category, which production's story creation records and its setup
+   * and turns read since the money-2 adoption (2026-10-02); round 4 on, where the premise is a learn-something one
+   */
+  learning?: true;
   maxTurns: number;
   tests: string;
 };
@@ -210,17 +216,32 @@ export const PLAYTHROUGHS_3: PlaythroughSpec[] = PLAYTHROUGHS_2.map((spec) =>
     : spec
 );
 
-/** A playthrough's setup input: the frozen premise's text, or the new one as the client merges its suggestion (its category and fields), at the story's length; a read-with-kids story gets production's kids setup, with the read-with-kids setting where the spec sets one. */
+/**
+ * The fourth round (the coordinator's brief of 2026-10-02, the confirming playthroughs after decision A): round 3's six
+ * premises again on production's current code, the lemonade as the learning story its frozen premise is (learn-something):
+ * production's story creation records that category from the setup form and passes it to the setup since the money-2
+ * adoption, and the turns read it from the story. The earlier rounds played it as a story of no category.
+ */
+export const PLAYTHROUGHS_4: PlaythroughSpec[] = PLAYTHROUGHS_3.map((spec) =>
+  spec.premiseId && SETUP_PREMISES.find((p) => p.id === spec.premiseId)?.category === "learn-something" ? { ...spec, learning: true } : spec
+);
+
+/**
+ * A playthrough's setup input: the frozen premise's text, or the new one as the client merges its suggestion (its category
+ * and fields), at the story's length; a read-with-kids story gets production's kids setup, with the read-with-kids setting
+ * where the spec sets one; a learning story (round 4 on) the learning flag production's story creation passes.
+ */
 export function playthroughSetupInput(spec: PlaythroughSpec, premises = SETUP_PREMISES): SetupInput {
+  const learning = spec.learning ? { learning: true } : {};
   if (spec.premiseId) {
     const frozen = premises.find((p) => p.id === spec.premiseId);
     if (!frozen) throw new Error(`Playthrough ${spec.id}: no frozen premise ${spec.premiseId}`);
-    return { premise: frozen.premise, playerCount: frozen.playerCount, gameMode: frozen.gameMode, maxTurns: spec.maxTurns, ...(frozen.tags.kids ? { kids: true } : {}) };
+    return { premise: frozen.premise, playerCount: frozen.playerCount, gameMode: frozen.gameMode, maxTurns: spec.maxTurns, ...(frozen.tags.kids ? { kids: true } : {}), ...learning };
   }
   if (!spec.premise) throw new Error(`Playthrough ${spec.id}: no premise`);
   const { text, playerCount, gameMode, category = "flexible", fields = {}, kidAges } = spec.premise;
   const kids = category === "read-with-kids";
-  return { premise: buildMergedPrompt(category, fields, text), playerCount, gameMode, maxTurns: spec.maxTurns, ...(kids ? { kids: true } : {}), ...(kids && kidAges ? { kidAges } : {}) };
+  return { premise: buildMergedPrompt(category, fields, text), playerCount, gameMode, maxTurns: spec.maxTurns, ...(kids ? { kids: true } : {}), ...(kids && kidAges ? { kidAges } : {}), ...learning };
 }
 
 /** Production's text settings with no env set: its code defaults, which apply once the text-model variables are deleted at merge. */
@@ -512,9 +533,11 @@ export type PlayTurn = {
 /**
  * The judged checks: a chapter's stage (staysWithinStage), a player's ending
  * (outcomesToldAsLeft), a player's options at an exploration step
- * (optionsFollowResults) and a chapter plan's results (resultsFitKind).
+ * (optionsFollowResults), a chapter plan's results (resultsFitKind) and, since
+ * round 4, a group chapter turn's people and places across the players' texts
+ * (placesConsistent v2, the scenes stage's calibrated check).
  */
-export type JudgeKind = "stage" | "ending" | "options" | "results";
+export type JudgeKind = "stage" | "ending" | "options" | "results" | "places";
 
 /** A judged check's reading (playthroughMode.ts runs them after the story). */
 export type JudgedItem = { key: string; kind: JudgeKind; turn: number; label: string; verdict?: boolean; evidence?: string; lines: string[]; costUsd: number };
@@ -749,6 +772,8 @@ export async function playStory(
     switchProblem?: (story: Story, plan: SwitchAnalysis) => string | undefined;
     from?: PlayFrom;
     stopAfterLastChapterPlan?: boolean;
+    /** Round 4 on: each group chapter turn's people and places judged after the story (placesConsistent v2) */
+    judgePlaces?: boolean;
   }
 ): Promise<PlayResult> {
   const id = options.from?.from.seedId ?? playRunId(spec, options.sample);
@@ -964,6 +989,9 @@ export async function playStory(
       const options = optionsJudgeRequest(before, reply, slot as PlayerSlot);
       if (options) targets.push({ key: `${id}-t${turn.turn}-${slot}`, kind: "options", turn: turn.turn, label: slot, request: options });
     }
+    // Round 4 on: a group chapter turn's people and places across every player's text (none on a switch, the ending or a single player's turn)
+    const places = options.judgePlaces ? placesJudgeRequest(before, reply) : undefined;
+    if (places) targets.push({ key: `${id}-t${turn.turn}`, kind: "places", turn: turn.turn, label: "places", request: places });
     if (turn.kind === "ending") {
       for (const slot of before.getPlayerSlots()) {
         const judge = endingJudgeRequest(before, reply, slot);

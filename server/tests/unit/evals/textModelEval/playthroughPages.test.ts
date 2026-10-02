@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { indexPage, storyFileName, storyPage } from "../../../../src/evals/textModelEval/playthroughPages.js";
-import { PLAYTHROUGHS, PLAYTHROUGHS_2, PLAYTHROUGHS_3, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
+import { PLAYTHROUGHS, PLAYTHROUGHS_2, PLAYTHROUGHS_3, PLAYTHROUGHS_4, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { beatSet, SIX_PARAGRAPHS, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
@@ -193,6 +193,36 @@ describe("indexPage and file names", () => {
     expect(html).toContain('href="../round2/index.html"');
     expect(html).toContain("2026-10-01_playthroughs-3-report.md");
     expect(storyPage(run)).toContain("2026-10-01_playthroughs-3-report.md");
+  });
+});
+
+describe("round 4's pages (the places check on group turns, money and counted stats)", () => {
+  it("titles round 4's index by its round, links the three earlier rounds' pages and names round 4's report", async () => {
+    const run = { ...(await played()), round: 4 };
+    const html = indexPage([run], new Date("2026-10-02T12:00:00Z"), 4);
+    expect(html).toContain("<h1>Round 4: one story on production's current code</h1>");
+    expect(html).toContain('href="../index.html"');
+    expect(html).toContain('href="../round2/index.html"');
+    expect(html).toContain('href="../round3/index.html"');
+    expect(html).toContain("2026-10-02_playthroughs-4-report.md");
+    expect(storyPage(run)).toContain("2026-10-02_playthroughs-4-report.md");
+  });
+
+  it("shows the judged places check under a group turn, flagged where it fails, and lists it and the counted stats among the readings", async () => {
+    const { run: group } = await playStory(PLAYTHROUGHS_4[2], input(2), fakeCall(2).call, { sample: 1 });
+    const run = structuredClone(group);
+    run.judged = [
+      { key: "play-food-trucks-s1-t3", kind: "places", turn: 3, label: "places", verdict: false, evidence: "Omar is at the yard and at the showcase.", lines: ["Omar (two places): yard; showcase"], costUsd: 0 },
+      { key: "play-food-trucks-s1-t4", kind: "places", turn: 4, label: "places", verdict: true, evidence: "Everyone is in one place.", lines: [], costUsd: 0 },
+    ];
+    const html = storyPage(run);
+    const turn3 = html.slice(html.indexOf('id="turn-3"'), html.indexOf("</article>", html.indexOf('id="turn-3"')));
+    expect(turn3).toContain('<p class="flag">Judged: someone or something is in two places across the players&#39; texts (Omar is at the yard and at the showcase.)');
+    expect(turn3).toContain("Omar (two places): yard; showcase");
+    const turn4 = html.slice(html.indexOf('id="turn-4"'), html.indexOf("</article>", html.indexOf('id="turn-4"')));
+    expect(turn4).toContain('<p class="muted">Judged: everyone and everything is in one place across the players&#39; texts (Everyone is in one place.)');
+    expect(html).toContain("Group chapter turns whose people and places add up across the players&#39; texts (judged, placesConsistent v2): 1 of 2");
+    expect(html).toContain("Money and counted stats");
   });
 });
 

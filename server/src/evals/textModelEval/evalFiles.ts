@@ -58,6 +58,7 @@ import type { CallRecord } from "./runner.js";
  *   stories/<id>.html, stories/index.html  each played story as a page for the owner (--playthroughs)
  *   playthroughs-2.md|json, stories/round2/  the second round, on production's current code (--playthroughs --round 2)
  *   playthroughs-3.md|json, stories/round3/  the third round, on production's code after the fixes of 2026-10-01 (--playthroughs --round 3)
+ *   playthroughs-4.md|json, stories/round4/  the fourth round, on production's code after decision A (--playthroughs --round 4)
  */
 
 /** Each frame set's file: the first backfill's, and the nearer backfill's (the owner's feedback of 2026-09-28). */

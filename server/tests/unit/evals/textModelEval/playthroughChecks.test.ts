@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { BeatOption } from "core/types/index.js";
-import { kidsLine, ownStatsLine, ownersRollLine, pacingLine, readStory, renderPlaythroughReadings } from "../../../../src/evals/textModelEval/playthroughChecks.js";
+import { countedLine, kidsLine, ownStatsLine, ownersRollLine, pacingLine, placesLine, readStory, renderPlaythroughReadings } from "../../../../src/evals/textModelEval/playthroughChecks.js";
 import { readabilityOf, readsForBand } from "../../../../src/evals/textModelEval/kidsReadability.js";
 import { PLAYTHROUGHS, PLAYTHROUGHS_3, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { buildMergedPrompt } from "../../../../src/evals/textModelEval/setupPremises.js";
 import type { SetupInput } from "../../../../src/evals/textModelEval/variants.js";
-import { beatSet, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
-import { DEFAULT, fakeCall, input, leverSet, type Overrides } from "./playFixtures.js";
+import { beatSet, stat, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
+import { DEFAULT, fakeCall, input, leverSet, setupReply, type Overrides } from "./playFixtures.js";
 
 /*
  * What the code checks on a whole played story: it ends on its turn count;
@@ -97,11 +97,65 @@ describe("readStory", () => {
     expect(single.leverFlags).toContainEqual({ chapter: 2, slot: "player1", rule: "reward in consecutive chapters", turns: [6, 7] });
     expect(single.leverFlags).toContainEqual({ chapter: 3, slot: "player1", rule: "reward in consecutive chapters", turns: [9, 10] });
     expect(single.leverFlags.some((f) => f.chapter === 1 && f.rule === "reward in consecutive chapters")).toBe(false);
-    // A group's players keep B6's rate line, which places no reward on a chapter's first step: that flag reads a single player only
+    // A group's players follow the same rule since the group-options adoption (2026-10-01, evening): the flag reads them too
     const group = readStory(await played(2, { chapterOptions: options }));
-    expect(group.leverFlags.some((f) => f.rule === "reward after the chapter's first step")).toBe(false);
+    expect(group.leverFlags).toContainEqual(expect.objectContaining({ chapter: 1, slot: "player1", rule: "reward after the chapter's first step" }));
     expect(group.leverFlags).toContainEqual(expect.objectContaining({ chapter: 2, slot: "player1", rule: "reward in consecutive chapters" }));
     expect(renderPlaythroughReadings([await played(1, { chapterOptions: options })], new Date(0))).toContain("chapter 2, player1: reward in consecutive chapters offered at turn 6, 7");
+  });
+
+  it("reads the judged places check on a group's chapter turns (round 4's, and round 3's judged for the comparison)", async () => {
+    const run = structuredClone(await played(2));
+    expect(readStory(run).places).toEqual([]);
+    expect(placesLine(readStory(run))).toBeUndefined();
+    run.judged = [
+      ...(run.judged ?? []),
+      { key: "play-food-trucks-s1-t7", kind: "places", turn: 7, label: "places", verdict: true, lines: [], costUsd: 0 },
+      { key: "play-food-trucks-s1-t6", kind: "places", turn: 6, label: "places", verdict: false, evidence: "Ves is in two rooms.", lines: ["Captain Ves (two places): the chart table; the ready room"], costUsd: 0 },
+    ];
+    const readings = readStory(run);
+    expect(readings.places).toEqual([
+      { turn: 6, slot: "places", verdict: false, evidence: "Ves is in two rooms.", lines: ["Captain Ves (two places): the chart table; the ready room"] },
+      { turn: 7, slot: "places", verdict: true, lines: [] },
+    ]);
+    expect(placesLine(readings)).toBe("Group chapter turns whose people and places add up across the players' texts (judged, placesConsistent v2): 1 of 2 (not at turn 6: Ves is in two rooms.)");
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain(placesLine(readings) ?? "a places line");
+  });
+
+  it("follows money and, in a learning story, every counted (number) stat over the story, with the turns that moved it (since round 4, the money-2 adoption)", async () => {
+    const withCash = () => ({
+      ...setupReply(1),
+      sharedStats: [
+        stat("shared_cash", { name: "Stand Cash", type: "number", initialValue: 10 }),
+        stat("shared_lemons", { name: "Lemons in Stock", type: "number", initialValue: 6 }),
+        stat("shared_margin", { name: "Profit Margin", type: "percentage", initialValue: 20 }),
+      ],
+    });
+    const overrides: Overrides = {
+      reply: (role) => (role === "setup" ? withCash() : DEFAULT),
+      statChanges: [{ type: "statChange", group: "shared", stat: "shared_cash", change: "addNumber", value: 2 }],
+    };
+    const { run } = await playStory(PLAYTHROUGHS[0], { ...input(1), learning: true }, fakeCall(1, overrides).call, { sample: 1 });
+    const readings = readStory(run);
+    expect(readings.counted.map((c) => [c.name, c.group, c.type, c.start])).toEqual([
+      ["Stand Cash", "shared", "number", 10],
+      ["Lemons in Stock", "shared", "number", 6],
+    ]);
+    const [cash, lemons] = readings.counted;
+    expect(cash.changedAt.length).toBeGreaterThan(5);
+    expect(cash.end).toBe(10 + 2 * cash.changedAt.length);
+    expect(lemons.changedAt).toEqual([]);
+    expect(countedLine(readings)).toBe(
+      `Money and counted stats (a learning story: every number stat, and any stat named for money): Stand Cash (shared, number): 10 → ${cash.end}, moved at ${cash.changedAt.length} turns (turn ${cash.changedAt.join(", ")}); Lemons in Stock (shared, number): 6 → 6, never moved.`
+    );
+    // A story of another kind: only the stat named for money, never a share such as a margin
+    const plain = readStory((await playStory(PLAYTHROUGHS[0], input(1), fakeCall(1, overrides).call, { sample: 1 })).run);
+    expect(plain.counted.map((c) => c.name)).toEqual(["Stand Cash"]);
+    // None at all: the line says so
+    const none = readStory(await played());
+    expect(none.counted).toEqual([]);
+    expect(countedLine(none)).toBe("Money and counted stats: none (no stat named for money, and not a learning story).");
+    expect(renderPlaythroughReadings([run], new Date(0))).toContain(countedLine(readings));
   });
 
   it("reads whether each sacrifice or reward the player took was paid, and the stat changes that don't fit their stat", async () => {

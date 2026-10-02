@@ -368,7 +368,7 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     prep-calls.jsonl, in the setup-rounds stage; writes setup-chain.md and .json with the runs the file already
  *     holds (--samples picks the chain's sample, default 1; --report-only renders afresh without calls; --merge adds
  *     another chain file's runs)
- *   --playthroughs [--round 2|3] [--cases <story ids>] [--samples N] [--turns N] [--max-spend 0.70] [--report-only]  whole-story
+ *   --playthroughs [--round 2|3|4] [--cases <story ids>] [--samples N] [--turns N] [--max-spend 0.70] [--report-only] [--judge-places]  whole-story
  *     playthroughs on production's own code (playthroughs.ts, playthroughMode.ts): four new setups played to their
  *     ending by an automated player, then the judged stage and ending checks; prep-calls.jsonl, in the playthroughs
  *     stage under adopted4; writes playthroughs.md and .json and a page per story in stories/ (--turns stops each
@@ -377,7 +377,12 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     twice, the judged options and results checks too), in the playthroughs-2 stage under adopted7; writes
  *     playthroughs-2.md and .json and its pages in stories/round2/. --round 3: the third round on production's code
  *     after the fixes of 2026-10-01 (round 2's six, the mouse story's age through the read-with-kids setting), in the
- *     playthroughs-3 stage under adopted22; writes playthroughs-3.md and .json and its pages in stories/round3/
+ *     playthroughs-3 stage under adopted22; writes playthroughs-3.md and .json and its pages in stories/round3/.
+ *     --round 4: the fourth round on production's code after decision A (round 3's six, the lemonade as a learning story,
+ *     the places check, placesConsistent v2, judged on every group chapter turn), in the playthroughs-4 stage under
+ *     adopted28; writes playthroughs-4.md and .json and its pages in stories/round4/. --round 3 --judge-places: plays
+ *     nothing; the places check on round 3's stored group chapter turns, replayed, for the comparison, booked to
+ *     playthroughs-4; keeps the verdicts in playthroughs-3.json and renders round 3's files afresh
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
@@ -507,8 +512,10 @@ type Args = {
   mergeFile?: string;
   /** --playthroughs --turns N: each story only to that many turns (the smoke) */
   turns?: number;
-  /** --playthroughs --round N: the round to play or render (1, the default, 2 or 3) */
-  round?: 1 | 2 | 3;
+  /** --playthroughs --round N: the round to play or render (1, the default, 2, 3 or 4) */
+  round?: 1 | 2 | 3 | 4;
+  /** --playthroughs --round N --judge-places: the places check on round N's stored group turns, booked to the latest round's stage */
+  judgePlaces?: boolean;
   /** --frames nearer: the nearer chapter frames (the owner's feedback of 2026-09-28) for the backfill, the judge and a turn page */
   frames?: FrameSet;
   /** --chain-cases: the chapter-opening items' cases on a pairwise turn page (turns-r1b: the old page's four) */
@@ -635,11 +642,16 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--round": {
         const round = numberArg(arg, next());
-        if (round !== 1 && round !== 2 && round !== 3)
-          throw new UsageError("--round is 1 (the first playthroughs), 2 (the second) or 3 (the third, on production's code after the fixes of 2026-10-01)");
+        if (round !== 1 && round !== 2 && round !== 3 && round !== 4)
+          throw new UsageError(
+            "--round is 1 (the first playthroughs), 2 (the second), 3 (the third, on production's code after the fixes of 2026-10-01) or 4 (the fourth, after decision A)"
+          );
         args.round = round;
         break;
       }
+      case "--judge-places":
+        args.judgePlaces = true;
+        break;
       case "--criteria": {
         const value = next();
         if (value !== "turn-round2" && value !== "groups" && value !== "options") {
@@ -1464,14 +1476,19 @@ async function main() {
         mergeFile: args.mergeFile,
       });
     case "playthroughs": {
-      // Each round books to its own stage, and one invocation spends at most that stage's cap unless --max-spend says less
+      // Each round books to its own stage, and one invocation spends at most that stage's cap unless --max-spend says less;
+      // --judge-places books the places check on a stored round's group turns to the latest round's stage (the comparison)
       const round = PLAYTHROUGH_ROUNDS[args.round ?? 1];
-      return playthroughsMode(args.reportOnly ? reportContext(files) : prepContext(args, files, round.stage, DEFAULT_STAGE_CAPS[round.stage]), {
+      const judgePlacesFor = args.judgePlaces ? PLAYTHROUGH_ROUNDS[4] : undefined;
+      if (judgePlacesFor && args.reportOnly) throw new UsageError("--judge-places sends calls; leave out --report-only");
+      const booked = judgePlacesFor ?? round;
+      return playthroughsMode(args.reportOnly ? reportContext(files) : prepContext(args, files, booked.stage, DEFAULT_STAGE_CAPS[booked.stage]), {
         sample: args.samples ?? 1,
         caseIds: args.caseIds,
         turns: args.turns,
         reportOnly: args.reportOnly,
         round,
+        ...(judgePlacesFor ? { judgePlacesFor } : {}),
       });
     }
     default:

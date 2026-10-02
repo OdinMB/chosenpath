@@ -28,6 +28,12 @@ import {
   pipelinePlans,
   PLAYTHROUGHS_2_PROMPT_STATE,
   PLAYTHROUGHS_3_PROMPT_STATE,
+  PLAYTHROUGHS_4_PROMPT_STATE,
+  CONTEST_SETTLED_PROMPT_STATE,
+  GROUP_OPTIONS_PROMPT_STATE,
+  MONEY_2_PROMPT_STATE,
+  RESULT_WORDS_PROMPT_STATE,
+  SCENES_PROMPT_STATE,
   productionArm,
   referenceKey,
   ROUND1_SETUP_PAGE_PREMISES,
@@ -477,6 +483,8 @@ describe("budget caps", () => {
       // Decision A of 2026-10-01 (2026-10-02): result words in the story text, the variant beside production's group turn
       // twice on the seven group turns of rounds 2 and 3 that named a result's kind, its estimate plus 30%
       "result-words": 0.26,
+      // The coordinator's brief of 2026-10-02: the confirming whole-story playthroughs on production's code after decision A
+      "playthroughs-4": 1,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -515,6 +523,7 @@ describe("budget caps", () => {
       "contest-settled",
       "money-2",
       "result-words",
+      "playthroughs-4",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -527,8 +536,11 @@ describe("budget caps", () => {
     const decisions = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("late-pacing") + 1, FEEDBACK_STAGES.indexOf("options-o2c") + 1);
     const review = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("outcome-settled"), FEEDBACK_STAGES.indexOf("late-pacing") + 1);
     const after = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("options-o2c") + 1, FEEDBACK_STAGES.indexOf("playthroughs-3") + 1);
-    const decisionA = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("playthroughs-3") + 1);
-    const before = FEEDBACK_STAGES.filter((stage) => !review.includes(stage) && !decisions.includes(stage) && !after.includes(stage) && !decisionA.includes(stage));
+    const decisionA = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("playthroughs-3") + 1, FEEDBACK_STAGES.indexOf("result-words") + 1);
+    const confirming = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("result-words") + 1);
+    const before = FEEDBACK_STAGES.filter(
+      (stage) => !review.includes(stage) && !decisions.includes(stage) && !after.includes(stage) && !decisionA.includes(stage) && !confirming.includes(stage)
+    );
     const capsOf = (stages: readonly (typeof FEEDBACK_STAGES)[number][]) => stages.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
     expect(capsOf(before)).toBeCloseTo(7.58);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + capsOf(before)).toBeLessThanOrEqual(HARD_CEILING);
@@ -553,6 +565,10 @@ describe("budget caps", () => {
     // caps fit with the $1.3 on top
     expect(decisionA).toEqual(["group-options", "scenes", "contest-settled", "money-2", "result-words"]);
     expect(LEDGER_WHEN_DECISION_A_OPENED + UNRECORDED_STAGE4_USD + capsOf(decisionA)).toBeLessThanOrEqual(HARD_CEILING);
+    // The fourth round of playthroughs opened with decision A's stages closed at what they spent (the ledger about $44.87):
+    // its cap fits the $48 on the recorded ledger, and with the $1.3 on top it would reach about $47.17 at the cap
+    expect(confirming).toEqual(["playthroughs-4"]);
+    expect(44.87 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["playthroughs-4"]).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
     const { caps: defaults } = resolveCaps({});
@@ -987,6 +1003,30 @@ describe("budget caps", () => {
     // and the switch plan check's pacing retries), inside the $45 hard cap with the ledger at $42.87
     expect(DEFAULT_STAGE_CAPS["playthroughs-3"]).toBe(1);
     expect(42.87 + DEFAULT_STAGE_CAPS["playthroughs-3"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("gives the fourth round of playthroughs (playthroughs-4, 2026-10-02) a stage of its own on production's code after decision A, under a tag of its own", () => {
+    for (const role of ["setup", "beat", "switch", "thread", "iteration"] as const) expect(armsFor("playthroughs-4", role)).toEqual([]);
+    expect(pipelinePlans("playthroughs-4")).toEqual([]);
+    expect(stageRunsBaseline("playthroughs-4")).toBe(false);
+    expect(stageChecksTurns("playthroughs-4")).toBe(false);
+    expect(STAGE_CAP_REASONS["playthroughs-4"]).toMatch(/2026-10-02/);
+    expect(STAGE_CAP_REASONS["playthroughs-4"]).toMatch(/few bucks don't matter/);
+    expect(STAGE_CAP_REASONS["playthroughs-4"]).toMatch(/placesConsistent/);
+    // Production's code since decision A (every request a stage before measured has changed since): a tag no earlier stage used
+    expect(PLAYTHROUGHS_4_PROMPT_STATE).toBe("adopted28");
+    expect([
+      PLAYTHROUGHS_3_PROMPT_STATE,
+      GROUP_OPTIONS_PROMPT_STATE,
+      SCENES_PROMPT_STATE,
+      CONTEST_SETTLED_PROMPT_STATE,
+      MONEY_2_PROMPT_STATE,
+      RESULT_WORDS_PROMPT_STATE,
+    ]).not.toContain(PLAYTHROUGHS_4_PROMPT_STATE);
+    // The coordinator's cap: $1.00 (round 3 came to $0.73 for the same six premises; this round adds the judged places check
+    // on the group turns, its own and round 3's for the comparison, about $0.05), inside the $48 hard cap at about $44.87
+    expect(DEFAULT_STAGE_CAPS["playthroughs-4"]).toBe(1);
+    expect(44.87 + DEFAULT_STAGE_CAPS["playthroughs-4"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {

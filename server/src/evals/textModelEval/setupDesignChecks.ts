@@ -200,7 +200,10 @@ const MONEY_SHARE = /\b(margin|rate|share|ratio|percent(age)?)\b/i;
 const threadTypeName = (type: string) => type.split(/[(:]/)[0].trim().toLowerCase();
 
 /** Names that a stat's name offers for matching: the whole name, and each side of an opposites name. */
-const statNames = (stat: Stat) => [stat.name, ...stat.name.split("|")].map((n) => n.trim().toLowerCase()).filter((n) => n.length >= 3);
+const statNames = (stat: Pick<Stat, "name">) => [stat.name, ...stat.name.split("|")].map((n) => n.trim().toLowerCase()).filter((n) => n.length >= 3);
+
+/** A stat named for money (cash, coins, a budget, funds and the like), never a share of it such as a margin or a rate, nor a scoreboard (moneyIsNumber's reading). */
+export const namedForMoney = (stat: Pick<Stat, "name" | "type">) => stat.type !== "opposites" && statNames(stat).some((name) => MONEY.test(name) && !MONEY_SHARE.test(name));
 
 /** Words of the story's element names that identify an element in an outcome's text (the research notes' rule). */
 function elementTerms(elements: Loose[]): { full: string[]; words: string[] } {
@@ -428,7 +431,7 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   }
   // The review of the third playthroughs (2026-10-01): money is a number stat (production's own setup rule), or no sale or
   // cost in coins has anywhere to land (the lemonade's "Stand Cash" as a percentage, which never moved)
-  const money = stats.filter((s) => s.type !== "opposites" && statNames(s).some((name) => MONEY.test(name) && !MONEY_SHARE.test(name)));
+  const money = stats.filter(namedForMoney);
   if (money.length > 0) {
     counts.moneyStats = money.length;
     checks.moneyIsNumber = money.every((s) => s.type === "number");

@@ -9,6 +9,7 @@ import {
   PLAYTHROUGH_PROMPT_STATE,
   PLAYTHROUGH_ROUNDS,
   judgeTargets,
+  judgedEstimate,
   measuredCallCosts,
   mergePlayRuns,
   playAndJudge,
@@ -16,9 +17,10 @@ import {
   playthroughEstimate,
   playthroughsMode,
   printPlaythroughPlan,
+  storedPlacesTargets,
   type ModeCall,
 } from "../../../../src/evals/textModelEval/playthroughMode.js";
-import { PLAYTHROUGHS, PLAYTHROUGHS_2, PLAYTHROUGHS_3, playthroughArm, type JudgeTarget, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
+import { PLAYTHROUGHS, PLAYTHROUGHS_2, PLAYTHROUGHS_3, PLAYTHROUGHS_4, playthroughArm, type JudgeTarget, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import type { PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
 import { executed, record } from "./fixtures.js";
@@ -44,7 +46,7 @@ afterEach(() => {
 
 const REQUEST = { prompt: "Plan the next switch.", schema: z.object({ ok: z.boolean() }) };
 
-function context(options: { prep?: CallRecord[]; outcome?: "valid" | "invalid-json" } = {}) {
+function context(options: { prep?: CallRecord[]; outcome?: "valid" | "invalid-json"; output?: unknown } = {}) {
   const prep: CallRecord[] = [...(options.prep ?? [])];
   const execute = jest.fn(async (): Promise<ExecutedCall> => ({ ...executed(options.outcome ?? "valid"), promptHash: sha256(REQUEST.prompt) }));
   const written: Record<string, unknown> = {};
@@ -52,7 +54,7 @@ function context(options: { prep?: CallRecord[]; outcome?: "valid" | "invalid-js
   const pages: Record<string, string> = {};
   const files = {
     readRecords: () => [],
-    loadOutput: () => ({ ok: true }),
+    loadOutput: () => options.output ?? { ok: true },
     readPrepRecords: () => [...prep],
     readProbe: () => undefined,
     readFilterRecords: () => [],
@@ -120,6 +122,27 @@ describe("playthroughCall: the stories' calls in their own stage", () => {
     expect(prep[0]).toMatchObject({ caseId: spec.caseId, stage: "playthroughs-3", promptState: "adopted22" });
   });
 
+  it("records round 4's calls in its own stage under its own tag: production's code after decision A, with the places check on group turns", async () => {
+    const round = PLAYTHROUGH_ROUNDS[4];
+    expect(round).toMatchObject({
+      round: 4,
+      stage: "playthroughs-4",
+      promptState: "adopted28",
+      fileBase: "playthroughs-4",
+      pagesDir: "stories/round4",
+      tryAgain: 1,
+      report: "2026-10-02_playthroughs-4-report.md",
+      judgePlaces: true,
+    });
+    expect(round.specs).toBe(PLAYTHROUGHS_4);
+    expect(DEFAULT_STAGE_CAPS[round.stage]).toBe(1);
+    // The earlier rounds played without it
+    for (const n of [1, 2, 3] as const) expect(PLAYTHROUGH_ROUNDS[n].judgePlaces).toBeFalsy();
+    const { ctx, prep } = context();
+    await playthroughCall(ctx, 1, 1, round)(spec);
+    expect(prep[0]).toMatchObject({ caseId: spec.caseId, stage: "playthroughs-4", promptState: "adopted28" });
+  });
+
   it("sends nothing past the spend limit, and says so", async () => {
     const { ctx, execute, lines } = context();
     const result = await playthroughCall(ctx, 1, 0)(spec);
@@ -178,6 +201,83 @@ describe("the judged checks after each story", () => {
       { key: "play-lemonade-s1-t3-player1", kind: "options", turn: 3, label: "player1", verdict: false, evidence: "Option 2 asks.", lines: ["option 1 → 1 (same)", "option 2 → none (asks)"], costUsd: 0.0005 },
       { key: "play-lemonade-s1-t2", kind: "results", turn: 2, label: "player1_main", verdict: true, evidence: "All outcomes.", lines: ["thread 1 step 1 favorable: outcome (turns out)"], costUsd: 0.0005 },
     ]);
+  });
+
+  it("judges a group turn's people and places with the scenes stage's calibrated check (placesConsistent v2)", async () => {
+    const calls: Parameters<ModeCall>[0][] = [];
+    const call: ModeCall = async (s) => {
+      calls.push(s);
+      return {
+        parsed: { people: [{ who: "Captain Ves", places: "Tomas's text: at the chart table; Oren's: in the ready room", conflict: "two places" }], placesConsistent: { evidence: "Ves is in two rooms.", answer: "no" } },
+        latencyMs: 400,
+        costUsd: 0.0004,
+        sends: [],
+      };
+    };
+    const items = await judgeTargets([{ key: "play-space-pirates-s1-t6", kind: "places", turn: 6, label: "places", request: REQUEST }], call);
+    expect(calls.map((c) => [c.kind, c.caseId, c.role, c.outputTokens, c.arm.key])).toEqual([["judge", "judge-play-places-v2-play-space-pirates-s1-t6", "beat", 1_000, JUDGE_ARMS[0].key]]);
+    expect(items).toEqual([
+      {
+        key: "play-space-pirates-s1-t6",
+        kind: "places",
+        turn: 6,
+        label: "places",
+        verdict: false,
+        evidence: "Ves is in two rooms.",
+        lines: ["Captain Ves (two places): Tomas's text: at the chart table; Oren's: in the ready room"],
+        costUsd: 0.0004,
+      },
+    ]);
+  });
+
+  it("plays round 4's group story and judges the places on its chapter turns after the story; round 3's rules judge none", async () => {
+    const { call: play } = fakeCall(2);
+    const judged: string[] = [];
+    const call: ModeCall = async (s) => {
+      if (s.kind === "judge") {
+        judged.push(s.caseId);
+        return { parsed: { people: [], placesConsistent: { evidence: "fine", answer: "yes" } }, latencyMs: 1, costUsd: 0, sends: [] };
+      }
+      return (await play(s)) ?? { latencyMs: 0, costUsd: 0, sends: [] };
+    };
+    const run = await playAndJudge(PLAYTHROUGHS_4[2], call, { sample: 1 }, undefined, PLAYTHROUGH_ROUNDS[4]);
+    const places = run.judged?.filter((j) => j.kind === "places") ?? [];
+    const chapterTurns = run.turns.filter((t) => t.kind === "chapter opening" || t.kind === "chapter step").map((t) => t.turn);
+    expect(places.map((j) => j.turn)).toEqual(chapterTurns);
+    expect(places.every((j) => j.verdict === true)).toBe(true);
+    expect(judged).toContain(`judge-play-places-v2-play-food-trucks-s1-t${chapterTurns[0]}`);
+    const { call: play3 } = fakeCall(2);
+    const round3 = await playAndJudge(PLAYTHROUGHS_3[2], async (s) => (s.kind === "judge" ? { latencyMs: 0, costUsd: 0, sends: [] } : ((await play3(s)) ?? { latencyMs: 0, costUsd: 0, sends: [] })), { sample: 1 }, undefined, PLAYTHROUGH_ROUNDS[3]);
+    expect(round3.judged?.some((j) => j.kind === "places")).toBe(false);
+  });
+
+  it("judges the places on a stored round's group turns (round 3, for the comparison) replayed, under keys of their own, charged to the round given", async () => {
+    const { call: play } = fakeCall(2);
+    const stored = await playAndJudge(PLAYTHROUGHS_3[2], async (s) => (s.kind === "judge" ? { latencyMs: 0, costUsd: 0, sends: [] } : ((await play(s)) ?? { latencyMs: 0, costUsd: 0, sends: [] })), { sample: 1 }, undefined, PLAYTHROUGH_ROUNDS[3]);
+    const targets = storedPlacesTargets(stored, "round3-");
+    const chapterTurns = stored.turns.filter((t) => t.kind === "chapter opening" || t.kind === "chapter step").map((t) => t.turn);
+    expect(targets.map((t) => [t.kind, t.turn, t.key])).toEqual(chapterTurns.map((turn) => ["places", turn, `round3-play-food-trucks-s1-t${turn}`]));
+    // A single player's story has none
+    const { call: one } = fakeCall(1);
+    const single = await playAndJudge(PLAYTHROUGHS_3[0], async (s) => (s.kind === "judge" ? { latencyMs: 0, costUsd: 0, sends: [] } : ((await one(s)) ?? { latencyMs: 0, costUsd: 0, sends: [] })), { sample: 1 }, undefined, PLAYTHROUGH_ROUNDS[3]);
+    expect(storedPlacesTargets(single, "round3-")).toEqual([]);
+    // The mode: round 3's file gains the verdicts (kept beside its other judged checks), the calls book to round 4's stage
+    const answer = { people: [], placesConsistent: { evidence: "Everyone is in one place.", answer: "yes" } };
+    const { ctx, prep, byFile, pages } = context({ output: answer });
+    byFile["playthroughs-3"] = { markdown: "", json: { runs: [stored, single] } };
+    const before = stored.judged?.length ?? 0;
+    await playthroughsMode(ctx, { sample: 1, round: PLAYTHROUGH_ROUNDS[3], judgePlacesFor: PLAYTHROUGH_ROUNDS[4] });
+    expect(prep.map((r) => [r.stage, r.promptState])).toEqual(chapterTurns.map(() => ["playthroughs-4", "adopted28"]));
+    expect(prep.map((r) => r.caseId)).toEqual(chapterTurns.map((turn) => `judge-play-places-v2-round3-play-food-trucks-s1-t${turn}`));
+    const runs = (byFile["playthroughs-3"].json as { runs: PlayRun[] }).runs;
+    expect(runs[0].judged?.filter((j) => j.kind !== "places")).toHaveLength(before);
+    expect(runs[0].judged?.filter((j) => j.kind === "places").map((j) => [j.turn, j.verdict])).toEqual(chapterTurns.map((turn) => [turn, true]));
+    expect(Object.keys(pages).sort()).toEqual(["round3/index.html", "round3/play-food-trucks.html", "round3/play-lemonade.html"]);
+    // Judged once: a second invocation sends nothing more
+    const again = context({ prep: [...prep], output: answer });
+    again.byFile["playthroughs-3"] = { markdown: "", json: { runs } };
+    await playthroughsMode(again.ctx, { sample: 1, round: PLAYTHROUGH_ROUNDS[3], judgePlacesFor: PLAYTHROUGH_ROUNDS[4] });
+    expect(again.prep).toHaveLength(prep.length);
   });
 
   it("plays a story and judges it, the judges after the story's last turn", async () => {
@@ -254,6 +354,18 @@ describe("the estimate the dry run prints", () => {
     expect(text).toMatch(/All six: est \$\d\.\d{3} before retries/);
   });
 
+  it("prints round 4's six stories under its stage, cap and tag, its judged checks counting the places check on the group stories' chapter turns", () => {
+    const lines: string[] = [];
+    const files = { readRecords: () => [], readPlaythroughs: () => undefined, readPrepRecords: () => [] } as unknown as EvalFiles;
+    printPlaythroughPlan(files, (line) => lines.push(line), PLAYTHROUGH_ROUNDS[4]);
+    const text = lines.join("\n");
+    expect(text).toContain("Whole-story playthroughs, round 4 (--playthroughs --round 4, stage playthroughs-4, cap $1, under adopted28)");
+    for (const p of PLAYTHROUGHS_4) expect(text).toContain(`  ${p.id}: `);
+    // A 25-turn group story: about 6 chapters, so about 19 chapter turns judged for places beside its other judged checks
+    expect(judgedEstimate(PLAYTHROUGHS_4[2], true).calls).toBe(judgedEstimate(PLAYTHROUGHS_4[2]).calls + 19);
+    expect(judgedEstimate(PLAYTHROUGHS_4[0], true).calls).toBe(judgedEstimate(PLAYTHROUGHS_4[0]).calls);
+  });
+
   it("reads the measured cost of production's own calls per arm, role and player count", () => {
     const records = [
       record({ callArmKey: "gpt-6-luna@medium/adopted", role: "beat", players: 1, promptState: "adopted1", costUsd: 0.003 }),
@@ -316,5 +428,20 @@ describe("the files: playthroughs.json and .md, a page per story and an index", 
     expect(byFile["playthroughs-3"].markdown).toContain("# Whole-story playthroughs on production's own code, round 3");
     expect(byFile["playthroughs-3"].json).toMatchObject({ round: 3, stage: "playthroughs-3", promptState: "adopted22" });
     expect(pages["round3/index.html"]).toContain("Round 3");
+  });
+
+  it("writes round 4 to its own files and pages (playthroughs-4, stories/round4), leaving the earlier rounds' as they are", async () => {
+    const { ctx, written, byFile, pages } = context();
+    const { call } = fakeCall(1);
+    const played = await playAndJudge(PLAYTHROUGHS_4[0], async (s) => (s.kind === "judge" ? { latencyMs: 0, costUsd: 0, sends: [] } : ((await call(s)) ?? { latencyMs: 0, costUsd: 0, sends: [] })), { sample: 1 }, undefined, PLAYTHROUGH_ROUNDS[4]);
+    expect(played.round).toBe(4);
+    byFile["playthroughs-4"] = { markdown: "", json: { runs: [played] } };
+    await playthroughsMode(ctx, { sample: 1, reportOnly: true, round: PLAYTHROUGH_ROUNDS[4] });
+    expect(written.json).toBeUndefined();
+    expect(byFile["playthroughs-3"]).toBeUndefined();
+    expect(Object.keys(pages).sort()).toEqual(["round4/index.html", "round4/play-lemonade.html"]);
+    expect(byFile["playthroughs-4"].markdown).toContain("# Whole-story playthroughs on production's own code, round 4");
+    expect(byFile["playthroughs-4"].json).toMatchObject({ round: 4, stage: "playthroughs-4", promptState: "adopted28" });
+    expect(pages["round4/index.html"]).toContain("Round 4");
   });
 });

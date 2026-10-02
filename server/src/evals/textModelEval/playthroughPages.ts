@@ -4,12 +4,14 @@ import {
   chargedAgainLine,
   chargedOnOfferLine,
   choiceLine,
+  countedLine,
   fixesLine,
   kidsLine,
   kidsWho,
   ownStatsLine,
   ownersRollLine,
   pacingLine,
+  placesLine,
   readStory,
   resentLine,
   resultWordsLine,
@@ -23,7 +25,12 @@ import type { PlayPick, PlayRun, PlayTurn } from "./playthroughs.js";
 import { contextLinesHtml, escapeHtml } from "./ratingHtml.js";
 
 /** Each round's hand-read report, in the output folder (the pages point to it). */
-export const PLAYTHROUGH_REPORTS: Record<number, string> = { 1: "2026-09-30_playthroughs-report.md", 2: "2026-09-30_playthroughs-2-report.md", 3: "2026-10-01_playthroughs-3-report.md" };
+export const PLAYTHROUGH_REPORTS: Record<number, string> = {
+  1: "2026-09-30_playthroughs-report.md",
+  2: "2026-09-30_playthroughs-2-report.md",
+  3: "2026-10-01_playthroughs-3-report.md",
+  4: "2026-10-02_playthroughs-4-report.md",
+};
 
 const reportOf = (round: number | undefined) => `DOCS/2026-09-26_gpt6-text-eval/${PLAYTHROUGH_REPORTS[round ?? 1] ?? PLAYTHROUGH_REPORTS[1]}`;
 
@@ -44,8 +51,10 @@ const reportOf = (round: number | undefined) => `DOCS/2026-09-26_gpt6-text-eval/
  * results checks. Since round 3 a page also flags a group step on a player's
  * own outcome that went another way than the owner's roll, shows under each
  * turn of a story read with a child how it reads against the band's limits,
- * and lists the pacing among the readings. Every story string goes through
- * escapeHtml. No rating page: one version, no blinding.
+ * and lists the pacing among the readings. Since round 4 a group chapter turn
+ * shows the judged places check (round 3's too, once judged for the
+ * comparison), and the readings follow money and counted stats. Every story
+ * string goes through escapeHtml. No rating page: one version, no blinding.
  */
 
 const e = escapeHtml;
@@ -431,12 +440,26 @@ function turnNotes(turn: PlayTurn): string {
   return notes.map((n) => `<p class="flag">${e(n)}</p>`).join("");
 }
 
+/** The judged places check on a group chapter turn (round 4 on, and round 3's for the comparison): its verdict, evidence and the people it listed. */
+function placesBlock(turn: PlayTurn, readings: StoryReadings): string {
+  const judged = readings.places.find((p) => p.turn === turn.turn);
+  if (!judged) return "";
+  const evidence = judged.evidence ? ` (${judged.evidence})` : "";
+  const verdict =
+    judged.verdict === false
+      ? `<p class="flag">${e(`Judged: someone or something is in two places across the players' texts${evidence}`)}</p>`
+      : `<p class="muted">${e(`Judged: ${judged.verdict ? "everyone and everything is in one place across the players' texts" : "no answer on the places across the players' texts"}${evidence}`)}</p>`;
+  const lines = judged.lines.length ? `<ul class="ctx-lines">${judged.lines.map((l) => `<li>${e(l)}</li>`).join("")}</ul>` : "";
+  return `${verdict}${lines}`;
+}
+
 function turnBlock(run: PlayRun, turn: PlayTurn, readings: StoryReadings): string {
   const slots = Object.keys(asObject(run.start?.players));
   const failed = !turn.reply ? `<p class="flag">No turn: ${e(run.stopped)}</p>` : "";
   return `<article class="turn" id="turn-${turn.turn}">
 <header><span class="turn-no">Turn ${turn.turn}</span><span class="kind">${e(turn.kind)}</span><span class="meta">wait ${seconds(turn.waitMs)} · ${usd(turn.costUsd)}</span></header>
 ${turn.reply ? slots.map((slot) => beatBlock(run, turn, slot, readings)).join("") : failed}
+${placesBlock(turn, readings)}
 ${turn.mechanics ? `<div class="changes"><h5>What this turn changes</h5>${contextLinesHtml(turn.mechanics.changes)}</div>` : ""}
 ${turnNotes(turn)}
 </article>`;
@@ -500,7 +523,7 @@ function readingsSection(run: PlayRun, readings: StoryReadings): string {
     `Sacrifices and rewards against the owner's rule: ${
       r.leverFlags.length
         ? r.leverFlags.map((f) => `chapter ${f.chapter} (${f.slot}): ${f.rule} at turn ${f.turns.join(", ")}`).join("; ")
-        : `no chapter offered a second reward or sacrifice${r.players === 1 ? " or a reward after its first step" : ""}, and none offered rewards in consecutive chapters`
+        : "no chapter offered a second reward or sacrifice or a reward after its first step, and none offered rewards in consecutive chapters"
     }.`,
     `Levers the player took, paid on the next turn: ${r.leversPaid.counts.applied} of ${Object.values(r.leversPaid.counts).reduce((a, b) => a + b, 0)}${
       r.leversPaid.counts.sharedOnce ? `; ${r.leversPaid.counts.sharedOnce} more rode on one change of a shared stat that paid another player's (${r.leversPaid.sharedOnce.map((s) => `turn ${s.turn}, ${s.stat}`).join("; ")})` : ""
@@ -524,7 +547,9 @@ function readingsSection(run: PlayRun, readings: StoryReadings): string {
     `Production's fixes that fired: ${fixesLine(r)}.`,
     `Repairs: plans retried ${r.repairs.planRetries.length}, one-paragraph turns retried ${r.repairs.shortTextRetries.length} (the retry one paragraph too and used: ${r.repairs.shortTextUsedAsIs.length}), turns without options retried ${r.repairs.optionsRetries.length}, calls re-sent ${r.repairs.resends.length}, beat repairs ${Object.values(r.repairs.beatRepairs).reduce((a, b) => a + b, 0)}.`,
     ownStatsLine(r),
+    countedLine(r),
     scoreboardLine(r),
+    ...(r.places.length ? [`${placesLine(r) ?? ""}.`] : []),
     ...(r.choices.options.length || r.choices.results.length
       ? [
           `Judged: ${choiceLine("option sets that carry out the result at each position", r.choices.options, (c) => `turn ${c.turn} ${c.slot}`)}.`,
@@ -578,7 +603,9 @@ export function indexPage(runs: PlayRun[], generatedAt: Date, round = 1): string
   const count = `${COUNT_WORDS[runs.length] ?? String(runs.length)} ${runs.length === 1 ? "story" : "stories"}`;
   const heading = round > 1 ? `Round ${round}: ${count} on production's current code` : `${count[0].toUpperCase()}${count.slice(1)} on production's own code`;
   const earlier =
-    round > 2
+    round > 3
+      ? `<p class="muted">The earlier rounds' pages, played before the fixes since: <a href="../index.html">round 1</a> (production's code of the morning of 30 September), <a href="../round2/index.html">round 2</a> (its code of the evening of 30 September) and <a href="../round3/index.html">round 3</a> (its code of the evening of 1 October, before decision A).</p>`
+      : round > 2
       ? `<p class="muted">The earlier rounds' pages, played before the fixes since: <a href="../index.html">round 1</a> (production's code of the morning of 30 September) and <a href="../round2/index.html">round 2</a> (its code of the evening of 30 September).</p>`
       : round > 1
         ? `<p class="muted">The first round's pages, played before the fixes since (production's code of the morning of 30 September): <a href="../index.html">round 1</a>.</p>`

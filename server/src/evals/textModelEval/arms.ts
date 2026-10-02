@@ -108,7 +108,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * production's one checked retry), then result words in the story text
  * (result-words: the variant beside production's group turn on the group turns
  * of rounds 2 and 3 whose text named a result's kind, each turn with
- * production's one checked retry).
+ * production's one checked retry), then a fourth round of whole-story
+ * playthroughs on production's code after decision A (playthroughs-4: no --run
+ * arms, the --playthroughs --round 4 mode's prep calls, and the judged places
+ * check on its group turns and on round 3's for the comparison).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -148,6 +151,7 @@ export const FEEDBACK_STAGES = [
   "contest-settled",
   "money-2",
   "result-words",
+  "playthroughs-4",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -1681,6 +1685,18 @@ export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
  * reused for a request today's code builds differently.
  */
 export const PLAYTHROUGHS_3_PROMPT_STATE = "adopted22";
+
+/**
+ * The prompt state of the fourth round of playthroughs (playthroughs-4,
+ * 2026-10-02): production's own code after decision A (the scoreboard, contest
+ * and double-charge repairs, the lower cap on a single player's chapter-ending
+ * turns, the owner's option rules for group turns, shared scenes on a group
+ * chapter's opening, the deciding chapter of a contest, the money setup and
+ * turn lines of a learning story, the result-words line), under a tag no
+ * earlier stage used, so no call recorded before those changes is reused for a
+ * request today's code builds differently.
+ */
+export const PLAYTHROUGHS_4_PROMPT_STATE = "adopted28";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
 const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp", "kids-turns", "kids-ages", "group-levers", "short-replies", "group-options", "scenes", "money-2", "result-words"];

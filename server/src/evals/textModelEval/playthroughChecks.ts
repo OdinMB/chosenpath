@@ -23,7 +23,7 @@ import { chaptersThatFit } from "../../game/services/pacing.js";
 import { scoreboardOf } from "../../game/services/scoreboards.js";
 import { repairBeatReply, resultWordsOfBeat } from "../../game/services/beatRepairs.js";
 import { percentile } from "./armStats.js";
-import { checkSetupDesign } from "./setupDesignChecks.js";
+import { checkSetupDesign, namedForMoney } from "./setupDesignChecks.js";
 import { KIDS_BAND_LIMITS, readabilityOf, readsForBand } from "./kidsReadability.js";
 import { readLatePacing } from "./latePacingPlay.js";
 import type { LeverReading, LeverStatus } from "./ratingMechanics.js";
@@ -120,9 +120,10 @@ export type ChapterReading = {
 
 /**
  * A chapter's levers against the owner's rule: a second reward or sacrifice offered (the reason a second sacrifice states
- * is read by hand); since round 3 a single player's reward after the chapter's first step (O2c places it on the reward turn,
- * the chapter's first step, since 2026-10-01) and a reward in a chapter right after one that offered one (O2c's "never two
- * chapters running"; a group's B6 rate line doesn't hold it, so for groups it reads the gap the review found)
+ * is read by hand); since round 3 a reward after the chapter's first step (O2c places it on the reward turn, the chapter's
+ * first step, since 2026-10-01; a group's players too since the group-options adoption of that evening, so since round 4
+ * the flag reads every player, the earlier rounds' groups against the rule they didn't yet carry) and a reward in a chapter
+ * right after one that offered one (O2c's "never two chapters running")
  */
 export type LeverFlag = {
   chapter: number;
@@ -319,6 +320,13 @@ export type KidsTurnReading = { turn: number; slot: string; words: number; parag
  */
 export type KidsReading = { ages: string | undefined; band: KidsBand; turns: KidsTurnReading[]; passed: number };
 
+/**
+ * Money, or a counted thing, over the story (since round 4, the money-2 adoption of 2026-10-02): every stat named for money
+ * (namedForMoney, moneyIsNumber's reading) and, in a learning story, every number stat (the money setup line makes counted
+ * things numbers in their own units): its type, its value at the start and the end, and the turns that moved it.
+ */
+export type CountedStatReading = { group: string; stat: string; name: string; type: string; start: unknown; end: unknown; changedAt: number[] };
+
 export type StoryReadings = {
   id: string;
   title: string;
@@ -361,6 +369,12 @@ export type StoryReadings = {
   kids?: KidsReading;
   /** The judged options check per player at an exploration step, and the results check per chapter plan (label: the plan's outcomes) */
   choices: { options: ChoiceJudged[]; results: ChoiceJudged[] };
+  /** The judged places check on each group chapter turn (round 4 on, and round 3's for the comparison), in turn order */
+  places: ChoiceJudged[];
+  /** Money and counted stats over the story (none: no stat named for money, and not a learning story) */
+  counted: CountedStatReading[];
+  /** A learning story (the setup form's learn-something category, played as one since round 4) */
+  learning: boolean;
   repairs: {
     setupRetries: number;
     backgroundFixes?: string;
@@ -1020,19 +1034,48 @@ function fixReadings(run: PlayRun): Record<FixKind, number[]> {
   return fixes;
 }
 
+/** A judged check's items of one kind, in turn order. */
+const judgedOf = (run: PlayRun, kind: "options" | "results" | "places") =>
+  (run.judged ?? [])
+    .filter((j) => j.kind === kind)
+    .sort((a, b) => a.turn - b.turn)
+    .map((j): ChoiceJudged => ({ turn: j.turn, slot: j.label, ...(j.verdict !== undefined ? { verdict: j.verdict } : {}), ...(j.evidence ? { evidence: j.evidence } : {}), lines: j.lines }));
+
 /** The judged options and results checks, in turn order. */
 function choiceReadings(run: PlayRun): StoryReadings["choices"] {
-  const of = (kind: "options" | "results") =>
-    (run.judged ?? [])
-      .filter((j) => j.kind === kind)
-      .sort((a, b) => a.turn - b.turn)
-      .map((j): ChoiceJudged => ({ turn: j.turn, slot: j.label, ...(j.verdict !== undefined ? { verdict: j.verdict } : {}), ...(j.evidence ? { evidence: j.evidence } : {}), lines: j.lines }));
-  return { options: of("options"), results: of("results") };
+  return { options: judgedOf(run, "options"), results: judgedOf(run, "results") };
 }
 
-/** Each chapter's levers against the owner's rule (LeverFlag); a reward after the chapter's first step reads a single player only. */
+/** Money and counted stats over the story (CountedStatReading): shared first, then each player's, in the setup's order. */
+const isLearning = (run: PlayRun) => run.input.learning === true || run.start?.category === "learn-something";
+
+function countedReadings(run: PlayRun): CountedStatReading[] {
+  const start = run.start;
+  if (!start) return [];
+  const learning = isLearning(run);
+  const counted = (stat: Stat) => namedForMoney(stat) || (learning && stat.type === "number");
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const valueIn = (values: { statId: string; value: unknown }[] | undefined, id: string) => values?.find((v) => v.statId === id)?.value;
+  const follow = (stat: Stat, group: string, at: (turn: PlayTurn) => unknown, first: unknown): CountedStatReading => {
+    let before = first;
+    const changedAt: number[] = [];
+    for (const turn of run.turns) {
+      const after = at(turn);
+      if (!same(before, after)) changedAt.push(turn.turn);
+      before = after;
+    }
+    return { group, stat: stat.id, name: stat.name, type: stat.type, start: first, end: before, changedAt };
+  };
+  return [
+    ...start.sharedStats.filter(counted).map((s) => follow(s, "shared", (t) => valueIn(t.statValues.shared, s.id), valueIn(start.sharedStatValues, s.id))),
+    ...start.playerStats.filter(counted).flatMap((s) =>
+      Object.keys(start.players).map((slot) => follow(s, slot, (t) => valueIn(t.statValues.players[slot], s.id), valueIn(start.players[slot]?.statValues, s.id)))
+    ),
+  ];
+}
+
+/** Each chapter's levers against the owner's rule (LeverFlag), every player's (a group's since the group-options adoption). */
 function leverFlagReadings(run: PlayRun, chapters: ChapterReading[]): LeverFlag[] {
-  const single = run.input.playerCount === 1;
   return chapters.flatMap((chapter, i) =>
     chapter.levers.flatMap((tally): LeverFlag[] => {
       const flag = (rule: LeverFlag["rule"], turns: number[]): LeverFlag[] => [{ chapter: chapter.index, slot: tally.slot, rule, turns }];
@@ -1041,7 +1084,7 @@ function leverFlagReadings(run: PlayRun, chapters: ChapterReading[]): LeverFlag[
       return [
         ...(tally.rewardSets > 1 ? flag("second reward", tally.rewardTurns.slice(1)) : []),
         ...(tally.sacrificeSets > 1 ? flag("second sacrifice", tally.sacrificeTurns.slice(1)) : []),
-        ...(single && late.length ? flag("reward after the chapter's first step", late) : []),
+        ...(late.length ? flag("reward after the chapter's first step", late) : []),
         ...(tally.rewardSets > 0 && (before?.rewardSets ?? 0) > 0 ? flag("reward in consecutive chapters", tally.rewardTurns) : []),
       ];
     })
@@ -1133,6 +1176,9 @@ export function readStory(run: PlayRun): StoryReadings {
     ...(pacing ? { pacing } : {}),
     ...(kids ? { kids } : {}),
     choices: choiceReadings(run),
+    places: judgedOf(run, "places"),
+    counted: countedReadings(run),
+    learning: isLearning(run),
     repairs: repairReadings(run),
     checkFailures,
     planCheckFailures,
@@ -1304,6 +1350,27 @@ export function kidsLine(r: StoryReadings): string | undefined {
   return `Read with ${who}: ${k.passed} of ${k.turns.length} turns within the band's limits (${bandLimitsText(k.band)}); words a turn median ${words}, grade median ${grade}.`;
 }
 
+/** The judged places check on a group's chapter turns, one line; undefined where none was judged. */
+export function placesLine(r: StoryReadings): string | undefined {
+  if (r.places.length === 0) return undefined;
+  return `${choiceLine("Group chapter turns whose people and places add up across the players' texts (judged, placesConsistent v2)", r.places, (c) => `turn ${c.turn}`)}`;
+}
+
+/** Money and counted stats over the story, one line. */
+export function countedLine(r: StoryReadings): string {
+  const label = "Money and counted stats";
+  if (r.counted.length === 0) return `${label}: none (no stat named for money, and not a learning story).`;
+  const learning = r.learning;
+  const shown = (value: unknown) => (Array.isArray(value) ? `[${value.join(", ")}]` : String(value));
+  const parts = r.counted.map(
+    (c) =>
+      `${c.name} (${c.group}, ${c.type}): ${shown(c.start)} → ${shown(c.end)}, ${
+        c.changedAt.length ? `moved at ${c.changedAt.length} turn${c.changedAt.length === 1 ? "" : "s"} (turn ${c.changedAt.join(", ")})` : "never moved"
+      }`
+  );
+  return `${label}${learning ? " (a learning story: every number stat, and any stat named for money)" : ""}: ${parts.join("; ")}.`;
+}
+
 /** A judged check's tally, one line: the passes of those answered, and where it failed with the judge's evidence. */
 export function choiceLine(label: string, items: ChoiceJudged[], where: (c: ChoiceJudged) => string): string {
   const answered = items.filter((c) => c.verdict !== undefined);
@@ -1386,7 +1453,7 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
       lines.push(`| ${c.index} | ${l.slot} | ${l.sets} | ${l.sacrificeSets} (${list(l.sacrificeTurns)}) | ${l.rewardSets} (${list(l.rewardTurns)}) | ${list(l.taken.map((t) => `${t.kind} at ${t.turn}`))} |`);
     }
   }
-  const noFlags = `no second reward or sacrifice offered in any chapter${r.players === 1 ? ", no reward after a chapter's first step" : ""}, no reward in consecutive chapters`;
+  const noFlags = "no second reward or sacrifice offered in any chapter, no reward after a chapter's first step, no reward in consecutive chapters";
   lines.push("", `Against the owner's rule: ${r.leverFlags.length ? r.leverFlags.map((f) => `chapter ${f.chapter}, ${f.slot}: ${f.rule} offered at turn ${list(f.turns)}`).join("; ") : noFlags}.`);
   const paid = r.leversPaid.counts;
   lines.push(
@@ -1405,6 +1472,8 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     ...r.unfit.map((u) => `- turn ${u.turn}, ${u.group}: ${u.name}: ${u.kinds.join("; ")}`),
     "",
     ownStatsLine(r),
+    "",
+    countedLine(r),
     "",
     scoreboardLine(r),
     ...r.scoreboard.map((m) => `- turn ${m.turn}, ${m.name}: ${m.before ?? "–"} → ${m.after ?? "–"} after ${m.results.length ? m.results.map((x) => x ?? "no result").join(", ") : "no contest result"}: ${m.reading}${m.repaired ? " (production turned the model's move around)" : ""}`),
@@ -1448,6 +1517,17 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     choiceLine("Option sets that carry out the result at each position", r.choices.options, (c) => `turn ${c.turn} ${c.slot}`),
     choiceLine("Chapter plans whose results fit their kind", r.choices.results, (c) => `turn ${c.turn}`),
     "",
+    ...(r.places.length
+      ? [
+          "### People and places across the players' texts (judged)",
+          "",
+          "The scenes stage's calibrated check (placesConsistent v2, Luna low) on each group chapter turn: across every player's text of the turn, is every person, group and vehicle in one place at a time, and every shared place or vehicle in the same place and state?",
+          "",
+          placesLine(r) ?? "",
+          ...r.places.filter((p) => p.verdict === false).flatMap((p) => p.lines.map((l) => `- turn ${p.turn}: ${cell(l)}`)),
+          "",
+        ]
+      : []),
     ...(r.kids
       ? [
           "### Read with a child",
