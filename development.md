@@ -16,6 +16,30 @@ Browser tests
 - 1: why does Brave browser not respect background color?
 - 1: Brave doesn't break up paragraphs in frontend fix logic
 
+# GPT-6 TEXT FOLLOW-UPS
+
+Details: DOCS/2026-09-26_gpt6-text-eval/2026-10-02_status.md (sections 4-6, 9) and the decision log .plans/2026-09-26_build-followup.md
+
+- 3: late "aftermath" chapters replay outcomes that are already complete and give them a third milestone, which can reverse one (space pirates 22-26, estate agents 17-21)
+- 3: a shared relationship outcome is played by one player at a time under the shared-scenes rule and settled by messages (estate agents 6-21); decide whether two players who share it may share a thread when only one picked it
+- 3: chapter planner: a one-sided contest stage's planned scene holds the other camp (space pirates 6-8), and two threads get planned in one room (estate agents 13-15); a plan check for one character in two scenes, and telling the planner each seat's camp
+- 2: group turns restate the same caveats turn after turn ("documented versus unexplained" in 19 of 26 estate agents turns)
+- 1: drop a reward offered on a stat already at its top step (four group rewards paid nothing in space pirates); lever reader should match part of a name or held item and never fall back to a stat that allows no lever
+- 3: learning stories: the lemonade stand never reaches its core activity (selling) in 10 turns
+- 2: pronouns as the setup names them: the kids story calls Pip, set up as they/them, "he"
+- 2: group options still told apart by risk alone where the stats give no bonus in the scene (space pirates); a base-point scale was never measured for groups
+- 1: the money turn line for learning stories rests on thin evidence (passes only with the case picked because production failed it); watch the money in learning stories, re-measure or revert
+- 1: watch the single-player chapter-ending output limit (7,500 tokens): one kids turn used 6,926; a cut costs about 30 s and a retry
+- 3: single-player chapter-ending turns sometimes reason until cut off; cause unknown, only contained by the lower limit and the retry
+- 1: chapter plans: a reworded copy of the last step still plays the moment twice; the plan check drops only exact copies
+- 2: contest edge cases the plan check still refuses: a cooperative thread with players on side B but no contest results, and a single player's contest results
+- 1: confirm or undo the eval's adoption calls: contest steps compare each side's average result, shared scenes at a chapter's opening only, the money turn line, and those listed in the 1 October status section 9
+- 3: held forms never rated: prose rules (B5), switch turns as scenes (B7) and the ending format (B8) on turns-r2.html, the group script (B10b) on turns-groups.html, and the cached request form (B9, 18% cheaper); each needs a rebuild and a paid check to join
+- 1: rate turns-options.html (45 min): the single-player option form in production since 1 October
+- 1: setups name stats "… Energy" (2 of 6 final-check setups, 2 of 4 kids setups); a fix is an untested sentence plus a retest
+- 2: fix the 10 Dependabot vulnerabilities on main and process the open Dependabot branches
+- 1: process the five untracked .plans/*-followup.md files from other runs with /review-followup
+
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer
