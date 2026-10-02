@@ -1,5 +1,6 @@
 import type { Story } from "core/models/Story.js";
 import type { Beat, BeatGeneration, Change, PaidLever, PlayerSlot, SetOfBeatGenerationSchema, Stat } from "core/types/index.js";
+import { takesMoneyRule } from "./moneyTurns.js";
 import type { Repair } from "./textRepairs.js";
 
 /*
@@ -21,7 +22,9 @@ import type { Repair } from "./textRepairs.js";
  * same day a list's item is a payment and a plural name reads in its singular.
  * Its review narrowed both: a singular form names its stat only as a word of
  * its own where no stat is named by its name, and a list's or a ladder's
- * payment is read later in the chapter only on a stat beats may not change.
+ * payment is read later in the chapter only on a stat beats may not change;
+ * since the review of the money-2 adoption (2026-10-02) so is a number's on a
+ * story that takes the money rule, whose beats move counted stats every turn.
  */
 
 export type Lever = "sacrifice" | "reward";
@@ -411,21 +414,26 @@ function paymentsBefore(story: Story): Payment[] {
  * false; the review of decision A's fixes, 2026-10-01). Its step is one item
  * or one rung, which every story move on such a stat shares, so a contact the
  * story adds later in the chapter would go as a repeat; the stored repeats on
- * lists and ladders all came on the turn after the payment. Kept: a charge
+ * lists and ladders all came on the turn after the payment. The same holds
+ * for a number on a story that takes the money rule (since the review of the
+ * money-2 adoption, 2026-10-02: every beat moves its counted stats by unit
+ * amounts, one crate a batch, the size a lever takes too). Kept: a charge
  * that a lever chosen on the last beat now owes (any player's, of the same
  * kind on the same stat), a change of another size or the other way, a late
  * payment (a last beat that recorded none), a switch turn or ending's change
  * on an earlier step's payment (it applies the stats' adjustments after
  * threads), and every turn after the chapter. A change of the same size the
  * stat's own rules happen to ask for on such a turn is dropped too (on a list
- * or a ladder, any item or rung the turn after the payment); the stored
- * playthroughs show none (`playthroughReplay.test.ts`). Called after the stat
- * changes are placed.
+ * or a ladder, any item or rung the turn after the payment, and on a money
+ * story a counted stat's move of the lever's size, a sale of two coins after
+ * a two-coin reward); the stored playthroughs show none
+ * (`playthroughReplay.test.ts`), and the money-2 stage's runs only a real
+ * repeat. Called after the stat changes are placed.
  */
 export function dropLeversChargedAgain(story: Story, changes: Change[], repairs: Repair[]): Change[] {
   const stats = leverStatsOf(story);
   const owed = owedLevers(story, stats);
-  const records = paymentsBefore(story).filter(({ paid, last }) => !owed.has(leverKey(paid)) && (last || readLaterInChapter(stats, paid)));
+  const records = paymentsBefore(story).filter(({ paid, last }) => !owed.has(leverKey(paid)) && (last || readLaterInChapter(story, stats, paid)));
   const pending = [...new Map(records.map((payment) => [`${leverKey(payment.paid)}|${payment.paid.step}|${payment.turn}`, payment])).values()];
   if (pending.length === 0) return changes;
 
@@ -447,12 +455,20 @@ export function dropLeversChargedAgain(story: Story, changes: Change[], repairs:
 
 /**
  * Whether a payment is read on a later step of its chapter: a percentage's or a number's, whose step size tells a repeat
- * from most story moves; a list's or a ladder's only where the stat's rules keep a beat from changing it.
+ * from most story moves; a list's or a ladder's only where the stat's rules keep a beat from changing it. On a story that
+ * takes the money rule (takesMoneyRule: a learning story keeping a counted stat), a number's only there too, since the
+ * review of the money-2 adoption (2026-10-02): the rule has every beat move a counted stat by exactly what its text pays,
+ * sells or uses up, in the small unit amounts a lever takes too ("Use 1 crate for an extra batch", then each batch's
+ * "one crate used", -1), so a number's step there tells a repeat from a story move no better than a list's item does,
+ * and dropping each later batch's crate left the count one too high a step while the text's totals follow the stat. The
+ * rule's own line already says the chosen lever is paid once; on the turn right after the payment, where the stored
+ * repeats came (the money-2 stage's one, a +2 reward told again as a sale), the repeat still goes.
  */
-function readLaterInChapter(stats: LeverStats, paid: PaidLever): boolean {
+function readLaterInChapter(story: Story, stats: LeverStats, paid: PaidLever): boolean {
   const stat = paid.group === "shared" ? stats.sharedStats.get(paid.stat) : stats.playerStats.get(paid.stat);
-  if (!stat || (stat.type !== "string[]" && ladderOf(stat) === undefined)) return true;
-  return stat.canBeChangedInBeatResolutions === false;
+  if (!stat) return true;
+  const sharesItsStep = stat.type === "string[]" || ladderOf(stat) !== undefined || (stat.type === "number" && takesMoneyRule(story));
+  return !sharesItsStep || stat.canBeChangedInBeatResolutions === false;
 }
 
 /** The levers chosen on the last beat, by kind, group and stat: their payment is due this turn. */

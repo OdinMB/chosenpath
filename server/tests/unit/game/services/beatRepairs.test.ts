@@ -17,6 +17,7 @@ import { GameModes } from "core/types/index.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { expectedOptionType, repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
 import { paidLevers } from "../../../../src/game/services/leverPayments.js";
+import { takesMoneyRule } from "../../../../src/game/services/moneyTurns.js";
 import { logRepairs, type Repair } from "../../../../src/game/services/textRepairs.js";
 import { beatStep, switchStep } from "../../../../src/game/services/storyTextSteps.js";
 import { ChangeService } from "../../../../src/game/services/ChangeService.js";
@@ -1249,6 +1250,51 @@ describe("repairBeatReply: a sacrifice or reward charged again on the turn after
       const atSwitch = ended.clone({ players: playersAtSwitch, storyPhases: [switchAnalysis(["player1"], 1), resolved, switchAnalysis(["player1"], 6)] });
       expect(atSwitch.getCurrentBeatType()).toBe("switch");
       expect(repaired(atSwitch, charge)).toEqual({ statChanges: charge, repairs: [] });
+    });
+
+    /*
+     * The review of the money-2 adoption (2026-10-02): on a learning story that keeps a counted stat (the money rule,
+     * takesMoneyRule), every beat moves a counted stat by exactly what its text pays, sells or uses up, in the small unit
+     * amounts a lever takes too ("Use 1 crate for an extra batch"; the next batch, "one crate used", -1). A number's payment
+     * was read on every later step of the chapter, so each such routine move was dropped as the lever charged again, the
+     * crate count one too high a step while the text's totals follow the stat. There a number's payment is read later in
+     * the chapter only where the stat's rules keep a beat from changing it, as a list's or a ladder's; on the turn right
+     * after the payment as before.
+     */
+    const CRATES = stat("shared_lemon_crates", { type: "number", name: "Lemon Crates", optionsToSacrifice: "Use 1 Lemon Crate for an extra batch during a scene.", initialValue: 4 });
+    const EXTRA_BATCH = "Use 1 Lemon Crate for an extra batch before the lunch rush.";
+    const cratePaid: PaidLever = { kind: "sacrifice", group: "shared", stat: CRATES.id, step: -1 };
+    const nextBatch = [statChange("shared", CRATES.id, "subtractNumber", 1)];
+
+    /** laterInChapter with the crate lever in its place: taken on the chapter's first step, paid on its second; a learning story unless `category` says otherwise. */
+    function crateLaterInChapter(crates: Stat = CRATES, category: StoryState["category"] = "learn-something"): Story {
+      const story = laterInChapter();
+      const players = Object.fromEntries(
+        Object.entries(story.getPlayers()).map(([slot, player]) => {
+          const beats = [...player.beatHistory];
+          beats[2] = { ...beats[2], options: withLever(lever(EXTRA_BATCH)), choice: 2 };
+          beats[3] = { ...beats[3], paidLever: cratePaid };
+          return [slot, { ...player, beatHistory: beats }];
+        })
+      );
+      return story.clone({ sharedStats: [crates], sharedStatValues: [{ statId: crates.id, value: 3 }], players, category });
+    }
+
+    it("keeps a routine move of a lever's size on a later step of a learning story's chapter (the next batch's crate)", () => {
+      const story = crateLaterInChapter();
+      expect(takesMoneyRule(story)).toBe(true);
+      expect(repaired(story, nextBatch)).toEqual({ statChanges: nextBatch, repairs: [] });
+    });
+
+    it("still drops it there where the stat's rules keep a beat from changing it, on the turn right after the payment, and on a later step of any other story", () => {
+      const fixed = repaired(crateLaterInChapter({ ...CRATES, canBeChangedInBeatResolutions: false }), nextBatch);
+      expect(fixed).toEqual({ statChanges: [], repairs: [{ kind: "leverChargedAgain", detail: "shared/shared_lemon_crates: -1, the sacrifice turn 4 paid, earlier in this chapter" }] });
+      const turnAfter = avalon({ tookLever: lever(EXTRA_BATCH), paidLever: cratePaid }).clone({ sharedStats: [CRATES], sharedStatValues: [{ statId: CRATES.id, value: 3 }], category: "learn-something" });
+      expect(takesMoneyRule(turnAfter)).toBe(true);
+      expect(repaired(turnAfter, nextBatch)).toEqual({ statChanges: [], repairs: [{ kind: "leverChargedAgain", detail: "shared/shared_lemon_crates: -1, the sacrifice the previous turn paid" }] });
+      const unlearned = crateLaterInChapter(CRATES, "enjoy-fiction");
+      expect(takesMoneyRule(unlearned)).toBe(false);
+      expect(repaired(unlearned, nextBatch).statChanges).toEqual([]);
     });
   });
 
