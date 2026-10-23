@@ -22,6 +22,10 @@ Keep TypeScript upgrades deliberate: bump it in the lockfile and check the build
 
 The tsconfigs carry no `baseUrl`, and `paths` are relative to each tsconfig file. tsc-alias only enables its `base-url` replacer when `baseUrl` is set, and that replacer is what rewrites `core/*` imports to the copied `dist/core/`. `server/tsconfig.json` turns it on explicitly (`"tsc-alias": { "replacers": { "base-url": { "enabled": true } } }`). If you remove that, the server's `core/*` imports stay bare in `dist` and the server fails at startup.
 
+### Node version
+
+`server/package.json` `engines` is the only Node pin (no `.nvmrc`, `.node-version`, Dockerfile or CI), and Render picks its Node from it unless a `NODE_VERSION` variable is set in the dashboard. The floor is `>=22.23.4 <23` since 2026-10-23: Node carries its own root CA list, and 22.23.4 is the first 22.x without "emSign ECC Root CA - G3", removed after the October 2026 eMudhra key compromise (checked: `tls.rootCertificates` holds it in 20.20.2 and 22.22.0, not in 22.23.4). Node 20 is end-of-life and still carries it. Moving to 24.x needs 24.22.1 or later for the same reason.
+
 ### Text-model environment variables
 
 Since the GPT-6 migration (2026-09-27), production text calls run only on `gpt-6-*` models, and the code defaults are the settled ones, so no text-model variable needs to be set. Seven groups can be overridden, each by `<PREFIX>_NAME` and `<PREFIX>_REASONING_EFFORT` (none, low, medium or high): `SETUP_MODEL`, `GENERATION_MODEL`, `TEXT_MODEL`, `MULTIPLAYER_TEXT_MODEL`, `SWITCH_THREAD_MODEL`, `MULTIPLAYER_SWITCH_THREAD_MODEL`, `CONTENT_FILTER_MODEL`. Defaults and rules: `.context/text-model-eval.md`, "Production text calls".

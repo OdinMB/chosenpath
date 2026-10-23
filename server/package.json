@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "20.x"
+    "node": ">=22.23.4 <23"
   },
   "scripts": {
     "build": "cd ../core && npm install --include=dev && node ../node_modules/typescript/bin/tsc --version && npm run build && cd ../server && npm install --include=dev && rm -rf dist && node ../node_modules/typescript/bin/tsc --project tsconfig.json && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias && npm run debug-build",
