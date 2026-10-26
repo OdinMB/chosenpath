@@ -10,8 +10,6 @@ import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
 import { StorySetupFailed } from "./StorySetupFailed";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
-import { RateLimitNotification } from "client/shared/notifications/RateLimitNotification";
-import { RateLimitedResponse } from "core/types/api";
 import { notificationService } from "shared/notifications/notificationService";
 import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
 import { DifficultySlider } from "./DifficultySlider";
@@ -20,12 +18,6 @@ type ConfigurableTemplate = TemplateMetadata;
 
 interface TemplateConfigLoaderData {
   template: ConfigurableTemplate;
-}
-
-// Minimal template interface for PlayerCodes component
-interface MinimalTemplate {
-  id: string;
-  title: string;
 }
 
 export function TemplateConfigurator() {
@@ -41,9 +33,6 @@ export function TemplateConfigurator() {
     useState<DifficultyLevel>(() => {
       return getDefaultDifficultyLevel();
     });
-  const [rateLimit, setRateLimit] = useState<
-    RateLimitedResponse["rateLimit"] | null
-  >(null);
 
   const {
     isLoading,
@@ -104,8 +93,6 @@ export function TemplateConfigurator() {
   const needsTurnsConfig = template.maxTurnsMin !== template.maxTurnsMax;
   const needsDifficultyConfig =
     template.difficultyLevels && template.difficultyLevels.length > 1;
-  const hasConfigurableSettings =
-    needsPlayerConfig || needsTurnsConfig || needsDifficultyConfig || true;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,20 +165,12 @@ export function TemplateConfigurator() {
   }
 
   if (storyId && playerCodes) {
-    // PlayerCodes only needs basic template fields
-    const playerCodesTemplate: MinimalTemplate = {
-      id: template.id,
-      title: template.title,
-    };
-
     return (
       <PlayerCodes
         codes={playerCodes}
         onCodeSubmit={handleCodeSubmit}
         storyReady={storyReady}
-        template={
-          playerCodesTemplate as unknown as import("core/types").StoryTemplate
-        }
+        template={template}
       />
     );
   }
@@ -199,13 +178,6 @@ export function TemplateConfigurator() {
   return (
     <div className="p-4 md:p-6 font-lora">
       <div className="max-w-2xl mx-auto">
-        {rateLimit && (
-          <RateLimitNotification
-            rateLimit={rateLimit}
-            onTimeout={() => setRateLimit(null)}
-            className="mb-6"
-          />
-        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="mb-6">
             <TemplateCard
@@ -224,140 +196,139 @@ export function TemplateConfigurator() {
             />
           </div>
 
-          {hasConfigurableSettings && (
-            <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
-              <h3 className="text-lg font-medium text-primary">Settings </h3>
+          {/* Always shown: the image and pregeneration options apply to every template */}
+          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
+            <h3 className="text-lg font-medium text-primary">Settings</h3>
 
-              {/* Player Count Section */}
-              {needsPlayerConfig && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="player-count"
-                    className="text-sm md:text-base font-medium text-primary"
-                  >
-                    Number of Players: {playerCount}
-                  </label>
-
-                  <input
-                    id="player-count"
-                    type="range"
-                    min={template.playerCountMin}
-                    max={template.playerCountMax}
-                    value={playerCount}
-                    aria-valuetext={`${playerCount} player${
-                      playerCount !== 1 ? "s" : ""
-                    }`}
-                    onChange={handlePlayerCountChange}
-                    className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-                  />
-                  <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                    <span>
-                      {template.playerCountMin} Player
-                      {template.playerCountMin > 1 ? "s" : ""}
-                    </span>
-                    <span>
-                      {template.playerCountMax} Player
-                      {template.playerCountMax > 1 ? "s" : ""}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Story Length Section */}
-              {needsTurnsConfig && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="max-turns"
-                    className="text-sm md:text-base font-medium text-primary"
-                  >
-                    Story Length: {maxTurns} turns
-                  </label>
-
-                  <input
-                    id="max-turns"
-                    type="range"
-                    min={template.maxTurnsMin}
-                    max={template.maxTurnsMax}
-                    value={maxTurns}
-                    aria-valuetext={`${maxTurns} turns`}
-                    onChange={(e) => setMaxTurns(Number(e.target.value))}
-                    className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-                  />
-                  <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                    <span>{template.maxTurnsMin} turns</span>
-                    <span>{template.maxTurnsMax} turns</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Difficulty Level Slider - Only show if configurable */}
-              {needsDifficultyConfig && template.difficultyLevels && (
-                <DifficultySlider
-                  selectedDifficultyLevel={selectedDifficultyLevel}
-                  availableDifficultyLevels={template.difficultyLevels}
-                  onChange={handleDifficultyChange}
-                  disabled={isLoading}
-                />
-              )}
-
-              {/* Images Checkbox */}
-              <div className="items-center flex">
-                <input
-                  id="generate-images"
-                  type="checkbox"
-                  checked={generateImages}
-                  onChange={(e) => setGenerateImages(e.target.checked)}
-                  className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
-                  disabled={isLoading}
-                />
+            {/* Player Count Section */}
+            {needsPlayerConfig && (
+              <div className="space-y-2">
                 <label
-                  htmlFor="generate-images"
-                  className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
+                  htmlFor="player-count"
+                  className="text-sm md:text-base font-medium text-primary"
                 >
-                  Add unique images to your story
-                  <InfoIcon
-                    tooltipText="The story always has default images. We will add additional ones for your unique story."
-                    className="ml-2 -mt-0.5"
-                    position="top"
-                  />
+                  Number of Players: {playerCount}
                 </label>
-              </div>
 
-              {/* Pregeneration Checkbox */}
-              <div className="items-center flex">
                 <input
-                  id="pregenerate-beats"
-                  type="checkbox"
-                  checked={pregenerateBeats}
-                  onChange={(e) => setPregenerateBeats(e.target.checked)}
-                  className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
-                  disabled={
-                    isLoading ||
-                    (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)
-                  }
-                />
-                <label
-                  htmlFor="pregenerate-beats"
-                  className={`ml-3 md:ml-4 text-sm md:text-base font-medium ${
-                    DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
-                      ? "text-gray-400"
-                      : "text-primary"
+                  id="player-count"
+                  type="range"
+                  min={template.playerCountMin}
+                  max={template.playerCountMax}
+                  value={playerCount}
+                  aria-valuetext={`${playerCount} player${
+                    playerCount !== 1 ? "s" : ""
                   }`}
-                >
-                  Reduce wait time after choices
-                  <InfoIcon
-                    tooltipText={
-                      DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
-                        ? "Pregeneration is currently unavailable for multiplayer games."
-                        : "Creates story content in advance for each possible choice. More expensive but eliminates waiting."
-                    }
-                    className="ml-2 -mt-0.5"
-                    position="top"
-                  />
-                </label>
+                  onChange={handlePlayerCountChange}
+                  className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+                />
+                <div className="flex justify-between text-xs md:text-sm text-primary-600">
+                  <span>
+                    {template.playerCountMin} Player
+                    {template.playerCountMin > 1 ? "s" : ""}
+                  </span>
+                  <span>
+                    {template.playerCountMax} Player
+                    {template.playerCountMax > 1 ? "s" : ""}
+                  </span>
+                </div>
               </div>
+            )}
+
+            {/* Story Length Section */}
+            {needsTurnsConfig && (
+              <div className="space-y-2">
+                <label
+                  htmlFor="max-turns"
+                  className="text-sm md:text-base font-medium text-primary"
+                >
+                  Story Length: {maxTurns} turns
+                </label>
+
+                <input
+                  id="max-turns"
+                  type="range"
+                  min={template.maxTurnsMin}
+                  max={template.maxTurnsMax}
+                  value={maxTurns}
+                  aria-valuetext={`${maxTurns} turns`}
+                  onChange={(e) => setMaxTurns(Number(e.target.value))}
+                  className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+                />
+                <div className="flex justify-between text-xs md:text-sm text-primary-600">
+                  <span>{template.maxTurnsMin} turns</span>
+                  <span>{template.maxTurnsMax} turns</span>
+                </div>
+              </div>
+            )}
+
+            {/* Difficulty Level Slider - Only show if configurable */}
+            {needsDifficultyConfig && template.difficultyLevels && (
+              <DifficultySlider
+                selectedDifficultyLevel={selectedDifficultyLevel}
+                availableDifficultyLevels={template.difficultyLevels}
+                onChange={handleDifficultyChange}
+                disabled={isLoading}
+              />
+            )}
+
+            {/* Images Checkbox */}
+            <div className="items-center flex">
+              <input
+                id="generate-images"
+                type="checkbox"
+                checked={generateImages}
+                onChange={(e) => setGenerateImages(e.target.checked)}
+                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
+                disabled={isLoading}
+              />
+              <label
+                htmlFor="generate-images"
+                className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
+              >
+                Add unique images to your story
+                <InfoIcon
+                  tooltipText="The story always has default images. We will add additional ones for your unique story."
+                  className="ml-2 -mt-0.5"
+                  position="top"
+                />
+              </label>
             </div>
-          )}
+
+            {/* Pregeneration Checkbox */}
+            <div className="items-center flex">
+              <input
+                id="pregenerate-beats"
+                type="checkbox"
+                checked={pregenerateBeats}
+                onChange={(e) => setPregenerateBeats(e.target.checked)}
+                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
+                disabled={
+                  isLoading ||
+                  (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)
+                }
+              />
+              <label
+                htmlFor="pregenerate-beats"
+                className={`ml-3 md:ml-4 text-sm md:text-base font-medium ${
+                  DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
+                    ? "text-gray-400"
+                    : "text-primary"
+                }`}
+              >
+                Reduce wait time after choices
+                <InfoIcon
+                  tooltipText={
+                    DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
+                      ? "Pregeneration is currently unavailable for multiplayer games."
+                      : "Creates story content in advance for each possible choice. More expensive but eliminates waiting."
+                  }
+                  className="ml-2 -mt-0.5"
+                  position="top"
+                />
+              </label>
+            </div>
+          </div>
 
           <SetupAiNotice
             source="template"

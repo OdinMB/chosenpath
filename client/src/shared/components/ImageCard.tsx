@@ -73,8 +73,9 @@ export const ImageCard = ({
               <img
                 src={imageSrc}
                 alt={alt}
-                className={`absolute h-full ${imageContainerClass} object-cover object-center transition-all duration-500 hover:scale-110
-                } ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+                className={`absolute h-full ${imageContainerClass} object-cover object-center transition-all duration-500 hover:scale-110 ${
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                }`}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
               />

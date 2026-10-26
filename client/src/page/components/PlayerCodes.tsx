@@ -9,7 +9,7 @@ interface PlayerCodesProps {
   codes: Record<string, string>;
   onCodeSubmit: (code: string) => void;
   storyReady: boolean;
-  template?: StoryTemplate;
+  template?: Pick<StoryTemplate, "id" | "title">;
   showGenerationProgress?: boolean; // When true, show GenerationProgress instead of old loading spinner
 }
 

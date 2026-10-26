@@ -653,7 +653,6 @@ export const StoryInitializer = ({
     if (kidAgesField.error) return;
 
     const mergedPrompt = buildMergedPrompt();
-    console.log("Final prompt being sent to backend:", mergedPrompt);
 
     // Ensure pregeneration is disabled for multiplayer if config is set
     const finalPregenerateBeats =

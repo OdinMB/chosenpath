@@ -94,8 +94,8 @@ export function groupTagsByCategories(
 
 /**
  * Sort tags according to the order of categories in TAG_CATEGORIES
- * Format tags come first, then Motivation tags, then Genre tags, etc.
- * Tags not in any category come last
+ * Category tags come first, then Genre, Setting and Tone tags
+ * Tags not in any category come last; tags in the same category keep their order
  * @param tags Array of tags to sort
  * @returns Sorted array of tags
  */
