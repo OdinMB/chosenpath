@@ -10,9 +10,16 @@ import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
 import { StorySetupFailed } from "./StorySetupFailed";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
+import {
+  clampGroupCount,
+  GROUP_COUNT_MIN,
+  useGroupStoryCreation,
+} from "page/hooks/useGroupStoryCreation";
 import { notificationService } from "shared/notifications/notificationService";
+import { useAuth } from "client/shared/auth/useAuth";
 import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
 import { DifficultySlider } from "./DifficultySlider";
+import { GroupStartField } from "./GroupStartField";
 
 type ConfigurableTemplate = TemplateMetadata;
 
@@ -29,6 +36,12 @@ export function TemplateConfigurator() {
   const [maxTurns, setMaxTurns] = useState(10);
   const [generateImages, setGenerateImages] = useState(false);
   const [pregenerateBeats, setPregenerateBeats] = useState(true);
+  // "Start several groups": signed-in users only
+  const { user } = useAuth();
+  const [startGroups, setStartGroups] = useState(false);
+  const [groupCount, setGroupCount] = useState(GROUP_COUNT_MIN);
+  const groupStart = useGroupStoryCreation();
+  const startsGroups = Boolean(user) && startGroups;
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
     useState<DifficultyLevel>(() => {
       return getDefaultDifficultyLevel();
@@ -103,16 +116,22 @@ export function TemplateConfigurator() {
       DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
         ? false
         : pregenerateBeats;
+    const settings = {
+      templateId: template.id,
+      playerCount,
+      maxTurns,
+      generateImages,
+      pregenerateBeats: finalPregenerateBeats,
+      difficultyLevel: selectedDifficultyLevel,
+    };
+
+    if (startsGroups) {
+      await groupStart.startGroups(settings, groupCount);
+      return;
+    }
 
     try {
-      const response = await createStoryFromTemplate({
-        templateId: template.id,
-        playerCount,
-        maxTurns,
-        generateImages,
-        pregenerateBeats: finalPregenerateBeats,
-        difficultyLevel: selectedDifficultyLevel,
-      });
+      const response = await createStoryFromTemplate(settings);
 
       if (!response) {
         // If response is undefined, an error was handled by the hook (e.g., navigation occurred).
@@ -272,27 +291,40 @@ export function TemplateConfigurator() {
               />
             )}
 
-            {/* Images Checkbox */}
-            <div className="items-center flex">
-              <input
-                id="generate-images"
-                type="checkbox"
-                checked={generateImages}
-                onChange={(e) => setGenerateImages(e.target.checked)}
-                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
-                disabled={isLoading}
-              />
-              <label
-                htmlFor="generate-images"
-                className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
-              >
-                Add unique images to your story
-                <InfoIcon
-                  tooltipText="The story always has default images. We will add additional ones for your unique story."
-                  className="ml-2 -mt-0.5"
-                  position="top"
+            {/* Images Checkbox: off while several groups start */}
+            <div>
+              <div className="items-center flex">
+                <input
+                  id="generate-images"
+                  type="checkbox"
+                  checked={generateImages && !startsGroups}
+                  onChange={(e) => setGenerateImages(e.target.checked)}
+                  className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
+                  disabled={isLoading || startsGroups}
+                  aria-describedby={startsGroups ? "group-images-note" : undefined}
                 />
-              </label>
+                <label
+                  htmlFor="generate-images"
+                  className={`ml-3 md:ml-4 text-sm md:text-base font-medium ${
+                    startsGroups ? "text-gray-400" : "text-primary"
+                  }`}
+                >
+                  Add unique images to your story
+                  <InfoIcon
+                    tooltipText="The story always has default images. We will add additional ones for your unique story."
+                    className="ml-2 -mt-0.5"
+                    position="top"
+                  />
+                </label>
+              </div>
+              {startsGroups && (
+                <p
+                  id="group-images-note"
+                  className="mt-1 pl-8 md:pl-10 text-xs md:text-sm text-primary-600"
+                >
+                  Several groups start without unique images.
+                </p>
+              )}
             </div>
 
             {/* Pregeneration Checkbox */}
@@ -328,11 +360,21 @@ export function TemplateConfigurator() {
                 />
               </label>
             </div>
+
+            {user && (
+              <GroupStartField
+                enabled={startGroups}
+                count={groupCount}
+                onEnabledChange={setStartGroups}
+                onCountChange={setGroupCount}
+                disabled={isLoading || groupStart.isStarting}
+              />
+            )}
           </div>
 
           <SetupAiNotice
             source="template"
-            images={generateImages}
+            images={generateImages && !startsGroups}
             className="sm:justify-end"
           />
 
@@ -358,12 +400,14 @@ export function TemplateConfigurator() {
             <PrimaryButton
               type="submit"
               size="lg"
-              disabled={isLoading}
-              isLoading={isLoading}
+              disabled={isLoading || groupStart.isStarting}
+              isLoading={isLoading || groupStart.isStarting}
               fullWidth
               className="font-semibold text-lg"
             >
-              Start Story
+              {startsGroups
+                ? `Start ${clampGroupCount(groupCount)} stories`
+                : "Start Story"}
             </PrimaryButton>
           </div>
         </form>

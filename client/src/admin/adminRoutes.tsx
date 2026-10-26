@@ -13,6 +13,7 @@ import { AdminTemplateEditor } from "./templates/AdminTemplateEditor.js";
 import { TemplateCarouselManager } from "../resources/templates/TemplateCarouselManager.js";
 import { FeedbackOverview } from "../resources/feedback/FeedbackOverview.js";
 import { feedbackLoader } from "../resources/feedback/loaders/feedbackLoader.js";
+import { AdminSystemPage } from "./system/AdminSystemPage.js";
 
 // Define routes for the admin section
 export const adminRoutes: RouteObject[] = [
@@ -65,6 +66,10 @@ export const adminRoutes: RouteObject[] = [
         path: "feedback",
         element: <FeedbackOverview />,
         loader: feedbackLoader,
+      },
+      {
+        path: "system",
+        element: <AdminSystemPage />,
       },
     ],
   },

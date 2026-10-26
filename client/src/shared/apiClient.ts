@@ -25,6 +25,7 @@ import {
   LinkStoryToUserResponse,
   CheckStoryStatusResponse,
   StoryStatusInfo,
+  CodeExistsResponse,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -385,6 +386,15 @@ export const userStoriesApi = {
     return apiClient.get<GetUserStoryFeedResponse["data"]>(url);
   },
   /**
+   * The signed-in user's newest created stories, with every seat's code
+   * (for the printable seat cards)
+   */
+  getCreatedStories: async (): Promise<{ stories: ExtendedStoryMetadata[] }> => {
+    return apiClient.get<GetUserStoryFeedResponse["data"]>(
+      "/users/stories/created"
+    );
+  },
+  /**
    * Link a local story code to the authenticated user
    */
   linkStoryToAccount: async (
@@ -423,6 +433,17 @@ export const storyApi = {
     return apiClient.get<CheckStoryStatusResponse["data"]>(
       `/stories/${storyId}/status`
     );
+  },
+
+  /**
+   * Whether a seat code names a story. A miss answers false, without a pop-up;
+   * too many misses are rate limited (the API client's limit pop-up).
+   */
+  checkCodeExists: async (code: string): Promise<boolean> => {
+    const info = await apiClient.get<CodeExistsResponse["data"]>(
+      `/stories/${encodeURIComponent(code)}/exists`
+    );
+    return info.exists;
   },
 
   /**

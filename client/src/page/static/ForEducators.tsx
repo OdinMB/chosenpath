@@ -110,6 +110,24 @@ export function ForEducators() {
         "Yes! Stories can be configured for different reading levels, vocabulary complexity, and cognitive load. The same educational scenario can be adapted for beginners through advanced learners.",
     },
     {
+      question: "Can I run this with a whole class?",
+      answer: (
+        <>
+          Yes.{" "}
+          <a href="/users/signin" className="text-link">
+            Sign in
+          </a>
+          , open a World from the library and choose "Start several groups":
+          up to 12 group stories of up to 3 players each, all with the same
+          settings. Then print the seat cards, one per student, each with the
+          group number, a seat code, a join link and a QR code. Students need
+          no account: they scan their card or type the code on the home page.
+          Stories started for several groups are text-only, without unique
+          images.
+        </>
+      ),
+    },
+    {
       question: "Can I share my educational Worlds with other educators?",
       answer: (
         <>

@@ -64,7 +64,21 @@ export function Privacy() {
                 We temporarily store your IP address to protect our site from
                 abuse, such as attacks, account theft attempts, or excessive
                 resource usage. IP addresses are only stored in memory (not in
-                log files) and are automatically deleted after 24 hours.
+                log files) and are automatically deleted after 24 hours. If you
+                are signed in, the stories you start are counted against your
+                account instead, also only in memory, and the count is dropped
+                when the limit's time window ends (after 24 hours at most).
+              </p>
+            </div>
+
+            <div className="p-4 bg-primary-50 rounded-lg">
+              <h3 className="text-md font-montserrat font-bold mb-1">
+                Usage totals
+              </h3>
+              <p className="text-sm text-primary-600">
+                We record what our AI calls cost as daily totals per kind of
+                story (started with or without an account). These totals
+                contain no account, IP address or story content.
               </p>
             </div>
 

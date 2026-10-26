@@ -59,6 +59,11 @@ let mockCreation = IDLE_CREATION;
 jest.mock("../../../src/page/hooks/useStoryCreation", () => ({
   useStoryCreation: () => mockCreation,
 }));
+// Signed out unless a test signs in
+let mockUser: { id: string } | null = null;
+jest.mock("../../../src/shared/auth/useAuth", () => ({
+  useAuth: () => ({ user: mockUser }),
+}));
 
 describe("TemplateConfigurator AI notice", () => {
   it("says next to the Start Story button that an AI system writes the story from this template", () => {
@@ -142,5 +147,34 @@ describe("TemplateConfigurator settings", () => {
     expect(html).not.toContain('id="player-count"');
     expect(html).toContain('id="generate-images"');
     expect(html).toContain('id="pregenerate-beats"');
+  });
+});
+
+describe("TemplateConfigurator group start", () => {
+  afterEach(() => {
+    mockUser = null;
+  });
+
+  it("offers no group start to a visitor who is not signed in", () => {
+    const html = renderMarkup(<TemplateConfigurator />);
+
+    expect(html).not.toContain('id="start-several-groups"');
+    expect(accessibleText(html)).not.toContain("Start several groups");
+    expect(accessibleText(html)).toContain("Start Story");
+  });
+
+  it("offers a signed-in user to start several groups, off by default", () => {
+    mockUser = { id: "user-1" };
+
+    const html = renderMarkup(<TemplateConfigurator />);
+
+    const checkbox = openingTag(html, "input", "id", "start-several-groups");
+    expect(attribute(checkbox, "type")).toBe("checkbox");
+    expect(checkbox).not.toMatch(/\schecked/);
+    expect(accessibleText(html)).toContain("Start several groups");
+    // The count and the images line appear only once it is ticked
+    expect(html).not.toContain('id="group-count"');
+    expect(accessibleText(html)).not.toContain("Several groups start without unique images.");
+    expect(accessibleText(html)).toContain("Start Story");
   });
 });

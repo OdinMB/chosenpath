@@ -1,6 +1,11 @@
 import { UserListItem } from "core/types";
 import { AdminStoriesListItem } from "core/types/story.js";
-import { GetAdminStoriesResponseData, FeedbackItem } from "core/types/api.js";
+import {
+  GetAdminStoriesResponseData,
+  FeedbackItem,
+  ConnectionReport,
+  SpendTotals,
+} from "core/types/api.js";
 import { apiClient } from "shared/apiClient";
 import { Logger } from "shared/logger";
 
@@ -82,5 +87,25 @@ export const adminFeedbackApi = {
       Logger.Admin.error(`Failed to delete feedback: ${feedbackId}`, error);
       throw error;
     }
+  },
+};
+
+// Admin "System" page: the TRUST_PROXY check and the AI spend totals
+export const adminSystemApi = {
+  /**
+   * How the server sees this browser's request; with `forgedAddress`, sent
+   * with that X-Forwarded-For entry, for the TRUST_PROXY verdict
+   */
+  getConnection: async (forgedAddress?: string): Promise<ConnectionReport> => {
+    return apiClient.get<ConnectionReport>(
+      "/admin/system/connection",
+      forgedAddress
+        ? { headers: { "X-Forwarded-For": forgedAddress } }
+        : undefined
+    );
+  },
+
+  getSpend: async (): Promise<SpendTotals> => {
+    return apiClient.get<SpendTotals>("/admin/system/spend");
   },
 };

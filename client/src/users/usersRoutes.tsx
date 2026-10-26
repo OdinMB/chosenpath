@@ -1,6 +1,7 @@
 import { RouteObject, Navigate } from "react-router-dom";
 import { UsersStories } from "./stories/UsersStories.js";
 import { UsersArchive } from "./stories/UsersArchive.js";
+import { SeatCardsPage } from "./stories/SeatCardsPage.js";
 import { UserTemplateList } from "./templates/UserTemplateList.js";
 import { UserTemplateEditor } from "./templates/UserTemplateEditor.js";
 import { UserAccountPage } from "./components/UserAccountPage";
@@ -52,6 +53,17 @@ export const userRoutes: RouteObject[] = [
         id: "user-template-editor",
       },
     ],
+  },
+  {
+    // Signed in, but outside the account layout, so that only the cards print
+    path: "/users/seat-cards",
+    element: (
+      <UserRouteGuard>
+        <SeatCardsPage />
+      </UserRouteGuard>
+    ),
+    errorElement: <UsersErrorBoundary />,
+    id: "user-seat-cards",
   },
   {
     // Sign-in route remains outside the guarded layout

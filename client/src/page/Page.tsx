@@ -6,7 +6,9 @@ import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { OrDivider, Footer, CategoryTile, JoinGameForm } from "./components";
 import { ResumableStories } from "resources/stories/ResumableStories";
 import { useAuth } from "client/shared/auth/useAuth";
+import { storyApi } from "client/shared/apiClient";
 import { config } from "../config";
+import { isStoryCodeFormat, joinByCode } from "./utils/joinByCode";
 
 // Page component refactored to use React Router
 export function Page() {
@@ -26,47 +28,20 @@ export function Page() {
     previousUserIdRef.current = currentUserId;
   }, [user?.id]);
 
-  const validateCodeFormat = (inputCode: string): boolean => {
-    const trimmedCode = inputCode.trim();
-    // Story codes are exactly 6 alphanumeric characters (0-9, A-Z)
-    // NOTE: This validation must match code generation in server/src/stories/StoryCreationService.ts (generatePlayerCodes method)
-    return trimmedCode.length === 6 && /^[A-Z0-9]+$/.test(trimmedCode);
-  };
-
   const handleJoinGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedCode = code.trim();
-
-    if (!trimmedCode) return;
-
-    if (!validateCodeFormat(trimmedCode)) {
-      setValidationError(
-        "Code must be exactly 6 characters and contain only letters and numbers"
-      );
-      return;
+    const sendsCheck = isStoryCodeFormat(code);
+    if (sendsCheck) {
+      setIsValidating(true);
+      setValidationError(null);
     }
+    const outcome = await joinByCode(code, storyApi.checkCodeExists);
+    if (sendsCheck) setIsValidating(false);
 
-    setIsValidating(true);
-    setValidationError(null);
-
-    try {
-      const response = await fetch(`/api/stories/${trimmedCode}/exists`);
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setValidationError(
-            "Story code not found. Please check the code and try again."
-          );
-          return;
-        }
-        throw new Error("Failed to validate story code");
-      }
-
-      navigate(`/game/${trimmedCode}`);
-    } catch {
-      setValidationError("Unable to validate code. Please try again.");
-    } finally {
-      setIsValidating(false);
+    if (outcome.kind === "open") {
+      navigate(outcome.path);
+    } else if (outcome.kind === "problem") {
+      setValidationError(outcome.message);
     }
   };
 
@@ -267,7 +242,7 @@ export function Page() {
           {/* Join game */}
           <JoinGameForm
             code={code}
-            isCodeValid={validateCodeFormat(code)}
+            isCodeValid={isStoryCodeFormat(code)}
             isValidating={isValidating}
             validationError={validationError}
             onCodeChange={handleInputChange}
