@@ -37,7 +37,7 @@ Details: DOCS/2026-09-26_gpt6-text-eval/2026-10-02_status.md (sections 4-6, 9) a
 - 3: held forms never rated: prose rules (B5), switch turns as scenes (B7) and the ending format (B8) on turns-r2.html, the group script (B10b) on turns-groups.html, and the cached request form (B9, 18% cheaper); each needs a rebuild and a paid check to join
 - 1: rate turns-options.html (45 min): the single-player option form in production since 1 October
 - 1: setups name stats "… Energy" (2 of 6 final-check setups, 2 of 4 kids setups); a fix is an untested sentence plus a retest
-- 2: fix the 10 Dependabot vulnerabilities on main and process the open Dependabot branches
+- 2: the last high npm audit finding (zod advisory GHSA-mrhx-c7xc-m3w5) needs zod 4 and LangChain 1.x (changes the structured-output schemas, so re-run the text eval); process the open Dependabot branches
 - 1: process the five untracked .plans/*-followup.md files from other runs with /review-followup
 
 # BETTER EXPERIENCE
