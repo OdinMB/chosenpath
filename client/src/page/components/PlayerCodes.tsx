@@ -27,7 +27,7 @@ export function PlayerCodes({
     // Convert "player1" to "Player 1"
     return slot.replace(
       /player(\d+)/,
-      (_, num) => `Player ${num}${num == 1 ? " (You)" : ""}`
+      (_, num) => `Player ${num}${num == 1 ? " (you, if you're playing)" : ""}`
     );
   };
 
@@ -72,9 +72,11 @@ export function PlayerCodes({
         <div className="bg-primary-50 border-l-4 border-primary-200 p-4 mb-6 rounded-md">
           <div className="flex">
             <p className="text-sm text-primary-700">
-              Send invite links (
-              <Icons.Share className="h-3.5 w-3.5 inline" />) to the other
-              players.
+              Each code is one player's seat in this story. Every player joins
+              on their own device: send them their invite link (
+              <Icons.Share className="h-3.5 w-3.5 inline" />) or have them
+              enter their code on the home page. Their code is also how they get
+              back into the story later.
             </p>
           </div>
         </div>
