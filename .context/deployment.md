@@ -52,7 +52,10 @@ To measure it:
 - The second path: the service's own `*.onrender.com` address bypasses any proxy on the custom domain. The browser check can't reach it, because the auth cookie is scoped to `.chosenpath.ai`. Measure it with `curl`: `GET /admin/system/connection` on the `onrender.com` address with an admin's `authToken` cookie and `X-Forwarded-For: 203.0.113.7`, then read `candidates`: the lowest `hops` whose `address` is `203.0.113.7`, minus one, is that path's count. Sign out afterwards to invalidate that session.
 - If the two paths give different counts, no single count is right for both: the higher lets a caller on the shorter path forge their address, the lower puts every visitor on the longer path in one bucket. Remove the extra path (disabling the default `onrender.com` domain is an option, not verified), or use the lower count only where the longer path carries no real visitors.
 
-Measured counts: none yet. Record each path's count here with its date.
+Measured counts (record each path's count here with its date):
+
+- chosenpath.ai → api.chosenpath.ai: **2** (Cloudflare, then Render's router), measured 2026-10-26 from a home connection: the forged request's chain was `203.0.113.7, <visitor>, <Cloudflare>`, socket a Render-internal address. The mobile-data check was skipped by the owner's decision; the unreadable-address row on `/admin/system` is the watch for a path with a shorter chain.
+- `*.onrender.com`: switched off by the owner in Render's dashboard on 2026-10-26, so there is no second path to measure. Re-measure if it is switched back on.
 
 ### Daily spend ceilings
 
