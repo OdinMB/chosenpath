@@ -1,16 +1,11 @@
 import { Pool } from "pg";
 import { Logger } from "./logger.js";
+import { dbConnectionSettings } from "./dbSettings.js";
 
 // PostgreSQL connection pool
 // For production, use environment variables provided by Render.
-// For local development, these match your docker-compose.yml.
-const pool = new Pool({
-  user: process.env.DB_USER || "devuser",
-  host: process.env.DB_HOST || "localhost",
-  database: process.env.DB_DATABASE || "chosenpath_dev",
-  password: process.env.DB_PASSWORD || "devpassword",
-  port: parseInt(process.env.DB_PORT || "5432", 10),
-});
+// For local development, the defaults match your docker-compose.yml.
+const pool = new Pool(dbConnectionSettings(process.env));
 
 pool.on("error", (err) => {
   Logger.DB.error("Unexpected error on idle client", err);
