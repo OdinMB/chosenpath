@@ -8,6 +8,7 @@ import { GameWebSocketServer } from "./game/websocket.js";
 import { GameHandler } from "game/GameHandler.js";
 import { initializeDatabase, closeDatabase } from "./shared/db.js";
 import { cleanupExpiredSessions } from "./users/userService.js";
+import { CSRF_COOKIE, verifyCsrfToken } from "./shared/csrf.js";
 import cookieParser from "cookie-parser";
 import crypto from "crypto";
 dotenv.config();
@@ -92,13 +93,13 @@ async function startServer() {
     // Add CSRF token to all responses
     app.use((req: Request, res: Response, next: NextFunction) => {
       // Get existing token from cookie
-      const existingToken = req.cookies["XSRF-TOKEN"];
+      const existingToken = req.cookies[CSRF_COOKIE];
 
       // Only set a new token if one doesn't exist
       if (!existingToken) {
         const token = generateCSRFToken();
-        console.log("[CSRF] Setting new token:", token);
-        res.cookie("XSRF-TOKEN", token, {
+        console.log("[CSRF] Setting a new token cookie");
+        res.cookie(CSRF_COOKIE, token, {
           secure: !isDevelopment,
           sameSite: "lax",
           path: "/",
@@ -111,33 +112,8 @@ async function startServer() {
       next();
     });
 
-    // Validate CSRF token
-    app.use((req: Request, res: Response, next: NextFunction) => {
-      // Skip CSRF check for GET, HEAD, OPTIONS requests
-      if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-        return next();
-      }
-
-      const token = req.headers["x-csrf-token"];
-      const cookieToken = req.cookies["XSRF-TOKEN"];
-
-      if (!token || !cookieToken || token !== cookieToken) {
-        console.log("[CSRF] Token validation failed");
-        console.log("[CSRF] Request headers:", req.headers);
-        console.log("[CSRF] Request cookies:", req.cookies);
-
-        return res.status(403).json({
-          status: "error",
-          errorMessage: "Invalid CSRF token",
-          details: {
-            headers: req.headers,
-            cookies: req.cookies,
-          },
-        });
-      }
-
-      next();
-    });
+    // Validate CSRF token (GET, HEAD and OPTIONS pass unchecked)
+    app.use(verifyCsrfToken);
 
     app.use(express.json());
 

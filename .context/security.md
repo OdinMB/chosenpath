@@ -1,4 +1,4 @@
 - **Authentication**: JWT tokens with secure cookie handling
-- **CSRF protection**: Token-based CSRF prevention
+- **CSRF protection**: double-submit token (`server/src/shared/csrf.ts`). The server sets a random `XSRF-TOKEN` cookie the client can read, and answers any request other than GET, HEAD or OPTIONS whose `X-CSRF-TOKEN` header doesn't match it with a 403 `{ status: "error", errorMessage: CSRF_FAILURE_MESSAGE }` (`core/types/api.ts`), which echoes nothing from the request. Its log line names the method, path and which check failed, never a token or cookie. The client (`client/src/shared/apiClient.ts`) recognises that 403, re-reads the cookie (the rejection sets a fresh one when the browser had none) and retries once if the token changed; otherwise the pop-up asks for a reload. Neither side logs token values.
 - **Rate limiting**: API endpoints protected against abuse
 - **Input validation**: Zod schemas validate all inputs

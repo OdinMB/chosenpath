@@ -181,7 +181,7 @@ class UserDbService {
       token,
     ]);
     if (result.rowCount && result.rowCount > 0) {
-      Logger.Transaction.log(`Deleted session token ${token}`);
+      Logger.Transaction.log("Deleted a session by token");
     }
     return result.rowCount ? result.rowCount > 0 : false;
   }

@@ -40,6 +40,13 @@ export interface ErrorResponse extends BaseServerResponse {
   operationType?: string;
 }
 
+/**
+ * The errorMessage of the server's 403 when a request's X-CSRF-TOKEN header
+ * doesn't match its XSRF-TOKEN cookie. The client recognises it to retry once
+ * with a refreshed token.
+ */
+export const CSRF_FAILURE_MESSAGE = "Invalid CSRF token";
+
 export interface RateLimitInfo {
   isLimited: boolean;
   timeRemaining: number;

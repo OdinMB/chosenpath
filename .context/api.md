@@ -21,6 +21,10 @@ The API uses HTTP-only cookies for authentication:
 - **Secure**: Yes (production only)
 - **SameSite**: `none` (production) / `lax` (development)
 
+### CSRF Token
+
+Every request other than GET, HEAD or OPTIONS must send the `XSRF-TOKEN` cookie's value in an `X-CSRF-TOKEN` header. Otherwise the server answers `403` with `{ status: "error", errorMessage: "Invalid CSRF token" }` (`CSRF_FAILURE_MESSAGE` in `core/types/api.ts`). The client retries such a request once when the cookie holds a newer token. Details in `.context/security.md`.
+
 ### Request ID
 
 All requests should include a `requestId` parameter (query param for GET, body param for POST/PUT/DELETE) for request tracking and logging.

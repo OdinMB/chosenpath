@@ -1,9 +1,7 @@
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import {
-  aiImageGenerator,
-  ImageGenerationError,
-} from "server/images/AIImageGenerator.js";
+import { aiImageGenerator } from "server/images/AIImageGenerator.js";
+import { sendImageGenerationError } from "server/images/imageGenerationErrorResponse.js";
 import { Logger } from "shared/logger.js";
 import {
   IMAGE_SIZES,
@@ -16,7 +14,6 @@ import {
   ImageSize,
   ImageQuality,
   ClientRequest,
-  ImageGenerationErrorResponse,
 } from "core/types/index.js";
 
 // Request interface for player image generation
@@ -50,45 +47,6 @@ const contentFilter = new ContentFilterService();
 const templateService = new TemplateService();
 const IMAGE_GENERATION_ACTION_TYPE = "imageGeneration";
 const MAX_TEXT_LENGTH = 2000;
-
-// Helper function to send image generation errors with structured information
-const sendImageGenerationError = (
-  res: express.Response,
-  error: Error,
-  requestId?: string
-): void => {
-  if (error instanceof ImageGenerationError) {
-    // Determine appropriate HTTP status code based on error type
-    let statusCode = 400; // Default to Bad Request for business logic errors
-
-    // Use 500 only for actual technical failures
-    if (error.imageGenerationError.errorCode === "TECHNICAL") {
-      statusCode = 500;
-    } else if (error.imageGenerationError.errorCode === "RATE_LIMIT") {
-      statusCode = 429; // Too Many Requests
-    }
-
-    // Send structured error information for image generation errors
-    const response: ImageGenerationErrorResponse = {
-      status:
-        statusCode === 400 ? ResponseStatus.INVALID : ResponseStatus.ERROR,
-      requestId: requestId || uuidv4(),
-      timestamp: Date.now(),
-      errorMessage: error.imageGenerationError.userFriendlyMessage,
-      operationType: res.req?.originalUrl?.split("?")[0],
-      imageGenerationError: error.imageGenerationError,
-    };
-
-    Logger.Story.log(
-      `Image generation error [${response.requestId}] (${statusCode}) - ${error.imageGenerationError.errorCode}: ${error.imageGenerationError.technicalMessage}`
-    );
-
-    res.status(statusCode).json(response);
-  } else {
-    // Fall back to regular error handling for non-image generation errors
-    sendError(res, error.message, 500, requestId, error);
-  }
-};
 
 // --- Validation Helper Functions ---
 const validateStringInput = (

@@ -1,4 +1,4 @@
-import { ResponseStatus } from "core/types/api";
+import { CSRF_FAILURE_MESSAGE, ResponseStatus } from "core/types/api";
 
 /** The title and message of the pop-up the API client shows when a request fails. */
 export interface ApiErrorDescription {
@@ -40,9 +40,6 @@ const MESSAGE_BY_STATUS: Record<number, string> = {
   403: "You don't have permission to do this.",
   404: "We couldn't find what you were looking for.",
 };
-
-// What the server's CSRF check answers with (server/src/index.ts)
-const CSRF_FAILURE = "Invalid CSRF token";
 
 // What browsers and axios say when a request never got an answer
 const NETWORK_ERROR_CODES = ["ERR_NETWORK", "ECONNABORTED"];
@@ -107,7 +104,8 @@ export function describeApiError(error: unknown): ApiErrorDescription {
   // Only a JSON error body's message is the server's own words: a plain text
   // body may be an HTML error page or name the API path
   const serverMessage = textOf(body.errorMessage).trim();
-  if (serverMessage === CSRF_FAILURE) return SESSION_NEEDS_RELOAD;
+  // By now the API client has retried once with a refreshed token, if it had one
+  if (serverMessage === CSRF_FAILURE_MESSAGE) return SESSION_NEEDS_RELOAD;
 
   if (body.status === ResponseStatus.INVALID || httpStatus === 400) {
     return { title: CHECK_AND_RETRY, message: serverMessage || NOT_ACCEPTED };

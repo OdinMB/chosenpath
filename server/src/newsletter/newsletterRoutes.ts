@@ -44,13 +44,9 @@ router.post("/newsletter/subscribe", async (req, res) => {
       return sendBadRequest(res, result.message, requestId);
     }
   } catch (error) {
+    // The detail stays in the server log; the user gets a plain sentence
     Logger.Route.error("Newsletter subscription failed", error);
-    return sendError(
-      res,
-      error instanceof Error ? error.message : "Subscription failed",
-      500,
-      requestId
-    );
+    return sendError(res, "Failed to subscribe to newsletter", 500, requestId);
   }
 });
 

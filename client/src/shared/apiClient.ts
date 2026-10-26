@@ -1,7 +1,12 @@
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, {
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { API_CONFIG } from "client/config";
 import {
+  CSRF_FAILURE_MESSAGE,
   ResponseStatus,
   BaseServerResponse,
   ErrorResponse,
@@ -64,6 +69,60 @@ const axiosInstance = axios.create({
 // Special timeout for AI operations that take longer
 export const LONG_OPERATION_TIMEOUT = 180000; // 3 minutes
 
+// The server sets the CSRF token in this cookie and checks it against the header
+const CSRF_COOKIE = "XSRF-TOKEN";
+const CSRF_HEADER = "X-CSRF-TOKEN";
+
+/** The CSRF token in the server's cookie, if there is one. */
+function readCsrfToken(): string | undefined {
+  const prefix = `${CSRF_COOKIE}=`;
+  return document.cookie
+    .split(";")
+    .map((row) => row.trim())
+    .find((row) => row.startsWith(prefix))
+    ?.slice(prefix.length);
+}
+
+/** Request headers as JSON for the debug log, without the CSRF token's value. */
+function headersForLog(headers: unknown): string {
+  return JSON.stringify(headers, (key: string, value: unknown) =>
+    key.toLowerCase() === CSRF_HEADER.toLowerCase() ? "[redacted]" : value
+  );
+}
+
+// A request already sent a second time after a CSRF rejection
+interface CsrfRetryConfig extends InternalAxiosRequestConfig {
+  csrfRetried?: boolean;
+}
+
+function isCsrfFailureBody(body: unknown): boolean {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    "errorMessage" in body &&
+    body.errorMessage === CSRF_FAILURE_MESSAGE
+  );
+}
+
+/**
+ * The request to send again after the server rejected its CSRF token, or
+ * undefined. A request is sent again once at most, and only when the cookie
+ * now holds a different token: the server sets a fresh cookie on its
+ * rejection when the browser had none, so reading the cookie is the refresh.
+ */
+function csrfRetryFor(error: unknown): CsrfRetryConfig | undefined {
+  if (!axios.isAxiosError(error) || error.response?.status !== 403) {
+    return undefined;
+  }
+  const config = error.config as CsrfRetryConfig | undefined;
+  if (!config || config.csrfRetried || !isCsrfFailureBody(error.response.data)) {
+    return undefined;
+  }
+  const token = readCsrfToken();
+  if (!token || token === config.headers[CSRF_HEADER]) return undefined;
+  return { ...config, csrfRetried: true };
+}
+
 // Add request interceptor to include auth token and CSRF token
 axiosInstance.interceptors.request.use(
   async (config) => {
@@ -74,16 +133,10 @@ axiosInstance.interceptors.request.use(
       }${config.url || ""}`
     );
 
-    // Get CSRF token from cookie
-    const csrfToken = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("XSRF-TOKEN="))
-      ?.split("=")[1];
-
     // Only add CSRF token for non-GET requests
+    const csrfToken = readCsrfToken();
     if (csrfToken && config.method !== "get") {
-      config.headers["X-CSRF-TOKEN"] = csrfToken;
-      console.log("[CSRF] Using token:", csrfToken);
+      config.headers[CSRF_HEADER] = csrfToken;
     }
 
     // Add requestId to all requests
@@ -110,7 +163,7 @@ axiosInstance.interceptors.request.use(
 
     // Log request details including the generated requestId
     Logger.API?.debug?.(
-      `Request details - ID: ${requestId}, Headers: ${JSON.stringify(
+      `Request details - ID: ${requestId}, Headers: ${headersForLog(
         config.headers
       )}`
     );
@@ -205,6 +258,14 @@ axiosInstance.interceptors.response.use(
   },
   async (error) => {
     Logger.API?.error?.(`API Error: ${error.message}`);
+
+    const csrfRetry = csrfRetryFor(error);
+    if (csrfRetry) {
+      Logger.API?.info?.("CSRF token rejected; retrying once with a refreshed token");
+      // A failed retry has already been through this handler and shown its pop-up
+      return axiosInstance(csrfRetry);
+    }
+
     if (error.response) {
       Logger.API?.error?.(
         `Status: ${error.response.status}, URL: ${
@@ -274,42 +335,6 @@ axiosInstance.interceptors.response.use(
             });
             return Promise.reject(apiResponse);
           }
-        }
-      }
-    }
-
-    // Fallback for CSRF token failures (which might not have error.response.data in our API format)
-    // or other network errors where error.response.data is not in our standard API format.
-    if (
-      error.response?.status === 403 &&
-      error.response?.data?.errorMessage === "Invalid CSRF token"
-    ) {
-      console.log("[CSRF] Token validation failed, retrying request");
-
-      // Get the new token from the cookie
-      const cookies = document.cookie.split(";");
-      const csrfCookie = cookies.find((cookie) =>
-        cookie.trim().startsWith("XSRF-TOKEN=")
-      );
-      const newToken = csrfCookie ? csrfCookie.split("=")[1] : null;
-
-      if (newToken) {
-        console.log("[CSRF] Retrying with new token:", newToken);
-        // Update the request config with the new token
-        const config = {
-          ...error.config,
-          headers: {
-            ...error.config?.headers,
-            "X-CSRF-TOKEN": newToken,
-          },
-        };
-        // Retry the request
-        try {
-          const response = await axiosInstance(config);
-          return response;
-        } catch (retryError) {
-          console.error("[CSRF] Retry failed:", retryError);
-          // If retry fails, continue with normal error handling
         }
       }
     }
