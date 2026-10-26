@@ -1,6 +1,7 @@
 import { StoryTemplate, TemplateMetadata } from "core/types";
 import { templateApi } from "../templateApi";
 import { Logger } from "shared/logger";
+import { InvalidTemplateError } from "./templateLoadErrors";
 
 /**
  * Loader for a single template with full content (for editing)
@@ -79,7 +80,7 @@ export async function configurableTemplateLoader(templateId: string): Promise<{
         `Template ${templateId} has invalid configuration data`,
         metadata
       );
-      throw new Error(
+      throw new InvalidTemplateError(
         `Template configuration is invalid. Missing required player count information.`
       );
     }
@@ -96,12 +97,8 @@ export async function configurableTemplateLoader(templateId: string): Promise<{
       error
     );
 
-    // Throw specific errors for route error boundary to handle
-    if (error && typeof error === "object" && "status" in error) {
-      throw error; // Re-throw HTTP errors for proper error boundary handling
-    }
-
-    // Throw our own error for validation failures
+    // The route's error boundary tells the visitor what went wrong
+    // (describeTemplateError)
     throw error;
   }
 }

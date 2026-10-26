@@ -3,7 +3,7 @@
 - Add types for request and response in [api.ts](mdc:core/types/api.ts)
 - Client: if the flow requires a new client route: main.tsx collects routes from pageRoutes, adminRoutes, usersRoutes, etc. Use loaders (create separate loader files) and check any conditions/guardrails in these route files. See [routing.mdc](mdc:.cursor/rules/routing.mdc).
 - Client: use [apiClient.ts](mdc:client/src/shared/apiClient.ts) through specialized wrappers (templateApi, storiesApi) to send type-safe requests and receive type-safe responses from the server.
-- Client: Components can focus on core business logic. apiClient.ts handles non-successful responses (errors, rate limited actions, requests that failed moderation checks, etc.) centrally and automatically, including user notifications through a global Notification provider.
+- Client: Components can focus on core business logic. apiClient.ts handles non-successful responses (errors, rate limited actions, requests that failed moderation checks, etc.) centrally and automatically, including user notifications through a global Notification provider. An error response (status `error` or `invalid`) is rejected as its body plus `httpStatus`, the HTTP status, so a caller can tell a 404 from a 500.
 - Server: Add a route in an appropriate resource folder's resourceRoutes.ts file (like server/src/templates/templateRoutes.ts)
 - Server: Add a function in an appropriate service file in server/src/resource/resourceService.ts
 - Server: In the service function, use [responseUtils.ts](mdc:server/src/shared/responseUtils.ts) to generate a typed response.

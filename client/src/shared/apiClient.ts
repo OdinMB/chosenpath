@@ -259,7 +259,13 @@ axiosInstance.interceptors.response.use(
                 "An unexpected server error occurred.",
               duration: 5000,
             });
-            return Promise.reject(apiResponse);
+            // The body alone doesn't tell a missing resource (404) from a
+            // server failure (500), so the status travels with it
+            const rejection: ErrorResponse & { httpStatus: number } = {
+              ...errorResponse,
+              httpStatus: error.response.status,
+            };
+            return Promise.reject(rejection);
           }
           default: {
             // This case handles situations where error.response.data exists and has a 'status'
