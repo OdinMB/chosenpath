@@ -61,7 +61,7 @@ server/src/
 │ ├── storageUtils.ts
 │ └── ...
 ├── evals/ # Offline eval CLIs (npm run eval:*): type-checked and linted with the server, never imported by the app (ESLint rejects such imports)
-├── scripts/ # One-off maintenance CLIs the owner runs by hand (npm run backfill:*), never started by the app
+├── scripts/ # CLIs run by hand, never started by the app: one-off maintenance (npm run backfill:*) and the local dev database seed (npm run seed:dev, .context/storage.md)
 ├── config.ts
 ├── routes.ts
 

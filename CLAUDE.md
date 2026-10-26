@@ -150,7 +150,7 @@ React SPA with:
 - `/.context/deployment.md` - Deployment, Workspace Dependencies, Install commands, why the server build pins its TypeScript compiler (read before touching build scripts or tsconfig `paths`)
 - `/.context/api.md` - Current endpoints
 - `/.context/api-dev.md` - How to create new API flows between client and server
-- `/.context/storage.md` - Database schemas and file storage system
+- `/.context/storage.md` - Database schemas and file storage system, and the local development database with synthetic data (`npm run seed:dev` in `server/`, guarded to local `*_dev` databases)
 - `/.context/testing.md` - Unit and integration tests, commands for checking for ESLint and TypeScript issues
 - `/.context/design-principles.md` - Design principles for frontend
 - `/.context/ui.md` - Style guide
