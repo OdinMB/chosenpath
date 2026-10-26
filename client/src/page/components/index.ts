@@ -17,3 +17,4 @@ export { LandingProcess } from "./LandingProcess";
 export { Carousel } from "./Carousel";
 export { LandingTestimonialCarousel } from "./LandingTestimonialCarousel";
 export { Footer } from "./Footer";
+export { JoinGameForm } from "./JoinGameForm";

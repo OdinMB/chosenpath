@@ -18,7 +18,7 @@ interface LibraryLoaderData {
 }
 
 // Simple share modal component
-function ShareFilterModal({
+export function ShareFilterModal({
   isOpen,
   onClose,
   shareUrl,
@@ -51,6 +51,7 @@ function ShareFilterModal({
             type="text"
             value={shareUrl}
             readOnly
+            aria-label="Link to the filtered library"
             className="flex-1 p-2 border border-r-0 rounded-l-md text-sm bg-gray-50"
             onClick={(e) => (e.target as HTMLInputElement).select()}
           />
@@ -192,7 +193,7 @@ export function LibraryBrowser() {
             <button
               onClick={toggleShowFilters}
               className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium border border-primary-300 rounded-md text-primary-700 hover:bg-primary-50"
-              aria-label={showFilters ? "Collapse filters" : "Expand filters"}
+              aria-expanded={showFilters}
             >
               Filters
               <Icons.ChevronDown
@@ -260,6 +261,8 @@ export function LibraryBrowser() {
                             count === playerCountFilter ? null : count
                           )
                         }
+                        aria-pressed={playerCountFilter === count}
+                        aria-label={`${count} player${count !== 1 ? "s" : ""}`}
                         className={`px-1.5 py-0.5 text-xs rounded-md transition-colors ${
                           playerCountFilter === count
                             ? "bg-primary-600 text-white"
@@ -284,6 +287,7 @@ export function LibraryBrowser() {
                           <button
                             key={tag}
                             onClick={() => handleTagToggle(tag)}
+                            aria-pressed={selectedTags.includes(tag)}
                             className={`px-1.5 py-0.5 text-xs rounded-md transition-colors ${
                               selectedTags.includes(tag)
                                 ? "bg-primary-600 text-white"
@@ -315,6 +319,7 @@ export function LibraryBrowser() {
                             <button
                               key={tag}
                               onClick={() => handleTagToggle(tag)}
+                              aria-pressed={selectedTags.includes(tag)}
                               className={`px-1.5 py-0.5 text-xs rounded-md transition-colors ${
                                 selectedTags.includes(tag)
                                   ? "bg-primary-600 text-white"

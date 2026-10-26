@@ -20,11 +20,8 @@ export function CategoryTile({ image, title, mobileTitle, onClick }: CategoryTil
       className="cursor-pointer overflow-hidden bg-white flex flex-col h-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
     >
       <div className="relative overflow-hidden h-20">
-        <img
-          src={image}
-          alt={title}
-          className="category-tile-image"
-        />
+        {/* Decorative: the tile's name is its title below */}
+        <img src={image} alt="" className="category-tile-image" />
       </div>
       <div className="p-1.5 text-center font-medium text-primary-700">
         {mobileTitle ? (

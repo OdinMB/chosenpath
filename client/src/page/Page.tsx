@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { PrimaryButton } from "components/ui";
 import { TemplateMetadata } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
-import { OrDivider, Footer, CategoryTile } from "./components";
+import { OrDivider, Footer, CategoryTile, JoinGameForm } from "./components";
 import { ResumableStories } from "resources/stories/ResumableStories.js";
 import { useAuth } from "client/shared/auth/useAuth.js";
 import { config } from "../config";
@@ -266,67 +266,14 @@ export function Page() {
           <OrDivider />
 
           {/* Join game */}
-          <form onSubmit={handleJoinGame} className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex flex-row gap-3 w-full">
-                <div className="flex-grow min-w-0 relative">
-                  <input
-                    id="code"
-                    type="text"
-                    value={code}
-                    onChange={handleInputChange}
-                    className={`w-full h-10 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent bg-white text-primary shadow-sm placeholder-primary-400 ${
-                      validationError
-                        ? "border-red-300"
-                        : code.trim() && validateCodeFormat(code.trim())
-                        ? "border-green-300"
-                        : "border-primary-100"
-                    }`}
-                    placeholder="Story code"
-                    disabled={isValidating}
-                  />
-                  {code.trim() &&
-                    validateCodeFormat(code.trim()) &&
-                    !validationError && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <svg
-                          className="w-4 h-4 text-green-500"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </div>
-                    )}
-                </div>
-                <PrimaryButton
-                  type="submit"
-                  disabled={
-                    !code.trim() ||
-                    !validateCodeFormat(code.trim()) ||
-                    isValidating
-                  }
-                  className="whitespace-nowrap min-w-[90px] relative"
-                >
-                  {isValidating ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Joining...</span>
-                    </div>
-                  ) : (
-                    "Join Game"
-                  )}
-                </PrimaryButton>
-              </div>
-              {validationError && (
-                <p className="text-red-600 text-sm px-1">{validationError}</p>
-              )}
-            </div>
-          </form>
+          <JoinGameForm
+            code={code}
+            isCodeValid={validateCodeFormat(code)}
+            isValidating={isValidating}
+            validationError={validationError}
+            onCodeChange={handleInputChange}
+            onSubmit={handleJoinGame}
+          />
         </div>
 
         <Footer />
