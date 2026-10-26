@@ -2,6 +2,9 @@ import { getDb } from "../shared/db.js";
 import { Logger } from "../shared/logger.js";
 import { PlayerSlot } from "core/types/index.js";
 
+/** Who started a story: a signed-in user, or someone without an account. */
+export type StoryOrigin = "account" | "anonymous";
+
 // Interface for player info retrieved from DB
 export interface StoryPlayerDbInfo {
   storyId: string;
@@ -331,6 +334,19 @@ class StoryDbService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Whether a signed-in user created the story ("account") or not
+   * ("anonymous"). A story without a row reads as anonymous, the stricter side.
+   * Uncached: one primary-key lookup.
+   */
+  async getStoryOrigin(storyId: string): Promise<StoryOrigin> {
+    const result = await getDb().query<{ creator_id: string | null }>(
+      "SELECT creator_id FROM stories WHERE id = $1",
+      [storyId]
+    );
+    return result.rows[0]?.creator_id ? "account" : "anonymous";
   }
 
   async getStoryPlayerCodes(

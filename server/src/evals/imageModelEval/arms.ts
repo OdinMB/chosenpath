@@ -1,9 +1,7 @@
 import { IMAGE_QUALITIES, IMAGE_SIZES } from "core/types/index.js";
 import type { ImageQuality, ImageSize } from "core/types/index.js";
-import {
-  effectiveImageQuality,
-  type ImageApiUsage,
-} from "../../images/openaiImageClient.js";
+import { effectiveImageQuality } from "../../images/openaiImageClient.js";
+import { imageCostFromUsage, imagePricesFor } from "../../spend/prices.js";
 import type { CallSite } from "./cases.js";
 
 /*
@@ -90,41 +88,8 @@ export function coverPortraitArms(callSite: Exclude<CallSite, "beat">): Arm[] {
   return COVER_PORTRAIT_ARMS[callSite];
 }
 
-/** USD per 1M tokens */
-type Prices = {
-  textIn: number;
-  textCached: number;
-  imageIn: number;
-  imageCached: number;
-  imageOut: number;
-};
-
-const GPT_IMAGE_1_5_PRICES: Prices = {
-  textIn: 5,
-  textCached: 1.25,
-  imageIn: 8,
-  imageCached: 2,
-  imageOut: 32,
-};
-
-// gpt-image-2, gpt-image-2.5-flare and gpt-image-2.5-sunburst share these rates
-const GPT_IMAGE_2_PRICES: Prices = {
-  textIn: 5,
-  textCached: 1.25,
-  imageIn: 8,
-  imageCached: 2,
-  imageOut: 30,
-};
-
-function pricesFor(model: string): Prices {
-  if (model.startsWith("gpt-image-1.5")) {
-    return GPT_IMAGE_1_5_PRICES;
-  }
-  if (model.startsWith("gpt-image-2")) {
-    return GPT_IMAGE_2_PRICES;
-  }
-  throw new Error(`No image prices known for model ${model}`);
-}
+// The per-1M-token image rates are the app's own (spend/prices.ts); the
+// usage cost is re-exported under its old name at the end
 
 type TokenTable = Partial<Record<ImageQuality, number>>;
 
@@ -182,7 +147,7 @@ export function estimateCallCost(
   promptChars: number,
   refCount: number
 ): number {
-  const prices = pricesFor(arm.model);
+  const prices = imagePricesFor(arm.model);
   const textTokens = Math.ceil(promptChars / 4);
   const imageTokens = refCount * ESTIMATED_TOKENS_PER_REFERENCE;
   const outputTokens = estimateOutputTokens(arm.model, arm.quality, arm.size);
@@ -195,22 +160,7 @@ export function estimateCallCost(
 }
 
 /**
- * Actual cost from reported usage. Cached input tokens, when the API reports
- * them, are billed at the cached rate; they are counted against text tokens
- * first because the API does not say which kind they are and the text
- * discount is the smaller one (conservative).
+ * Actual cost from reported usage (spend/prices.ts): cached input tokens at
+ * the cached rate, counted against text tokens first (conservative).
  */
-export function costFromUsage(model: string, usage: ImageApiUsage): number {
-  const prices = pricesFor(model);
-  const cached = usage.cachedInputTokens ?? 0;
-  const cachedText = Math.min(cached, usage.inputTextTokens);
-  const cachedImage = Math.min(cached - cachedText, usage.inputImageTokens);
-  return (
-    ((usage.inputTextTokens - cachedText) * prices.textIn +
-      cachedText * prices.textCached +
-      (usage.inputImageTokens - cachedImage) * prices.imageIn +
-      cachedImage * prices.imageCached +
-      usage.outputTokens * prices.imageOut) /
-    1_000_000
-  );
-}
+export { imageCostFromUsage as costFromUsage };

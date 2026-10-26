@@ -43,6 +43,7 @@ import { getDb } from "shared/db.js";
 import { IMAGE_GENERATION_STORY_COVER_QUALITY } from "server/config.js";
 import { gameQueueProcessor } from "../game/services/GameQueueProcessor.js";
 import { startBackgroundImageGeneration } from "../game/services/StoryImageJobs.js";
+import { imagesAllowedFor } from "server/spend/spendLedger.js";
 
 export class StoryCreationService {
   private contentFilter: ContentFilterService;
@@ -66,7 +67,7 @@ export class StoryCreationService {
 
     playerSlots.forEach((slot) => {
       // Generate a random 6-character alphanumeric code (0-9, A-Z)
-      // NOTE: If you change this format, also update validation in client/src/page/Page.tsx (validateCodeFormat function)
+      // NOTE: If you change this format, also update validation in client/src/page/utils/joinByCode.ts (isStoryCodeFormat)
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
       codes[slot] = code;
     });
@@ -351,6 +352,7 @@ export class StoryCreationService {
             {
               generate: (story, request) =>
                 this.aiImageGenerator.generateBeatImage(story, request),
+              mayGenerate: (gameId) => imagesAllowedFor(gameId),
               enqueue: (operation) => gameQueueProcessor.addOperation(operation),
             },
             storyId,

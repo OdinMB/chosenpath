@@ -9,6 +9,8 @@ import { GameHandler } from "game/GameHandler.js";
 import { initializeDatabase, closeDatabase } from "./shared/db.js";
 import { cleanupExpiredSessions } from "./users/userService.js";
 import { CSRF_COOKIE, verifyCsrfToken } from "./shared/csrf.js";
+import { trustProxyHops } from "./shared/clientAddress.js";
+import { spendCeilings } from "./spend/spendLedger.js";
 import cookieParser from "cookie-parser";
 import crypto from "crypto";
 dotenv.config();
@@ -37,6 +39,9 @@ async function startServer() {
 
     // Stops here, before anything listens, on a retired (gpt-4.x) or unsupported text model
     productionTextModels();
+    // Likewise on a TRUST_PROXY or spend-ceiling value that is not a valid setting
+    const hops = trustProxyHops();
+    spendCeilings();
 
     // Initialize database
     await initializeDatabase();
@@ -46,6 +51,8 @@ async function startServer() {
     setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
 
     const app = express();
+    // With a hop count it governs only req.protocol: limits read clientAddress.ts, never req.ip
+    app.set("trust proxy", hops ?? true);
 
     // Request logging middleware for debugging
     app.use((req, res, next) => {
@@ -77,7 +84,13 @@ async function startServer() {
         },
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         credentials: true,
-        allowedHeaders: ["Content-Type", "X-CSRF-TOKEN", "X-XSRF-TOKEN"],
+        // X-Forwarded-For: the admin address check sends a forged entry (/admin/system)
+        allowedHeaders: [
+          "Content-Type",
+          "X-CSRF-TOKEN",
+          "X-XSRF-TOKEN",
+          "X-Forwarded-For",
+        ],
         exposedHeaders: ["X-CSRF-TOKEN", "X-XSRF-TOKEN"],
       })
     );
@@ -120,7 +133,6 @@ async function startServer() {
     // Regular API routes
     app.use("", router);
 
-    app.set("trust proxy", true);
     const server = http.createServer(app);
 
     // Create a single GameHandler instance to be used by the WebSocket server

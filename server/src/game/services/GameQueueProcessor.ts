@@ -18,6 +18,7 @@ import { pregenerationService } from "./PregenerationService.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { storyDbService } from "server/stories/StoryDbService.js";
+import { imagesAllowedFor } from "server/spend/spendLedger.js";
 import { CharacterIdentity } from "core/types/index.js";
 import { noteBroadcast, notePregenerationFinished } from "./turnTimings.js";
 import { TURN_RESENDS } from "./retryOnce.js";
@@ -108,6 +109,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
     this.imageJobDeps = {
       generate: (story, request) =>
         aiImageGenerator.generateBeatImage(story, request),
+      mayGenerate: (gameId) => imagesAllowedFor(gameId),
       enqueue: (operation) => this.addOperation(operation),
     };
   }

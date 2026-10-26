@@ -7,6 +7,7 @@ import {
   VerifyCodeResponse,
   ErrorResponse,
   ClientStoryState,
+  RateLimitInfo,
 } from "core/types/index.js";
 import { connectionManager } from "./ConnectionManager.js";
 import {
@@ -15,10 +16,14 @@ import {
   GAME_SESSION_CONFIG,
 } from "core/config.js";
 import {
+  addressKey,
   checkRateLimit,
   incrementRateLimit,
-  getClientIP,
+  limitFailures,
 } from "shared/rateLimiter.js";
+import { choiceLimitKey } from "shared/limitPolicy.js";
+import { socketAddress } from "shared/clientAddress.js";
+import { storyDbService } from "server/stories/StoryDbService.js";
 import { Logger } from "shared/logger.js";
 import { API_CONFIG } from "../config.js";
 
@@ -118,84 +123,73 @@ export class GameWebSocketServer {
     });
   }
 
+  /** Tells the client its request was rate limited, under the action's response type. */
+  private emitRateLimited(
+    socket: Socket,
+    action: RateLimitedAction,
+    rateLimit: RateLimitInfo,
+    requestId?: string
+  ): void {
+    Logger.Websocket.log(`[WebSocket] Rate limited for ${action}:`, {
+      socketId: socket.id,
+      timeRemaining: rateLimit.timeRemaining,
+    });
+    socket.emit("response", {
+      type: `${action}_response`,
+      status: ResponseStatus.RATE_LIMITED,
+      requestId: requestId || crypto.randomUUID(),
+      timestamp: Date.now(),
+      rateLimit: {
+        action,
+        timeRemaining: rateLimit.timeRemaining,
+        maxRequests: rateLimit.maxRequests,
+        windowMs: rateLimit.windowMs,
+        requestsRemaining: rateLimit.requestsRemaining,
+      },
+    });
+  }
+
   /**
-   * Checks if a request is rate limited and sends a response if it is
-   * @param socket The client socket
-   * @param action The action being rate limited
-   * @param requestId Optional request ID to include in response
+   * Counts the request against the key's limit for the action, or, when the
+   * key is limited, answers the client instead.
    * @returns True if the request is rate limited, false otherwise
    */
   private checkAndHandleRateLimit(
     socket: Socket,
+    key: string,
     action: RateLimitedAction,
     requestId?: string
   ): boolean {
-    // Get client IP address using the helper function
-    const ip = getClientIP(socket);
-    if (!ip) {
-      // Handle cases where IP might not be available
-      Logger.Websocket.warn(
-        "[WebSocket] Could not determine client IP for rate limiting",
-        {
-          socketId: socket.id,
-        }
-      );
-      // Potentially allow or deny, based on policy for unknown IPs
-      return false; // Or true, depending on strictness
-    }
-
-    // Enhanced debugging for rate limit tracking
-    console.log(`[WebSocket] Rate limit check for ${action}:`, {
-      clientIP: ip,
-      socketId: socket.id,
-      action,
-    });
-
-    // console.log("[WebSocket] Client connection headers:", {
-    //   address: socket.handshake.address,
-    //   xForwardedFor: socket.handshake.headers["x-forwarded-for"],
-    //   xRealIp: socket.handshake.headers["x-real-ip"],
-    // });
-
-    // Check if rate limited
-    const limitStatus = checkRateLimit(ip, action);
-
-    // Log rate limit status for debugging
-    console.log(`[WebSocket] Rate limit status for ${ip} [${action}]:`, {
-      isLimited: limitStatus.isLimited,
-      requestsRemaining: limitStatus.requestsRemaining,
-      timeRemaining: `${Math.round(limitStatus.timeRemaining / 1000)}s`,
-      maxRequests: limitStatus.maxRequests,
-    });
-
+    const limitStatus = checkRateLimit(key, action);
     if (limitStatus.isLimited) {
-      Logger.Websocket.log(`[WebSocket] Rate limited for ${action}:`, {
-        ip,
-        timeRemaining: limitStatus.timeRemaining,
-        requestsRemaining: limitStatus.requestsRemaining,
-      });
-
-      // Send rate limit response
-      socket.emit("response", {
-        type: `${action}_response`,
-        status: ResponseStatus.RATE_LIMITED,
-        requestId: requestId || crypto.randomUUID(),
-        timestamp: Date.now(),
-        rateLimit: {
-          action,
-          timeRemaining: limitStatus.timeRemaining,
-          maxRequests: limitStatus.maxRequests,
-          windowMs: limitStatus.windowMs,
-          requestsRemaining: limitStatus.requestsRemaining,
-        },
-      });
-
+      this.emitRateLimited(socket, action, limitStatus, requestId);
       return true;
     }
-
-    // Increment counter for this action
-    incrementRateLimit(ip, action);
+    incrementRateLimit(key, action);
     return false;
+  }
+
+  /**
+   * The key a choice, character pick or turn retry counts against: the seat
+   * in a story an account started, else the address (limitPolicy.ts). The
+   * address too when the story's origin can't be read.
+   */
+  private async choiceKey(socket: Socket): Promise<string> {
+    const address = socketAddress(socket);
+    const seat = connectionManager.getPlayerBySocket(socket.id);
+    if (!seat) {
+      return choiceLimitKey(undefined, undefined, address);
+    }
+    try {
+      const origin = await storyDbService.getStoryOrigin(seat.storyId);
+      return choiceLimitKey(origin, seat, address);
+    } catch (error) {
+      Logger.Websocket.error(
+        "[WebSocket] Could not read the story's origin; counting the choice by address",
+        error
+      );
+      return choiceLimitKey(undefined, seat, address);
+    }
   }
 
   private setupSocketServer(): void {
@@ -289,6 +283,7 @@ export class GameWebSocketServer {
             if (
               this.checkAndHandleRateLimit(
                 socket,
+                await this.choiceKey(socket),
                 "make_choice",
                 data.requestId
               )
@@ -352,19 +347,25 @@ export class GameWebSocketServer {
               userId: data.userId,
             });
 
-            // Check rate limiting
-            if (
-              this.checkAndHandleRateLimit(
+            // Only a code that names no story counts against the limit
+            const outcome = await limitFailures(
+              addressKey(socketAddress(socket)),
+              "verify_code",
+              async () => {
+                const verified = await connectionManager.verifyCode(data.code);
+                return { succeeded: verified.state !== null, value: verified };
+              }
+            );
+            if (outcome.limited) {
+              this.emitRateLimited(
                 socket,
                 "verify_code",
+                outcome.rateLimit,
                 data.requestId
-              )
-            ) {
+              );
               return;
             }
-
-            // Get verification result from ConnectionManager
-            const result = await connectionManager.verifyCode(data.code);
+            const result = outcome.value;
 
             if (result.state) {
               // Add this connection to the player's active connections
@@ -471,6 +472,7 @@ export class GameWebSocketServer {
             if (
               this.checkAndHandleRateLimit(
                 socket,
+                await this.choiceKey(socket),
                 "make_choice",
                 data.requestId
               )
@@ -508,21 +510,35 @@ export class GameWebSocketServer {
       );
 
       // A player still on a story's page whose connection came back (GameHandler.rejoinGame);
-      // it looks up a player's code, so it counts against verify_code's limit
+      // it looks up a player's code, so a code that names no story counts against verify_code's limit
       socket.on(
         "rejoin_session",
         async (data: { playerCode?: string | null; requestId?: string } = {}) => {
           try {
-            if (
-              this.checkAndHandleRateLimit(socket, "verify_code", data.requestId)
-            ) {
+            const outcome = await limitFailures(
+              addressKey(socketAddress(socket)),
+              "verify_code",
+              async () => {
+                const rejoined = await this.gameHandler.rejoinGame(
+                  socket,
+                  data.playerCode
+                );
+                return {
+                  succeeded: !data.playerCode || rejoined !== null,
+                  value: rejoined,
+                };
+              }
+            );
+            if (outcome.limited) {
+              this.emitRateLimited(
+                socket,
+                "verify_code",
+                outcome.rateLimit,
+                data.requestId
+              );
               return;
             }
-
-            const gameId = await this.gameHandler.rejoinGame(
-              socket,
-              data.playerCode
-            );
+            const gameId = outcome.value;
             if (gameId) {
               this.broadcastActivePlayersUpdate(gameId);
             }
@@ -550,7 +566,12 @@ export class GameWebSocketServer {
       socket.on("retry_turn", async (data: { requestId?: string } = {}) => {
         try {
           if (
-            this.checkAndHandleRateLimit(socket, "make_choice", data.requestId)
+            this.checkAndHandleRateLimit(
+              socket,
+              await this.choiceKey(socket),
+              "make_choice",
+              data.requestId
+            )
           ) {
             return;
           }

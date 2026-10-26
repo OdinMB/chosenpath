@@ -1,278 +1,150 @@
-// Rate limiter implementation for limiting access to API endpoints
+import type { Request } from "express";
 import { RateLimitedAction, RATE_LIMITS } from "core/config.js";
 import { RateLimitInfo } from "core/types/api.js";
-import { Socket } from "socket.io";
 import { Logger } from "shared/logger.js";
-import { Request } from "express";
+import { requestAddress } from "shared/clientAddress.js";
 
-// RateLimitRecord tracks requests for a specific IP and action
-interface RateLimitRecord {
+/*
+ * Counts requests per key and action in memory, in fixed windows
+ * (RATE_LIMITS in core/config.ts). A key names who is counted: an address, an
+ * account or a story seat, built below so the kinds never share a count. Who
+ * is counted for what is decided in limitPolicy.ts. Log lines name the key's
+ * kind and the action, never the key: addresses and account ids stay out of
+ * the logs (the Privacy page, "IP Address").
+ */
+
+/** All requests whose address can't be read share this one bucket. */
+export function addressKey(address: string | null): string {
+  return `address:${address ?? "unknown"}`;
+}
+
+export function accountKey(userId: string): string {
+  return `account:${userId}`;
+}
+
+export function seatKey(storyId: string, playerSlot: string): string {
+  return `seat:${storyId}:${playerSlot}`;
+}
+
+function kindOf(key: string): string {
+  const colon = key.indexOf(":");
+  return colon > 0 ? key.slice(0, colon) : "unknown";
+}
+
+interface LimitWindow {
   count: number;
   resetAt: number;
 }
 
-// Store rate limit records by IP and action type
-const rateLimits: Record<string, Record<string, RateLimitRecord>> = {};
+const windows = new Map<string, Map<RateLimitedAction, LimitWindow>>();
 
-/**
- * Normalizes IP addresses to handle various formats
- * @param ip The IP address to normalize
- * @returns Normalized IP address
- */
-function normalizeIP(ip: string): string {
-  // Clean up IPv6 prefix for local IPv4 addresses
-  // (socket.io sometimes sends '::ffff:127.0.0.1' for localhost)
-  if (ip.startsWith("::ffff:")) {
-    return ip.substring(7);
-  }
-
-  // Handle case when IP includes port
-  const colonIndex = ip.lastIndexOf(":");
-  if (colonIndex !== -1 && !ip.includes(".", colonIndex)) {
-    return ip.substring(0, colonIndex);
-  }
-
-  return ip;
-}
-
-// Clean expired records every 5 minutes
+// Drops ended windows every 5 minutes; unref'd, so it never keeps the process alive
 setInterval(() => {
   const now = Date.now();
-
-  for (const ip in rateLimits) {
-    for (const action in rateLimits[ip]) {
-      if (rateLimits[ip][action].resetAt < now) {
-        delete rateLimits[ip][action];
-      }
+  for (const [key, actions] of windows) {
+    for (const [action, window] of actions) {
+      if (window.resetAt <= now) actions.delete(action);
     }
-
-    // Clean up empty IP entries
-    if (Object.keys(rateLimits[ip]).length === 0) {
-      delete rateLimits[ip];
-    }
+    if (actions.size === 0) windows.delete(key);
   }
-}, 5 * 60 * 1000);
+}, 5 * 60 * 1000).unref();
 
-/**
- * Check if a request is rate limited
- * @param ip The client's IP address
- * @param action The action type (MAKE_CHOICE or NEW_STORY)
- * @returns Object with isLimited flag and timeRemaining in ms
- */
+/** The key's running window for the action, a fresh one once the last has ended. */
+function currentWindow(
+  key: string,
+  action: RateLimitedAction,
+  now: number
+): LimitWindow {
+  let actions = windows.get(key);
+  if (!actions) {
+    actions = new Map();
+    windows.set(key, actions);
+  }
+  let window = actions.get(action);
+  if (!window || window.resetAt <= now) {
+    window = { count: 0, resetAt: now + RATE_LIMITS[action].windowMs };
+    actions.set(action, window);
+  }
+  return window;
+}
+
+/** Whether the key has used up the action's requests in its current window. */
 export function checkRateLimit(
-  ip: string,
+  key: string,
   action: RateLimitedAction
 ): RateLimitInfo {
-  // Extract IP from request
-  // const ip = req.ip || req.socket.remoteAddress || "unknown";
-  const normalizedIp = normalizeIP(ip);
-
   const now = Date.now();
-  const limitConfig = RATE_LIMITS[action];
-
-  // Initialize rate limit records for this IP if they don't exist
-  if (!rateLimits[normalizedIp]) {
-    rateLimits[normalizedIp] = {};
-  }
-
-  // Initialize or reset record if expired
-  if (
-    !rateLimits[normalizedIp][action] ||
-    rateLimits[normalizedIp][action].resetAt < now
-  ) {
-    rateLimits[normalizedIp][action] = {
-      count: 0,
-      resetAt: now + limitConfig.windowMs,
-    };
-  }
-
-  // Get current record
-  const record = rateLimits[normalizedIp][action];
-
-  // Calculate requests remaining and time remaining
-  const requestsRemaining = Math.max(0, limitConfig.maxRequests - record.count);
-  const timeRemaining = Math.max(0, record.resetAt - now);
-
-  const result = {
-    isLimited: record.count >= limitConfig.maxRequests,
-    timeRemaining,
-    requestsRemaining,
-    maxRequests: limitConfig.maxRequests,
-    windowMs: limitConfig.windowMs,
+  const { maxRequests, windowMs } = RATE_LIMITS[action];
+  const window = currentWindow(key, action, now);
+  const info: RateLimitInfo = {
+    isLimited: window.count >= maxRequests,
+    timeRemaining: Math.max(0, window.resetAt - now),
+    requestsRemaining: Math.max(0, maxRequests - window.count),
+    maxRequests,
+    windowMs,
   };
-
   Logger.Route.log(
-    `[RateLimiter] Rate limit status for ${normalizedIp} - ${action}: ` +
-      `Limited: ${result.isLimited}, ` +
-      `Remaining: ${result.requestsRemaining}/${result.maxRequests}, ` +
-      `Time left: ${Math.ceil(result.timeRemaining / 1000)}s`
+    `[RateLimiter] ${kindOf(key)} ${action}: limited ${info.isLimited}, ` +
+      `remaining ${info.requestsRemaining}/${maxRequests}, ` +
+      `resets in ${Math.ceil(info.timeRemaining / 1000)}s`
   );
-
-  return result;
+  return info;
 }
 
-/**
- * Wrapper for checkRateLimit that accepts an Express Request object.
- * @param req The Express request object
- * @param action The action type
- * @returns RateLimitInfo
- */
+/** Counts one request of the key; a key already at its limit stays there. */
+export function incrementRateLimit(
+  key: string,
+  action: RateLimitedAction
+): void {
+  const { maxRequests } = RATE_LIMITS[action];
+  const window = currentWindow(key, action, Date.now());
+  if (window.count < maxRequests) {
+    window.count += 1;
+  }
+  Logger.Route.log(
+    `[RateLimiter] ${kindOf(key)} ${action}: ${window.count}/${maxRequests} used`
+  );
+}
+
+/** The request's address limit for the action (login, the editor's AI and image routes, sign-up). */
 export function checkRateLimitForRequest(
-  req: Request,
+  req: Pick<Request, "socket" | "headers">,
   action: RateLimitedAction
 ): RateLimitInfo {
-  const ip = req.ip || req.socket.remoteAddress || "unknown";
-  return checkRateLimit(ip, action);
+  return checkRateLimit(addressKey(requestAddress(req)), action);
 }
 
-/**
- * Increment the request count for an IP and action
- * @param ip The client's IP address
- * @param action The action type (MAKE_CHOICE or NEW_STORY)
- */
-export function incrementRateLimit(
-  ip: string,
-  action: RateLimitedAction
-): void {
-  // Extract IP from request
-  // const ip = req.ip || req.socket.remoteAddress || "unknown";
-  const normalizedIp = normalizeIP(ip);
-  Logger.Route.log(
-    `[RateLimiter] Incrementing rate limit for ${normalizedIp} - ${action}`
-  );
-
-  const limitStatus = checkRateLimit(ip, action);
-
-  // If not already limited, increment the count
-  if (!limitStatus.isLimited) {
-    rateLimits[normalizedIp][action].count += 1;
-    Logger.Route.log(
-      `[RateLimiter] Incremented rate limit for ${normalizedIp} - ${action}: ${rateLimits[normalizedIp][action].count}/${limitStatus.maxRequests}`
-    );
-  } else {
-    Logger.Route.log(
-      `[RateLimiter] Rate limit already exceeded for ${normalizedIp} - ${action}, not incrementing`
-    );
-  }
-}
-
-/**
- * Wrapper for incrementRateLimit that accepts an Express Request object.
- * @param req The Express request object
- * @param action The action type
- */
 export function incrementRateLimitForRequest(
-  req: Request,
+  req: Pick<Request, "socket" | "headers">,
   action: RateLimitedAction
 ): void {
-  const ip = req.ip || req.socket.remoteAddress || "unknown";
-  incrementRateLimit(ip, action);
+  incrementRateLimit(addressKey(requestAddress(req)), action);
 }
 
-/**
- * Get rate limit info for an IP address
- * @param ip The IP address
- * @returns Object containing rate limit info for each action type
- */
-export function getRateLimitInfo(ip: string): Record<
-  RateLimitedAction,
-  {
-    requestsRemaining: number;
-    maxRequests: number;
-    resetsAt: number;
-  }
-> {
-  ip = normalizeIP(ip);
-  Logger.Route.log(`[RateLimiter] Getting rate limit info for ${ip}`);
+/** An attempt that can fail, such as a code guess; only failures are counted. */
+export type Attempt<T> = { succeeded: boolean; value: T };
 
-  const result: Record<RateLimitedAction, {
-    requestsRemaining: number;
-    maxRequests: number;
-    resetsAt: number;
-  }> = {} as Record<RateLimitedAction, {
-    requestsRemaining: number;
-    maxRequests: number;
-    resetsAt: number;
-  }>;
-  const now = Date.now();
-
-  // For each action type, get the current status
-  for (const action of Object.keys(RATE_LIMITS) as RateLimitedAction[]) {
-    const limitConfig = RATE_LIMITS[action];
-    const record = rateLimits[ip]?.[action];
-
-    if (record && record.resetAt > now) {
-      result[action] = {
-        requestsRemaining: Math.max(0, limitConfig.maxRequests - record.count),
-        maxRequests: limitConfig.maxRequests,
-        resetsAt: record.resetAt,
-      };
-      Logger.Route.log(
-        `[RateLimiter] Rate limit info for ${ip} - ${action}: ` +
-          `Remaining: ${result[action].requestsRemaining}/${result[action].maxRequests}, ` +
-          `Resets at: ${new Date(result[action].resetsAt).toISOString()}`
-      );
-    } else {
-      result[action] = {
-        requestsRemaining: limitConfig.maxRequests,
-        maxRequests: limitConfig.maxRequests,
-        resetsAt: now + limitConfig.windowMs,
-      };
-      Logger.Route.log(
-        `[RateLimiter] No active rate limit for ${ip} - ${action}, ` +
-          `Available: ${result[action].maxRequests} requests`
-      );
-    }
-  }
-
-  return result;
-}
+export type LimitedAttempt<T> =
+  | { limited: true; rateLimit: RateLimitInfo }
+  | { limited: false; value: T };
 
 /**
- * Get the rate limit configuration
+ * Runs the attempt unless the key is already limited, and counts it only when
+ * it fails: a class joining from one address by valid codes is never
+ * limited, while someone guessing codes is. A thrown error is not counted.
  */
-export function getRateLimitConfig() {
-  Logger.Route.log("[RateLimiter] Getting rate limit configuration");
-  return { ...RATE_LIMITS };
-}
-
-/**
- * Gets the real client IP address accounting for proxies and load balancers
- * @param socket The client socket
- * @returns The normalized client IP address
- */
-export function getClientIP(socket: Socket): string {
-  // Try to get IP from standard proxy headers first
-  const forwardedFor = socket.handshake.headers["x-forwarded-for"];
-  if (forwardedFor) {
-    // Parse the x-forwarded-for header which can be either an array or string
-    let clientIP: string;
-
-    if (Array.isArray(forwardedFor)) {
-      // If it's an array, take the first entry
-      clientIP = forwardedFor[0];
-    } else {
-      // If it's a string, split by comma and take the leftmost IP (client's original IP)
-      const ips = forwardedFor.split(",");
-      clientIP = ips[0].trim();
-    }
-
-    console.log(
-      `[RateLimiter] Extracted client IP: ${clientIP} from x-forwarded-for: ${forwardedFor}`
-    );
-    return normalizeIP(clientIP);
+export async function limitFailures<T>(
+  key: string,
+  action: RateLimitedAction,
+  attempt: () => Promise<Attempt<T>>
+): Promise<LimitedAttempt<T>> {
+  const rateLimit = checkRateLimit(key, action);
+  if (rateLimit.isLimited) {
+    return { limited: true, rateLimit };
   }
-
-  // Try other common proxy headers
-  const realIP = socket.handshake.headers["x-real-ip"];
-  if (realIP) {
-    const clientIP = Array.isArray(realIP) ? realIP[0] : realIP;
-    console.log(`[RateLimiter] Using x-real-ip: ${clientIP}`);
-    return normalizeIP(clientIP);
+  const outcome = await attempt();
+  if (!outcome.succeeded) {
+    incrementRateLimit(key, action);
   }
-
-  // Fall back to direct socket address if no proxy headers exist
-  const directIP = socket.handshake.address || "unknown";
-  console.log(`[RateLimiter] Using direct IP: ${directIP}`);
-  return normalizeIP(directIP);
+  return { limited: false, value: outcome.value };
 }

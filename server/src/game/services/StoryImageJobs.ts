@@ -25,6 +25,11 @@ export type ImageOutcomeOperation =
 export type StoryImageJobDeps = {
   /** Generates and writes one image; rejects when nothing was written. */
   generate: (story: Story, request: ImageRequest) => Promise<void>;
+  /**
+   * Whether the story may get new images now: false once its kind of story
+   * has reached today's spend ceiling (spendLedger.imagesAllowedFor). Never rejects.
+   */
+  mayGenerate: (gameId: string) => Promise<boolean>;
   /** Hands an outcome to the game queue, which applies it in order. */
   enqueue: (operation: ImageOutcomeOperation) => Promise<unknown>;
 };
@@ -56,8 +61,10 @@ export function collectLatestBeatImageRequests(story: Story): ImageRequest[] {
 /**
  * Starts one generation per request and enqueues each outcome. With
  * `attachToLibrary` off (covers, player portraits), a written image needs no
- * bookkeeping; a failure is still recorded. Resolves once every outcome is
- * enqueued; callers normally do not wait for it.
+ * bookkeeping; a failure is still recorded. Over the spend ceiling nothing is
+ * generated and every request is recorded as failed, so the reader hides its
+ * slot as for a refused image. Resolves once every outcome is enqueued;
+ * callers normally do not wait for it.
  */
 export async function startBackgroundImageGeneration(
   deps: StoryImageJobDeps,
@@ -66,12 +73,21 @@ export async function startBackgroundImageGeneration(
   requests: ImageRequest[],
   options: { attachToLibrary: boolean }
 ): Promise<void> {
+  if (requests.length === 0) return;
+  const allowed = await deps.mayGenerate(gameId);
+  if (!allowed) {
+    Logger.Queue.log(
+      `[StoryImageJobs] Today's spend ceiling is reached; skipping ${requests.length} image(s) for ${gameId}`
+    );
+  }
   await Promise.all(
     requests.map(async (request) => {
       let written = false;
       try {
-        await deps.generate(story, request);
-        written = true;
+        if (allowed) {
+          await deps.generate(story, request);
+          written = true;
+        }
       } catch (error) {
         Logger.Queue.error(
           `[StoryImageJobs] Image generation failed for ${gameId} (${request.id}):`,

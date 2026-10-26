@@ -134,6 +134,73 @@ export interface StoryStatusInfo {
 export interface CheckStoryStatusResponse
   extends SuccessResponse<StoryStatusInfo> {}
 
+/** GET /stories/:code/exists: whether a seat code names a story (never which one). */
+export interface CodeExistsInfo {
+  exists: boolean;
+}
+export interface CodeExistsResponse extends SuccessResponse<CodeExistsInfo> {}
+
+/**
+ * The 503's errorMessage when a story start is refused because today's AI
+ * spend ceiling for its kind of story is reached (server/src/spend/).
+ */
+export const SPEND_CEILING_MESSAGE =
+  "New stories are paused until tomorrow: today's budget is used up. Stories already running continue, without new images.";
+
+/**
+ * Admin "System" page
+ */
+
+/**
+ * GET /admin/system/connection: how the server sees the caller's own request,
+ * for setting TRUST_PROXY (the number of proxies in front of the app).
+ */
+export interface ConnectionReport {
+  /** The address the per-address limits count by; null when it can't be read */
+  address: string | null;
+  /** The configured hop count; null when TRUST_PROXY is not set */
+  trustProxy: number | null;
+  /** The socket's address: the nearest proxy, or the caller when there is none */
+  connectionAddress: string | null;
+  /** The X-Forwarded-For chain as sent, left to right */
+  forwardedFor: string[];
+  /** For each hop count from 0 to the chain's length, the address it would give */
+  candidates: { hops: number; address: string | null }[];
+  host: string | null;
+  protocol: string;
+}
+
+/** Who an AI call's cost is booked to: stories without an account, with one, or neither (editor, filter). */
+export type SpendBucket = "anonymous" | "account" | "other";
+export const SPEND_BUCKETS: readonly SpendBucket[] = [
+  "anonymous",
+  "account",
+  "other",
+];
+
+export interface SpendBucketTotal {
+  usd: number;
+  textCalls: number;
+  imageCalls: number;
+}
+
+/** GET /admin/system/spend: today's and this month's AI spend per bucket (UTC days). */
+export interface SpendTotals {
+  /** Today, UTC, as YYYY-MM-DD */
+  today: string;
+  /** The first day of this month, UTC, as YYYY-MM-DD */
+  monthStart: string;
+  buckets: Record<
+    SpendBucket,
+    {
+      today: SpendBucketTotal;
+      month: SpendBucketTotal;
+      /** US$ a day; null when no ceiling is set (recording only) */
+      ceilingUsdPerDay: number | null;
+    }
+  >;
+}
+
 /**
  * User basics
  */

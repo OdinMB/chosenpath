@@ -1,4 +1,4 @@
-import { Router, Request } from "express";
+import { Router, Request, Response } from "express";
 import type * as Express from "express";
 import { Logger } from "shared/logger.js";
 import {
@@ -8,12 +8,19 @@ import {
 } from "shared/responseUtils.js";
 import { storyCreationService } from "./StoryCreationService.js";
 import {
-  checkRateLimitForRequest,
-  incrementRateLimitForRequest,
+  addressKey,
+  checkRateLimit,
+  incrementRateLimit,
+  limitFailures,
 } from "shared/rateLimiter.js";
+import { storyStartLimit, type LimitTarget } from "shared/limitPolicy.js";
+import { requestAddress } from "shared/clientAddress.js";
+import { isOverCeiling } from "server/spend/spendLedger.js";
 import {
+  CodeExistsInfo,
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
+  SPEND_CEILING_MESSAGE,
   UpdateStoryStatusRequest,
 } from "core/types/api.js";
 import { PlayerCount, isStoryCategory, kidAgesFrom } from "core/types/index.js";
@@ -24,6 +31,31 @@ import { storyDbService } from "./StoryDbService.js";
 
 const router = Router();
 
+/**
+ * Lets a story start through, or answers its refusal: 503 once today's spend
+ * ceiling for its kind of story (signed in or not) is reached, 429 once its
+ * start limit is (limitPolicy.ts). Returns the limit to count the start
+ * against, or null after a refusal; a refused start counts nothing.
+ */
+async function admitStoryStart(
+  req: Request,
+  res: Response,
+  generateImages: boolean,
+  requestId: string
+): Promise<LimitTarget | null> {
+  if (await isOverCeiling(req.user ? "account" : "anonymous")) {
+    sendError(res, SPEND_CEILING_MESSAGE, 503, requestId);
+    return null;
+  }
+  const limit = storyStartLimit(req.user?.id, generateImages, requestAddress(req));
+  const rateLimit = checkRateLimit(limit.key, limit.action);
+  if (rateLimit.isLimited) {
+    sendRateLimited(res, rateLimit, requestId);
+    return null;
+  }
+  return limit;
+}
+
 // Create a new story
 router.post(
   "/stories",
@@ -31,15 +63,17 @@ router.post(
   async (req: Request, res) => {
     try {
       const requestId = req.body?.requestId || "unknown";
-      // Check rate limit
-      const rateLimit = checkRateLimitForRequest(req, "initialize_story");
-      if (rateLimit.isLimited) {
-        sendRateLimited(res, rateLimit, requestId);
-        return;
-      }
+      // As the creation reads it: any truthy value asks for images
+      const limit = await admitStoryStart(
+        req,
+        res,
+        Boolean((req.body as CreateStoryRequest)?.generateImages),
+        requestId
+      );
+      if (!limit) return;
 
-      // Increment rate limit after successful creation
-      incrementRateLimitForRequest(req, "initialize_story");
+      // Counted before creation: the setup runs after the response
+      incrementRateLimit(limit.key, limit.action);
 
       const {
         prompt,
@@ -102,12 +136,13 @@ router.post(
     const requestId = req.body?.requestId || "unknown";
 
     try {
-      // Check rate limit
-      const rateLimit = checkRateLimitForRequest(req, "initialize_story");
-      if (rateLimit.isLimited) {
-        sendRateLimited(res, rateLimit, requestId);
-        return;
-      }
+      const limit = await admitStoryStart(
+        req,
+        res,
+        Boolean((req.body as CreateStoryFromTemplateRequest)?.generateImages),
+        requestId
+      );
+      if (!limit) return;
 
       const {
         templateId,
@@ -134,13 +169,39 @@ router.post(
       );
 
       // Increment rate limit after successful creation
-      incrementRateLimitForRequest(req, "initialize_story");
+      incrementRateLimit(limit.key, limit.action);
     } catch (error) {
       Logger.Route.error("Failed to create story from template", error);
       sendError(res, "Failed to create story", 500, requestId, error);
     }
   }
 );
+
+// Whether a seat code names a story, for the home page's join form. Answers
+// 200 either way and never which story; a miss counts as a failed code check
+// against the address (verify_code), as a wrong code on the game page does.
+router.get("/stories/:code/exists", async (req, res) => {
+  const requestId = (req.query.requestId as string) || uuidv4();
+  try {
+    const outcome = await limitFailures(
+      addressKey(requestAddress(req)),
+      "verify_code",
+      async () => {
+        const exists =
+          (await storyDbService.getStoryPlayerByCode(req.params.code)) !==
+          undefined;
+        return { succeeded: exists, value: exists };
+      }
+    );
+    if (outcome.limited) {
+      sendRateLimited(res, outcome.rateLimit, requestId);
+      return;
+    }
+    sendSuccess<CodeExistsInfo>(res, { exists: outcome.value }, requestId);
+  } catch (error) {
+    sendError(res, "Failed to check the story code", 500, requestId, error);
+  }
+});
 
 // Check story status
 router.get("/stories/:id/status", async (req, res) => {

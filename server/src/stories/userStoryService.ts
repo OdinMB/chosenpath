@@ -48,18 +48,33 @@ interface StoryFeedDbRow {
   sp_username: string | null; // Added for player username
 }
 
+/** How many of a user's created stories the seat-card feed covers, newest first. */
+const CREATED_STORIES_LIMIT = 50;
+
 /**
- * New consolidated function to get all relevant story data for a user or codes.
+ * The SELECTs of the story ids a feed covers, and their parameters: the
+ * user's created stories alone (createdOnly), or the stories in which the
+ * user holds a seat with the status, plus those of the device's local codes.
  */
-export async function getStoryFeed(
-  authUserId?: string,
-  clientPlayerCodes?: string[],
-  playerStatus: "active" | "archived" = "active"
-): Promise<ExtendedStoryMetadata[]> {
-  const pool = getDb();
+function relevantStoryClauses(
+  authUserId: string | undefined,
+  clientPlayerCodes: string[] | undefined,
+  playerStatus: "active" | "archived",
+  createdOnly: boolean
+): { unionClauses: string[]; params: (string | string[])[] } {
+  if (createdOnly) {
+    return authUserId
+      ? {
+          unionClauses: [
+            `SELECT id AS story_id FROM stories WHERE creator_id = $1 ORDER BY created_at DESC LIMIT ${CREATED_STORIES_LIMIT}`,
+          ],
+          params: [authUserId],
+        }
+      : { unionClauses: [], params: [] };
+  }
+
   const finalQueryParams: (string | string[])[] = [];
   const unionClauses: string[] = [];
-
   let paramIdx = 1;
   if (authUserId) {
     finalQueryParams.push(authUserId);
@@ -82,8 +97,27 @@ export async function getStoryFeed(
     unionClauses.push(
       `SELECT story_id FROM story_players WHERE code = ANY($${paramIdx}::TEXT[]) AND status = 'active'`
     );
-    paramIdx++;
   }
+  return { unionClauses, params: finalQueryParams };
+}
+
+/**
+ * New consolidated function to get all relevant story data for a user or codes.
+ * With createdOnly, the user's newest created stories instead, with every seat code.
+ */
+export async function getStoryFeed(
+  authUserId?: string,
+  clientPlayerCodes?: string[],
+  playerStatus: "active" | "archived" = "active",
+  options: { createdOnly?: boolean } = {}
+): Promise<ExtendedStoryMetadata[]> {
+  const pool = getDb();
+  const { unionClauses, params: finalQueryParams } = relevantStoryClauses(
+    authUserId,
+    clientPlayerCodes,
+    playerStatus,
+    options.createdOnly ?? false
+  );
 
   if (unionClauses.length === 0) {
     Logger.Route.log(

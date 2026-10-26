@@ -37,10 +37,13 @@ export const MULTIPLAYER_STORY_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
 // Rate limiting configuration
 export const RATE_LIMITED_ACTIONS = [
   "initialize_story",
+  "initialize_story_text",
+  "initialize_story_images",
   "verify_code",
   "make_choice",
   "join_game",
   "login",
+  "register",
   "imageGeneration",
   "templateGeneration",
   "templateIteration",
@@ -59,8 +62,18 @@ export const RATE_LIMITS: Record<
     maxRequests: number;
   }
 > = {
-  // Allow 1 request per 15 minutes for createStory
+  // Story starts without an account, counted per address, images or not
   initialize_story: {
+    windowMs: 30 * 60 * 1000, // 30 minutes
+    maxRequests: 2,
+  },
+  // Signed-in story starts without images, counted per account
+  initialize_story_text: {
+    windowMs: 60 * 60 * 1000, // 1 hour
+    maxRequests: 15,
+  },
+  // Signed-in story starts with images, counted per account
+  initialize_story_images: {
     windowMs: 30 * 60 * 1000, // 30 minutes
     maxRequests: 2,
   },
@@ -83,6 +96,11 @@ export const RATE_LIMITS: Record<
   login: {
     windowMs: 24 * 60 * 60 * 1000, // 24 hours
     maxRequests: 50, // 50 attempts per 24 hours
+  },
+  // Accounts created per address; rejected sign-ups don't count
+  register: {
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    maxRequests: 3,
   },
   imageGeneration: {
     windowMs: 60 * 60 * 1000, // 1 hour

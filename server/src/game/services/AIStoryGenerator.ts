@@ -30,6 +30,7 @@ import {
 } from "shared/llm/chatModel.js";
 import { settingsFor, type TextRole } from "shared/llm/textModelSettings.js";
 import { llmCallLogger, type CallTags } from "shared/llm/usageRecorder.js";
+import { textSpendCallback } from "server/spend/spendLedger.js";
 import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
 import { repairBeatReply } from "./beatRepairs.js";
@@ -96,7 +97,7 @@ export class AIStoryGenerator {
         settings,
         maxRetries: PRODUCTION_MAX_RETRIES,
         ...limits,
-        callbacks: [llmCallLogger],
+        callbacks: [llmCallLogger, textSpendCallback],
       });
       this.models.set(key, model);
     }
@@ -118,7 +119,8 @@ export class AIStoryGenerator {
       playerCount,
       gameMode,
       maxTurns,
-      options
+      options,
+      gameId
     );
 
     const players = this.createPlayersFromSetup(setup, playerCount);
@@ -244,7 +246,9 @@ export class AIStoryGenerator {
     playerCount: PlayerCount,
     gameMode: GameMode,
     maxTurns: number,
-    options: SetupPromptOptions = {}
+    options: SetupPromptOptions = {},
+    // Tags the call, so its cost is booked to the story's kind (spend/spendLedger.ts)
+    storyId?: string
   ): Promise<StorySetupGeneration<typeof playerCount>> {
     // Create a filename based on the parameters
     const mockStoriesEnabled =
@@ -300,7 +304,7 @@ export class AIStoryGenerator {
       // Written in the generation order; put back into the fields saved today before anything reads it
       const result = request.assemble(
         await structuredModel.invoke(request.prompt, {
-          metadata: { players: playerCount },
+          metadata: { storyId, players: playerCount },
         })
       );
       Logger.Story.log("Story setup generated");

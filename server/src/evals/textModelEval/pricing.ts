@@ -1,61 +1,19 @@
 import type { Arm, EvalRole } from "./arms.js";
+import { textCostFromUsage as costFromUsage } from "../../spend/prices.js";
 
 /*
- * What a call costs: the per-model price table, the cost of measured usage,
- * and the pre-run estimate of a planned call. Prices are hard-coded here
- * (test plan §2.1); arms.ts never imports this module.
+ * What a call costs: the cost of measured usage and the pre-run estimate of a
+ * planned call. The price table (test plan §2.1) is the app's own, in
+ * spend/prices.ts, re-exported here under its old names; arms.ts never
+ * imports this module.
  */
 
-export type Usage = {
-  inputTokens: number;
-  cachedTokens: number;
-  cacheWriteTokens: number;
-  /** Includes reasoning tokens */
-  outputTokens: number;
-  reasoningTokens?: number;
-};
-
-type Price = { input: number; cached: number; cacheWrite: number; output: number };
-
-/**
- * US$ per 1M tokens (test plan §2.1). Longest matching prefix wins.
- * gpt-6.1-sol from OpenAI's model and pricing pages of 2026-09-30
- * (DOCS/2026-09-30_sol-6-1-assessment.md): today's Sol's but for cached input.
- */
-const PRICES: [string, Price][] = [
-  ["gpt-4.1-mini", { input: 0.4, cached: 0.1, cacheWrite: 0, output: 1.6 }],
-  ["gpt-4.1", { input: 2.0, cached: 0.5, cacheWrite: 0, output: 8.0 }],
-  ["gpt-6-sol", { input: 2.0, cached: 0.2, cacheWrite: 2.5, output: 10.0 }],
-  ["gpt-6.1-sol", { input: 2.0, cached: 0.1, cacheWrite: 2.5, output: 10.0 }],
-  ["gpt-6-luna", { input: 0.1, cached: 0.01, cacheWrite: 0.125, output: 0.5 }],
-];
+export type { TextUsage as Usage } from "../../spend/prices.js";
+export { costFromUsage };
 
 /** Today's Sol or GPT-6.1 Sol, which estimates read alike until measured (Artificial Analysis: the same pace at low). */
 function isSol(model: string): boolean {
   return model.startsWith("gpt-6-sol") || model.startsWith("gpt-6.1-sol");
-}
-
-function priceFor(model: string): Price {
-  const match = PRICES.filter(([prefix]) => model.startsWith(prefix)).sort(
-    (a, b) => b[0].length - a[0].length
-  )[0];
-  if (!match) {
-    throw new Error(`No price for model ${model}`);
-  }
-  return match[1];
-}
-
-/** (I − C − W)·p_in + C·p_cached + W·p_write + O·p_out; O already includes reasoning. */
-export function costFromUsage(model: string, usage: Usage): number {
-  const price = priceFor(model);
-  const uncached = Math.max(0, usage.inputTokens - usage.cachedTokens - usage.cacheWriteTokens);
-  return (
-    (uncached * price.input +
-      usage.cachedTokens * price.cached +
-      usage.cacheWriteTokens * price.cacheWrite +
-      usage.outputTokens * price.output) /
-    1_000_000
-  );
 }
 
 /** Visible output tokens per call (test plan §2.2). */

@@ -28,6 +28,14 @@ jest.unstable_mockModule("../../../src/shared/storageUtils.js", () => ({
   getStoragePath: () => storageRoot,
 }));
 
+// Each written image's cost is booked; here nothing reaches the database
+const recordImageCall = jest.fn<
+  (charge: unknown, model: string, usage: unknown) => Promise<void>
+>();
+jest.unstable_mockModule("../../../src/spend/spendLedger.js", () => ({
+  recordImageCall,
+}));
+
 const { AIImageGenerator, ImageGenerationError } = await import(
   "../../../src/images/AIImageGenerator.js"
 );
@@ -94,6 +102,7 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+  recordImageCall.mockReset();
 });
 
 afterAll(() => {
@@ -126,6 +135,49 @@ describe("AIImageGenerator.generateBeatImage", () => {
     expect(fs.readFileSync(storedImagePath("generated_beat_image"))).toEqual(
       IMAGE_BYTES
     );
+  });
+});
+
+describe("AIImageGenerator spend", () => {
+  it("books a written in-game image once, to its story", async () => {
+    const generator = new AIImageGenerator(makeClient());
+    const story = createMockStory({ id: STORY_ID, generateImages: true });
+
+    await generator.generateBeatImage(
+      story,
+      makeRequest("booked_beat_image", "a quiet harbour")
+    );
+
+    expect(recordImageCall).toHaveBeenCalledTimes(1);
+    expect(recordImageCall.mock.calls[0]![0]).toEqual({ storyId: STORY_ID });
+    expect(recordImageCall.mock.calls[0]![1]).toBe(IMAGE_GENERATION_MODEL);
+  });
+
+  it("books a template-editor image to other", async () => {
+    const generator = new AIImageGenerator(makeClient());
+
+    await generator.generateImageForTemplate(
+      "lighthouse",
+      TEMPLATE_ID,
+      "a white lighthouse on a rock",
+      DEFAULT_IMAGE_MODERATION
+    );
+
+    expect(recordImageCall).toHaveBeenCalledTimes(1);
+    expect(recordImageCall.mock.calls[0]![0]).toEqual({ bucket: "other" });
+  });
+
+  it("books nothing when the image API fails", async () => {
+    const generator = new AIImageGenerator(makeClient());
+    const story = createMockStory({ id: STORY_ID, generateImages: true });
+
+    await expect(
+      generator.generateBeatImage(
+        story,
+        makeRequest("unbooked_beat_image", "an unlucky harbour")
+      )
+    ).rejects.toBeInstanceOf(ImageGenerationError);
+    expect(recordImageCall).not.toHaveBeenCalled();
   });
 });
 

@@ -191,6 +191,20 @@ export async function initializeDatabase() {
       )
     `);
 
+    // AI spend per UTC day and bucket (server/src/spend/): totals only, no
+    // user, address, story or text
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS spend_daily (
+        day DATE NOT NULL,
+        bucket TEXT NOT NULL CHECK (bucket IN ('anonymous', 'account', 'other')),
+        usd NUMERIC(12, 6) NOT NULL DEFAULT 0,
+        text_calls INTEGER NOT NULL DEFAULT 0,
+        image_calls INTEGER NOT NULL DEFAULT 0,
+        updated_at BIGINT NOT NULL,
+        PRIMARY KEY (day, bucket)
+      )
+    `);
+
     // Create indexes for better performance
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`

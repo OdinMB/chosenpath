@@ -34,12 +34,12 @@ import {
   getTemplateCoverPrompt,
   getTemplatePlayerPortraitPrompt,
 } from "./imagePrompts.js";
-import {
-  DEFAULT_IMAGE_MODERATION,
-  imageModerationFor,
-  type ImageModeration,
-} from "./imageSafety.js";
+import { imageModerationFor, type ImageModeration } from "./imageSafety.js";
+import { recordImageCall, type SpendCharge } from "server/spend/spendLedger.js";
 dotenv.config();
+
+/** Template-editor images belong to no story; their cost is booked to "other". */
+const TEMPLATE_EDITOR_CHARGE: SpendCharge = { bucket: "other" };
 
 /**
  * Enhanced error class for image generation that includes structured error information
@@ -88,7 +88,8 @@ export class AIImageGenerator {
       size,
       quality || IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY,
       IMAGE_GENERATION_TEMPLATE_MODEL,
-      moderation
+      moderation,
+      TEMPLATE_EDITOR_CHARGE
     );
     return this.saveImageToTemplate(imageId, templateId, imageBuffer);
   }
@@ -123,7 +124,8 @@ export class AIImageGenerator {
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for player images
       quality || IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY,
       IMAGE_GENERATION_TEMPLATE_MODEL,
-      moderation
+      moderation,
+      TEMPLATE_EDITOR_CHARGE
     );
 
     // Save the image in template/images/players directory
@@ -155,7 +157,8 @@ export class AIImageGenerator {
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers (1024x1536)
       quality || IMAGE_GENERATION_TEMPLATE_COVER_QUALITY,
       IMAGE_GENERATION_TEMPLATE_MODEL,
-      moderation
+      moderation,
+      TEMPLATE_EDITOR_CHARGE
     );
 
     // Stored as returned, never resized: any re-encode would invalidate the
@@ -163,13 +166,15 @@ export class AIImageGenerator {
     return this.saveImageToTemplate("cover", templateId, imageBuffer);
   }
 
+  /** Generates one image and books its cost to the charge once the API has answered. */
   private async generateImage(
     prompt: string,
     references: ImageReference[] | undefined,
     size: ImageSize | undefined,
     quality: ImageQuality | undefined,
     model: string,
-    moderation: ImageModeration = DEFAULT_IMAGE_MODERATION
+    moderation: ImageModeration,
+    charge: SpendCharge
   ): Promise<Buffer> {
     try {
       Logger.Story.log("Generating image for prompt:", prompt);
@@ -194,6 +199,8 @@ export class AIImageGenerator {
       Logger.Story.log(
         `Image generated: model ${result.model}, quality ${result.quality}, size ${result.size}, ${result.imagesSent} reference image(s), usage ${usage}`
       );
+      // Paid once the API answered, whether or not the file is saved; never throws
+      void recordImageCall(charge, result.model, result.usage);
 
       return result.buffer;
     } catch (error) {
@@ -323,7 +330,8 @@ export class AIImageGenerator {
       imageRequest.imageSize || IMAGE_SIZES.SQUARE,
       imageRequest.imageQuality || IMAGE_GENERATION_BEAT_QUALITY,
       IMAGE_GENERATION_MODEL,
-      imageModerationFor(story)
+      imageModerationFor(story),
+      { storyId: story.getId() }
     );
 
     await this.saveImageToStory(

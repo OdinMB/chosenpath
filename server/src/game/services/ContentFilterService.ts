@@ -10,6 +10,7 @@ import {
 } from "shared/llm/chatModel.js";
 import { settingsFor, type TextModelSettings } from "shared/llm/textModelSettings.js";
 import { llmCallLogger } from "shared/llm/usageRecorder.js";
+import { textSpendCallback } from "server/spend/spendLedger.js";
 import { PROHIBITED_CONTENT_RULES } from "shared/contentSafetyRules.js";
 import dotenv from "dotenv";
 
@@ -140,7 +141,7 @@ export class ContentFilterService {
     }
     this.classify = contentFilterClassifier(
       settingsFor(productionTextModels(), "contentFilter"),
-      { callbacks: [llmCallLogger] }
+      { callbacks: [llmCallLogger, textSpendCallback] }
     );
   }
 

@@ -10,6 +10,7 @@ import userRoutes from "./users/userRoutes.js";
 import adminUserRoutes from "./users/adminUserRoutes.js";
 import adminStoryRoutes from "./stories/adminStoryRoutes.js";
 import adminFeedbackRoutes from "./feedback/adminFeedbackRoutes.js";
+import adminSystemRoutes from "./system/adminSystemRoutes.js";
 
 import { imageRouter } from "./images/imageRoutes.js";
 import imageGenerationRoutes from "./images/imageGenerationRoutes.js";
@@ -48,6 +49,7 @@ router.use("/feedback", feedbackRoutes);
 router.use(adminUserRoutes);
 router.use(adminStoryRoutes);
 router.use(adminFeedbackRoutes);
+router.use(adminSystemRoutes);
 
 // Catch-all 404 handler
 router.use((req, res) => {

@@ -66,8 +66,11 @@ function player(beatHistory: Beat[]): PlayerState {
   };
 }
 
-/** A generator that fails every request whose id mentions "refused". */
-function makeDeps() {
+/**
+ * A generator that fails every request whose id mentions "refused", for a
+ * story whose spend ceiling allows images or not.
+ */
+function makeDeps(imagesAllowed = true) {
   const enqueued: ImageOutcomeOperation[] = [];
   const generate = jest.fn<StoryImageJobDeps["generate"]>(
     async (_story: Story, req: ImageRequest) => {
@@ -76,13 +79,17 @@ function makeDeps() {
       }
     }
   );
+  const mayGenerate = jest.fn<StoryImageJobDeps["mayGenerate"]>(
+    async () => imagesAllowed
+  );
   const deps: StoryImageJobDeps = {
     generate,
+    mayGenerate,
     enqueue: async (operation) => {
       enqueued.push(operation);
     },
   };
-  return { deps, enqueued, generate };
+  return { deps, enqueued, generate, mayGenerate };
 }
 
 beforeEach(() => {
@@ -135,6 +142,34 @@ describe("startBackgroundImageGeneration", () => {
         type: "recordImageFailure",
         gameId: GAME_ID,
         input: { imageId: "refused_harbour" },
+      },
+    ]);
+  });
+
+  it("generates nothing over the spend ceiling and records each image as failed, so the reader hides it", async () => {
+    const { deps, enqueued, generate, mayGenerate } = makeDeps(false);
+    const story = createMockStory();
+
+    await startBackgroundImageGeneration(
+      deps,
+      GAME_ID,
+      story,
+      [request("harbour"), request("player1_0")],
+      { attachToLibrary: true }
+    );
+
+    expect(mayGenerate).toHaveBeenCalledWith(GAME_ID);
+    expect(generate).not.toHaveBeenCalled();
+    expect(enqueued).toEqual([
+      {
+        type: "recordImageFailure",
+        gameId: GAME_ID,
+        input: { imageId: "harbour" },
+      },
+      {
+        type: "recordImageFailure",
+        gameId: GAME_ID,
+        input: { imageId: "player1_0" },
       },
     ]);
   });

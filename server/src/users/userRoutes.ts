@@ -105,8 +105,15 @@ router.post("/auth/register", async (req, res) => {
     );
   }
 
+  const rateLimit = checkRateLimitForRequest(req, "register");
+  if (rateLimit.isLimited) {
+    return sendRateLimited(res, rateLimit, requestId);
+  }
+
   try {
     const user = await createUser(email, username, password);
+    // Only a created account counts: a rejected sign-up created nothing
+    incrementRateLimitForRequest(req, "register");
     return sendSuccess(res, { user }, requestId);
   } catch (error) {
     Logger.Route.error("User registration failed", error);
@@ -304,6 +311,30 @@ router.get(
     }
   }
 );
+
+/**
+ * The signed-in user's newest created stories with every seat code, so a
+ * teacher can print seat cards on any device (/users/seat-cards)
+ * GET /users/stories/created
+ * Returns: GetUserStoryFeedResponse
+ */
+router.get("/users/stories/created", verifyUser(), async (req, res) => {
+  const requestId = (req.query.requestId as string) || "unknown";
+  const userId = req.user?.id;
+  if (!userId) {
+    return sendUnauthorized(res, "Authentication required", requestId);
+  }
+
+  try {
+    const stories = await getStoryFeed(userId, undefined, "active", {
+      createdOnly: true,
+    });
+    return sendSuccess(res, { stories }, requestId);
+  } catch (error) {
+    Logger.Route.error("Failed to get the user's created stories", error);
+    return sendError(res, "Failed to get your stories", 500, requestId);
+  }
+});
 
 /**
  * Link a story code to the authenticated user
