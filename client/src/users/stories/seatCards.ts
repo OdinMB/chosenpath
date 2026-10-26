@@ -2,15 +2,20 @@ import type { ExtendedStoryMetadata } from "core/types/api";
 import { generateJoinLink } from "shared/utils/codeSetUtils";
 
 /*
- * The printable seat cards of a class: one card per student, cut out and
- * handed round. A group is one story; its number follows the order in which
- * the stories were started, so the first group started is Group 1.
+ * The printable seat cards of the stories someone started: one card per seat,
+ * cut out and handed round. Stories are numbered in the order they were
+ * started, so the first one started is Story 1; seats are numbered within
+ * their story among the cards it gets.
  */
 
 export interface SeatCardData {
   storyId: string;
   storyTitle: string;
-  groupNumber: number;
+  storyNumber: number;
+  /** The seat's place among its story's cards, from 1. */
+  seatNumber: number;
+  /** How many cards its story has; a story with one seat names no seat. */
+  seatCount: number;
   code: string;
   joinLink: string;
 }
@@ -21,9 +26,16 @@ function seatOrder(slot: string): number {
   return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
 
+/** A story's seat codes in seat order, leaving out seats without a code. */
+function seatCodes(story: ExtendedStoryMetadata): string[] {
+  return [...story.players]
+    .sort((a, b) => seatOrder(a.playerSlot) - seatOrder(b.playerSlot))
+    .flatMap((player) => (player.code ? [player.code] : []));
+}
+
 /**
- * The cards of the selected stories: groups numbered 1..n oldest first, among
- * the selected ones only, and one card per seat that has a code.
+ * The cards of the selected stories: stories numbered 1..n oldest first,
+ * among the selected ones only, and one card per seat that has a code.
  */
 export function seatCardsFor(
   stories: ExtendedStoryMetadata[],
@@ -32,21 +44,16 @@ export function seatCardsFor(
   return stories
     .filter((story) => selectedIds.has(story.id))
     .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
-    .flatMap((story, index) =>
-      [...story.players]
-        .sort((a, b) => seatOrder(a.playerSlot) - seatOrder(b.playerSlot))
-        .flatMap((player) =>
-          player.code
-            ? [
-                {
-                  storyId: story.id,
-                  storyTitle: story.title,
-                  groupNumber: index + 1,
-                  code: player.code,
-                  joinLink: generateJoinLink(player.code),
-                },
-              ]
-            : []
-        )
-    );
+    .flatMap((story, index) => {
+      const codes = seatCodes(story);
+      return codes.map((code, seatIndex) => ({
+        storyId: story.id,
+        storyTitle: story.title,
+        storyNumber: index + 1,
+        seatNumber: seatIndex + 1,
+        seatCount: codes.length,
+        code,
+        joinLink: generateJoinLink(code),
+      }));
+    });
 }

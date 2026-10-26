@@ -2,8 +2,9 @@ import type { ExtendedStoryMetadata, StoryPlayerEntry } from "core/types/api";
 import { seatCardsFor } from "../../../src/users/stories/seatCards";
 
 /*
- * A class's seat cards: one per student, for the stories the teacher picked,
- * with the groups numbered in the order the stories were started.
+ * Seat cards: one per seat, for the stories the signed-in user picked, with
+ * the stories numbered in the order they were started and the seats within
+ * each story.
  */
 
 jest.mock("../../../src/shared/utils/codeSetUtils", () => ({
@@ -54,10 +55,10 @@ const STORIES = [
 ];
 
 describe("seatCardsFor", () => {
-  it("numbers the selected stories' groups in the order they were started", () => {
+  it("numbers the selected stories in the order they were started", () => {
     const cards = seatCardsFor(STORIES, new Set(["a", "b", "c"]));
 
-    expect(cards.map((card) => [card.groupNumber, card.storyId, card.code])).toEqual([
+    expect(cards.map((card) => [card.storyNumber, card.storyId, card.code])).toEqual([
       [1, "a", "AAA111"],
       [1, "a", "AAA222"],
       [2, "b", "BBB111"],
@@ -66,10 +67,23 @@ describe("seatCardsFor", () => {
     ]);
   });
 
+  it("numbers each story's seats among its cards, out of how many cards it has", () => {
+    const cards = seatCardsFor(STORIES, new Set(["a", "b", "c"]));
+
+    // Story a's third seat has no code, so it has two cards: seat 1 and 2 of 2
+    expect(cards.map((card) => [card.storyId, card.seatNumber, card.seatCount])).toEqual([
+      ["a", 1, 2],
+      ["a", 2, 2],
+      ["b", 1, 2],
+      ["b", 2, 2],
+      ["c", 1, 1],
+    ]);
+  });
+
   it("leaves out the stories not selected and numbers the rest from 1", () => {
     const cards = seatCardsFor(STORIES, new Set(["c", "b"]));
 
-    expect(cards.map((card) => [card.groupNumber, card.storyId])).toEqual([
+    expect(cards.map((card) => [card.storyNumber, card.storyId])).toEqual([
       [1, "b"],
       [1, "b"],
       [2, "c"],
@@ -90,7 +104,9 @@ describe("seatCardsFor", () => {
     expect(card).toEqual({
       storyId: "c",
       storyTitle: "Story c",
-      groupNumber: 1,
+      storyNumber: 1,
+      seatNumber: 1,
+      seatCount: 1,
       code: "CCC111",
       joinLink: "https://join.example/game/CCC111",
     });

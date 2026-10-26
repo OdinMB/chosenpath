@@ -15,15 +15,29 @@ const QRCodeSVG = QRCodeSVGTypedForReact19 as unknown as ComponentType<
   } & SVGAttributes<SVGSVGElement>
 >;
 
+/** "Seat 2 of 3", or nothing for a story with one seat. */
+function seatLabel(card: SeatCardData): string | null {
+  return card.seatCount > 1 ? `Seat ${card.seatNumber} of ${card.seatCount}` : null;
+}
+
 /**
- * One printable seat card: the story, the group, the seat code, its join link
- * and a QR code of the link. It never breaks across printed pages.
+ * One printable seat card: the story's number and title, the seat (when the
+ * story has more than one), the seat code, its join link and a QR code of the
+ * link. It never breaks across printed pages.
  */
 export function SeatCard({ card }: { card: SeatCardData }) {
+  const seat = seatLabel(card);
   return (
     <article
       className="break-inside-avoid flex items-center gap-4 p-4 bg-white border border-primary-200 rounded-lg print:rounded-none print:border-dashed print:border-gray-400"
-      aria-label={`Seat card, group ${card.groupNumber}, code ${card.code}`}
+      aria-label={[
+        "Seat card",
+        `story ${card.storyNumber}`,
+        seat?.toLowerCase(),
+        `code ${card.code}`,
+      ]
+        .filter(Boolean)
+        .join(", ")}
     >
       <QRCodeSVG
         value={card.joinLink}
@@ -35,7 +49,8 @@ export function SeatCard({ card }: { card: SeatCardData }) {
       />
       <div className="min-w-0 space-y-1 font-lora">
         <p className="text-xs uppercase tracking-wide text-primary-600">
-          Group {card.groupNumber}
+          Story {card.storyNumber}
+          {seat && ` · ${seat}`}
         </p>
         <h3 className="text-sm font-medium text-primary-800 truncate">
           {card.storyTitle}

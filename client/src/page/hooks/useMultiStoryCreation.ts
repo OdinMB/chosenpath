@@ -11,33 +11,42 @@ import { addCodeSetToStorage } from "../../shared/utils/codeSetUtils";
 import { useSession } from "../../shared/session/useSession";
 
 /*
- * "Start several groups" on a World's settings (TemplateConfigurator): the same
- * template started once per group, one after another, each through the
- * ordinary start route and its limits. The created stories go on to the
- * printable seat cards.
+ * "Start several stories at once" on a World's settings (TemplateConfigurator):
+ * the same template started several times, one after another, each through
+ * the ordinary start route and its limits. Each story has its own seat codes
+ * and as many seats as the form's player count; the created stories go on to
+ * the printable seat cards.
  */
 
-export const GROUP_COUNT_MIN = 2;
-export const GROUP_COUNT_MAX = 12;
+export const STORY_COUNT_MIN = 2;
+export const STORY_COUNT_MAX = 12;
 
-/** The number of groups to start: a whole number from 2 to 12. */
-export function clampGroupCount(count: number): number {
-  if (!Number.isFinite(count)) return GROUP_COUNT_MIN;
-  return Math.min(GROUP_COUNT_MAX, Math.max(GROUP_COUNT_MIN, Math.round(count)));
+/** The number of stories to start: a whole number from 2 to 12. */
+export function clampStoryCount(count: number): number {
+  if (!Number.isFinite(count)) return STORY_COUNT_MIN;
+  return Math.min(STORY_COUNT_MAX, Math.max(STORY_COUNT_MIN, Math.round(count)));
 }
 
 /**
- * What each group's start sends, and how many: the settings without unique
- * images (several image starts would use up the image limit at once), and the
- * count within 2 to 12.
+ * The count one stepper press away, from the count the start would use (an
+ * empty field counts as 2), kept within 2 to 12.
  */
-export function groupStartRequest(
+export function stepStoryCount(count: number, step: 1 | -1): number {
+  return clampStoryCount(clampStoryCount(count) + step);
+}
+
+/**
+ * What each start sends, and how many: the settings without unique images
+ * (several image starts would use up the image limit at once), and the count
+ * within 2 to 12.
+ */
+export function multiStoryRequest(
   settings: CreateStoryFromTemplateRequest,
   count: number
 ): { request: CreateStoryFromTemplateRequest; count: number } {
   return {
     request: { ...settings, generateImages: false },
-    count: clampGroupCount(count),
+    count: clampStoryCount(count),
   };
 }
 
@@ -55,7 +64,7 @@ export async function startSequentially<T>(
     try {
       started.push(await start());
     } catch (error) {
-      Logger.App.warn(`Group start ${index + 1} of ${count} failed`, error);
+      Logger.App.warn(`Story start ${index + 1} of ${count} failed`, error);
       break;
     }
   }
@@ -67,24 +76,24 @@ export function seatCardsPath(storyIds: string[]): string {
   return `/users/seat-cards?stories=${storyIds.map(encodeURIComponent).join(",")}`;
 }
 
-export function useGroupStoryCreation() {
+export function useMultiStoryCreation() {
   const navigate = useNavigate();
   const { refreshStoredCodeSets } = useSession();
   const [isStarting, setIsStarting] = useState(false);
 
   /**
-   * Starts the groups and opens their seat cards; stays on the form when not
+   * Starts the stories and opens their seat cards; stays on the form when not
    * even the first one started.
    */
-  const startGroups = async (
+  const startStories = async (
     settings: CreateStoryFromTemplateRequest,
     requestedCount: number
   ): Promise<void> => {
-    const { request, count } = groupStartRequest(settings, requestedCount);
+    const { request, count } = multiStoryRequest(settings, requestedCount);
     setIsStarting(true);
     const started = await startSequentially<CreateStoryInfo>(count, async () => {
       const info = await storyApi.createStoryFromTemplate(request);
-      // Each group's codes are kept on this device, as for a single start
+      // Each story's codes are kept on this device, as for a single start
       const codes = Object.values(info.codes);
       if (codes.length > 0) addCodeSetToStorage(codes);
       return info;
@@ -96,13 +105,13 @@ export function useGroupStoryCreation() {
     if (started.length < count) {
       notificationService.addNotification({
         type: "warning",
-        title: "Not every group started",
-        message: `Started ${started.length} of ${count} groups`,
+        title: "Not every story started",
+        message: `Started ${started.length} of ${count} stories`,
         autoClose: false,
       });
     }
     navigate(seatCardsPath(started.map((story) => story.storyId)));
   };
 
-  return { isStarting, startGroups };
+  return { isStarting, startStories };
 }

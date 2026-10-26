@@ -1,14 +1,15 @@
 import type { CreateStoryFromTemplateRequest } from "core/types/api";
 import {
-  clampGroupCount,
-  groupStartRequest,
+  clampStoryCount,
+  multiStoryRequest,
   seatCardsPath,
   startSequentially,
-} from "../../../src/page/hooks/useGroupStoryCreation";
+  stepStoryCount,
+} from "../../../src/page/hooks/useMultiStoryCreation";
 
 /*
- * "Start several groups": the same World started once per group, one start
- * after another through the ordinary route, so each counts against the
+ * "Start several stories at once": the same World started several times, one
+ * start after another through the ordinary route, so each counts against the
  * signed-in user's text-start limit and a refusal stops the rest.
  */
 
@@ -73,22 +74,42 @@ describe("startSequentially", () => {
   });
 });
 
-describe("groupStartRequest", () => {
-  it("starts every group without unique images, whatever the form said", () => {
-    const { request } = groupStartRequest(SETTINGS, 4);
+describe("multiStoryRequest", () => {
+  it("starts every story without unique images, whatever the form said", () => {
+    const { request } = multiStoryRequest(SETTINGS, 4);
 
     expect(request).toEqual({ ...SETTINGS, generateImages: false });
     expect(SETTINGS.generateImages).toBe(true);
   });
 
-  it("keeps the number of groups within 2 to 12", () => {
-    expect(groupStartRequest(SETTINGS, 4).count).toBe(4);
-    expect(groupStartRequest(SETTINGS, 1).count).toBe(2);
-    expect(groupStartRequest(SETTINGS, 0).count).toBe(2);
-    expect(groupStartRequest(SETTINGS, 13).count).toBe(12);
-    expect(groupStartRequest(SETTINGS, 40).count).toBe(12);
-    expect(clampGroupCount(Number.NaN)).toBe(2);
-    expect(clampGroupCount(5.4)).toBe(5);
+  it("keeps the number of stories within 2 to 12", () => {
+    expect(multiStoryRequest(SETTINGS, 4).count).toBe(4);
+    expect(multiStoryRequest(SETTINGS, 1).count).toBe(2);
+    expect(multiStoryRequest(SETTINGS, 0).count).toBe(2);
+    expect(multiStoryRequest(SETTINGS, 13).count).toBe(12);
+    expect(multiStoryRequest(SETTINGS, 40).count).toBe(12);
+    expect(clampStoryCount(Number.NaN)).toBe(2);
+    expect(clampStoryCount(5.4)).toBe(5);
+  });
+});
+
+describe("stepStoryCount", () => {
+  it("moves the count one story up or down", () => {
+    expect(stepStoryCount(4, 1)).toBe(5);
+    expect(stepStoryCount(4, -1)).toBe(3);
+  });
+
+  it("stops at 2 and at 12", () => {
+    expect(stepStoryCount(2, -1)).toBe(2);
+    expect(stepStoryCount(12, 1)).toBe(12);
+  });
+
+  it("steps from what the summary shows when the field is empty or out of range", () => {
+    // An empty field reads as 2, the fewest the start allows
+    expect(stepStoryCount(Number.NaN, 1)).toBe(3);
+    expect(stepStoryCount(Number.NaN, -1)).toBe(2);
+    expect(stepStoryCount(40, -1)).toBe(11);
+    expect(stepStoryCount(5.4, 1)).toBe(6);
   });
 });
 

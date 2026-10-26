@@ -753,7 +753,7 @@ export const lectures: Lecture[] = [
       <div class="bg-gray-50 p-4 rounded-lg mb-4">
         <p class="mb-2"><strong>No head start:</strong> In single-player stories, Chosen Path can prepare the next Beat for each option in advance ("Reduce wait time after choices"). This isn't available for multiplayer stories: the next Beat is only written once the last player has chosen.</p>
         <p class="mb-2"><strong>More to write:</strong> Each turn, the engine writes a Beat for every player. Turns that end or start a Thread take a little longer, because the engine also plans what comes next.</p>
-        <p class="mb-0"><strong>Small groups, not whole classes:</strong> A story is made for one group of up to three players. To prevent misuse, the site limits how many stories can be started and how many game actions can be sent from one network address in a short time, so when several groups play at once on the same school network, choices get turned away until the limit resets. Plan for one group at a time rather than a whole class.</p>
+        <p class="mb-0"><strong>Several stories at once:</strong> A story is made for up to three players. To run several side by side, for a class, a workshop or a game night, sign in, open a World and tick "Start several stories at once": you start 2 to 12 copies, each with its own codes, and get printable seat cards to hand out. Choices in stories you started while signed in are counted per seat, so they can all run on the same network. Stories started without an account share their network address's limits: when several of them run on one network, such as a school's, choices get turned away until the limit resets.</p>
       </div>
 
       <h3 class="text-lg font-semibold mb-3 mt-6">Key Concepts Summary</h3>
@@ -763,7 +763,7 @@ export const lectures: Lecture[] = [
         <p class="mb-2"><strong>Threads:</strong> Everyone starts together. After that, each player is in exactly one Thread, and parallel Threads stay in step.</p>
         <p class="mb-2"><strong>Shared vs. personal:</strong> Shared Stats and Outcomes belong to the group; Player Stats and Outcomes to one player.</p>
         <p class="mb-2"><strong>Game modes:</strong> Cooperative stories never play a Contest. Mixed and Competitive stories can have Contests between Side A and Side B.</p>
-        <p class="mb-0"><strong>Sessions:</strong> One code per player, waits between turns, one small group at a time.</p>
+        <p class="mb-0"><strong>Sessions:</strong> One code per player, waits between turns, and several stories at once when you start them signed in.</p>
       </div>
 
       <h3 class="text-lg font-semibold mb-3 mt-6">Design Tip: Start Together, Then Let Players Drift Apart</h3>

@@ -68,6 +68,20 @@ export function ForTherapists() {
                 might have therapeutic applications too.
               </p>
             </div>
+            <div className="p-4 bg-primary-50 rounded-lg">
+              <h3 className="text-md font-montserrat font-bold mb-1">
+                Several stories at once
+              </h3>
+              <p className="text-primary-600">
+                Signed in, you can start 2 to 12 copies of a story World at
+                once, each with its own seat codes. In a group session, several
+                clients could each play a story of their own, or two or three
+                could share one. You print a card per seat with its code and a
+                QR code, and players need no account. These stories are
+                text-only. Whether this fits group work in therapy is for
+                practitioners to judge.
+              </p>
+            </div>
           </div>
         </section>
 

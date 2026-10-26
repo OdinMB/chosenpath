@@ -11,15 +11,15 @@ import { PlayerCodes } from "./PlayerCodes";
 import { StorySetupFailed } from "./StorySetupFailed";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import {
-  clampGroupCount,
-  GROUP_COUNT_MIN,
-  useGroupStoryCreation,
-} from "page/hooks/useGroupStoryCreation";
+  clampStoryCount,
+  STORY_COUNT_MIN,
+  useMultiStoryCreation,
+} from "page/hooks/useMultiStoryCreation";
 import { notificationService } from "shared/notifications/notificationService";
 import { useAuth } from "client/shared/auth/useAuth";
 import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
 import { DifficultySlider } from "./DifficultySlider";
-import { GroupStartField } from "./GroupStartField";
+import { MultiStoryStartField } from "./MultiStoryStartField";
 
 type ConfigurableTemplate = TemplateMetadata;
 
@@ -36,12 +36,12 @@ export function TemplateConfigurator() {
   const [maxTurns, setMaxTurns] = useState(10);
   const [generateImages, setGenerateImages] = useState(false);
   const [pregenerateBeats, setPregenerateBeats] = useState(true);
-  // "Start several groups": signed-in users only
+  // "Start several stories at once": signed-in users only
   const { user } = useAuth();
-  const [startGroups, setStartGroups] = useState(false);
-  const [groupCount, setGroupCount] = useState(GROUP_COUNT_MIN);
-  const groupStart = useGroupStoryCreation();
-  const startsGroups = Boolean(user) && startGroups;
+  const [startSeveral, setStartSeveral] = useState(false);
+  const [storyCount, setStoryCount] = useState(STORY_COUNT_MIN);
+  const multiStart = useMultiStoryCreation();
+  const startsSeveral = Boolean(user) && startSeveral;
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
     useState<DifficultyLevel>(() => {
       return getDefaultDifficultyLevel();
@@ -125,8 +125,8 @@ export function TemplateConfigurator() {
       difficultyLevel: selectedDifficultyLevel,
     };
 
-    if (startsGroups) {
-      await groupStart.startGroups(settings, groupCount);
+    if (startsSeveral) {
+      await multiStart.startStories(settings, storyCount);
       return;
     }
 
@@ -217,7 +217,9 @@ export function TemplateConfigurator() {
 
           {/* Always shown: the image and pregeneration options apply to every template */}
           <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
-            <h3 className="text-lg font-medium text-primary">Settings</h3>
+            <h3 className="text-lg font-medium text-primary">
+              {startsSeveral ? "Settings for each story" : "Settings"}
+            </h3>
 
             {/* Player Count Section */}
             {needsPlayerConfig && (
@@ -291,22 +293,24 @@ export function TemplateConfigurator() {
               />
             )}
 
-            {/* Images Checkbox: off while several groups start */}
+            {/* Images Checkbox: off while several stories start */}
             <div>
               <div className="items-center flex">
                 <input
                   id="generate-images"
                   type="checkbox"
-                  checked={generateImages && !startsGroups}
+                  checked={generateImages && !startsSeveral}
                   onChange={(e) => setGenerateImages(e.target.checked)}
                   className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
-                  disabled={isLoading || startsGroups}
-                  aria-describedby={startsGroups ? "group-images-note" : undefined}
+                  disabled={isLoading || startsSeveral}
+                  aria-describedby={
+                    startsSeveral ? "several-stories-images-note" : undefined
+                  }
                 />
                 <label
                   htmlFor="generate-images"
                   className={`ml-3 md:ml-4 text-sm md:text-base font-medium ${
-                    startsGroups ? "text-gray-400" : "text-primary"
+                    startsSeveral ? "text-gray-400" : "text-primary"
                   }`}
                 >
                   Add unique images to your story
@@ -317,12 +321,12 @@ export function TemplateConfigurator() {
                   />
                 </label>
               </div>
-              {startsGroups && (
+              {startsSeveral && (
                 <p
-                  id="group-images-note"
+                  id="several-stories-images-note"
                   className="mt-1 pl-8 md:pl-10 text-xs md:text-sm text-primary-600"
                 >
-                  Several groups start without unique images.
+                  Stories started several at once have no unique images.
                 </p>
               )}
             </div>
@@ -360,21 +364,21 @@ export function TemplateConfigurator() {
                 />
               </label>
             </div>
-
-            {user && (
-              <GroupStartField
-                enabled={startGroups}
-                count={groupCount}
-                onEnabledChange={setStartGroups}
-                onCountChange={setGroupCount}
-                disabled={isLoading || groupStart.isStarting}
-              />
-            )}
           </div>
+
+          {user && (
+            <MultiStoryStartField
+              enabled={startSeveral}
+              count={storyCount}
+              onEnabledChange={setStartSeveral}
+              onCountChange={setStoryCount}
+              disabled={isLoading || multiStart.isStarting}
+            />
+          )}
 
           <SetupAiNotice
             source="template"
-            images={generateImages && !startsGroups}
+            images={generateImages && !startsSeveral}
             className="sm:justify-end"
           />
 
@@ -400,13 +404,13 @@ export function TemplateConfigurator() {
             <PrimaryButton
               type="submit"
               size="lg"
-              disabled={isLoading || groupStart.isStarting}
-              isLoading={isLoading || groupStart.isStarting}
+              disabled={isLoading || multiStart.isStarting}
+              isLoading={isLoading || multiStart.isStarting}
               fullWidth
               className="font-semibold text-lg"
             >
-              {startsGroups
-                ? `Start ${clampGroupCount(groupCount)} stories`
+              {startsSeveral
+                ? `Start ${clampStoryCount(storyCount)} stories`
                 : "Start Story"}
             </PrimaryButton>
           </div>

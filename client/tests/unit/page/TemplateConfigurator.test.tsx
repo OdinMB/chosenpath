@@ -8,6 +8,7 @@ import {
   openingTag,
   renderMarkup,
 } from "../../helpers/staticMarkup";
+import { AUDIENCE_WORDS } from "../../helpers/genericWording";
 
 // The real config reads import.meta.env, which Jest cannot parse
 jest.mock("../../../src/config", () =>
@@ -150,31 +151,36 @@ describe("TemplateConfigurator settings", () => {
   });
 });
 
-describe("TemplateConfigurator group start", () => {
+describe("TemplateConfigurator several stories at once", () => {
   afterEach(() => {
     mockUser = null;
   });
 
-  it("offers no group start to a visitor who is not signed in", () => {
+  it("offers no several-stories start to a visitor who is not signed in", () => {
     const html = renderMarkup(<TemplateConfigurator />);
 
-    expect(html).not.toContain('id="start-several-groups"');
-    expect(accessibleText(html)).not.toContain("Start several groups");
+    expect(html).not.toContain('id="start-several-stories"');
     expect(accessibleText(html)).toContain("Start Story");
   });
 
-  it("offers a signed-in user to start several groups, off by default", () => {
+  it("offers a signed-in user to start several stories, off by default", () => {
     mockUser = { id: "user-1" };
 
     const html = renderMarkup(<TemplateConfigurator />);
 
-    const checkbox = openingTag(html, "input", "id", "start-several-groups");
+    const checkbox = openingTag(html, "input", "id", "start-several-stories");
     expect(attribute(checkbox, "type")).toBe("checkbox");
     expect(checkbox).not.toMatch(/\schecked/);
-    expect(accessibleText(html)).toContain("Start several groups");
-    // The count and the images line appear only once it is ticked
-    expect(html).not.toContain('id="group-count"');
-    expect(accessibleText(html)).not.toContain("Several groups start without unique images.");
+    // Until it is ticked, the form starts one story: no count, images allowed
+    expect(html).not.toContain('id="story-count"');
+    expect(html).not.toContain('id="several-stories-images-note"');
+    expect(openingTag(html, "input", "id", "generate-images")).not.toMatch(/\sdisabled/);
     expect(accessibleText(html)).toContain("Start Story");
+  });
+
+  it("names no audience or group on the signed-in user's form", () => {
+    mockUser = { id: "user-1" };
+
+    expect(accessibleText(renderMarkup(<TemplateConfigurator />))).not.toMatch(AUDIENCE_WORDS);
   });
 });

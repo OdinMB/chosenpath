@@ -130,6 +130,27 @@ export function ForCoaches() {
       ),
     },
     {
+      question: "Can I use it in a workshop or team session?",
+      answer: (
+        <>
+          Yes.{" "}
+          <a href="/users/signin" className="text-link">
+            Sign in
+          </a>
+          , open a World, tick "Start several stories at once" and choose how
+          many: 2 to 12 copies of the story, all with the same settings and
+          each with its own seat codes. Each participant can explore a story of
+          their own, or small teams of two or three can share one (where the
+          World allows it). Print the seat cards and hand them out:
+          participants scan the QR code or type their code on the home page,
+          with no account needed. Stories started several at once are
+          text-only, without unique images. Since a full story takes about an
+          hour, plan the session around it, then compare the paths people took
+          in the debrief.
+        </>
+      ),
+    },
+    {
       question: "How do I integrate this into my coaching practice?",
       answer:
         "You can use Chosen Path as 'homework' between sessions — coachees explore scenarios on their own, then bring their experiences to the next coaching call for deeper discussion. Since a full story takes about 1 hour to complete, it's typically not ideal for use during coaching sessions themselves.",

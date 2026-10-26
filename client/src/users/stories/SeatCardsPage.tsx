@@ -10,7 +10,7 @@ import { SeatCard } from "./SeatCard";
  * /users/seat-cards: the printable seat cards of the stories the signed-in
  * user started, outside the account layout so that only the cards print. The
  * toolbar (screen only) picks the stories; ?stories=<ids> preselects them, as
- * the group start does.
+ * "Start several stories at once" does.
  */
 
 /** The story ids a ?stories= list names. */
@@ -97,9 +97,9 @@ export function SeatCardsPage() {
             </div>
           </div>
           <p className="text-sm text-primary-700">
-            One card per student: their group, their seat code, a join link and
-            a QR code. Students need no account. They scan the card or type the
-            code on the home page.
+            One card per seat: the story's number, the seat code, a join link
+            and a QR code. Players need no account. They scan the card or type
+            the code on the home page.
           </p>
 
           {stories === null && !loadFailed && (
@@ -113,7 +113,7 @@ export function SeatCardsPage() {
           {stories !== null && stories.length === 0 && (
             <p className="text-sm text-primary-700">
               You haven't started a story yet. Open a World from the library and
-              choose "Start several groups".
+              choose "Start several stories at once".
             </p>
           )}
           {newestFirst.length > 0 && (

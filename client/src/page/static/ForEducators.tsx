@@ -117,13 +117,15 @@ export function ForEducators() {
           <a href="/users/signin" className="text-link">
             Sign in
           </a>
-          , open a World from the library and choose "Start several groups":
-          up to 12 group stories of up to 3 players each, all with the same
-          settings. Then print the seat cards, one per student, each with the
-          group number, a seat code, a join link and a QR code. Students need
-          no account: they scan their card or type the code on the home page.
-          Stories started for several groups are text-only, without unique
-          images.
+          , open a World from the library, tick "Start several stories at
+          once" and choose how many: 2 to 12 copies of the story, all with the
+          same settings and each with its own seat codes. With the number of
+          players set to 1, every student plays a story of their own; with 2
+          or 3 (where the World allows it), small teams share one. Then print
+          the seat cards, one per seat, each with the story's number, a seat
+          code, a join link and a QR code. Students need no account: they scan
+          their card or type the code on the home page. Stories started
+          several at once are text-only, without unique images.
         </>
       ),
     },
