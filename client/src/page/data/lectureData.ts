@@ -611,11 +611,164 @@ export const lectures: Lecture[] = [
   {
     id: "multiplayer",
     title: "Multiplayer",
-    summary: "Features are available. Lecture is coming soon.",
+    summary:
+      "Up to three players share one World, each with their own character, code and point of view. Learn how turns, shared Stats and Outcomes, and the three game modes work, and how to design and run a story for a group.",
     imagePath: "/academy/multiplayer.jpeg",
     content: `
+      <p class="mt-4 mb-4">
+        <strong>One story, told to every player at once.</strong>
+      </p>
       <p class="mb-4">
-        Multiplayer features are available. Lecture is coming soon.
+        Stories in Chosen Path can be played by <strong>1 to 3 players</strong>. In a multiplayer story, each player sits at their own device, joins with their own code and plays their own character. The engine writes a separate Beat for every player, addressed to them as "you", while the other player characters appear by name. Everyone shares the same World, the same Shared Stats and the same Shared Outcomes, but each player experiences the story from their own point of view.
+      </p>
+      <p class="mb-4">
+        That makes multiplayer interesting for teachers and trainers who want a small group to negotiate, cooperate or compete in a simulation, for coaches working with pairs, and for game designers who want group play without managing a story tree for every combination of choices.
+      </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">What Each Player Sees</h3>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Their own Beats:</strong> A text written for their character, and their own options. Players don't see each other's texts or options.</p>
+        <p class="mb-2"><strong>Shared Stats:</strong> The same values for everyone.</p>
+        <p class="mb-2"><strong>Their own Player Stats:</strong> Each player sees their own values, not the other players'.</p>
+        <p class="mb-0"><strong>Who is still choosing:</strong> While a player waits, the game shows which players haven't made their choice yet.</p>
+      </div>
+      <p class="mb-4">
+        Players act only by choosing options. There is no chat inside the game, so groups talk to each other in the room or on a call.
+      </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">How a Turn Works</h3>
+      <p class="mb-4">
+        There is no turn order. Everyone reads and chooses at the same time, and the story moves forward together:
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <ol class="list-decimal list-inside space-y-2 ml-4">
+          <li>Every player reads their own Beat and picks one of their options, in any order.</li>
+          <li>Players who have chosen wait for the others.</li>
+          <li>Once the last player has chosen, the engine writes the next Beat for all players at once.</li>
+        </ol>
+      </div>
+      <p class="mb-4">
+        The story waits for everyone. Nobody is skipped: if one player stops playing, the story pauses until they come back. At the end, every player gets their own ending.
+      </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Switches and Threads with Several Players</h3>
+      <p class="mb-4">
+        The structure from the lecture "Narrative Structure: Switches and Threads" stays the same: Switch, Thread, Switch, Thread, ..., Ending. With several players, a few rules apply:
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Together at the start:</strong> The first Thread always puts every player into one Thread about a Shared Outcome. In a competitive story with a contested Outcome, it's about that Outcome.</p>
+        <p class="mb-2"><strong>One Thread per player:</strong> After every Switch, each player is in exactly one Thread. Players can share a Thread or play separate Threads side by side.</p>
+        <p class="mb-2"><strong>In step:</strong> Threads that run side by side always have the same number of Beats, so all players reach the next Switch at the same time.</p>
+        <p class="mb-0"><strong>Grouping:</strong> At a Switch, each player chooses from their own options. The AI decides how to group players: it can give everyone the same Flavor Switch for a joint Thread, let players opt into a shared Thread through their options, or send them down separate paths. It then plans the next Threads around everyone's picks.</p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">When Players Share a Thread</h3>
+      <p class="mb-4">
+        Every player in a Thread makes their own choice in each Beat. The engine combines those choices into one result for the Thread's step:
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Challenge Threads:</strong> Every player rolls for their own option. The step can only go the way the rolls lean, or end Mixed: the more they lean one way, the likelier that result. When favorable and unfavorable rolls cancel each other out, the step is Mixed.</p>
+        <p class="mb-2"><strong>Exploration Threads:</strong> The option most players chose decides the step. A tie is broken by chance.</p>
+        <p class="mb-0"><strong>A player's own Outcome:</strong> If the Thread is about one player's personal Outcome and that player is in it, only their roll or choice decides the step. The others take part in the scene, but it's that player's story.</p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Shared vs. Personal</h3>
+      <p class="mb-4">
+        The lectures on Outcomes and Stats introduced shared and personal elements. In multiplayer stories, this is where the design happens:
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Shared Stats:</strong> One value for the whole group. Every player's story can move them, and a sacrifice or reward on a Shared Stat spends or gains for everyone. Good for the group's resources, the state of the world, and relationships between the player characters.</p>
+        <p class="mb-2"><strong>Player Stats:</strong> Every player has every Player Stat, each with their own value. Starting values come from the Background a player chooses, unless you switch off "Part of player backgrounds" for a stat: then every player starts with the same value.</p>
+        <p class="mb-2"><strong>Shared Outcomes:</strong> The questions the group's story answers. A story with two or three players needs at least one: without it, the story won't start, and the World's validation flags it.</p>
+        <p class="mb-0"><strong>Player Outcomes:</strong> Each player seat (Player 1, 2 and 3) has its own personal Outcomes in the <strong>"Players" tab</strong>. They give each player something of their own to pursue.</p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">The Three Game Modes</h3>
+      <p class="mb-4">
+        Every multiplayer story has a game mode. For a World, you set it in the <strong>"Meta" tab</strong> (Shared Goals, Mixed Goals or Competing Goals). Players who create their own story choose it on the setup form (Cooperative, Mixed or Competitive).
+      </p>
+
+      <h4 class="text-md font-semibold mb-2 mt-4">Cooperative (Shared Goals)</h4>
+      <p class="mb-2">
+        Players work together toward shared goals.
+      </p>
+      <div class="bg-blue-50 p-3 rounded-lg mb-4">
+        <p class="mb-2"><strong>Rule:</strong> The engine never plays a contest in a cooperative story. If the AI plans one anyway, it becomes a shared Challenge for everyone in it.</p>
+        <p class="mb-0"><strong>Example:</strong> "Will the Hero Guilds reform their anti-goblin policies?" (All players are goblin activists.)</p>
+      </div>
+
+      <h4 class="text-md font-semibold mb-2 mt-4">Mixed (Mixed Goals)</h4>
+      <p class="mb-2">
+        Players cooperate overall, but also have goals that pull them apart.
+      </p>
+      <div class="bg-blue-50 p-3 rounded-lg mb-4">
+        <p class="mb-2"><strong>Typical setup:</strong> One Shared Outcome the group can only reach together, one contested Shared Outcome they compete over, and a personal Outcome for each player.</p>
+        <p class="mb-0"><strong>Example:</strong> The activists fight for reform together, but compete over who will speak for the goblins at the Queen's council.</p>
+      </div>
+
+      <h4 class="text-md font-semibold mb-2 mt-4">Competitive (Competing Goals)</h4>
+      <p class="mb-2">
+        Players compete over what matters most.
+      </p>
+      <div class="bg-blue-50 p-3 rounded-lg mb-4">
+        <p class="mb-2"><strong>Typical setup:</strong> At least one contested Shared Outcome, plus personal Outcomes about what winning or losing costs each character.</p>
+        <p class="mb-0"><strong>Example:</strong> "Who will become the King's Black Hand?" (In a World in which players compete for positions at a royal court.)</p>
+      </div>
+      <p class="mb-4">
+        The game mode also guides how the AI groups players. In cooperative stories, it looks for chances to put players into the same Thread. In competitive stories, it mixes separate Threads (preparation, eavesdropping) with direct confrontations. In mixed stories, it balances joint Threads for shared goals with individual Threads for personal goals.
+      </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Contests: Side A vs. Side B</h3>
+      <p class="mb-4">
+        In Mixed and Competitive stories with two or more players, a Shared Outcome can be a <strong>Contest</strong>. Its Resolutions are <em>Side A wins</em>, <em>Mixed</em> (a draw or compromise) and <em>Side B wins</em>. The World editor offers the Contest kind only on Shared Outcomes of Worlds that can play it.
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Two sides, always:</strong> Side A is Player 1's side. With three players, a Contest still has only two sides, so two players share one. There are no three-way contests.</p>
+        <p class="mb-2"><strong>Who wins a step:</strong> Every player in a contest Thread rolls. Each side is scored by the average of its players' results, and the better side wins the step. Even sides make it Mixed.</p>
+        <p class="mb-0"><strong>Only one side shows up:</strong> If only one side's players end up in a contest Thread because the others chose something else, it's played as that side's Challenge: a favorable result counts as their side winning.</p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Designing a World for a Group</h3>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Make every player count work:</strong> In the "Meta" tab, you set the minimum and maximum number of players. Player 1's seat is always in play; Player 2 and Player 3 only join when a story has that many players. Check that your World works for every count you allow: multiplayer stories need a Shared Outcome, and Contests only work with two or more players.</p>
+        <p class="mb-2"><strong>Give each seat its own role:</strong> Each seat has its own Identities, Backgrounds and personal Outcomes. Make the seats clearly different (the organizer, the printer, the spy), so that players never end up playing the same character.</p>
+        <p class="mb-2"><strong>Open with a reason to be together:</strong> Since the first Thread puts everyone on a Shared Outcome, make sure at least one Shared Outcome gives every character a reason to be in the same scene from the start.</p>
+        <p class="mb-2"><strong>Give each player a personal pull:</strong> At least one personal Outcome per seat gives players a reason to split up into separate Threads, and each of them a story of their own. The recommendation of about 3 Outcomes per player includes the Shared Outcomes.</p>
+        <p class="mb-2"><strong>One relationship, one stat:</strong> A relationship between two player characters is one Shared Stat, not a copy for each player.</p>
+        <p class="mb-2"><strong>One scoreboard per Contest:</strong> Add a Shared Stat of the Opposites type that shows who is ahead, named after the two sides, Player 1's side first (for example "Enclave's Voice|Printers' Voice"). End the Contest's resonance with "Scored by" and the stat's name. Start it at 50, and under "How to change after Threads" let it move 10 to 20 points toward the side that won each Thread about the Contest, none after a Mixed result. When the engine can tell which side just won, it turns around any scoreboard move against that side. Once the Contest has all its Milestones, the AI is told to let the side ahead win in the ending unless the Milestones clearly say otherwise; a score between 45 and 55 counts as a draw.</p>
+        <p class="mb-2"><strong>Camps for three players:</strong> In a three-player Contest, say in each seat's Backgrounds which side that seat is on.</p>
+        <p class="mb-0"><strong>Spread out your key characters:</strong> Threads that run side by side happen at the same moment, and the AI is told to keep each person in only one Thread's scene at a time. A World with several important NPCs gives parallel Threads more to work with than one character every Thread needs.</p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Running a Session</h3>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Start the story:</strong> Pick a World from the Library or create your own story, and choose the number of players. You get a code for every player and play as Player 1.</p>
+        <p class="mb-2"><strong>Invite the others:</strong> The share icon next to each code copies a join link. Send each player their own link. They can also type their 6-character code into "Join Game" on the start page.</p>
+        <p class="mb-2"><strong>Choose characters:</strong> Each player picks an Identity and a Background for their seat. The story begins once everyone has chosen.</p>
+        <p class="mb-2"><strong>Getting back in:</strong> Players can return with their link or code at any time, and the story continues where it stopped. On the device you played on, the story also appears on the start page with a "Resume" button, and once you're logged in, you can link it to your account. As the story's creator, you see every player's code there, so you can send a lost one again.</p>
+        <p class="mb-0"><strong>If a turn fails:</strong> Every player sees a notice with a "Try again" button.</p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Plan for Waiting</h3>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>No head start:</strong> In single-player stories, Chosen Path can prepare the next Beat for each option in advance ("Reduce wait time after choices"). This isn't available for multiplayer stories: the next Beat is only written once the last player has chosen.</p>
+        <p class="mb-2"><strong>More to write:</strong> Each turn, the engine writes a Beat for every player. Turns that end or start a Thread take a little longer, because the engine also plans what comes next.</p>
+        <p class="mb-0"><strong>Small groups, not whole classes:</strong> A story is made for one group of up to three players. To prevent misuse, the site limits how many stories can be started and how many game actions can be sent from one network address in a short time, so when several groups play at once on the same school network, choices get turned away until the limit resets. Plan for one group at a time rather than a whole class.</p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Key Concepts Summary</h3>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>1-3 players:</strong> Each on their own device, with their own code, reading their own Beats.</p>
+        <p class="mb-2"><strong>Turns:</strong> Everyone chooses at the same time. The story moves on when the last player has chosen.</p>
+        <p class="mb-2"><strong>Threads:</strong> Everyone starts together. After that, each player is in exactly one Thread, and parallel Threads stay in step.</p>
+        <p class="mb-2"><strong>Shared vs. personal:</strong> Shared Stats and Outcomes belong to the group; Player Stats and Outcomes to one player.</p>
+        <p class="mb-2"><strong>Game modes:</strong> Cooperative stories never play a Contest. Mixed and Competitive stories can have Contests between Side A and Side B.</p>
+        <p class="mb-0"><strong>Sessions:</strong> One code per player, waits between turns, one small group at a time.</p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Design Tip: Start Together, Then Let Players Drift Apart</h3>
+      <p class="mb-4">
+        Imagine a two-player version of our sample World "Goblin Rights Now!". The reform of the Hero Guilds is the Shared Outcome that brings both activists into the first Thread. Each seat has a role of its own (Player 1 the enclave's organizer, Player 2 the movement's printer) with personal Outcomes that grow out of that role. After the opening Thread, the activists can split up to follow their own concerns, and come back together when the movement needs them both.
       </p>
     `,
   },
