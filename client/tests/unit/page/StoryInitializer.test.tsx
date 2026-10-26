@@ -1,6 +1,7 @@
 import { GameModes, KID_AGES_HINT } from "core/types";
 import { StoryInitializer } from "../../../src/page/components/StoryInitializer";
 import { gameModeDescription } from "../../../src/page/data/gameModeDescriptions";
+import type { GameModeKeyEvent } from "../../../src/page/utils/gameModeSlider";
 import {
   accessibleText,
   attribute,
@@ -21,11 +22,37 @@ jest.mock("core/utils/difficultyUtils.js", () =>
 // the rest of the query string, which is where the images setting comes from.
 const STEP_3 = "step=3&category=enjoy-fiction";
 let mockSearch = STEP_3;
+// The form keeps its settings in the query string, through navigate
+const mockNavigate = jest.fn();
 jest.mock("react-router-dom", () => ({
   ...jest.requireActual("react-router-dom"),
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
   useSearchParams: () => [new URLSearchParams(mockSearch), jest.fn()],
 }));
+/*
+ * The game-mode slider is a plain <input>, with no child component to mock, so
+ * its props are kept as JSX creates them: the runtime is the real one, and
+ * every render adds the slider's props here, handlers included, for the tests
+ * to call without a DOM.
+ */
+type GameModeSliderProps = {
+  onKeyDown?: (event: GameModeKeyEvent) => void;
+  onChange?: (event: { target: { value: string } }) => void;
+};
+const mockGameModeSliders: GameModeSliderProps[] = [];
+jest.mock("react/jsx-runtime", () => {
+  const runtime =
+    jest.requireActual<typeof import("react/jsx-runtime")>("react/jsx-runtime");
+  const keepingSlider =
+    (create: typeof runtime.jsx): typeof runtime.jsx =>
+    (type, props, key) => {
+      if (type === "input" && (props as { id?: unknown }).id === "game-mode") {
+        mockGameModeSliders.push(props as GameModeSliderProps);
+      }
+      return create(type, props, key);
+    };
+  return { ...runtime, jsx: keepingSlider(runtime.jsx), jsxs: keepingSlider(runtime.jsxs) };
+});
 const IDLE_CREATION = {
   isLoading: false,
   storyId: null as string | null,
@@ -225,6 +252,108 @@ describe("StoryInitializer setup sliders", () => {
 
     expect(description(html)).toBe(gameModeDescription(GameModes.Competitive, 2));
     expect(attribute(slider(html, "game-mode"), "aria-describedby")).toBe(DESCRIPTION_ID);
+  });
+});
+
+/*
+ * Choosing the game mode on step 2. The slider runs from 0 to 1 in steps of
+ * 0.01: its keys move from mode to mode, and dragging or clicking picks the
+ * mode where the slider is let go. The form puts the chosen mode in the query
+ * string.
+ */
+describe("StoryInitializer game mode slider", () => {
+  beforeEach(() => {
+    // The form logs each mode it sets
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    mockNavigate.mockClear();
+    mockGameModeSliders.length = 0;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  /** Renders step 2 for two players in this mode and returns the game-mode slider's props. */
+  function renderSlider(mode: string): GameModeSliderProps {
+    mockSearch = `step=2&category=enjoy-fiction&players=2&mode=${mode}`;
+    renderMarkup(<StoryInitializer onBack={jest.fn()} />);
+    return mockGameModeSliders[mockGameModeSliders.length - 1] ?? {};
+  }
+
+  /** The mode the form last put in the query string, or undefined when it put none. */
+  function modeInUrl(): string | null | undefined {
+    const calls = mockNavigate.mock.calls;
+    const url = calls[calls.length - 1]?.[0] as string | undefined;
+    return url === undefined ? undefined : new URLSearchParams(url.split("?")[1]).get("mode");
+  }
+
+  /** Presses a key on the slider and returns its preventDefault. */
+  function press(sliderProps: GameModeSliderProps, key: string): jest.Mock {
+    const preventDefault = jest.fn();
+    sliderProps.onKeyDown?.({ key, altKey: false, ctrlKey: false, metaKey: false, preventDefault });
+    return preventDefault;
+  }
+
+  it.each([
+    ["cooperative", "ArrowRight", "cooperative-competitive"],
+    ["cooperative", "ArrowUp", "cooperative-competitive"],
+    ["cooperative-competitive", "ArrowRight", "competitive"],
+    ["competitive", "ArrowLeft", "cooperative-competitive"],
+    ["cooperative-competitive", "ArrowDown", "cooperative"],
+    ["cooperative", "PageUp", "cooperative-competitive"],
+    ["competitive", "PageDown", "cooperative-competitive"],
+    ["cooperative", "End", "competitive"],
+    ["competitive", "Home", "cooperative"],
+  ])("moves from %s with %s to %s", (mode, key, next) => {
+    const preventDefault = press(renderSlider(mode), key);
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(modeInUrl()).toBe(next);
+  });
+
+  it("keeps the mode at an end, without the browser's step", () => {
+    const preventDefault = press(renderSlider("cooperative"), "ArrowLeft");
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("leaves Tab to the browser", () => {
+    const preventDefault = press(renderSlider("cooperative"), "Tab");
+
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  // Dragging and clicking go through the change handler, as they did before keys had their own
+  it.each([
+    ["0", "cooperative"],
+    ["0.33", "cooperative"],
+    ["0.34", "cooperative-competitive"],
+    ["0.5", "cooperative-competitive"],
+    ["0.66", "cooperative-competitive"],
+    ["0.67", "competitive"],
+    ["1", "competitive"],
+  ])("picks the mode where the pointer leaves the slider (%s: %s)", (value, mode) => {
+    renderSlider("cooperative").onChange?.({ target: { value } });
+
+    expect(modeInUrl()).toBe(mode);
+  });
+
+  it("has the same keys when drafting a World", () => {
+    mockSearch = "step=2&category=enjoy-fiction";
+    renderMarkup(
+      <StoryInitializer
+        onBack={jest.fn()}
+        templateMode
+        initialPlayerCount={2}
+        initialGameMode={GameModes.Cooperative}
+      />
+    );
+    const sliderProps = mockGameModeSliders[mockGameModeSliders.length - 1];
+
+    expect(sliderProps?.onKeyDown).toEqual(expect.any(Function));
+    expect(press(sliderProps ?? {}, "ArrowRight")).toHaveBeenCalled();
   });
 });
 
