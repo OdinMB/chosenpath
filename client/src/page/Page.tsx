@@ -4,8 +4,8 @@ import { PrimaryButton } from "components/ui";
 import { TemplateMetadata } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { OrDivider, Footer, CategoryTile, JoinGameForm } from "./components";
-import { ResumableStories } from "resources/stories/ResumableStories.js";
-import { useAuth } from "client/shared/auth/useAuth.js";
+import { ResumableStories } from "resources/stories/ResumableStories";
+import { useAuth } from "client/shared/auth/useAuth";
 import { config } from "../config";
 
 // Page component refactored to use React Router
@@ -250,7 +250,6 @@ export function Page() {
                         : ""
                     }
                   `}
-                  onClick={() => navigate(tile.url)}
                 >
                   <CategoryTile
                     image={tile.image}
