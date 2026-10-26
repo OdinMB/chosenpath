@@ -248,6 +248,18 @@ function readErrorField(error: unknown, field: string): unknown {
 }
 
 /**
+ * Whether the Images API's own moderation refused the request (an answer from
+ * the API), as opposed to a failure on the way to it or one of ours.
+ */
+export function isImageApiRefusal(error: unknown): boolean {
+  const code = readErrorField(error, "code");
+  return (
+    readErrorField(error, "status") === 400 &&
+    (code === "moderation_blocked" || code === "content_policy_violation")
+  );
+}
+
+/**
  * Analyzes OpenAI API errors and provides structured error information
  */
 export function analyzeImageGenerationError(

@@ -398,7 +398,8 @@ export class StoryCreationService {
     difficultyLevel: DifficultyLevel,
     res: Response,
     creatorId?: string
-  ): Promise<void> {
+  ): Promise<boolean> {
+    // Answers the request itself; resolves true only when the story was created
     Logger.Route.log(
       `Creating story from template: ${templateId} for ${playerCount} players, difficulty: ${difficultyLevel.title}`
     );
@@ -407,7 +408,7 @@ export class StoryCreationService {
 
     if (!template) {
       sendError(res, "Template not found", 404);
-      return;
+      return false;
     }
 
     if (
@@ -422,7 +423,7 @@ export class StoryCreationService {
         `Player count ${playerCount} is outside template limits (${template.playerCountMin}-${template.playerCountMax})`,
         400
       ); // Send error and return
-      return;
+      return false;
     }
 
     const startProblem = templateStartProblem(template, playerCount);
@@ -437,7 +438,7 @@ export class StoryCreationService {
         } yet: ${startProblem}.`,
         400
       );
-      return;
+      return false;
     }
 
     const storyId = randomUUID();
@@ -496,6 +497,7 @@ export class StoryCreationService {
         codes: playerCodes,
         status: "ready",
       });
+      return true;
     } catch (error) {
       Logger.Route.error(
         `Failed to create story from template ${templateId} for story ${storyId}:`,
@@ -517,6 +519,7 @@ export class StoryCreationService {
       }
       // TODO: Consider deleting story directory here: await deleteStoryDirectory(storyId);
       sendError(res, "Failed to create story from template", 500); // Send error after cleanup attempt
+      return false;
     }
   }
 

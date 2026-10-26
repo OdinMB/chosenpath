@@ -1,5 +1,5 @@
 import type { RateLimitedAction } from "core/config.js";
-import type { StoryOrigin } from "server/stories/StoryDbService.js";
+import type { StoryOrigin } from "server/stories/storyOrigins.js";
 import { accountKey, addressKey, seatKey } from "shared/rateLimiter.js";
 
 /*

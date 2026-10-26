@@ -25,6 +25,7 @@ import { getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import {
   analyzeImageGenerationError,
+  isImageApiRefusal,
   loadReferenceImages,
   requestImage,
   type ImageApiClient,
@@ -35,7 +36,11 @@ import {
   getTemplatePlayerPortraitPrompt,
 } from "./imagePrompts.js";
 import { imageModerationFor, type ImageModeration } from "./imageSafety.js";
-import { recordImageCall, type SpendCharge } from "server/spend/spendLedger.js";
+import {
+  recordImageCall,
+  recordRefusedImageCall,
+  type SpendCharge,
+} from "server/spend/spendLedger.js";
 dotenv.config();
 
 /** Template-editor images belong to no story; their cost is booked to "other". */
@@ -205,6 +210,8 @@ export class AIImageGenerator {
       return result.buffer;
     } catch (error) {
       Logger.Story.error("Error generating image:", error);
+      // A refusal is the API's answer, which may be billed; never throws
+      if (isImageApiRefusal(error)) void recordRefusedImageCall(charge);
 
       // Analyze the error and provide structured information
       const errorInfo = analyzeImageGenerationError(error, prompt);

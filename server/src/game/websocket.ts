@@ -17,13 +17,12 @@ import {
 } from "core/config.js";
 import {
   addressKey,
-  checkRateLimit,
-  incrementRateLimit,
+  claimRateLimit,
   limitFailures,
 } from "shared/rateLimiter.js";
 import { choiceLimitKey } from "shared/limitPolicy.js";
 import { socketAddress } from "shared/clientAddress.js";
-import { storyDbService } from "server/stories/StoryDbService.js";
+import { storyOrigin } from "server/stories/storyOrigins.js";
 import { Logger } from "shared/logger.js";
 import { API_CONFIG } from "../config.js";
 
@@ -160,19 +159,20 @@ export class GameWebSocketServer {
     action: RateLimitedAction,
     requestId?: string
   ): boolean {
-    const limitStatus = checkRateLimit(key, action);
-    if (limitStatus.isLimited) {
-      this.emitRateLimited(socket, action, limitStatus, requestId);
+    const claim = claimRateLimit(key, action);
+    if (!claim.claimed) {
+      this.emitRateLimited(socket, action, claim.rateLimit, requestId);
       return true;
     }
-    incrementRateLimit(key, action);
     return false;
   }
 
   /**
    * The key a choice, character pick or turn retry counts against: the seat
    * in a story an account started, else the address (limitPolicy.ts). The
-   * address too when the story's origin can't be read.
+   * address too when the story's origin can't be read. The origin is
+   * remembered per story (storyOrigins.ts), so a choice queries the database
+   * at most once per story every few minutes.
    */
   private async choiceKey(socket: Socket): Promise<string> {
     const address = socketAddress(socket);
@@ -181,7 +181,7 @@ export class GameWebSocketServer {
       return choiceLimitKey(undefined, undefined, address);
     }
     try {
-      const origin = await storyDbService.getStoryOrigin(seat.storyId);
+      const origin = await storyOrigin(seat.storyId);
       return choiceLimitKey(origin, seat, address);
     } catch (error) {
       Logger.Websocket.error(

@@ -4,6 +4,7 @@ import { Logger } from "../shared/logger.js";
 import { PublicUser } from "core/types/user.js";
 import { SESSION_DURATION } from "../config.js";
 import { userDbService } from "./UserDbService.js";
+import { forgetStoriesOfCreator } from "../stories/storyOrigins.js";
 
 // JWT payload interface
 interface JwtUserPayload {
@@ -327,6 +328,8 @@ export async function deleteUserById(userId: string): Promise<boolean> {
 
     const deleted = await userDbService.deleteUserEntryById(userId);
     if (deleted) {
+      // Their stories are anonymous now (creator_id ON DELETE SET NULL)
+      forgetStoriesOfCreator(userId);
       Logger.DB.log(`Deleted user: ${user.username} (${userId}) (via service)`);
     }
     return deleted;

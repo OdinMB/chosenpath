@@ -6,7 +6,8 @@ import { Logger } from "shared/logger.js";
 
 /*
  * Turns one finished chat call into a metrics record and logs it: role,
- * model, effort, tokens by type, milliseconds, finish reason, refusal, and the
+ * model, effort, output cap, the prompt's length, tokens by type,
+ * milliseconds, finish reason, refusal, and the
  * story tags the caller passed as invoke metadata. Never logs prompt or
  * output text (so no error message), and never a user id. A reply cut off
  * at its output cap fails inside openai's parse, so it shows only as a
@@ -43,6 +44,10 @@ export type CallTags = {
 export type LlmCallRecord = CallTags & {
   model?: string;
   effort?: string;
+  /** The call's output cap, as sent (max_completion_tokens, else max_tokens) */
+  maxOutputTokens?: number;
+  /** The prompt's length in characters (never its text), for estimating a cut-off call's cost */
+  promptCharacters?: number;
   ms: number;
   ok: boolean;
   metrics?: CallMetrics;
@@ -128,7 +133,36 @@ function tagsFrom(metadata: Record<string, unknown> | undefined): CallTags {
   };
 }
 
-type StartedCall = { startedAt: number; tags: CallTags; model?: string; effort?: string };
+type StartedCall = {
+  startedAt: number;
+  tags: CallTags;
+  model?: string;
+  effort?: string;
+  maxOutputTokens?: number;
+  promptCharacters: number;
+};
+
+function optionalNumberAt(value: unknown, key: string): number | undefined {
+  const found = field(value, key);
+  return typeof found === "number" ? found : undefined;
+}
+
+/** The characters of the messages' text; image parts and the like count nothing. */
+function promptCharactersOf(messages: BaseMessage[][]): number {
+  let characters = 0;
+  for (const message of messages.flat()) {
+    const content: unknown = message.content;
+    if (typeof content === "string") {
+      characters += content.length;
+    } else if (Array.isArray(content)) {
+      for (const part of content) {
+        const text = field(part, "text");
+        if (typeof text === "string") characters += text.length;
+      }
+    }
+  }
+  return characters;
+}
 
 export class LlmCallLogger extends BaseCallbackHandler {
   name = "llm-call-logger";
@@ -144,7 +178,7 @@ export class LlmCallLogger extends BaseCallbackHandler {
 
   handleChatModelStart(
     _llm: Serialized,
-    _messages: BaseMessage[][],
+    messages: BaseMessage[][],
     runId: string,
     _parentRunId?: string,
     extraParams?: Record<string, unknown>,
@@ -157,6 +191,10 @@ export class LlmCallLogger extends BaseCallbackHandler {
       tags: tagsFrom(metadata),
       model: stringAt(params, "model"),
       effort: stringAt(params, "reasoning_effort"),
+      maxOutputTokens:
+        optionalNumberAt(params, "max_completion_tokens") ??
+        optionalNumberAt(params, "max_tokens"),
+      promptCharacters: promptCharactersOf(messages),
     });
   }
 
@@ -190,6 +228,8 @@ export class LlmCallLogger extends BaseCallbackHandler {
       ...(call?.tags ?? {}),
       model: call?.model,
       effort: call?.effort,
+      maxOutputTokens: call?.maxOutputTokens,
+      promptCharacters: call?.promptCharacters,
       ms: call ? this.now() - call.startedAt : 0,
     };
   }

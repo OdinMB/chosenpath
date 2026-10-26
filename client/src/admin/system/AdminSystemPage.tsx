@@ -5,11 +5,13 @@ import {
   type SpendBucket,
   type SpendBucketTotal,
   type SpendTotals,
+  type UnreadableAddressCounts,
 } from "core/types/api";
 import { LoadingSpinner, PrimaryButton } from "components/ui";
 import { adminSystemApi } from "../adminApi";
 import {
   clientAddressVerdict,
+  describeUnreadableCounts,
   describeVerdict,
   FORGED_ADDRESS,
 } from "./clientAddressVerdict";
@@ -53,6 +55,7 @@ function AddressCheckPanel() {
   const [reports, setReports] = useState<{
     plain: ConnectionReport;
     forged: ConnectionReport;
+    unreadable: UnreadableAddressCounts;
   } | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -61,7 +64,8 @@ function AddressCheckPanel() {
     try {
       const plain = await adminSystemApi.getConnection();
       const forged = await adminSystemApi.getConnection(FORGED_ADDRESS);
-      setReports({ plain, forged });
+      const unreadable = await adminSystemApi.getAddressCounts();
+      setReports({ plain, forged, unreadable });
     } catch {
       // The API client has shown what went wrong
       setFailed(true);
@@ -93,6 +97,8 @@ function AddressCheckPanel() {
         <dl className="grid grid-cols-1 sm:grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
           <dt className="font-medium text-primary">Verdict</dt>
           <dd>{describeVerdict(clientAddressVerdict(reports.forged))}</dd>
+          <dt className="font-medium text-primary">Requests without a readable address</dt>
+          <dd>{describeUnreadableCounts(reports.unreadable)}</dd>
           <dt className="font-medium text-primary">Your address, as limits see it</dt>
           <dd>{reports.plain.address ?? "unknown (shares one bucket)"}</dd>
           <dt className="font-medium text-primary">TRUST_PROXY</dt>

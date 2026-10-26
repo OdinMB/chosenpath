@@ -5,6 +5,7 @@ import {
   FeedbackItem,
   ConnectionReport,
   SpendTotals,
+  UnreadableAddressCounts,
 } from "core/types/api.js";
 import { apiClient } from "shared/apiClient";
 import { Logger } from "shared/logger";
@@ -103,6 +104,11 @@ export const adminSystemApi = {
         ? { headers: { "X-Forwarded-For": forgedAddress } }
         : undefined
     );
+  },
+
+  /** How many of the server's address reads found no address (counts only) */
+  getAddressCounts: async (): Promise<UnreadableAddressCounts> => {
+    return apiClient.get<UnreadableAddressCounts>("/admin/system/addresses");
   },
 
   getSpend: async (): Promise<SpendTotals> => {

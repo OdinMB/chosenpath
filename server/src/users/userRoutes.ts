@@ -25,10 +25,7 @@ import {
   getStoryPlayerByCode,
 } from "server/stories/userStoryService.js";
 import { storyDbService } from "server/stories/StoryDbService.js";
-import {
-  checkRateLimitForRequest,
-  incrementRateLimitForRequest,
-} from "shared/rateLimiter.js";
+import { claimRateLimitForRequest } from "shared/rateLimiter.js";
 import { API_CONFIG } from "server/config.js";
 
 const router = express.Router();
@@ -105,17 +102,18 @@ router.post("/auth/register", async (req, res) => {
     );
   }
 
-  const rateLimit = checkRateLimitForRequest(req, "register");
-  if (rateLimit.isLimited) {
-    return sendRateLimited(res, rateLimit, requestId);
+  // Counted before the account is written, so parallel sign-ups meet the same cap
+  const claim = claimRateLimitForRequest(req, "register");
+  if (!claim.claimed) {
+    return sendRateLimited(res, claim.rateLimit, requestId);
   }
 
   try {
     const user = await createUser(email, username, password);
-    // Only a created account counts: a rejected sign-up created nothing
-    incrementRateLimitForRequest(req, "register");
     return sendSuccess(res, { user }, requestId);
   } catch (error) {
+    // Only a created account counts: a rejected sign-up created nothing
+    claim.refund();
     Logger.Route.error("User registration failed", error);
     const errorMessage =
       error instanceof Error ? error.message : "Registration failed";
@@ -157,13 +155,15 @@ router.post("/auth/login", async (req, res) => {
     return sendBadRequest(res, "Email and password are required", requestId);
   }
 
-  const rateLimit = checkRateLimitForRequest(req, "login");
-  if (rateLimit.isLimited) {
-    return sendRateLimited(res, rateLimit, requestId);
+  // Failed logins per address: counted while the check runs, handed back on success
+  const claim = claimRateLimitForRequest(req, "login");
+  if (!claim.claimed) {
+    return sendRateLimited(res, claim.rateLimit, requestId);
   }
 
   try {
     const result = await authenticateUser(email, password, rememberMe);
+    claim.refund();
     res.cookie("authToken", result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -175,7 +175,6 @@ router.post("/auth/login", async (req, res) => {
           ? `.${API_CONFIG.DEFAULT_DOMAIN}`
           : undefined,
     });
-    incrementRateLimitForRequest(req, "login");
     return sendSuccess(res, { user: result.user }, requestId);
   } catch (error) {
     Logger.Route.warn(`Login failed for email: ${email}`);

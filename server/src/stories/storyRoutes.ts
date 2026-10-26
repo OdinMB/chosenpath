@@ -9,11 +9,11 @@ import {
 import { storyCreationService } from "./StoryCreationService.js";
 import {
   addressKey,
-  checkRateLimit,
-  incrementRateLimit,
+  claimRateLimit,
   limitFailures,
+  type RateLimitClaim,
 } from "shared/rateLimiter.js";
-import { storyStartLimit, type LimitTarget } from "shared/limitPolicy.js";
+import { storyStartLimit } from "shared/limitPolicy.js";
 import { requestAddress } from "shared/clientAddress.js";
 import { isOverCeiling } from "server/spend/spendLedger.js";
 import {
@@ -31,29 +31,34 @@ import { storyDbService } from "./StoryDbService.js";
 
 const router = Router();
 
+type StartAdmission = Extract<RateLimitClaim, { claimed: true }>;
+
 /**
- * Lets a story start through, or answers its refusal: 503 once today's spend
- * ceiling for its kind of story (signed in or not) is reached, 429 once its
- * start limit is (limitPolicy.ts). Returns the limit to count the start
- * against, or null after a refusal; a refused start counts nothing.
+ * Lets a story start through, or answers its refusal: 429 once its start
+ * limit is reached (limitPolicy.ts), 503 once today's spend ceiling for its
+ * kind of story (signed in or not) is. The start is counted at once, before
+ * the ceiling's database read, so parallel starts meet the same limit; a
+ * refused start counts nothing. Returns the start's count, or null after a
+ * refusal.
  */
 async function admitStoryStart(
   req: Request,
   res: Response,
   generateImages: boolean,
   requestId: string
-): Promise<LimitTarget | null> {
+): Promise<StartAdmission | null> {
+  const limit = storyStartLimit(req.user?.id, generateImages, requestAddress(req));
+  const claim = claimRateLimit(limit.key, limit.action);
+  if (!claim.claimed) {
+    sendRateLimited(res, claim.rateLimit, requestId);
+    return null;
+  }
   if (await isOverCeiling(req.user ? "account" : "anonymous")) {
+    claim.refund();
     sendError(res, SPEND_CEILING_MESSAGE, 503, requestId);
     return null;
   }
-  const limit = storyStartLimit(req.user?.id, generateImages, requestAddress(req));
-  const rateLimit = checkRateLimit(limit.key, limit.action);
-  if (rateLimit.isLimited) {
-    sendRateLimited(res, rateLimit, requestId);
-    return null;
-  }
-  return limit;
+  return claim;
 }
 
 // Create a new story
@@ -63,17 +68,15 @@ router.post(
   async (req: Request, res) => {
     try {
       const requestId = req.body?.requestId || "unknown";
-      // As the creation reads it: any truthy value asks for images
-      const limit = await admitStoryStart(
+      // As the creation reads it: any truthy value asks for images. The start
+      // stays counted even when the content filter refuses it: that is an AI call
+      const admitted = await admitStoryStart(
         req,
         res,
         Boolean((req.body as CreateStoryRequest)?.generateImages),
         requestId
       );
-      if (!limit) return;
-
-      // Counted before creation: the setup runs after the response
-      incrementRateLimit(limit.key, limit.action);
+      if (!admitted) return;
 
       const {
         prompt,
@@ -135,14 +138,15 @@ router.post(
   async (req, res) => {
     const requestId = req.body?.requestId || "unknown";
 
+    let admitted: StartAdmission | null = null;
     try {
-      const limit = await admitStoryStart(
+      admitted = await admitStoryStart(
         req,
         res,
         Boolean((req.body as CreateStoryFromTemplateRequest)?.generateImages),
         requestId
       );
-      if (!limit) return;
+      if (!admitted) return;
 
       const {
         templateId,
@@ -157,7 +161,7 @@ router.post(
       const creatorId = (req as Express.Request & { user?: { id: string } })
         .user?.id;
 
-      await storyCreationService.createStoryFromTemplate(
+      const created = await storyCreationService.createStoryFromTemplate(
         templateId,
         reqPlayerCount as PlayerCount,
         reqMaxTurns,
@@ -168,9 +172,11 @@ router.post(
         creatorId
       );
 
-      // Increment rate limit after successful creation
-      incrementRateLimit(limit.key, limit.action);
+      // A refused start (no such World, a player count it doesn't take, a
+      // failed write) created nothing, so it doesn't count
+      if (!created) admitted.refund();
     } catch (error) {
+      admitted?.refund();
       Logger.Route.error("Failed to create story from template", error);
       sendError(res, "Failed to create story", 500, requestId, error);
     }

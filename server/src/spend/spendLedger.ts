@@ -4,10 +4,16 @@ import type {
   SpendTotals,
 } from "core/types/api.js";
 import type { ImageApiUsage } from "server/images/openaiImageClient.js";
-import { storyDbService } from "server/stories/StoryDbService.js";
+import { storyOrigin } from "server/stories/storyOrigins.js";
 import { LlmCallLogger, type LlmCallRecord } from "shared/llm/usageRecorder.js";
 import { Logger } from "shared/logger.js";
-import { imageCallCostUsd, textCallCostUsd } from "./prices.js";
+import {
+  imageCallCostUsd,
+  REFUSED_IMAGE_ESTIMATE_USD,
+  textCallCostUsd,
+  unreportedTextUsage,
+  type TextUsage,
+} from "./prices.js";
 import {
   addSpend,
   bucketTotalOn,
@@ -69,16 +75,33 @@ export function spendCeilings(): SpendCeilings {
   return configuredCeilings;
 }
 
+/** A story's bucket is its origin, remembered per story (storyOrigins.ts). */
 function storyBucket(storyId: string): Promise<SpendBucket> {
-  return storyDbService.getStoryOrigin(storyId);
+  return storyOrigin(storyId);
 }
 
-/** Books a finished text call. A failed call reports no usage, so it is skipped. */
+// The finish reasons of a reply the API produced, and billed, but that failed
+// in parsing before its usage was reported (usageRecorder.ts)
+const BILLED_FAILURES = new Set(["length", "content_filter"]);
+
+/** What a call used: its reported usage, an estimate for a billed failure, or nothing to book. */
+function bookableUsage(record: LlmCallRecord): TextUsage | undefined {
+  if (record.metrics) return record.metrics;
+  const finishReason = record.error?.finishReason;
+  if (finishReason && BILLED_FAILURES.has(finishReason)) {
+    return unreportedTextUsage(record.promptCharacters, record.maxOutputTokens);
+  }
+  // Refused before a reply (a timeout, an outage, a 4xx): nothing was produced
+  return undefined;
+}
+
+/** Books a text call: a finished one by its usage, one cut off after billing by an estimate. */
 export async function recordTextCall(record: LlmCallRecord): Promise<void> {
-  if (!record.metrics) return;
+  const usage = bookableUsage(record);
+  if (!usage) return;
   try {
     const bucket = record.storyId ? await storyBucket(record.storyId) : "other";
-    const usd = textCallCostUsd(record.metrics.model ?? record.model, record.metrics);
+    const usd = textCallCostUsd(record.metrics?.model ?? record.model, usage);
     await addSpend(utcDay(new Date()), bucket, usd, "text");
   } catch (error) {
     log.error("Could not record a text call's spend", error);
@@ -90,18 +113,27 @@ export const textSpendCallback = new LlmCallLogger((record) => {
   void recordTextCall(record);
 });
 
+async function bookImage(charge: SpendCharge, usd: () => number): Promise<void> {
+  try {
+    const bucket = "storyId" in charge ? await storyBucket(charge.storyId) : charge.bucket;
+    await addSpend(utcDay(new Date()), bucket, usd(), "image");
+  } catch (error) {
+    log.error("Could not record an image's spend", error);
+  }
+}
+
 /** Books a written image by the usage the Images API reported. */
 export async function recordImageCall(
   charge: SpendCharge,
   model: string,
   usage: ImageApiUsage | undefined
 ): Promise<void> {
-  try {
-    const bucket = "storyId" in charge ? await storyBucket(charge.storyId) : charge.bucket;
-    await addSpend(utcDay(new Date()), bucket, imageCallCostUsd(model, usage), "image");
-  } catch (error) {
-    log.error("Could not record an image's spend", error);
-  }
+  await bookImage(charge, () => imageCallCostUsd(model, usage));
+}
+
+/** Books an image the Images API's moderation refused, at a conservative estimate. */
+export async function recordRefusedImageCall(charge: SpendCharge): Promise<void> {
+  await bookImage(charge, () => REFUSED_IMAGE_ESTIMATE_USD);
 }
 
 /** Whether today's spend in the bucket has reached its ceiling. Unset, "other" or an unreadable store: false. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   clientAddress,
   describeConnection,
+  ipv6Network64,
   legacyClientAddress,
   parseTrustProxy,
 } from "../../../src/shared/clientAddress.js";
@@ -140,4 +141,20 @@ describe("parseTrustProxy", () => {
       expect(() => parseTrustProxy(raw)).toThrow(/TRUST_PROXY/);
     }
   );
+});
+
+describe("ipv6Network64", () => {
+  it("reduces an IPv6 address to its /64 network, in every written form", () => {
+    expect(ipv6Network64("2001:db8:abcd:12:1:2:3:4")).toBe("2001:db8:abcd:12::/64");
+    expect(ipv6Network64("2001:DB8:ABCD:0012::")).toBe("2001:db8:abcd:12::/64");
+    expect(ipv6Network64("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(ipv6Network64("::1")).toBe("0:0:0:0::/64");
+    expect(ipv6Network64("fe80::1%eth0")).toBe("fe80:0:0:0::/64");
+    expect(ipv6Network64("64:ff9b::198.51.100.23")).toBe("64:ff9b:0:0::/64");
+  });
+
+  it("leaves anything but IPv6 alone", () => {
+    expect(ipv6Network64("198.51.100.23")).toBeNull();
+    expect(ipv6Network64("not an address")).toBeNull();
+  });
 });

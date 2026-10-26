@@ -170,6 +170,17 @@ export interface ConnectionReport {
   protocol: string;
 }
 
+/**
+ * GET /admin/system/addresses: how many of the limits' address reads found no
+ * client address. They all share one bucket; most of them means TRUST_PROXY
+ * is set higher than the real proxy chain.
+ */
+export interface UnreadableAddressCounts {
+  /** `since`: when the server process started, in ms since the epoch */
+  sinceStart: { unreadable: number; total: number; since: number };
+  lastHour: { unreadable: number; total: number };
+}
+
 /** Who an AI call's cost is booked to: stories without an account, with one, or neither (editor, filter). */
 export type SpendBucket = "anonymous" | "account" | "other";
 export const SPEND_BUCKETS: readonly SpendBucket[] = [

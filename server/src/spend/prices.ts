@@ -162,6 +162,36 @@ export function imageCostFromUsage(model: string, usage: ImageApiUsage): number 
 /** Booked for an image whose usage the API did not report: more than any image the app makes costs. */
 export const IMAGE_CALL_FALLBACK_USD = 0.25;
 
+/**
+ * Booked for an image the Images API's moderation refused. Whether such a
+ * request is billed is not verified, so it is booked as the costliest image.
+ */
+export const REFUSED_IMAGE_ESTIMATE_USD = IMAGE_CALL_FALLBACK_USD;
+
+// Fewer characters per token than English prompts have (about 4), so the
+// estimate errs high
+const ESTIMATE_CHARACTERS_PER_TOKEN = 3;
+// The largest production output cap (chatModel.ts, productionCallLimits), for
+// a call whose own cap wasn't seen
+const ESTIMATE_OUTPUT_CAP_TOKENS = 20_000;
+
+/**
+ * The usage to book for a text call the API billed but that failed before it
+ * reported usage: a reply cut off at its output cap, or stopped by the content
+ * filter. The whole cap, and the prompt at a generous token count.
+ */
+export function unreportedTextUsage(
+  promptCharacters: number | undefined,
+  maxOutputTokens: number | undefined
+): TextUsage {
+  return {
+    inputTokens: Math.ceil((promptCharacters ?? 0) / ESTIMATE_CHARACTERS_PER_TOKEN),
+    cachedTokens: 0,
+    cacheWriteTokens: 0,
+    outputTokens: maxOutputTokens ?? ESTIMATE_OUTPUT_CAP_TOKENS,
+  };
+}
+
 const warned = new Set<string>();
 
 function warnOnce(topic: string, message: string): void {

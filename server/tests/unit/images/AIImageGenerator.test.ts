@@ -32,8 +32,10 @@ jest.unstable_mockModule("../../../src/shared/storageUtils.js", () => ({
 const recordImageCall = jest.fn<
   (charge: unknown, model: string, usage: unknown) => Promise<void>
 >();
+const recordRefusedImageCall = jest.fn<(charge: unknown) => Promise<void>>();
 jest.unstable_mockModule("../../../src/spend/spendLedger.js", () => ({
   recordImageCall,
+  recordRefusedImageCall,
 }));
 
 const { AIImageGenerator, ImageGenerationError } = await import(
@@ -103,6 +105,7 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
   recordImageCall.mockReset();
+  recordRefusedImageCall.mockReset();
 });
 
 afterAll(() => {
@@ -177,6 +180,30 @@ describe("AIImageGenerator spend", () => {
         makeRequest("unbooked_beat_image", "an unlucky harbour")
       )
     ).rejects.toBeInstanceOf(ImageGenerationError);
+    expect(recordImageCall).not.toHaveBeenCalled();
+    expect(recordRefusedImageCall).not.toHaveBeenCalled();
+  });
+
+  it("books an image the API's moderation refused, to its story", async () => {
+    const refusal = Object.assign(
+      new Error("Your request was rejected by the safety system."),
+      { status: 400, code: "moderation_blocked" }
+    );
+    const client: ImageApiClient = {
+      images: {
+        generate: async () => Promise.reject(refusal),
+        edit: async () => Promise.reject(refusal),
+      },
+    };
+    const generator = new AIImageGenerator(client);
+    const story = createMockStory({ id: STORY_ID, generateImages: true });
+
+    await expect(
+      generator.generateBeatImage(story, makeRequest("refused_beat_image", "a harbour"))
+    ).rejects.toBeInstanceOf(ImageGenerationError);
+
+    expect(recordRefusedImageCall).toHaveBeenCalledTimes(1);
+    expect(recordRefusedImageCall).toHaveBeenCalledWith({ storyId: STORY_ID });
     expect(recordImageCall).not.toHaveBeenCalled();
   });
 });

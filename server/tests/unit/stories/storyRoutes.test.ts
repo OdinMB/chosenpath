@@ -11,7 +11,7 @@ import type { SpendBucket } from "core/types/api.js";
 
 const isOverCeiling = jest.fn<(bucket: SpendBucket) => Promise<boolean>>();
 const createStory = jest.fn<() => Promise<void>>();
-const createStoryFromTemplate = jest.fn<() => Promise<void>>();
+const createStoryFromTemplate = jest.fn<() => Promise<boolean>>();
 const getStoryPlayerByCode =
   jest.fn<(code: string) => Promise<{ storyId: string; playerSlot: string } | undefined>>();
 
@@ -69,7 +69,13 @@ beforeEach(() => {
     jest.spyOn(console, method).mockImplementation(() => undefined);
   }
   isOverCeiling.mockResolvedValue(false);
+  createStoryFromTemplate.mockResolvedValue(true);
 });
+
+/** Resolves on a later turn of the event loop, as a database or file write would. */
+function later<T>(value: T): Promise<T> {
+  return new Promise((resolve) => setImmediate(() => resolve(value)));
+}
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -116,6 +122,61 @@ describe("story starts over the spend ceiling", () => {
   });
 });
 
+describe("story start limits", () => {
+  it("holds an address to its anonymous starts when World starts arrive in parallel", async () => {
+    createStoryFromTemplate.mockImplementation(() => later(true));
+    const request = fromNewAddress({ generateImages: false });
+    const handler = handlerOf("post", "/stories/template");
+
+    const sent = await Promise.all(Array.from({ length: 6 }, () => call(handler, request)));
+
+    expect(createStoryFromTemplate).toHaveBeenCalledTimes(RATE_LIMITS.initialize_story.maxRequests);
+    expect(sent.filter((answer) => answer.statusCode === 429)).toHaveLength(
+      6 - RATE_LIMITS.initialize_story.maxRequests
+    );
+  });
+
+  it("holds an account to its image starts when they arrive in parallel", async () => {
+    createStoryFromTemplate.mockImplementation(() => later(true));
+    const request = {
+      ...fromNewAddress({ generateImages: true }),
+      user: { id: `teacher-${addressCounter}` } as Request["user"],
+    };
+    const handler = handlerOf("post", "/stories/template");
+
+    await Promise.all(Array.from({ length: 5 }, () => call(handler, request)));
+
+    expect(createStoryFromTemplate).toHaveBeenCalledTimes(
+      RATE_LIMITS.initialize_story_images.maxRequests
+    );
+  });
+
+  it("doesn't count a World start the creation refused (no such World, a bad player count)", async () => {
+    createStoryFromTemplate.mockResolvedValue(false);
+    const request = fromNewAddress({ generateImages: false });
+
+    await call(handlerOf("post", "/stories/template"), request);
+
+    expect(checkRateLimit(addressKey(request.address), "initialize_story").requestsRemaining).toBe(
+      RATE_LIMITS.initialize_story.maxRequests
+    );
+  });
+
+  it("refuses a start over its limit without reading today's spend", async () => {
+    const request = fromNewAddress({ generateImages: false });
+    const handler = handlerOf("post", "/stories/template");
+    for (let i = 0; i < RATE_LIMITS.initialize_story.maxRequests; i++) {
+      await call(handler, request);
+    }
+    isOverCeiling.mockClear();
+
+    const sent = await call(handler, request);
+
+    expect(sent.statusCode).toBe(429);
+    expect(isOverCeiling).not.toHaveBeenCalled();
+  });
+});
+
 describe("GET /stories/:code/exists", () => {
   it("answers 200 either way, with whether the code names a story and never which", async () => {
     getStoryPlayerByCode.mockResolvedValueOnce({ storyId: "story-secret", playerSlot: "player1" });
@@ -148,5 +209,19 @@ describe("GET /stories/:code/exists", () => {
     const sent = await call(handler, request);
 
     expect(sent.statusCode).toBe(429);
+  });
+
+  it("holds the cap when the guesses arrive in parallel", async () => {
+    getStoryPlayerByCode.mockImplementation(() => later(undefined));
+    const request = { ...fromNewAddress(), params: { code: "ZZZ999" } };
+    const handler = handlerOf("get", "/stories/:code/exists");
+    const { maxRequests } = RATE_LIMITS.verify_code;
+
+    const sent = await Promise.all(
+      Array.from({ length: maxRequests * 3 }, () => call(handler, request))
+    );
+
+    expect(sent.filter((answer) => answer.statusCode === 200)).toHaveLength(maxRequests);
+    expect(getStoryPlayerByCode).toHaveBeenCalledTimes(maxRequests);
   });
 });

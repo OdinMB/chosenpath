@@ -162,5 +162,8 @@ describe("LlmCallLogger", () => {
       ok: false,
       error: { name: "LengthFinishReasonError", finishReason: "length" },
     });
+    // What the spend ledger books such a billed failure by (spendLedger.ts)
+    expect(records[0]!.maxOutputTokens).toBe(12_000);
+    expect(records[0]!.promptCharacters).toBe("x".length);
   });
 });

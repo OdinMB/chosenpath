@@ -2,7 +2,7 @@ import type { Request } from "express";
 import { RateLimitedAction, RATE_LIMITS } from "core/config.js";
 import { RateLimitInfo } from "core/types/api.js";
 import { Logger } from "shared/logger.js";
-import { requestAddress } from "shared/clientAddress.js";
+import { ipv6Network64, requestAddress } from "shared/clientAddress.js";
 
 /*
  * Counts requests per key and action in memory, in fixed windows
@@ -11,11 +11,21 @@ import { requestAddress } from "shared/clientAddress.js";
  * is counted for what is decided in limitPolicy.ts. Log lines name the key's
  * kind and the action, never the key: addresses and account ids stay out of
  * the logs (the Privacy page, "IP Address").
+ *
+ * A request that awaits something before it is done (a database lookup, a
+ * sign-up) claims its count before the await (claimRateLimit), so parallel
+ * requests can't all pass the check at the same count; it hands the count back
+ * when the request should not count after all.
  */
 
-/** All requests whose address can't be read share this one bucket. */
+/**
+ * The limit key of an address. All requests whose address can't be read share
+ * one bucket, and an IPv6 address counts by its /64 network, which one
+ * connection usually holds whole, so rotating through it changes nothing.
+ */
 export function addressKey(address: string | null): string {
-  return `address:${address ?? "unknown"}`;
+  if (address === null) return "address:unknown";
+  return `address:${ipv6Network64(address) ?? address}`;
 }
 
 export function accountKey(userId: string): string {
@@ -106,7 +116,44 @@ export function incrementRateLimit(
   );
 }
 
-/** The request's address limit for the action (login, the editor's AI and image routes, sign-up). */
+/**
+ * A request counted against a limit when it was let through. refund() takes
+ * the count back, once, and only while the window it was counted in still
+ * runs: a later window never pays back an earlier one's request.
+ */
+export type RateLimitClaim =
+  | { claimed: false; rateLimit: RateLimitInfo }
+  | { claimed: true; refund: () => void };
+
+/**
+ * Checks the key's limit and, when it isn't reached, counts the request in
+ * the same step, before the caller awaits anything.
+ */
+export function claimRateLimit(
+  key: string,
+  action: RateLimitedAction
+): RateLimitClaim {
+  const rateLimit = checkRateLimit(key, action);
+  if (rateLimit.isLimited) return { claimed: false, rateLimit };
+
+  const window = currentWindow(key, action, Date.now());
+  window.count += 1;
+  let refunded = false;
+  return {
+    claimed: true,
+    refund: () => {
+      if (refunded) return;
+      refunded = true;
+      const stillRunning =
+        windows.get(key)?.get(action) === window && window.resetAt > Date.now();
+      if (stillRunning && window.count > 0) {
+        window.count -= 1;
+      }
+    },
+  };
+}
+
+/** The request's address limit for the action (the editor's AI and image routes). */
 export function checkRateLimitForRequest(
   req: Pick<Request, "socket" | "headers">,
   action: RateLimitedAction
@@ -121,6 +168,14 @@ export function incrementRateLimitForRequest(
   incrementRateLimit(addressKey(requestAddress(req)), action);
 }
 
+/** claimRateLimit by the request's address (sign-up, login). */
+export function claimRateLimitForRequest(
+  req: Pick<Request, "socket" | "headers">,
+  action: RateLimitedAction
+): RateLimitClaim {
+  return claimRateLimit(addressKey(requestAddress(req)), action);
+}
+
 /** An attempt that can fail, such as a code guess; only failures are counted. */
 export type Attempt<T> = { succeeded: boolean; value: T };
 
@@ -129,22 +184,28 @@ export type LimitedAttempt<T> =
   | { limited: false; value: T };
 
 /**
- * Runs the attempt unless the key is already limited, and counts it only when
- * it fails: a class joining from one address by valid codes is never
- * limited, while someone guessing codes is. A thrown error is not counted.
+ * Runs the attempt unless the key is limited, and counts it only when it
+ * fails: a class joining from one address by valid codes is never limited,
+ * while someone guessing codes is. The attempt is counted while it runs, so
+ * guesses sent in parallel meet the same cap as guesses sent one by one; a
+ * success or a thrown error hands its count back.
  */
 export async function limitFailures<T>(
   key: string,
   action: RateLimitedAction,
   attempt: () => Promise<Attempt<T>>
 ): Promise<LimitedAttempt<T>> {
-  const rateLimit = checkRateLimit(key, action);
-  if (rateLimit.isLimited) {
-    return { limited: true, rateLimit };
+  const claim = claimRateLimit(key, action);
+  if (!claim.claimed) {
+    return { limited: true, rateLimit: claim.rateLimit };
   }
-  const outcome = await attempt();
-  if (!outcome.succeeded) {
-    incrementRateLimit(key, action);
+  let outcome: Attempt<T>;
+  try {
+    outcome = await attempt();
+  } catch (error) {
+    claim.refund();
+    throw error;
   }
+  if (outcome.succeeded) claim.refund();
   return { limited: false, value: outcome.value };
 }

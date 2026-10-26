@@ -92,10 +92,11 @@ export const RATE_LIMITS: Record<
     windowMs: 60 * 1000, // 1 minute
     maxRequests: 15,
   },
-  // Limit login attempts
+  // Failed logins per address; a successful login doesn't count. Room for a
+  // school network's teachers mistyping, not for guessing passwords
   login: {
-    windowMs: 24 * 60 * 60 * 1000, // 24 hours
-    maxRequests: 50, // 50 attempts per 24 hours
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    maxRequests: 20,
   },
   // Accounts created per address; rejected sign-ups don't count
   register: {

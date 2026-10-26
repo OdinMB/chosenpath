@@ -1,4 +1,4 @@
-import type { ConnectionReport } from "core/types/api";
+import type { ConnectionReport, UnreadableAddressCounts } from "core/types/api";
 
 /*
  * Whether TRUST_PROXY (the number of proxies in front of the server) is set
@@ -57,4 +57,20 @@ export function describeVerdict(verdict: ClientAddressVerdict): string {
     case "header-removed":
       return "A proxy removed the X-Forwarded-For header this page sent, so the count can't be measured from here.";
   }
+}
+
+/**
+ * How many of the server's address reads found no address, in one line: all
+ * such requests share one limit bucket, and most of them means TRUST_PROXY
+ * counts more proxies than the chain has.
+ */
+export function describeUnreadableCounts(counts: UnreadableAddressCounts): string {
+  const { lastHour, sinceStart } = counts;
+  const since = `${new Date(sinceStart.since).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+  const line =
+    `${lastHour.unreadable.toLocaleString("en-US")} of ${lastHour.total.toLocaleString("en-US")} in the last hour; ` +
+    `${sinceStart.unreadable.toLocaleString("en-US")} of ${sinceStart.total.toLocaleString("en-US")} since the server started (${since}).`;
+  return lastHour.unreadable * 2 > lastHour.total
+    ? `${line} Most requests share one bucket: TRUST_PROXY is likely higher than the proxy chain.`
+    : line;
 }

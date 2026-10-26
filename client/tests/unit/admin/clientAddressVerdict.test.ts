@@ -1,6 +1,7 @@
 import type { ConnectionReport } from "core/types/api";
 import {
   clientAddressVerdict,
+  describeUnreadableCounts,
   describeVerdict,
   FORGED_ADDRESS,
 } from "../../../src/admin/system/clientAddressVerdict";
@@ -101,5 +102,37 @@ describe("describeVerdict", () => {
     expect(describeVerdict({ kind: "too-low", configured: 2, correct: 3 })).toContain("(2 → 3)");
     expect(describeVerdict({ kind: "not-set", correct: 3 })).toContain("Set it to 3");
     expect(describeVerdict({ kind: "right", hops: 3 })).toContain("right");
+  });
+});
+
+describe("describeUnreadableCounts", () => {
+  const since = Date.parse("2026-10-26T09:30:00Z");
+
+  it("gives the last hour's and the total counts with the server's start", () => {
+    expect(
+      describeUnreadableCounts({
+        lastHour: { unreadable: 3, total: 1200 },
+        sinceStart: { unreadable: 5, total: 24000, since },
+      })
+    ).toBe("3 of 1,200 in the last hour; 5 of 24,000 since the server started (2026-10-26 09:30 UTC).");
+  });
+
+  it("points at TRUST_PROXY once most of the last hour's requests had no address", () => {
+    const line = describeUnreadableCounts({
+      lastHour: { unreadable: 90, total: 100 },
+      sinceStart: { unreadable: 90, total: 100, since },
+    });
+
+    expect(line).toContain("Most requests share one bucket");
+    expect(line).toContain("TRUST_PROXY");
+  });
+
+  it("says nothing more when no request came in the last hour", () => {
+    expect(
+      describeUnreadableCounts({
+        lastHour: { unreadable: 0, total: 0 },
+        sinceStart: { unreadable: 0, total: 0, since },
+      })
+    ).not.toContain("Most requests");
   });
 });

@@ -110,3 +110,37 @@ describe("GET /admin/system/connection", () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 });
+
+describe("GET /admin/system/addresses", () => {
+  it("refuses a caller without a session before the handler runs", async () => {
+    const [guard] = handlersOf("/admin/system/addresses");
+    const sent: Sent[] = [];
+    const next = jest.fn();
+
+    await guard!(
+      { ...adminRequest(), user: undefined, cookies: {} } as unknown as Request,
+      fakeResponse(sent, "/admin/system/addresses"),
+      next
+    );
+
+    expect(next).not.toHaveBeenCalled();
+    expect(sent[0]?.statusCode).toBe(401);
+  });
+
+  it("answers with the unreadable-address counts and nothing else, uncached", async () => {
+    const handlers = handlersOf("/admin/system/addresses");
+    const handler = handlers[handlers.length - 1]!;
+    const sent: Sent[] = [];
+
+    await handler(adminRequest(), fakeResponse(sent, "/admin/system/addresses"), jest.fn());
+
+    expect(sent[0]!.statusCode).toBe(200);
+    expect(sent[0]!.headers["cache-control"]).toBe("private, no-store");
+    const data = sent[0]!.body.data as Record<string, unknown>;
+    expect(Object.keys(data).sort()).toEqual(["lastHour", "sinceStart"]);
+    const answer = JSON.stringify(sent[0]!.body);
+    for (const address of ["203.0.113.7", "198.51.100.23", "10.0.0.3"]) {
+      expect(answer).not.toContain(address);
+    }
+  });
+});

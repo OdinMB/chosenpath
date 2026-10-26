@@ -4,6 +4,7 @@ import {
   accountKey,
   addressKey,
   checkRateLimit,
+  claimRateLimit,
   incrementRateLimit,
   limitFailures,
   seatKey,
@@ -118,6 +119,38 @@ describe("limitFailures", () => {
     });
   });
 
+  it("holds the cap for guesses sent in parallel, each awaiting its lookup", async () => {
+    const key = addressKey(fresh("burst"));
+    const { maxRequests } = RATE_LIMITS.verify_code;
+    const slowFailure = async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+      return { succeeded: false, value: "invalid" };
+    };
+
+    const outcomes = await Promise.all(
+      Array.from({ length: maxRequests * 3 }, () =>
+        limitFailures(key, "verify_code", slowFailure)
+      )
+    );
+
+    expect(outcomes.filter((outcome) => !outcome.limited)).toHaveLength(maxRequests);
+    expect(checkRateLimit(key, "verify_code").isLimited).toBe(true);
+  });
+
+  it("hands back the count of an attempt that throws", async () => {
+    const key = addressKey(fresh("outage"));
+
+    await expect(
+      limitFailures(key, "verify_code", async () => {
+        throw new Error("database unavailable");
+      })
+    ).rejects.toThrow("database unavailable");
+
+    expect(checkRateLimit(key, "verify_code").requestsRemaining).toBe(
+      RATE_LIMITS.verify_code.maxRequests
+    );
+  });
+
   it("refuses a limited key without running the attempt, even one that would succeed", async () => {
     const key = addressKey(fresh("guesser"));
     useUp(key, "verify_code");
@@ -127,6 +160,63 @@ describe("limitFailures", () => {
 
     expect(outcome).toMatchObject({ limited: true });
     expect(attempt).not.toHaveBeenCalled();
+  });
+});
+
+describe("claimRateLimit", () => {
+  it("counts a request when it lets it through, so parallel requests can't share a count", () => {
+    const key = accountKey(fresh("teacher"));
+    const { maxRequests } = RATE_LIMITS.initialize_story_images;
+
+    const claims = Array.from({ length: maxRequests + 3 }, () =>
+      claimRateLimit(key, "initialize_story_images")
+    );
+
+    expect(claims.filter((claim) => claim.claimed)).toHaveLength(maxRequests);
+    expect(claims[maxRequests]).toMatchObject({ claimed: false, rateLimit: { isLimited: true } });
+  });
+
+  it("takes a refunded count back once", () => {
+    const key = addressKey(fresh("signup"));
+    const claim = claimRateLimit(key, "register");
+    claimRateLimit(key, "register");
+    if (!claim.claimed) throw new Error("the first claim was refused");
+
+    claim.refund();
+    claim.refund();
+
+    expect(checkRateLimit(key, "register").requestsRemaining).toBe(
+      RATE_LIMITS.register.maxRequests - 1
+    );
+  });
+
+  it("never refunds into a later window", () => {
+    jest.useFakeTimers();
+    const key = addressKey(fresh("late"));
+    const { windowMs } = RATE_LIMITS.verify_code;
+    const early = claimRateLimit(key, "verify_code");
+    if (!early.claimed) throw new Error("the first claim was refused");
+
+    jest.advanceTimersByTime(windowMs + 1);
+    claimRateLimit(key, "verify_code");
+    early.refund();
+
+    expect(checkRateLimit(key, "verify_code").requestsRemaining).toBe(
+      RATE_LIMITS.verify_code.maxRequests - 1
+    );
+  });
+});
+
+describe("address keys", () => {
+  it("counts an IPv6 address by its /64 network, so rotating within it changes nothing", () => {
+    expect(addressKey("2001:db8:abcd:12:1:2:3:4")).toBe(addressKey("2001:db8:abcd:12:ffff::9"));
+    expect(addressKey("2001:db8:abcd:12::1")).not.toBe(addressKey("2001:db8:abcd:13::1"));
+    expect(addressKey("2001:db8:abcd:12::1")).toBe("address:2001:db8:abcd:12::/64");
+  });
+
+  it("keeps IPv4 addresses whole", () => {
+    expect(addressKey("198.51.100.23")).toBe("address:198.51.100.23");
+    expect(addressKey("198.51.100.23")).not.toBe(addressKey("198.51.100.24"));
   });
 });
 

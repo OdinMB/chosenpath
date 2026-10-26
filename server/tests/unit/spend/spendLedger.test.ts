@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { SpendBucket } from "core/types/api.js";
 import type { DailySpend, SpendKind } from "../../../src/spend/spendStore.js";
-import type { StoryOrigin } from "../../../src/stories/StoryDbService.js";
+import type { StoryOrigin } from "../../../src/stories/storyOrigins.js";
 import type { LlmCallRecord } from "../../../src/shared/llm/usageRecorder.js";
+import {
+  REFUSED_IMAGE_ESTIMATE_USD,
+  textCallCostUsd,
+} from "../../../src/spend/prices.js";
 
 const addSpend =
   jest.fn<(day: string, bucket: SpendBucket, usd: number, kind: SpendKind) => Promise<void>>();
@@ -16,14 +20,15 @@ jest.unstable_mockModule("../../../src/spend/spendStore.js", () => ({
   totalsSince,
   utcDay: (date: Date) => date.toISOString().slice(0, 10),
 }));
-jest.unstable_mockModule("../../../src/stories/StoryDbService.js", () => ({
-  storyDbService: { getStoryOrigin },
+jest.unstable_mockModule("../../../src/stories/storyOrigins.js", () => ({
+  storyOrigin: getStoryOrigin,
 }));
 
 const {
   imagesAllowedFor,
   isOverCeiling,
   recordImageCall,
+  recordRefusedImageCall,
   recordTextCall,
   resolveSpendCeilings,
   spendTotals,
@@ -85,11 +90,47 @@ describe("recordTextCall", () => {
     expect(addSpend.mock.calls[0]![1]).toBe("other");
   });
 
-  it("records nothing for a failed call, whose cost isn't reported", async () => {
-    await recordTextCall(textRecord({ ok: false, metrics: undefined, storyId: "story-1" }));
+  it("records nothing for a call that failed before a reply (a timeout, an outage)", async () => {
+    await recordTextCall(
+      textRecord({
+        ok: false,
+        metrics: undefined,
+        storyId: "story-1",
+        maxOutputTokens: 8_000,
+        promptCharacters: 30_000,
+        error: { name: "APIConnectionTimeoutError" },
+      })
+    );
 
     expect(addSpend).not.toHaveBeenCalled();
   });
+
+  it.each(["length", "content_filter"])(
+    "books a reply that failed with %s after it was billed: the whole output cap and the prompt",
+    async (finishReason) => {
+      getStoryOrigin.mockResolvedValue("account");
+
+      await recordTextCall(
+        textRecord({
+          ok: false,
+          metrics: undefined,
+          storyId: "story-1",
+          maxOutputTokens: 8_000,
+          promptCharacters: 30_000,
+          error: { name: "LengthFinishReasonError", finishReason },
+        })
+      );
+
+      const expected = textCallCostUsd("gpt-6-luna", {
+        inputTokens: 10_000,
+        cachedTokens: 0,
+        cacheWriteTokens: 0,
+        outputTokens: 8_000,
+      });
+      expect(addSpend).toHaveBeenCalledWith(expect.any(String), "account", expected, "text");
+      expect(expected).toBeGreaterThan(0);
+    }
+  );
 
   it("never throws into the model call when the store fails", async () => {
     addSpend.mockRejectedValue(new Error("connection refused"));
@@ -110,6 +151,19 @@ describe("recordImageCall", () => {
       ["anonymous", "image"],
       ["other", "image"],
     ]);
+  });
+
+  it("books an image the API's moderation refused at the conservative estimate", async () => {
+    getStoryOrigin.mockResolvedValue("anonymous");
+
+    await recordRefusedImageCall({ storyId: "story-2" });
+
+    expect(addSpend).toHaveBeenCalledWith(
+      expect.any(String),
+      "anonymous",
+      REFUSED_IMAGE_ESTIMATE_USD,
+      "image"
+    );
   });
 });
 

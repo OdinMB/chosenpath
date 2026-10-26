@@ -3,6 +3,7 @@ import type { Request } from "express";
 import type { Socket } from "socket.io";
 import type { ConnectionReport } from "core/types/api.js";
 import { Logger } from "shared/logger.js";
+import { noteAddressRead } from "shared/unreadableAddresses.js";
 
 /*
  * The visitor's address, which every per-address limit counts by, for HTTP
@@ -60,6 +61,33 @@ function normalizeAddress(entry: string | undefined): string | null {
   const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(host);
   const address = mapped ? mapped[1] : host;
   return isIP(address) ? address : null;
+}
+
+/** An IPv6 address's groups, "::" expanded; a dotted IPv4 tail counts as its two groups. */
+function ipv6Groups(address: string): string[] {
+  const [head, tail] = address.split("::");
+  const groupsOf = (part: string | undefined) =>
+    (part ? part.split(":") : []).flatMap((group) =>
+      group.includes(".") ? ["0", "0"] : [group]
+    );
+  const before = groupsOf(head);
+  const after = tail === undefined ? [] : groupsOf(tail);
+  const missing = tail === undefined ? 0 : 8 - before.length - after.length;
+  return [...before, ...Array<string>(Math.max(0, missing)).fill("0"), ...after];
+}
+
+/**
+ * The /64 network of an IPv6 address, written "2001:db8:1:2::/64"; null for
+ * anything else. One connection is usually handed a whole /64, so per-address
+ * limits count it as one address (rateLimiter.ts, addressKey).
+ */
+export function ipv6Network64(address: string): string | null {
+  const bare = address.split("%")[0];
+  if (isIP(bare) !== 6) return null;
+  const network = ipv6Groups(bare)
+    .slice(0, 4)
+    .map((group) => parseInt(group, 16).toString(16));
+  return `${network.join(":")}::/64`;
 }
 
 /**
@@ -149,24 +177,15 @@ export function trustProxyHops(): number | null {
   return configuredHops.hops;
 }
 
-let unknownLogged = false;
-
-/** Logs once per process that an address couldn't be read; never the request's headers. */
-function noteUnknown(address: string | null): string | null {
-  if (address === null && !unknownLogged) {
-    unknownLogged = true;
-    log.warn(
-      "A request's client address could not be read (no X-Forwarded-For, a chain shorter than TRUST_PROXY, or no address at that position). Such requests share one limit bucket. Logged once per process."
-    );
-  }
-  return address;
-}
-
-/** The visitor's address for an HTTP request, by the configured hop count. */
+/**
+ * The visitor's address for an HTTP request, by the configured hop count.
+ * Each read is counted (unreadableAddresses.ts), so an unreadable share shows
+ * on /admin/system.
+ */
 export function requestAddress(
   req: Pick<Request, "socket" | "headers">
 ): string | null {
-  return noteUnknown(
+  return noteAddressRead(
     addressFor(
       req.socket.remoteAddress,
       req.headers["x-forwarded-for"],
@@ -177,7 +196,7 @@ export function requestAddress(
 
 /** The visitor's address for a Socket.IO connection, by the configured hop count. */
 export function socketAddress(socket: Pick<Socket, "handshake">): string | null {
-  return noteUnknown(
+  return noteAddressRead(
     addressFor(
       socket.handshake.address,
       socket.handshake.headers["x-forwarded-for"],
