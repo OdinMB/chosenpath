@@ -35,6 +35,13 @@ function render(enabled: boolean, count = 4, disabled = false): string {
 }
 
 const isDisabled = (tag: string): boolean => /\sdisabled=""/.test(tag);
+/** Disabled outright, or marked unavailable while staying focusable. */
+const isUnavailable = (tag: string): boolean =>
+  isDisabled(tag) || attribute(tag, "aria-disabled") === "true";
+const fewer = (html: string) => openingTag(html, "button", "aria-label", "One story fewer");
+const more = (html: string) => openingTag(html, "button", "aria-label", "One story more");
+const panelClass = (html: string): string =>
+  attribute(openingTag(html, "div", "id", "several-stories-panel"), "class") ?? "";
 
 describe("MultiStoryStartField, not ticked", () => {
   it("offers the checkbox and nothing to count yet", () => {
@@ -72,20 +79,39 @@ describe("MultiStoryStartField, ticked", () => {
   });
 
   it("lets the stepper go no lower than 2 and no higher than 12", () => {
-    const fewer = (html: string) => openingTag(html, "button", "aria-label", "One story fewer");
-    const more = (html: string) => openingTag(html, "button", "aria-label", "One story more");
-
     const atMin = render(true, 2);
-    expect(isDisabled(fewer(atMin))).toBe(true);
-    expect(isDisabled(more(atMin))).toBe(false);
+    expect(isUnavailable(fewer(atMin))).toBe(true);
+    expect(isUnavailable(more(atMin))).toBe(false);
 
     const between = render(true, 5);
-    expect(isDisabled(fewer(between))).toBe(false);
-    expect(isDisabled(more(between))).toBe(false);
+    expect(isUnavailable(fewer(between))).toBe(false);
+    expect(isUnavailable(more(between))).toBe(false);
 
     const atMax = render(true, 12);
-    expect(isDisabled(fewer(atMax))).toBe(false);
-    expect(isDisabled(more(atMax))).toBe(true);
+    expect(isUnavailable(fewer(atMax))).toBe(false);
+    expect(isUnavailable(more(atMax))).toBe(true);
+  });
+
+  it("keeps a stepper button at its limit focusable, and drops its hover look", () => {
+    // A keyboard user pressing + up to 12 keeps their place on the button
+    const button = more(render(true, 12));
+
+    expect(isDisabled(button)).toBe(false);
+    expect(attribute(button, "class")).toMatch(/cursor-not-allowed/);
+    expect(attribute(button, "class")).not.toMatch(/hover:/);
+    expect(attribute(more(render(true, 5)), "class")).toMatch(/hover:/);
+  });
+
+  it("tints the panel only while ticked, with nothing white competing", () => {
+    expect(panelClass(render(true))).toMatch(/\bbg-accent-100\b/);
+    expect(panelClass(render(true))).not.toMatch(/\bbg-white\b/);
+    expect(panelClass(render(false))).toMatch(/\bbg-white\b/);
+    expect(panelClass(render(false))).not.toMatch(/\bbg-accent/);
+  });
+
+  it("keeps the left bar's width in both states, so ticking moves nothing", () => {
+    expect(panelClass(render(false))).toMatch(/\bborder-l-8\b/);
+    expect(panelClass(render(true))).toMatch(/\bborder-l-8\b/);
   });
 
   it("locks every control while stories are starting", () => {
@@ -93,8 +119,8 @@ describe("MultiStoryStartField, ticked", () => {
 
     expect(isDisabled(openingTag(html, "input", "id", "start-several-stories"))).toBe(true);
     expect(isDisabled(openingTag(html, "input", "id", "story-count"))).toBe(true);
-    expect(isDisabled(openingTag(html, "button", "aria-label", "One story fewer"))).toBe(true);
-    expect(isDisabled(openingTag(html, "button", "aria-label", "One story more"))).toBe(true);
+    expect(isDisabled(fewer(html))).toBe(true);
+    expect(isDisabled(more(html))).toBe(true);
   });
 });
 

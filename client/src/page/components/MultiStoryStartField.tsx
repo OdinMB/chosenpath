@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ColoredBox, Icons, InfoIcon, PrimaryButton } from "components/ui";
+import { Icons, InfoIcon } from "components/ui";
 import {
   STORY_COUNT_MAX,
   STORY_COUNT_MIN,
@@ -30,6 +31,51 @@ function listSeparator(index: number, length: number): string {
   return index === length - 2 ? " and " : ", ";
 }
 
+interface StepperButtonProps {
+  label: string;
+  /** The count is at this button's end of 2 to 12. */
+  atLimit: boolean;
+  /** The whole form is busy. */
+  disabled: boolean;
+  onStep: () => void;
+  children: ReactNode;
+}
+
+/**
+ * The − or + beside the count. At its limit it stays focusable (aria-disabled),
+ * so a keyboard user stepping to 2 or 12 keeps their place; while the form is
+ * busy it is disabled outright. Either way it looks unavailable and has no
+ * hover look, and its focus ring shows for keyboard focus only.
+ */
+function StepperButton({
+  label,
+  atLimit,
+  disabled,
+  onStep,
+  children,
+}: StepperButtonProps) {
+  const unavailable = disabled || atLimit;
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-controls="story-count"
+      aria-disabled={atLimit || undefined}
+      disabled={disabled}
+      onClick={() => {
+        if (!unavailable) onStep();
+      }}
+      className={`inline-flex h-12 w-12 items-center justify-center rounded-lg border bg-white text-primary-800 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent ${
+        unavailable
+          ? "border-primary-200 opacity-40 cursor-not-allowed"
+          : "border-primary-400 hover:border-accent hover:bg-accent-50"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 /**
  * "Start several stories at once", for signed-in users on a World's settings:
  * the checkbox, with where the feature is explained, and while it is ticked,
@@ -47,12 +93,16 @@ export function MultiStoryStartField({
   const shownCount = clampStoryCount(count);
 
   return (
-    <ColoredBox
-      as="div"
-      colorType={enabled ? "accent" : "grey"}
-      isActive={enabled}
-      leftBorder={enabled}
-      className="p-4 md:p-6 space-y-4"
+    // Not ColoredBox: its own bg-white outranks its active tint in the
+    // built CSS. The left bar keeps its width unticked (transparent), so
+    // ticking the box moves nothing.
+    <div
+      id="several-stories-panel"
+      className={`p-4 md:p-6 space-y-4 rounded-lg border border-l-8 shadow-md transition-colors duration-300 motion-reduce:transition-none ${
+        enabled
+          ? "border-accent-800 bg-accent-100"
+          : "border-primary-100 border-l-transparent bg-white"
+      }`}
     >
       <div>
         <div className="items-center flex">
@@ -72,6 +122,8 @@ export function MultiStoryStartField({
             <InfoIcon
               tooltipText="Starts several copies of this story, all with these settings. Each copy has its own seat codes, for one player or several."
               className="ml-2 -mt-0.5"
+              // Narrow enough for the tooltip's shift to keep it on a phone's screen
+              contentClassName="max-w-[min(20rem,calc(100vw-1rem))]"
               position="top"
             />
           </label>
@@ -115,18 +167,14 @@ export function MultiStoryStartField({
               Number of stories
             </label>
             <div className="mt-2 flex items-center justify-center gap-3 sm:gap-4">
-              <PrimaryButton
-                type="button"
-                variant="outline"
-                leftBorder={false}
-                aria-label="One story fewer"
-                aria-controls="story-count"
-                onClick={() => onCountChange(stepStoryCount(count, -1))}
-                disabled={disabled || shownCount <= STORY_COUNT_MIN}
-                className="h-12 w-12"
+              <StepperButton
+                label="One story fewer"
+                atLimit={shownCount <= STORY_COUNT_MIN}
+                disabled={disabled}
+                onStep={() => onCountChange(stepStoryCount(count, -1))}
               >
                 <Icons.Minus className="h-4 w-4" />
-              </PrimaryButton>
+              </StepperButton>
               <input
                 id="story-count"
                 type="number"
@@ -142,18 +190,14 @@ export function MultiStoryStartField({
                 className="w-24 h-14 px-2 bg-white border border-accent rounded-md shadow-sm text-center font-montserrat text-3xl md:text-4xl font-semibold text-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 disabled={disabled}
               />
-              <PrimaryButton
-                type="button"
-                variant="outline"
-                leftBorder={false}
-                aria-label="One story more"
-                aria-controls="story-count"
-                onClick={() => onCountChange(stepStoryCount(count, 1))}
-                disabled={disabled || shownCount >= STORY_COUNT_MAX}
-                className="h-12 w-12"
+              <StepperButton
+                label="One story more"
+                atLimit={shownCount >= STORY_COUNT_MAX}
+                disabled={disabled}
+                onStep={() => onCountChange(stepStoryCount(count, 1))}
               >
                 <Icons.Plus className="h-4 w-4" />
-              </PrimaryButton>
+              </StepperButton>
             </div>
             <p
               id="story-count-range"
@@ -170,6 +214,6 @@ export function MultiStoryStartField({
           </p>
         </div>
       )}
-    </ColoredBox>
+    </div>
   );
 }
