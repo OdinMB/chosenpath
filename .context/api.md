@@ -1573,7 +1573,7 @@ The following client routes are available for navigation:
 
 Loads template data via `configurableTemplateLoader`.
 
-**Error**: Throws 400 if template ID is missing.
+**Error**: Throws 400 if template ID is missing. The route's `TemplateErrorBoundary` shows what any loader or render error means in plain words, through `describeTemplateError` (`client/src/resources/templates/loaders/templateLoadErrors.ts`), never the raw error text: a missing (404) or unshared (401/403) template "isn't available — it may have been removed, or its creator isn't sharing it right now" (a "private" template is only unlisted, so its links still work), without Retry; a failed connection says so and offers Retry; a template missing its player counts (`InvalidTemplateError`) can't be played, without Retry; anything else gets a plain message and Retry.
 
 ---
 
