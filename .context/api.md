@@ -1561,6 +1561,8 @@ The following client routes are available for navigation:
 - `/for-storytellers` - Information for storytellers
 - `/for-coaches` - Information for coaches
 - `/for-educators` - Information for educators
+- `/for-therapists` - Information for therapists
+- `/stewardship` - For organisations that could take the project on
 - `/academy` - Academy landing page
 - `/academy/:lectureId` - Individual lecture pages
 - `/library` - Template library browser
