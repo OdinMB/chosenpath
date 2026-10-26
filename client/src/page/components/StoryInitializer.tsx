@@ -1304,7 +1304,7 @@ export const StoryInitializer = ({
                       : getPlaceholderText();
                   }
                   if (selectedCategory === "vent-about-reality") {
-                    return "I'm poor soul who tries to find an apartment";
+                    return "I'm a poor soul who tries to find an apartment";
                   }
                   if (selectedCategory === "pretend-to-be") {
                     return "Let the story play in Los Angeles";

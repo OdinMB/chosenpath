@@ -127,6 +127,17 @@ describe("StoryInitializer read-with-kids ages", () => {
   });
 });
 
+describe("StoryInitializer premise placeholder", () => {
+  it("reads as a sentence for vent about reality", () => {
+    mockSearch = "step=3&category=vent-about-reality";
+    const html = renderMarkup(<StoryInitializer onBack={jest.fn()} />);
+
+    expect(html).toContain(
+      'placeholder="I&#x27;m a poor soul who tries to find an apartment"'
+    );
+  });
+});
+
 describe("StoryInitializer after a setup", () => {
   afterEach(() => {
     mockCreation = IDLE_CREATION;
