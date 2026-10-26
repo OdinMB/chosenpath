@@ -4,11 +4,16 @@ import { TemplateMetadata } from "core/types";
 import { groupTagsByCategories } from "../../resources/templates/tagCategories";
 import { templateCache } from "../../resources/templates/templateCache";
 
-interface LibraryLoaderData {
+export interface LibraryLoaderData {
   templates: TemplateMetadata[];
   tagCategories: Record<string, string[]>;
   initialTags: string[];
   initialPlayerCount: number | null;
+  /**
+   * The templates couldn't be fetched (and none were cached), so an empty list
+   * means "not loaded", not "nothing matches"
+   */
+  loadFailed: boolean;
 }
 
 /**
@@ -50,6 +55,7 @@ export async function libraryLoader({
         tagCategories: {},
         initialTags: [],
         initialPlayerCount: null,
+        loadFailed: false,
       };
     }
 
@@ -87,27 +93,19 @@ export async function libraryLoader({
       tagCategories,
       initialTags,
       initialPlayerCount,
+      loadFailed: false,
     };
   } catch (error) {
     Logger.App.error("Failed to load template metadata", error);
 
-    // Return appropriate empty structure based on context
-    return isWelcomeScreen
-      ? {
-          templates: [],
-          tagCategories: {},
-          initialTags: [],
-          initialPlayerCount: null,
-        }
-      : {
-          templates: [],
-          tagCategories: {},
-          initialTags: [],
-          initialPlayerCount: playersParam
-            ? isNaN(parseInt(playersParam, 10))
-              ? null
-              : parseInt(playersParam, 10)
-            : null,
-        };
+    // The page shows the failure and a retry instead of filters, so no filter
+    // is read from the URL
+    return {
+      templates: [],
+      tagCategories: {},
+      initialTags: [],
+      initialPlayerCount: null,
+      loadFailed: true,
+    };
   }
 }

@@ -2,20 +2,16 @@ import { TemplateMetadata } from "core/types";
 import { TemplateCard } from "./TemplateCard";
 import { PrimaryButton, Icons } from "components/ui";
 import { useEffect, useState, useMemo, useCallback } from "react";
+import type { ReactNode } from "react";
 import { Modal } from "shared/components/ui";
 import { CreateYourOwnCard } from "./CreateYourOwnCard";
 import { NoMatchesCard } from "./NoMatchesCard";
+import { LibraryLoadFailedNotice } from "./LibraryLoadFailedNotice";
 import { NewsletterModal, useNewsletter } from "../../resources/newsletter";
 import { NewsletterCard } from "./NewsletterCard";
-import { useNavigate, useLoaderData } from "react-router-dom";
+import { useNavigate, useLoaderData, useRevalidator } from "react-router-dom";
 import { useLibraryBrowser } from "../hooks/useLibraryBrowser";
-
-interface LibraryLoaderData {
-  templates: TemplateMetadata[];
-  tagCategories: Record<string, string[]>;
-  initialTags: string[];
-  initialPlayerCount: number | null;
-}
+import type { LibraryLoaderData } from "../loaders/libraryLoader";
 
 // Simple share modal component
 export function ShareFilterModal({
@@ -84,9 +80,84 @@ export function ShareFilterModal({
 }
 
 export function LibraryBrowser() {
+  const loaderData = useLoaderData() as LibraryLoaderData;
+
+  // Switching from one to the other mounts the library afresh, so after a
+  // retry that works its filters start from the URL
+  return loaderData.loadFailed ? (
+    <LibraryLoadFailed />
+  ) : (
+    <LoadedLibrary {...loaderData} />
+  );
+}
+
+/** The library's heading and Back button around its content; actions go before Back. */
+function LibraryPage({
+  actions,
+  children,
+}: {
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   const navigate = useNavigate();
-  const { templates, tagCategories, initialTags, initialPlayerCount } =
-    useLoaderData() as LibraryLoaderData;
+
+  const handleBack = () => {
+    // Clear URL parameters before going back
+    window.history.replaceState({}, document.title, window.location.pathname);
+    navigate("/");
+  };
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      <main className="flex-1">
+        <div className="max-w-4xl mx-auto p-4 font-lora">
+          <div className="flex justify-between items-center mb-6 relative">
+            <div className="w-full flex justify-start lg:justify-center">
+              <h1 className="text-2xl font-bold text-primary-800">Library</h1>
+            </div>
+            <div className="flex items-center gap-2 absolute right-0">
+              {actions}
+              <PrimaryButton
+                onClick={handleBack}
+                size="sm"
+                variant="outline"
+                leftBorder={false}
+                className="flex items-center gap-1 h-[32px]"
+              >
+                <Icons.ArrowLeft className="w-4 h-4" />
+                Back
+              </PrimaryButton>
+            </div>
+          </div>
+
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/** No templates could be fetched: say so and offer to load them again, instead of filters. */
+function LibraryLoadFailed() {
+  const revalidator = useRevalidator();
+
+  return (
+    <LibraryPage>
+      <LibraryLoadFailedNotice
+        onRetry={() => void revalidator.revalidate()}
+        isRetrying={revalidator.state === "loading"}
+      />
+    </LibraryPage>
+  );
+}
+
+function LoadedLibrary({
+  templates,
+  tagCategories,
+  initialTags,
+  initialPlayerCount,
+}: LibraryLoaderData) {
+  const navigate = useNavigate();
 
   const {
     filteredTemplates,
@@ -171,12 +242,6 @@ export function LibraryBrowser() {
     },
     [navigate]
   );
-
-  const handleBack = () => {
-    // Clear URL parameters before going back
-    window.history.replaceState({}, document.title, window.location.pathname);
-    navigate("/");
-  };
 
   const handleCreateStory = useCallback(() => {
     navigate("/setup");
@@ -396,79 +461,60 @@ export function LibraryBrowser() {
   ]);
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <main className="flex-1">
-        <div className="max-w-4xl mx-auto p-4 font-lora">
-          <div className="flex justify-between items-center mb-6 relative">
-            <div className="w-full flex justify-start lg:justify-center">
-              <h1 className="text-2xl font-bold text-primary-800">Library</h1>
-            </div>
-            <div className="flex items-center gap-2 absolute right-0">
-              {/* Share button - only visible when filters are active */}
-              {hasActiveFilters && (
-                <PrimaryButton
-                  onClick={handleShare}
-                  size="sm"
-                  variant="outline"
-                  leftBorder={false}
-                  className="flex items-center gap-1 h-[32px]"
-                  aria-label="Share current filters"
-                  title="Share current filters"
-                  leftIcon={<Icons.Share className="w-4 h-4" />}
-                />
-              )}
-              <PrimaryButton
-                onClick={handleBack}
-                size="sm"
-                variant="outline"
-                leftBorder={false}
-                className="flex items-center gap-1 h-[32px]"
-              >
-                <Icons.ArrowLeft className="w-4 h-4" />
-                Back
-              </PrimaryButton>
-            </div>
+    <LibraryPage
+      actions={
+        // Share button - only visible when filters are active
+        hasActiveFilters && (
+          <PrimaryButton
+            onClick={handleShare}
+            size="sm"
+            variant="outline"
+            leftBorder={false}
+            className="flex items-center gap-1 h-[32px]"
+            aria-label="Share current filters"
+            title="Share current filters"
+            leftIcon={<Icons.Share className="w-4 h-4" />}
+          />
+        )
+      }
+    >
+      {/* Text-based filters */}
+      {renderFilters()}
+
+      {/* Templates grid */}
+      {filteredTemplates.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+          <CreateYourOwnCard
+            onCreateStory={handleCreateStory}
+            className="h-full"
+          />
+          <NoMatchesCard onClearFilters={clearFilters} className="h-full" />
+          <div className="md:col-span-2">
+            <NewsletterCard
+              onOpenNewsletter={openNewsletterModal}
+              className="h-full"
+            />
           </div>
-
-          {/* Text-based filters */}
-          {renderFilters()}
-
-          {/* Templates grid */}
-          {filteredTemplates.length === 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-              <CreateYourOwnCard
-                onCreateStory={handleCreateStory}
-                className="h-full"
-              />
-              <NoMatchesCard onClearFilters={clearFilters} className="h-full" />
-              <div className="md:col-span-2">
-                <NewsletterCard
-                  onOpenNewsletter={openNewsletterModal}
-                  className="h-full"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-              {shuffledAndPositionedItems}
-            </div>
-          )}
-
-          {/* Share modal */}
-          <ShareFilterModal
-            isOpen={isShareModalOpen}
-            onClose={() => setIsShareModalOpen(false)}
-            shareUrl={shareUrl}
-          />
-
-          {/* Newsletter Modal */}
-          <NewsletterModal
-            isOpen={isNewsletterModalOpen}
-            onClose={closeNewsletterModal}
-            onSubmit={handleSubscribe}
-          />
         </div>
-      </main>
-    </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+          {shuffledAndPositionedItems}
+        </div>
+      )}
+
+      {/* Share modal */}
+      <ShareFilterModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        shareUrl={shareUrl}
+      />
+
+      {/* Newsletter Modal */}
+      <NewsletterModal
+        isOpen={isNewsletterModalOpen}
+        onClose={closeNewsletterModal}
+        onSubmit={handleSubscribe}
+      />
+    </LibraryPage>
   );
 }
