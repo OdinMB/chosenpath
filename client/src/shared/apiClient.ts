@@ -28,6 +28,7 @@ import {
 } from "./notifications/notifications";
 import { notificationService } from "./notifications/notificationService";
 import { MODERATION_MESSAGE } from "./notifications/moderationMessage";
+import { describeApiError } from "./notifications/apiErrorMessages";
 
 // Extend axios request config to include adminAuth property
 export interface AdminRequestConfig extends AxiosRequestConfig {
@@ -187,10 +188,12 @@ axiosInstance.interceptors.response.use(
         response.data.status &&
         response.data.status !== ResponseStatus.SUCCESS
       ) {
+        Logger.API?.error?.(
+          `Unexpected API status '${response.data.status}' in a successful HTTP response from ${responseUrl}`
+        );
         notificationService.addNotification({
           type: "error",
-          title: "API Error",
-          message: `Unexpected API status '${response.data.status}' in a successful HTTP response.`,
+          ...describeApiError({ response }),
           duration: 7000,
         });
         return Promise.reject(response.data); // Reject with the problematic data.
@@ -230,9 +233,7 @@ axiosInstance.interceptors.response.use(
             const rateLimitError = apiResponse as RateLimitedResponse;
             notificationService.addNotification({
               type: "warning",
-              title: "Rate Limit Exceeded",
-              message:
-                "You've reached the maximum number of requests for this action.",
+              ...describeApiError(error),
               timeRemaining: rateLimitError.rateLimit.timeRemaining,
               autoClose: false,
             } as RateLimitNotification);
@@ -251,12 +252,7 @@ axiosInstance.interceptors.response.use(
             
             notificationService.addNotification({
               type: "error",
-              title: errorResponse.operationType
-                ? `Error: ${errorResponse.operationType}`
-                : "Error",
-              message:
-                errorResponse.errorMessage ||
-                "An unexpected server error occurred.",
+              ...describeApiError(error),
               duration: 5000,
             });
             // The body alone doesn't tell a missing resource (404) from a
@@ -270,10 +266,10 @@ axiosInstance.interceptors.response.use(
           default: {
             // This case handles situations where error.response.data exists and has a 'status'
             // field, but that status isn't one of the known handled cases.
+            Logger.API?.error?.(`Unknown API status '${apiResponse.status}'`);
             notificationService.addNotification({
               type: "error",
-              title: "API Error",
-              message: `Received an unknown API status: ${apiResponse.status}. Please try again.`,
+              ...describeApiError(error),
               duration: 5000,
             });
             return Promise.reject(apiResponse);
@@ -320,17 +316,10 @@ axiosInstance.interceptors.response.use(
 
     // Generic fallback notification if none of the above specific handlers caught it.
     // This handles cases like network errors (error.response is undefined), or if error.response.data
-    // isn't in the expected {status: ..., ...} format.
-    const fallbackErrorMessage =
-      error.response?.data?.errorMessage || // If there's a structured message from a non-standard API error
-      (typeof error.response?.data === "string" ? error.response.data : null) || // If data is just a string message
-      error.message || // Axios or network error message
-      "An unexpected network or server error occurred.";
-
+    // isn't in the expected {status: ..., ...} format. The raw error text is logged above.
     notificationService.addNotification({
       type: "error",
-      title: "Network/Server Error",
-      message: fallbackErrorMessage,
+      ...describeApiError(error),
       duration: 7000,
     });
 
