@@ -116,4 +116,31 @@ describe("TemplateConfigurator after a setup", () => {
     expect(text).toContain("We couldn't create this story. Please try again.");
     expect(text).not.toContain("ABC123");
   });
+
+  it("shows the codes under the template's title once the story is set up", () => {
+    mockCreation = { ...IDLE_CREATION, storyId: "story-1", playerCodes: { player1: "ABC123" }, storyReady: true };
+
+    const text = accessibleText(renderMarkup(<TemplateConfigurator />));
+
+    expect(text).toContain("The Lighthouse");
+    expect(text).toContain("ABC123");
+    expect(text).not.toContain("Settings");
+  });
+});
+
+describe("TemplateConfigurator settings", () => {
+  afterEach(() => {
+    mockTemplate = TEMPLATE;
+  });
+
+  it("shows the settings panel even when the template fixes players, length and difficulty", () => {
+    mockTemplate = { ...TEMPLATE, playerCountMax: 1 };
+
+    const html = renderMarkup(<TemplateConfigurator />);
+
+    expect(accessibleText(html)).toContain("Settings");
+    expect(html).not.toContain('id="player-count"');
+    expect(html).toContain('id="generate-images"');
+    expect(html).toContain('id="pregenerate-beats"');
+  });
 });

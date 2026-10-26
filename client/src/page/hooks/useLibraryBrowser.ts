@@ -7,6 +7,54 @@ interface UseLibraryBrowserProps {
   initialPlayerCount: number | null;
 }
 
+/** Every tag the templates carry, trimmed */
+export function tagsInTemplates(templates: TemplateMetadata[]): Set<string> {
+  const uniqueTags = new Set<string>();
+  templates.forEach((template) => {
+    if (template.tags && Array.isArray(template.tags)) {
+      template.tags.forEach((tag) => {
+        if (typeof tag === "string" && tag.trim()) {
+          uniqueTags.add(tag.trim());
+        }
+      });
+    }
+  });
+  return uniqueTags;
+}
+
+/**
+ * The templates that can be played by `players` and carry every one of `tags`.
+ * A null player count matches any template; tags no template carries are ignored.
+ */
+export function filterTemplates(
+  templates: TemplateMetadata[],
+  players: number | null,
+  tags: string[]
+): TemplateMetadata[] {
+  let result = [...templates];
+
+  if (players !== null) {
+    result = result.filter(
+      (template) =>
+        players >= template.playerCountMin &&
+        players <= template.playerCountMax
+    );
+  }
+
+  const validTags = tagsInTemplates(templates);
+  const validSelectedTags = tags.filter((tag) => validTags.has(tag));
+
+  if (validSelectedTags.length > 0) {
+    result = result.filter(
+      (template) =>
+        template.tags &&
+        validSelectedTags.every((tag) => template.tags.includes(tag))
+    );
+  }
+
+  return result;
+}
+
 export function useLibraryBrowser({
   templates,
   initialTags,
@@ -23,19 +71,10 @@ export function useLibraryBrowser({
   });
 
   // Get all valid tags from templates
-  const getValidTags = useCallback(() => {
-    const uniqueTags = new Set<string>();
-    templates.forEach((template) => {
-      if (template.tags && Array.isArray(template.tags)) {
-        template.tags.forEach((tag) => {
-          if (typeof tag === "string" && tag.trim()) {
-            uniqueTags.add(tag.trim());
-          }
-        });
-      }
-    });
-    return uniqueTags;
-  }, [templates]);
+  const getValidTags = useCallback(
+    () => tagsInTemplates(templates),
+    [templates]
+  );
 
   // Get all available player counts from templates
   const getAvailablePlayerCounts = useCallback(() => {
@@ -107,30 +146,13 @@ export function useLibraryBrowser({
 
   // Apply filters to templates
   const applyFilters = useCallback(() => {
-    let result = [...templates];
+    setFilteredTemplates(
+      filterTemplates(templates, playerCountFilter, selectedTags)
+    );
 
-    // Filter by player count
-    if (playerCountFilter !== null) {
-      result = result.filter(
-        (template) =>
-          playerCountFilter >= template.playerCountMin &&
-          playerCountFilter <= template.playerCountMax
-      );
-    }
-
-    // Get valid tags to filter against
+    // Only tags that exist in templates go into the URL
     const validTags = getValidTags();
     const validSelectedTags = selectedTags.filter((tag) => validTags.has(tag));
-
-    if (validSelectedTags.length > 0) {
-      result = result.filter(
-        (template) =>
-          template.tags &&
-          validSelectedTags.every((tag) => template.tags.includes(tag))
-      );
-    }
-
-    setFilteredTemplates(result);
 
     if (playerCountFilter !== null || validSelectedTags.length > 0) {
       updateUrlWithFilters(validSelectedTags);
