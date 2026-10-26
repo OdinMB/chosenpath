@@ -52,9 +52,30 @@ export function accessibleText(html: string): string {
     .trim();
 }
 
-function attribute(tag: string, name: string): string | undefined {
+/** An attribute's value in an opening tag, entities decoded. */
+export function attribute(tag: string, name: string): string | undefined {
   const match = tag.match(new RegExp(`\\s${name}="([^"]*)"`));
   return match?.[1] === undefined ? undefined : decode(match[1]);
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The opening tag of the first <tag> whose attribute `name` is `value` (as the
+ * markup writes it), or "" when there is none.
+ */
+export function openingTag(
+  html: string,
+  tag: string,
+  name: string,
+  value: string
+): string {
+  const pattern = new RegExp(
+    `<${tag}(?=\\s)[^>]*\\s${escapeRegExp(name)}="${escapeRegExp(value)}"[^>]*>`
+  );
+  return pattern.exec(html)?.[0] ?? "";
 }
 
 export type RenderedNote = {

@@ -899,6 +899,11 @@ export const StoryInitializer = ({
   };
 
   const renderStep2 = () => {
+    // The game mode's name as its label shows it, which the slider reads out too
+    const gameModeName = gameMode
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+
     return (
       <div className="space-y-4 sm:space-y-6">
         <ConfigSummary
@@ -927,6 +932,9 @@ export const StoryInitializer = ({
               min={MIN_PLAYERS}
               max={MAX_PLAYERS}
               value={playerCount}
+              aria-valuetext={`${playerCount} player${
+                playerCount !== 1 ? "s" : ""
+              }`}
               onChange={(e) =>
                 handlePlayerCountChangeInternal(
                   Number(e.target.value) as PlayerCount
@@ -947,10 +955,7 @@ export const StoryInitializer = ({
                 htmlFor="game-mode"
                 className="text-sm md:text-base font-medium text-primary"
               >
-                Game Mode:{" "}
-                {gameMode
-                  .replace(/-/g, " ")
-                  .replace(/\b\w/g, (l) => l.toUpperCase())}
+                Game Mode: {gameModeName}
               </label>
               <input
                 id="game-mode"
@@ -965,6 +970,7 @@ export const StoryInitializer = ({
                     ? 0.5
                     : 1
                 }
+                aria-valuetext={gameModeName}
                 onChange={handleGameModeChange}
                 className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
               />

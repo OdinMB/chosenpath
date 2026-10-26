@@ -84,7 +84,7 @@ tests/
 
 ### Client rendering tests
 
-The client has no DOM in Jest (`testEnvironment: node`, no Testing Library). Components are rendered with `renderMarkup` from `client/tests/helpers/staticMarkup.ts` (`react-dom/server`), which runs no effects: the markup is the first paint, before any interaction. That is what the AI-label tests assert (`notesIn` reads each `role="note"` with its accessible name, `lang` and text). Story and session fixtures are in `client/tests/helpers/storyFixtures.ts`; wrap game components in `GameSessionContext.Provider` with `gameSession(state)`.
+The client has no DOM in Jest (`testEnvironment: node`, no Testing Library). Components are rendered with `renderMarkup` from `client/tests/helpers/staticMarkup.ts` (`react-dom/server`), which runs no effects: the markup is the first paint, before any interaction. That is what the AI-label tests assert (`notesIn` reads each `role="note"` with its accessible name, `lang` and text). The accessibility tests read single elements with `openingTag` (the first tag with a given attribute value) and `attribute` (a value, entities decoded): labels, `aria-*` state, `aria-valuetext`. Story and session fixtures are in `client/tests/helpers/storyFixtures.ts`; wrap game components in `GameSessionContext.Provider` with `gameSession(state)`.
 
 - State that an effect sets (beat navigation, image sources in `StoryImage` and `ImageCard`) never appears in a static render: mock the hook or the image component with a marker that shows the props you assert on.
 - A button's handler can be reached without a DOM when its component uses no hooks: call the component as a function and walk the returned element tree, element props included, for the button (`TurnFailedNotice.test.tsx`).

@@ -15,11 +15,11 @@ How to keep this true:
 
 | Item | Value | Evidence |
 |---|---|---|
-| Name on the system (F1) | "Chosen Path" at chosenpath.ai. A private individual runs it under that name; he is named in the site footer. It is not incorporated. | `client/src/page/components/Footer.tsx:95-124`; `client/index.html:14`; `client/src/page/static/ForStorytellers.tsx:91` |
+| Name on the system (F1) | "Chosen Path" at chosenpath.ai. A private individual runs it under that name; he is named in the site footer. It is not incorporated. | `client/src/page/components/Footer.tsx:95-133`; `client/index.html:14`; `client/src/page/static/ForStorytellers.tsx:91` |
 | Our role | **Both.** Provider of the Chosen Path AI system, built on OpenAI models [AIA Art. 3(3); G ¶¶10–11]. Deployer for what the operator publishes himself: library templates and covers an admin approves, site illustrations, launch posts [G ¶15]. | assessment §2 |
 | Partner and written role split (F6) | None today. A new steward is being sought, and nothing is in writing (ASK-OWNER, §11). | `client/src/page/static/Stewardship.tsx:13-16` |
 | Audience; minors or vulnerable users (F2) | Public. Anyone can create and play without a login. **Minors: yes** ("Read with Kids"). Emotionally vulnerable users are plausible ("Vent about Reality", "Meet your Future Self", the therapist and coach pages). | `server/src/stories/storyRoutes.ts` (`verifyUser({ required: false })`); `client/src/page/Page.tsx:96-130` |
-| Professional or personal (F3) | Not purely personal, so the Art. 50(4) deployer duties apply [G ¶19]. Whether it is "placed on the market" is open (brief §10 q2–q4): it is free, donation-funded, offers a commercial licence, and plans a premium tier. | `Footer.tsx:115`; `Page.tsx:193`; `Stewardship.tsx:76-83` |
+| Professional or personal (F3) | Not purely personal, so the Art. 50(4) deployer duties apply [G ¶19]. Whether it is "placed on the market" is open (brief §10 q2–q4): it is free, donation-funded, offers a commercial licence, and plans a premium tier. | `Footer.tsx:121`; `Page.tsx:193`; `Stewardship.tsx:76-83` |
 | Open source; hosted instance, and whether it runs today (F5) | AGPL-3.0-or-later. Hosted at chosenpath.ai and api.chosenpath.ai on Render; assumed to be running. | `LICENSE`; `.context/deployment.md` |
 | Code of Practice signatory | No | — |
 

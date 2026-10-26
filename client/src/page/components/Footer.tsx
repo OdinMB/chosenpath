@@ -100,24 +100,33 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center hover:text-primary-600"
+              aria-label="Odin Mühlenbein's website"
             >
-              <Icons.Globe />
+              <span aria-hidden="true">
+                <Icons.Globe />
+              </span>
             </a>
             <a
               href="https://www.linkedin.com/in/odinmuehlenbein/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center hover:text-primary-600"
+              aria-label="Odin Mühlenbein on LinkedIn"
             >
-              <Icons.LinkedIn />
+              <span aria-hidden="true">
+                <Icons.LinkedIn />
+              </span>
             </a>
             <a
               href="https://ko-fi.com/OdinMB"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center hover:text-primary-600"
+              aria-label="Support us on Ko-fi"
             >
-              <Icons.Heart />
+              <span aria-hidden="true">
+                <Icons.Heart />
+              </span>
             </a>
           </div>
           <span>Sonnenallee 50, 12045 Berlin</span>

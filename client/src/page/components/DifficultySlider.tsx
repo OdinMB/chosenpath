@@ -42,7 +42,7 @@ export const DifficultySlider: React.FC<DifficultySliderProps> = ({
   return (
     <div>
       <label
-        htmlFor="difficulty-level-title"
+        htmlFor="difficulty-level-slider"
         className="text-sm md:text-base font-medium text-primary flex items-center mb-2"
       >
         Difficulty: {selectedDifficultyLevel.title}
@@ -59,6 +59,7 @@ export const DifficultySlider: React.FC<DifficultySliderProps> = ({
         max={availableDifficultyLevels.length - 1}
         step={1}
         value={currentSliderValue}
+        aria-valuetext={selectedDifficultyLevel.title}
         onChange={handleSliderChange}
         className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
         disabled={disabled}

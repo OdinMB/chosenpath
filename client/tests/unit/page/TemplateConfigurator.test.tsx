@@ -1,7 +1,13 @@
 import { GameModes, PublicationStatus } from "core/types";
 import type { TemplateMetadata } from "core/types";
 import { TemplateConfigurator } from "../../../src/page/components/TemplateConfigurator";
-import { accessibleText, notesIn, renderMarkup } from "../../helpers/staticMarkup";
+import {
+  accessibleText,
+  attribute,
+  notesIn,
+  openingTag,
+  renderMarkup,
+} from "../../helpers/staticMarkup";
 
 // The real config reads import.meta.env, which Jest cannot parse
 jest.mock("../../../src/config", () =>
@@ -32,10 +38,11 @@ const TEMPLATE: TemplateMetadata = {
 
 // /templates/:id/configure, where library and home "Play" buttons and shared
 // links arrive
+let mockTemplate = TEMPLATE;
 jest.mock("react-router-dom", () => ({
   ...jest.requireActual("react-router-dom"),
   useNavigate: () => jest.fn(),
-  useLoaderData: () => ({ template: TEMPLATE }),
+  useLoaderData: () => ({ template: mockTemplate }),
 }));
 const IDLE_CREATION = {
   isLoading: false,
@@ -72,6 +79,27 @@ describe("TemplateConfigurator AI notice", () => {
       .replace(/<p[\s\S]*?<\/p>/, "");
     expect(afterNote).toMatch(/^<div[^>]*><button[^>]*>[\s\S]*?Back/);
     expect(afterNote).toContain("Start Story");
+  });
+});
+
+describe("TemplateConfigurator sliders", () => {
+  afterEach(() => {
+    mockTemplate = TEMPLATE;
+  });
+
+  it("reads out the player count with its unit", () => {
+    const slider = openingTag(renderMarkup(<TemplateConfigurator />), "input", "id", "player-count");
+
+    expect(attribute(slider, "value")).toBe("1");
+    expect(attribute(slider, "aria-valuetext")).toBe("1 player");
+  });
+
+  it("reads out the story length in turns", () => {
+    mockTemplate = { ...TEMPLATE, maxTurnsMin: 8, maxTurnsMax: 12 };
+
+    const slider = openingTag(renderMarkup(<TemplateConfigurator />), "input", "id", "max-turns");
+
+    expect(attribute(slider, "aria-valuetext")).toBe(`${attribute(slider, "value")} turns`);
   });
 });
 

@@ -1,6 +1,12 @@
 import { KID_AGES_HINT } from "core/types";
 import { StoryInitializer } from "../../../src/page/components/StoryInitializer";
-import { accessibleText, notesIn, renderMarkup } from "../../helpers/staticMarkup";
+import {
+  accessibleText,
+  attribute,
+  notesIn,
+  openingTag,
+  renderMarkup,
+} from "../../helpers/staticMarkup";
 
 // The real config reads import.meta.env, which Jest cannot parse
 jest.mock("../../../src/config", () =>
@@ -124,6 +130,45 @@ describe("StoryInitializer read-with-kids ages", () => {
     const html = renderKids("");
     expect(accessibleText(html)).not.toContain(KID_AGES_HINT);
     expect(createButton(html)).not.toContain("disabled");
+  });
+});
+
+// Step 2, where the player count and (for a group) the game mode are set
+describe("StoryInitializer setup sliders", () => {
+  function renderStep2(query: string): string {
+    mockSearch = `step=2&category=enjoy-fiction&${query}`;
+    return renderMarkup(<StoryInitializer onBack={jest.fn()} />);
+  }
+  const slider = (html: string, id: string) => openingTag(html, "input", "id", id);
+
+  it("reads out the player count with its unit", () => {
+    expect(attribute(slider(renderStep2("players=1"), "player-count-step2"), "aria-valuetext")).toBe("1 player");
+    expect(attribute(slider(renderStep2("players=3"), "player-count-step2"), "aria-valuetext")).toBe("3 players");
+  });
+
+  // The visible "Game Mode: …" label's text after the colon
+  const gameModeLabelName = (html: string) =>
+    accessibleText(
+      /<label[^>]*for="game-mode"[^>]*>([\s\S]*?)<\/label>/.exec(html)?.[1] ?? ""
+    ).replace(/^Game Mode:\s*/, "");
+
+  it.each([
+    ["cooperative", "0", "Cooperative"],
+    ["cooperative-competitive", "0.5", "Cooperative Competitive"],
+    ["competitive", "1", "Competitive"],
+    // A link can carry the single-player mode with more players
+    ["single-player", "1", "Single Player"],
+  ])("reads out game mode %s by the name its label shows", (mode, value, name) => {
+    const html = renderStep2(`players=2&mode=${mode}`);
+    const gameMode = slider(html, "game-mode");
+
+    expect(gameModeLabelName(html)).toBe(name);
+    expect(attribute(gameMode, "value")).toBe(value);
+    expect(attribute(gameMode, "aria-valuetext")).toBe(name);
+  });
+
+  it("has no game mode slider for one player", () => {
+    expect(slider(renderStep2("players=1"), "game-mode")).toBe("");
   });
 });
 

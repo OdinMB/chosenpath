@@ -244,6 +244,9 @@ export function TemplateConfigurator() {
                     min={template.playerCountMin}
                     max={template.playerCountMax}
                     value={playerCount}
+                    aria-valuetext={`${playerCount} player${
+                      playerCount !== 1 ? "s" : ""
+                    }`}
                     onChange={handlePlayerCountChange}
                     className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
                   />
@@ -276,6 +279,7 @@ export function TemplateConfigurator() {
                     min={template.maxTurnsMin}
                     max={template.maxTurnsMax}
                     value={maxTurns}
+                    aria-valuetext={`${maxTurns} turns`}
                     onChange={(e) => setMaxTurns(Number(e.target.value))}
                     className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
                   />
