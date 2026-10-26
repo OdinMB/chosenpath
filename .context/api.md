@@ -1581,6 +1581,8 @@ Loads template data via `configurableTemplateLoader`.
 
 Loads library data via `libraryLoader`.
 
+**Error**: When the templates can't be fetched (and `templateCache` holds no copy, stale or fresh), the loader returns no templates and `loadFailed: true` instead of throwing. `LibraryBrowser` then shows "We couldn't load the library" with Retry (`LibraryLoadFailedNotice`; Retry revalidates the route) in place of the filters, so the no-matches card only ever means the filters match nothing. A retry that works mounts the library afresh, with the URL's filters.
+
 ---
 
 ## Security Considerations
