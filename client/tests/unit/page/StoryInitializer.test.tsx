@@ -1,5 +1,6 @@
-import { KID_AGES_HINT } from "core/types";
+import { GameModes, KID_AGES_HINT } from "core/types";
 import { StoryInitializer } from "../../../src/page/components/StoryInitializer";
+import { gameModeDescription } from "../../../src/page/data/gameModeDescriptions";
 import {
   accessibleText,
   attribute,
@@ -180,6 +181,50 @@ describe("StoryInitializer setup sliders", () => {
 
   it("has no game mode slider for one player", () => {
     expect(slider(renderStep2("players=1"), "game-mode")).toBe("");
+  });
+
+  // The line under the game mode slider that says what the selected mode means
+  const DESCRIPTION_ID = "game-mode-description";
+  const description = (html: string) =>
+    accessibleText(
+      new RegExp(`<p[^>]*id="${DESCRIPTION_ID}"[^>]*>([\\s\\S]*?)</p>`).exec(html)?.[1] ?? ""
+    );
+
+  it.each([
+    ["cooperative", "2", GameModes.Cooperative],
+    ["cooperative-competitive", "2", GameModes.CooperativeCompetitive],
+    ["competitive", "2", GameModes.Competitive],
+    ["cooperative-competitive", "3", GameModes.CooperativeCompetitive],
+    ["competitive", "3", GameModes.Competitive],
+  ])("says what game mode %s means for %s players, tied to the slider", (mode, players, gameMode) => {
+    const html = renderStep2(`players=${players}&mode=${mode}`);
+    const gameModeSlider = slider(html, "game-mode");
+
+    expect(description(html)).toBe(gameModeDescription(gameMode, Number(players)));
+    expect(description(html)).not.toBe("");
+    expect(attribute(gameModeSlider, "aria-describedby")).toBe(DESCRIPTION_ID);
+  });
+
+  it("names no description where the mode has none (single-player mode carried by a link)", () => {
+    const html = renderStep2("players=2&mode=single-player");
+
+    expect(html).not.toContain(DESCRIPTION_ID);
+    expect(attribute(slider(html, "game-mode"), "aria-describedby")).toBeUndefined();
+  });
+
+  it("shows the same line when drafting a World", () => {
+    mockSearch = "step=2&category=enjoy-fiction";
+    const html = renderMarkup(
+      <StoryInitializer
+        onBack={jest.fn()}
+        templateMode
+        initialPlayerCount={2}
+        initialGameMode={GameModes.Competitive}
+      />
+    );
+
+    expect(description(html)).toBe(gameModeDescription(GameModes.Competitive, 2));
+    expect(attribute(slider(html, "game-mode"), "aria-describedby")).toBe(DESCRIPTION_ID);
   });
 });
 
