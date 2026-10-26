@@ -136,7 +136,7 @@ Create a new user account.
 
 Authenticate user and receive auth cookie.
 
-**Rate Limit**: Applied per address (`login`)
+**Rate Limit**: `login`, per address, 20 failed logins per 15 minutes; a successful login doesn't count. Over it: `429`, and the password isn't checked.
 
 **Request Body:**
 
@@ -426,9 +426,9 @@ Link a story code to authenticated user account.
 
 **Auth Required**: No (optional, associates story with user if authenticated)
 
-**Rate Limit**: Signed out, `initialize_story` per address; signed in, `initialize_story_text` or `initialize_story_images` per account, by `generateImages` (`server/src/shared/limitPolicy.ts`). Counted before the setup is queued; a start the ceiling or the limit refuses counts nothing.
+**Rate Limit**: Signed out, `initialize_story` per address; signed in, `initialize_story_text` or `initialize_story_images` per account, by `generateImages` (`server/src/shared/limitPolicy.ts`). Counted when the start is let through, before the spend ceiling is read; a start the ceiling refuses counts nothing. A premise the content filter refuses stays counted (the filter is an AI call).
 
-**Spend ceiling**: refused with a `503` once today's spend ceiling for its kind of story (signed in or not) is reached, checked before the rate limit.
+**Spend ceiling**: refused with a `503` once today's spend ceiling for its kind of story (signed in or not) is reached, checked after the rate limit: a `429` comes before a `503`.
 
 Create a new story from a prompt.
 
@@ -482,7 +482,7 @@ Story is generated asynchronously. Client should poll `/stories/:id/status` unti
 
 **Auth Required**: No (optional)
 
-**Rate Limit**: As for Create Story; counted once the story is created
+**Rate Limit**: As for Create Story; a start the creation refuses (`404` no such template, either `400` refusal listed below, `500` a failed write) counts nothing.
 
 **Spend ceiling**: As for Create Story (`503`)
 
@@ -1456,7 +1456,7 @@ Subscribe email to newsletter.
 
 ## Admin System Endpoints
 
-The admin "System" page's two read-only routes (`server/src/system/adminSystemRoutes.ts`; `/admin/system` in the client), listed here as the exception to this document's non-admin scope. Both need an admin (`verifyAdmin`).
+The admin "System" page's three read-only routes (`server/src/system/adminSystemRoutes.ts`; `/admin/system` in the client), listed here as the exception to this document's non-admin scope. Both need an admin (`verifyAdmin`).
 
 ### Get Connection Report
 
@@ -1465,6 +1465,14 @@ The admin "System" page's two read-only routes (`server/src/system/adminSystemRo
 How the server sees the caller's own request, for setting `TRUST_PROXY` (`.context/deployment.md`, "Client address (`TRUST_PROXY`)"). Sent with `Cache-Control: private, no-store`; it reads, stores and logs nothing of the request. CORS allows an `X-Forwarded-For` header, which the page's second request forges.
 
 **Response:** `ConnectionReport` (`core/types/api.ts`): `address` (what the per-address limits count by, or null), `trustProxy` (the configured count, or null when unset), `connectionAddress` (the socket), `forwardedFor` (the chain as sent, left to right), `candidates` (for each count from 0 to the chain's length, the address it would give), `host`, `protocol`.
+
+### Get Unreadable Address Counts
+
+**GET** `/admin/system/addresses`
+
+How many of the server's address reads found no client address, for spotting a `TRUST_PROXY` set higher than the proxy chain (`.context/deployment.md`). Sent with `Cache-Control: private, no-store`; counts only.
+
+**Response:** `UnreadableAddressCounts` (`core/types/api.ts`): `sinceStart` (`unreadable`, `total`, `since` in ms) and `lastHour` (`unreadable`, `total`).
 
 ### Get Spend Totals
 
@@ -1703,7 +1711,7 @@ The filter fails closed. If it cannot answer, the request is refused: a `500` wi
 
 Rate limits are applied to (windows in `RATE_LIMITS`, `core/config.ts`; who counts for what in `.context/security.md`):
 
-- **Login**: Per address
+- **Login**: `login` per address, failed logins only
 - **Registration**: `register` limit per address, created accounts only
 - **Story Creation**: `initialize_story` per address when signed out; `initialize_story_text` or `initialize_story_images` per account when signed in
 - **Choices** (socket `make_choice`, `select_character`, `retry_turn`): `make_choice` limit per seat in stories an account started, otherwise per address
