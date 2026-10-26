@@ -43,6 +43,7 @@ import {
   defaultPlaceholders,
   PromptCategory,
 } from "../data/suggestionData";
+import { gameModeDescription } from "page/data/gameModeDescriptions";
 import { ConfigSummary } from "./ConfigSummary";
 import { GenerationProgress } from "./GenerationProgress";
 import { AcademyModal } from "shared/components/AcademyModal";
@@ -903,6 +904,8 @@ export const StoryInitializer = ({
     const gameModeName = gameMode
       .replace(/-/g, " ")
       .replace(/\b\w/g, (l) => l.toUpperCase());
+    // What the selected mode means, under the slider and read with it
+    const gameModeHelp = gameModeDescription(gameMode, playerCount);
 
     return (
       <div className="space-y-4 sm:space-y-6">
@@ -971,6 +974,9 @@ export const StoryInitializer = ({
                     : 1
                 }
                 aria-valuetext={gameModeName}
+                aria-describedby={
+                  gameModeHelp ? "game-mode-description" : undefined
+                }
                 onChange={handleGameModeChange}
                 className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
               />
@@ -979,6 +985,14 @@ export const StoryInitializer = ({
                 <span>Mixed</span>
                 <span>Competitive</span>
               </div>
+              {gameModeHelp && (
+                <p
+                  id="game-mode-description"
+                  className="text-sm text-primary-700"
+                >
+                  {gameModeHelp}
+                </p>
+              )}
             </div>
           )}
         </div>
