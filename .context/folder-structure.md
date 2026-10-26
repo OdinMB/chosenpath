@@ -10,16 +10,18 @@
 client/src/
 ├── admin/ # Admin-specific components/pages
 │ ├── components/
+│ ├── system/ # The System page (/admin/system): client-address check, AI spend
 │ ├── adminApi.ts
 │ ├── adminRoutes.ts
 │ └── ...
-├── user/ # User account area components/pages
+├── users/ # User account area components/pages
 │ ├── components/
 │ ├── hooks/
-│ ├── userApi.ts
-│ ├── userRoutes.ts
+│ ├── stories/ # My Stories, the archive, printable seat cards (/users/seat-cards)
+│ ├── usersRoutes.tsx
 │ └── ...
 ├── page/ # Public pages
+│ ├── utils/ # e.g. joinByCode.ts: the home page's join-form code check
 │ └── ...
 ├── resources/ # Feature modules used across contexts
 │ ├── templates/ # Template functionality (used in both admin & user)
@@ -53,8 +55,12 @@ server/src/
 │ ├── templateRoutes.ts
 │ ├── templateService.ts
 │ └── ...
+├── spend/ # AI spend ledger: the price table, the spend_daily store, the daily ceilings
+├── system/ # Admin System routes (/admin/system/connection, /admin/system/spend)
 ├── shared/
+│ ├── clientAddress.ts # The visitor's address for every per-address limit (TRUST_PROXY)
 │ ├── db.ts
+│ ├── limitPolicy.ts # Who a story start or a choice is counted against
 │ ├── logger.ts
 │ ├── rateLimiter.ts
 │ ├── responseUtils.ts

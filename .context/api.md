@@ -91,6 +91,8 @@ All requests should include a `requestId` parameter (query param for GET, body p
 
 Create a new user account.
 
+**Rate Limit**: `register`, per address, 3 per 24 hours; only a created account counts
+
 **Request Body:**
 
 ```typescript
@@ -123,6 +125,7 @@ Create a new user account.
 **Error Cases:**
 
 - `400`: Email already in use, username taken, or invalid password
+- `429`: Rate limit exceeded
 - `500`: Registration failed
 
 ---
@@ -133,7 +136,7 @@ Create a new user account.
 
 Authenticate user and receive auth cookie.
 
-**Rate Limit**: Applied per IP/user
+**Rate Limit**: Applied per address (`login`)
 
 **Request Body:**
 
@@ -356,6 +359,27 @@ Get stories for current user or based on client story codes.
 
 ---
 
+### Get Created Stories
+
+**GET** `/users/stories/created`
+
+**Auth Required**: Yes
+
+The signed-in user's newest 50 created stories, newest first, each with every seat and its code, so seat cards can be printed on any device (`/users/seat-cards`).
+
+**Query Params:**
+
+- `requestId` (optional): Request tracking ID
+
+**Response:** `GetUserStoryFeedResponse` (`core/types/api.ts`): `{ stories: ExtendedStoryMetadata[] }`, each story's `players` holding every seat's code.
+
+**Error Cases:**
+
+- `401`: Authentication required
+- `500`: Failed to get your stories
+
+---
+
 ### Link Story Code
 
 **POST** `/users/stories/link`
@@ -402,7 +426,9 @@ Link a story code to authenticated user account.
 
 **Auth Required**: No (optional, associates story with user if authenticated)
 
-**Rate Limit**: Applied (initialize_story)
+**Rate Limit**: Signed out, `initialize_story` per address; signed in, `initialize_story_text` or `initialize_story_images` per account, by `generateImages` (`server/src/shared/limitPolicy.ts`). Counted before the setup is queued; a start the ceiling or the limit refuses counts nothing.
+
+**Spend ceiling**: refused with a `503` once today's spend ceiling for its kind of story (signed in or not) is reached, checked before the rate limit.
 
 Create a new story from a prompt.
 
@@ -446,6 +472,7 @@ Story is generated asynchronously. Client should poll `/stories/:id/status` unti
 - `400`: The premise was blocked by content moderation (checked before anything is queued, so a refusal never shows up as a failed setup)
 - `429`: Rate limit exceeded
 - `500`: Story creation failed, including when the content filter was unavailable (it fails closed)
+- `503`: Today's spend ceiling is reached; the error message is `SPEND_CEILING_MESSAGE` (`core/types/api.ts`)
 
 ---
 
@@ -455,7 +482,9 @@ Story is generated asynchronously. Client should poll `/stories/:id/status` unti
 
 **Auth Required**: No (optional)
 
-**Rate Limit**: Applied (initialize_story)
+**Rate Limit**: As for Create Story; counted once the story is created
+
+**Spend ceiling**: As for Create Story (`503`)
 
 Create a story from an existing template.
 
@@ -496,7 +525,40 @@ Template-based stories are created synchronously and are ready immediately (no p
 
 - `400`: Player count outside the template's limits, or the template can't start a story for that many players (no outcomes on the shared list or the seats in play, or a multiplayer story without a shared outcome; `core/utils/outcomeReadiness.ts`)
 - `404`: Template not found
+- `429`: Rate limit exceeded
 - `500`: Story creation failed
+- `503`: Today's spend ceiling is reached (`SPEND_CEILING_MESSAGE`)
+
+---
+
+### Check Story Code
+
+**GET** `/stories/:code/exists`
+
+Whether a seat code names a story, for the home page's join form (`client/src/page/utils/joinByCode.ts`). Answers `200` either way and never says which story.
+
+**Rate Limit**: `verify_code` per address, counting misses only (`limitFailures`), as a wrong code on the game page does
+
+**Path Params:**
+
+- `code`: Seat code
+
+**Response:**
+
+```typescript
+{
+  success: true,
+  data: {
+    exists: boolean  // CodeExistsInfo
+  },
+  requestId: string
+}
+```
+
+**Error Cases:**
+
+- `429`: Rate limit exceeded (too many codes that named no story)
+- `500`: Failed to check the story code
 
 ---
 
@@ -1392,6 +1454,32 @@ Subscribe email to newsletter.
 
 ---
 
+## Admin System Endpoints
+
+The admin "System" page's two read-only routes (`server/src/system/adminSystemRoutes.ts`; `/admin/system` in the client), listed here as the exception to this document's non-admin scope. Both need an admin (`verifyAdmin`).
+
+### Get Connection Report
+
+**GET** `/admin/system/connection`
+
+How the server sees the caller's own request, for setting `TRUST_PROXY` (`.context/deployment.md`, "Client address (`TRUST_PROXY`)"). Sent with `Cache-Control: private, no-store`; it reads, stores and logs nothing of the request. CORS allows an `X-Forwarded-For` header, which the page's second request forges.
+
+**Response:** `ConnectionReport` (`core/types/api.ts`): `address` (what the per-address limits count by, or null), `trustProxy` (the configured count, or null when unset), `connectionAddress` (the socket), `forwardedFor` (the chain as sent, left to right), `candidates` (for each count from 0 to the chain's length, the address it would give), `host`, `protocol`.
+
+### Get Spend Totals
+
+**GET** `/admin/system/spend`
+
+Today's and this month's AI spend per bucket (`anonymous`, `account`, `other`; UTC days), with each bucket's daily ceiling.
+
+**Response:** `SpendTotals` (`core/types/api.ts`): `today`, `monthStart`, and per bucket `today` and `month` (`usd`, `textCalls`, `imageCalls`) and `ceilingUsdPerDay` (null when none is set; always null for `other`).
+
+**Error Cases:**
+
+- `500`: Failed to load the spend totals
+
+---
+
 ## WebSocket API
 
 ### Connection
@@ -1613,12 +1701,17 @@ The filter fails closed. If it cannot answer, the request is refused: a `500` wi
 
 ### Rate Limiting
 
-Rate limits are applied to:
+Rate limits are applied to (windows in `RATE_LIMITS`, `core/config.ts`; who counts for what in `.context/security.md`):
 
-- **Login**: Per IP/user
-- **Story Creation**: `initialize_story` limit
+- **Login**: Per address
+- **Registration**: `register` limit per address, created accounts only
+- **Story Creation**: `initialize_story` per address when signed out; `initialize_story_text` or `initialize_story_images` per account when signed in
+- **Choices** (socket `make_choice`, `select_character`, `retry_turn`): `make_choice` limit per seat in stories an account started, otherwise per address
+- **Code checks** (socket `verify_code` and `rejoin_session`, `GET /stories/:code/exists`): `verify_code` limit per address, misses only
 - **Template Generation**: `templateGeneration` limit (non-admin)
 - **Template Iteration**: `templateIteration` limit (non-admin)
+
+Story creation is also refused with a `503` once today's spend ceiling for its kind of story is reached (`.context/deployment.md`, "Daily spend ceilings").
 
 ### Permission-Based Access
 
@@ -1639,6 +1732,7 @@ Template modification endpoints verify:
 - `404` - Not Found (resource doesn't exist)
 - `429` - Too Many Requests (rate limit exceeded)
 - `500` - Internal Server Error (unexpected server error)
+- `503` - Service Unavailable (story starts only: today's spend ceiling is reached)
 
 ---
 

@@ -5,6 +5,7 @@
 - **story_players**: One row per seat in a story: its join code, the account that claimed it, active or archived
 - **templates**: Public library entries, tags, ratings
 - **feedback**: User feedback and content moderation
+- **spend_daily**: AI spend per UTC day and bucket (`anonymous`, `account` or `other`, by who started the story): `day`, `bucket`, `usd`, `text_calls`, `image_calls`, `updated_at`. Totals only, with no user id, address, story id or text. Every AI call adds to its row (`server/src/spend/`); the daily spend ceilings and `/admin/system` read it
 
 The server creates the tables at startup (`initializeDatabase` in `server/src/shared/db.ts`). It connects with `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USER` and `DB_PASSWORD`; unset ones fall back to the docker-compose database (`server/src/shared/dbSettings.ts`).
 

@@ -36,6 +36,28 @@ Since the GPT-6 migration (2026-09-27), production text calls run only on `gpt-6
 - The template editor's group (`GENERATION_MODEL_*`: AI Draft and AI Iteration) defaults to `gpt-6.1-sol` at low effort since 2026-10-02 (`gpt-6-sol` low from 2026-09-28, the owner's templates rating); custom-story setup (`SETUP_MODEL_*`) stays on `gpt-6-luna` low and never follows it. The Render key's OpenAI project must be allowed `gpt-6.1-sol`. `gpt-6.1-sol` takes no effort `none`, so `GENERATION_MODEL_REASONING_EFFORT=none` now stops the server at startup. Its call limits are 360 s since 2026-10-02 (150 s, then 240 s from 2026-09-29) and 20,000 output tokens: 240 s was sized for today's Sol, whose AI Drafts took up to 134 s on a slow evening, and 6.1's one measured draft took 202 s, so the timeout went to 360 s; at that draft's pace the cap is reached around 540 s, so the timeout binds first (`.context/text-model-eval.md`, "Timeouts and output caps"). To roll templates back without a code change, set `GENERATION_MODEL_NAME=gpt-6-sol` (or `gpt-6-luna`) and `GENERATION_MODEL_REASONING_EFFORT=low`.
 - After a deploy, the startup log line `[LLM] text models {…}` shows each group's `model@effort`, and each call's `[LLM] {…}` line its model and effort.
 
+### Client address (`TRUST_PROXY`)
+
+Every per-address limit (anonymous story starts, sign-ups, logins, code checks, choices outside account stories, the editor's AI and image routes) counts by the visitor's address. `server/src/shared/clientAddress.ts` reads it for HTTP and Socket.IO alike: each proxy in front of the app appends to `X-Forwarded-For` the address it received the request from, so with `TRUST_PROXY=N` the visitor is the Nth entry from the right. The count has to be right:
+
+- Too low, and the entry read is a proxy's: every visitor lands in one bucket, and one class can lock out everyone.
+- Too high, and the entry read is one the visitor wrote: anyone can forge their address and step around the limits.
+- Unset (legacy mode), limits use the leftmost entry, which a visitor can forge, and the server logs a warning at startup pointing here. Anything other than a whole number from 0 to 10 (`true`, an address list) refuses startup. 0 means nothing in front: the socket is the visitor (local runs).
+
+Express's `trust proxy` gets the same count (`true` when unset), which now governs only `req.protocol`: limits never read `req.ip`.
+
+To measure it:
+
+- Deploy with it unset, sign in as an admin and open `/admin/system` on chosenpath.ai (which calls api.chosenpath.ai), once from home and once from a phone on mobile data. The page sends a second request with the forged entry `203.0.113.7` and names the count it reaches (`client/src/admin/system/clientAddressVerdict.ts`). Set that number on Render's Environment page. There is no `render.yaml`, so the dashboard holds the value, and saving it redeploys.
+- The second path: the service's own `*.onrender.com` address bypasses any proxy on the custom domain. The browser check can't reach it, because the auth cookie is scoped to `.chosenpath.ai`. Measure it with `curl`: `GET /admin/system/connection` on the `onrender.com` address with an admin's `authToken` cookie and `X-Forwarded-For: 203.0.113.7`, then read `candidates`: the lowest `hops` whose `address` is `203.0.113.7`, minus one, is that path's count. Sign out afterwards to invalidate that session.
+- If the two paths give different counts, no single count is right for both: the higher lets a caller on the shorter path forge their address, the lower puts every visitor on the longer path in one bucket. Remove the extra path (disabling the default `onrender.com` domain is an option, not verified), or use the lower count only where the longer path carries no real visitors.
+
+Measured counts: none yet. Record each path's count here with its date.
+
+### Daily spend ceilings
+
+`SPEND_CEILING_ANONYMOUS_USD_PER_DAY` and `SPEND_CEILING_ACCOUNT_USD_PER_DAY` cap the AI spend per UTC day, in US$, of stories started without and with an account (`server/src/spend/spendLedger.ts`). Unset, the totals are only recorded; 0 refuses every new story of that kind; anything but a number of 0 or more refuses startup. The startup log line `daily spend ceilings (US$, null records only) {…}` shows what the server read. Once a bucket reaches its ceiling, new stories of that kind get a 503 and running ones get no new images; their text goes on. Calls tied to no story (the template editor, the content filter) are booked to `other`, which takes no ceiling. Today's and this month's totals and the ceilings are on `/admin/system`; the costs come from the price table in `server/src/spend/prices.ts`, so compare them with the OpenAI bill.
+
 ### Dependency overrides
 
 The root `package.json` overrides `langsmith` to `^0.6.0`. LangChain 0.3 (`@langchain/core`) still asks for langsmith `^0.3`, and langsmith below 0.6.0 has a high-severity advisory. The server's `ChatOpenAI` + `withStructuredOutput` calls were checked against 0.6.3, with tracing on and off. Drop the override when LangChain moves to 1.x, which accepts langsmith 0.5 and later on its own. The client declares `uuid` itself: it used to get the package and its types from langsmith 0.3 by hoisting.
