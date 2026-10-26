@@ -87,7 +87,7 @@ Express.js backend with:
 
 - **WebSocket**: Real-time game orchestration via Socket.IO
 - **HTTP API**: REST endpoints for CRUD operations
-- **AI Integration**: OpenAI only: text through LangChain `ChatOpenAI`, images through the OpenAI Images API (`@langchain/anthropic` and `@langchain/google-genai` are installed but unused)
+- **AI Integration**: OpenAI only: text through LangChain `ChatOpenAI` (`@langchain/openai`, `@langchain/core`), images through the OpenAI Images API
 - **Storage**: PostgreSQL for users/metadata, JSON files for stories/templates
 - **Authentication**: JWT with role-based access (user/admin)
 

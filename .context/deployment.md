@@ -38,7 +38,11 @@ Since the GPT-6 migration (2026-09-27), production text calls run only on `gpt-6
 
 ### Dependency overrides
 
-The root `package.json` overrides `langsmith` to `^0.6.0`. LangChain 0.3 (`langchain`, `@langchain/core`) still asks for langsmith `^0.3`, and langsmith below 0.6.0 has a high-severity advisory. The server's `ChatOpenAI` + `withStructuredOutput` calls were checked against 0.6.3, with tracing on and off. Drop the override when LangChain moves to 1.x, which accepts langsmith 0.5 and later on its own. The client declares `uuid` itself: it used to get the package and its types from langsmith 0.3 by hoisting.
+The root `package.json` overrides `langsmith` to `^0.6.0`. LangChain 0.3 (`@langchain/core`) still asks for langsmith `^0.3`, and langsmith below 0.6.0 has a high-severity advisory. The server's `ChatOpenAI` + `withStructuredOutput` calls were checked against 0.6.3, with tracing on and off. Drop the override when LangChain moves to 1.x, which accepts langsmith 0.5 and later on its own. The client declares `uuid` itself: it used to get the package and its types from langsmith 0.3 by hoisting.
+
+### Known npm audit findings
+
+Since 2026-10-26 `npm audit` reports no critical finding. The high findings left all come from one advisory, zod's GHSA-mrhx-c7xc-m3w5: an array, map or set with a size limit has every element parsed before the limit is checked. They are zod itself plus `openai`, `@langchain/openai` and `@langchain/core`, which are flagged only because they depend on zod 3. The fix exists only in zod 4.6.6 and later. Moving to it means migrating every schema in core, server and client to zod 4, and with them the structured-output JSON schemas sent to OpenAI, which the text-model eval measures byte for byte. It also needs LangChain 1.x. Importing `zod/v3` from a zod 4 package clears the audit but not the issue: the 4.6.6 fix touches only zod 4's core, so `zod/v3` is unchanged. Exposure is small: the only untrusted input zod parses is the feedback body (no arrays, under `express.json()`'s 100 kB limit); everything else zod parses is a model reply. The moderate findings also wait on major upgrades: `uuid` below 11.1.1 (only `v4()` is used, and the advisory concerns v3/v5/v6 with a buffer) and `postcss-selector-parser` through Tailwind 3 (build time only). CSRF protection is hand-written in `server/src/index.ts`; the unused `csurf` package, which kept an old `cookie` installed, was removed.
 
 ### Installation
 

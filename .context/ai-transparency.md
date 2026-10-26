@@ -23,7 +23,7 @@ How to keep this true:
 | Open source; hosted instance, and whether it runs today (F5) | AGPL-3.0-or-later. Hosted at chosenpath.ai and api.chosenpath.ai on Render; assumed to be running. | `LICENSE`; `.context/deployment.md` |
 | Code of Practice signatory | No | — |
 
-Architecture and processors: no `.context/system-overview.md` exists yet. The only AI vendor is OpenAI, through LangChain `ChatOpenAI` for text and the `openai` SDK for images. The `@langchain/anthropic` and `@langchain/google-genai` packages are installed but unused.
+Architecture and processors: no `.context/system-overview.md` exists yet. The only AI vendor is OpenAI, through LangChain `ChatOpenAI` for text and the `openai` SDK for images. No other model provider's package is installed (`@langchain/anthropic` and `@langchain/google-genai`, never used, were removed on 2026-10-26).
 
 ## 2. AI features
 
