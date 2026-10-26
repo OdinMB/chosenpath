@@ -44,6 +44,7 @@ import {
   PromptCategory,
 } from "../data/suggestionData";
 import { gameModeDescription } from "page/data/gameModeDescriptions";
+import { gameModeKeyHandler } from "page/utils/gameModeSlider";
 import { ConfigSummary } from "./ConfigSummary";
 import { GenerationProgress } from "./GenerationProgress";
 import { AcademyModal } from "shared/components/AcademyModal";
@@ -712,6 +713,13 @@ export const StoryInitializer = ({
     }
   };
 
+  // A game mode chosen on the slider, by dragging or clicking or by key
+  const selectGameMode = (mode: GameMode) => {
+    setGameMode(mode);
+    updateURLParams({ mode });
+    Logger.App.log(`Updated game mode to: ${mode}`);
+  };
+
   const handleGameModeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
     let mode: GameMode;
@@ -724,9 +732,7 @@ export const StoryInitializer = ({
       mode = GameModes.Competitive;
     }
 
-    setGameMode(mode);
-    updateURLParams({ mode });
-    Logger.App.log(`Updated game mode to: ${mode}`);
+    selectGameMode(mode);
   };
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -977,6 +983,8 @@ export const StoryInitializer = ({
                   gameModeHelp ? "game-mode-description" : undefined
                 }
                 onChange={handleGameModeChange}
+                // Keys move from mode to mode; the 0.01 step is for dragging
+                onKeyDown={gameModeKeyHandler(gameMode, selectGameMode)}
                 className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
               />
               <div className="flex justify-between text-xs md:text-sm text-primary-600">
