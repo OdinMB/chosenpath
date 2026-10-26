@@ -39,8 +39,12 @@ npm run test:all    # Tests + test linting
 **Run Specific Tests:**
 
 ```bash
-npm test -- --testPathPattern=fileName.test.ts
+npm test -- --testPathPatterns=fileName.test.ts   # Jest 30 name; --testPathPattern is rejected
 ```
+
+The server's `test:unit` and `test:integration` run `tests/unit/` and `tests/integration/`. `test:watch`, `test:coverage`, `test:unit` and `test:integration` all go through `npm test -- <args>`.
+
+**Server tests need `--experimental-vm-modules`:** the server runs Jest in ESM mode (`ts-jest/presets/default-esm`), which needs that Node flag. The server's `test` script passes it directly: `node --experimental-vm-modules ../node_modules/jest/bin/jest.js` (Jest is hoisted to the root `node_modules`). That works unchanged on Windows (npm's default cmd.exe), macOS and Linux, so no `NODE_OPTIONS` needs exporting. Keep it that way: `set NODE_OPTIONS=…&& jest` only sets the flag in cmd.exe, and `NODE_OPTIONS=… jest` only works in POSIX shells. Jest passes the flag on to its worker processes. The client runs Jest in CommonJS mode and needs no flag.
 
 ### Project-Specific Lint/TypeScript Rules
 
