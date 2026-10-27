@@ -23,7 +23,7 @@ function seatLabel(card: SeatCardData): string | null {
 /**
  * One printable seat card: the story's number and title, the seat (when the
  * story has more than one), the seat code, its join link and a QR code of the
- * link. It never breaks across printed pages.
+ * link, both clickable. It never breaks across printed pages.
  */
 export function SeatCard({ card }: { card: SeatCardData }) {
   const seat = seatLabel(card);
@@ -39,14 +39,26 @@ export function SeatCard({ card }: { card: SeatCardData }) {
         .filter(Boolean)
         .join(", ")}
     >
-      <QRCodeSVG
-        value={card.joinLink}
-        size={112}
-        level="M"
-        marginSize={0}
-        title={`QR code for ${card.joinLink}`}
-        className="flex-shrink-0"
-      />
+      {/* Real links, so a PDF saved from the print dialog keeps them
+          clickable. The QR code's link is for the mouse only: the text link
+          below is the one keyboards and screen readers get. */}
+      <a
+        href={card.joinLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        tabIndex={-1}
+        aria-hidden="true"
+        className="block flex-shrink-0"
+      >
+        <QRCodeSVG
+          value={card.joinLink}
+          size={112}
+          level="M"
+          marginSize={0}
+          title={`QR code for ${card.joinLink}`}
+          className="block"
+        />
+      </a>
       <div className="min-w-0 space-y-1 font-lora">
         <p className="text-xs uppercase tracking-wide text-primary-600">
           Story {card.storyNumber}
@@ -58,7 +70,17 @@ export function SeatCard({ card }: { card: SeatCardData }) {
         <p className="font-mono text-2xl font-semibold tracking-widest text-primary-900">
           {card.code}
         </p>
-        <p className="text-xs text-primary-700 break-all">{card.joinLink}</p>
+        <p className="text-xs text-primary-700 break-all">
+          {/* A new tab, so a click on screen leaves the cards open */}
+          <a
+            href={card.joinLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          >
+            {card.joinLink}
+          </a>
+        </p>
         <p className="text-xs text-primary-600">
           Scan the code, or type it on the home page. No account needed.
         </p>

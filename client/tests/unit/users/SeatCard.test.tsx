@@ -47,6 +47,22 @@ describe("SeatCard", () => {
     expect(accessibleText(renderMarkup(<SeatCard card={CARD} />))).not.toMatch(AUDIENCE_WORDS);
   });
 
+  it("makes the join link and the QR code real links, so a saved PDF keeps them clickable", () => {
+    const html = renderMarkup(<SeatCard card={CARD} />);
+
+    const links = [...html.matchAll(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)];
+    expect(links.map(([, href]) => href)).toEqual([
+      "https://join.example/game/AB12CD",
+      "https://join.example/game/AB12CD",
+    ]);
+    // The QR code's link is one more way to click, not a second tab stop
+    const [qrLink, textLink] = links;
+    expect(qrLink?.[2]).toMatch(/<svg/);
+    expect(qrLink?.[0]).toMatch(/tabindex="-1"/);
+    expect(qrLink?.[0]).toMatch(/aria-hidden="true"/);
+    expect(accessibleText(textLink?.[2] ?? "")).toBe("https://join.example/game/AB12CD");
+  });
+
   it("draws the join link as an inline QR code that stays on one page", () => {
     const html = renderMarkup(<SeatCard card={CARD} />);
 

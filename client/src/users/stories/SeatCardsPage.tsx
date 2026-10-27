@@ -3,14 +3,17 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import type { ExtendedStoryMetadata } from "core/types/api";
 import { Checkbox, Icons, LoadingSpinner, PrimaryButton } from "components/ui";
 import { userStoriesApi } from "client/shared/apiClient";
+import { useDocumentTitle } from "shared/utils/documentTitle";
 import { seatCardsFor } from "./seatCards";
+import { seatCardsDocumentTitle } from "./seatCardsTitle";
 import { SeatCard } from "./SeatCard";
 
 /*
  * /users/seat-cards: the printable seat cards of the stories the signed-in
  * user started, outside the account layout so that only the cards print. The
  * toolbar (screen only) picks the stories; ?stories=<ids> preselects them, as
- * "Start several stories at once" does.
+ * "Start several stories at once" does. While it is open, the page's title
+ * names the date and the stories, so a PDF saved from the print dialog does.
  */
 
 /** The story ids a ?stories= list names. */
@@ -68,6 +71,13 @@ export function SeatCardsPage() {
     (a, b) => b.createdAt - a.createdAt
   );
   const cards = seatCardsFor(stories ?? [], selected);
+  // The print dialog names a saved PDF after the page's title
+  useDocumentTitle(
+    seatCardsDocumentTitle(
+      cards.map((card) => card.storyTitle),
+      new Date()
+    )
+  );
 
   return (
     <div className="min-h-screen bg-white font-lora">
