@@ -2,82 +2,103 @@ import path from "path";
 import fs from "fs/promises";
 import fsSync from "fs";
 import os from "os";
+import { StoryTemplate } from "core/types/index.js";
 import { extractZip, copyDirectoryContents } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 
 const logger = Logger.forService("TemplateZipUtils");
 
 export interface TemplateExtractionResult {
-  templateId: string;
+  /** The World id the zip names, as it names it: check it before any use */
+  templateId: unknown;
+  /** The zip's template.json, or null when the id comes from a folder name */
+  template: Partial<StoryTemplate> | null;
   sourceDir: string;
   tempExtractDir: string;
   tempZipPath: string;
 }
 
+interface TemplateIdAndSource {
+  templateId: unknown;
+  template: Partial<StoryTemplate> | null;
+  sourceDir: string;
+}
+
 /**
- * Extracts a zip file and analyzes its structure to find template ID and source directory
+ * Extracts a zip file into a temporary folder of its own and analyzes its
+ * structure to find template ID and source directory. On failure it removes
+ * the temporary files before throwing.
  * @param zipBuffer - Buffer containing the zip file data
  * @returns Object containing template ID, source directory, and temp paths for cleanup
  */
 export async function extractAndAnalyzeTemplateZip(
   zipBuffer: Buffer
 ): Promise<TemplateExtractionResult> {
-  // Create temporary file for the zip
-  const tempZipPath = path.join(
-    os.tmpdir(),
-    `template-import-${Date.now()}.zip`
+  // A folder no other import shares, and the zip file beside it
+  const tempExtractDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), "template-extract-")
   );
-  await fs.writeFile(tempZipPath, zipBuffer);
+  const tempZipPath = `${tempExtractDir}.zip`;
 
-  // Create temporary extraction directory
-  const tempExtractDir = path.join(
-    os.tmpdir(),
-    `template-extract-${Date.now()}`
-  );
-  await fs.mkdir(tempExtractDir, { recursive: true });
+  try {
+    await fs.writeFile(tempZipPath, zipBuffer);
 
-  // Extract the zip to inspect its structure
-  await extractZip(tempZipPath, tempExtractDir);
+    // Extract the zip to inspect its structure
+    await extractZip(tempZipPath, tempExtractDir);
 
-  // Find template ID and source directory
-  const { templateId, sourceDir } = await findTemplateIdAndSource(
-    tempExtractDir
-  );
+    // Find template ID and source directory
+    const { templateId, template, sourceDir } = await findTemplateIdAndSource(
+      tempExtractDir
+    );
 
-  if (!templateId) {
-    throw new Error("Could not extract template ID from zip file structure");
+    if (!templateId) {
+      throw new Error("Could not extract template ID from zip file structure");
+    }
+
+    return {
+      templateId,
+      template,
+      sourceDir,
+      tempExtractDir,
+      tempZipPath,
+    };
+  } catch (error) {
+    await cleanupTempFiles(tempZipPath, tempExtractDir);
+    throw error;
   }
+}
 
-  return {
-    templateId,
-    sourceDir,
-    tempExtractDir,
-    tempZipPath,
-  };
+/** A template.json's template; throws if the file doesn't hold a JSON object */
+async function readTemplateJson(
+  filePath: string
+): Promise<Partial<StoryTemplate>> {
+  const parsed: unknown = JSON.parse(await fs.readFile(filePath, "utf-8"));
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("template.json holds no template");
+  }
+  return parsed as Partial<StoryTemplate>;
 }
 
 /**
  * Analyzes the extracted zip structure to find template ID and determine source directory
  * @param extractDir - Directory where zip was extracted
- * @returns Object containing template ID and source directory path
+ * @returns Object containing template ID, the template.json it came from, and source directory path
  */
 async function findTemplateIdAndSource(
   extractDir: string
-): Promise<{ templateId: string | null; sourceDir: string }> {
-  let templateId: string | null = null;
+): Promise<TemplateIdAndSource> {
+  let templateId: unknown = null;
   let sourceDir: string = extractDir;
 
   // Check for template.json file at root level
   const rootTemplateJsonPath = path.join(extractDir, "template.json");
   if (fsSync.existsSync(rootTemplateJsonPath)) {
     try {
-      const templateData = JSON.parse(
-        await fs.readFile(rootTemplateJsonPath, "utf-8")
-      );
-      templateId = templateData.id;
+      const template = await readTemplateJson(rootTemplateJsonPath);
+      templateId = template.id;
       sourceDir = extractDir; // Files are at root level
       logger.log(`Found template.json at root level with ID: ${templateId}`);
-      return { templateId, sourceDir };
+      return { templateId, template, sourceDir };
     } catch {
       logger.warn(
         "Failed to parse template.json at root level, checking subdirectories"
@@ -97,15 +118,13 @@ async function findTemplateIdAndSource(
     const dirTemplateJsonPath = path.join(extractDir, dir, "template.json");
     if (fsSync.existsSync(dirTemplateJsonPath)) {
       try {
-        const templateData = JSON.parse(
-          await fs.readFile(dirTemplateJsonPath, "utf-8")
-        );
-        templateId = templateData.id;
+        const template = await readTemplateJson(dirTemplateJsonPath);
+        templateId = template.id;
         sourceDir = path.join(extractDir, dir); // Files are in subdirectory
         logger.log(
           `Found template.json in subdirectory '${dir}' with ID: ${templateId}`
         );
-        return { templateId, sourceDir };
+        return { templateId, template, sourceDir };
       } catch {
         logger.warn(`Failed to parse template.json in directory ${dir}`);
       }
@@ -129,7 +148,7 @@ async function findTemplateIdAndSource(
     }
   }
 
-  return { templateId, sourceDir };
+  return { templateId, template: null, sourceDir };
 }
 
 /**
@@ -170,9 +189,7 @@ export async function cleanupTempFiles(
     }
 
     // Clean up temporary extraction directory
-    if (fsSync.existsSync(tempExtractDir)) {
-      await fs.rmdir(tempExtractDir, { recursive: true });
-    }
+    await fs.rm(tempExtractDir, { recursive: true, force: true });
 
     logger.log("Cleaned up temporary files");
   } catch (error) {

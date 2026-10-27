@@ -1,5 +1,23 @@
 import { describe, expect, it } from "@jest/globals";
-import { validateSafePaths } from "../../../src/shared/safePaths.js";
+import { isUuid, validateSafePaths } from "../../../src/shared/safePaths.js";
+
+describe("isUuid", () => {
+  it("accepts a UUID, the form a World's id takes", () => {
+    expect(isUuid("6f1c2e8a-3b4d-4c5e-9f60-718293a4b5c6")).toBe(true);
+  });
+
+  it.each([
+    ["a parent path", "../../escape"],
+    ["a UUID with a parent step", "6f1c2e8a-3b4d-4c5e-9f60-718293a4b5c6/../x"],
+    ["a plain name", "images"],
+    ["an empty string", ""],
+    ["a number", 7],
+    ["an object", {}],
+    ["a missing value", undefined],
+  ])("refuses %s", (_what, value) => {
+    expect(isUuid(value)).toBe(false);
+  });
+});
 
 describe("validateSafePaths", () => {
   it("accepts ids and relative paths that stay where they are joined", () => {

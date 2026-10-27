@@ -909,9 +909,15 @@ Binary ZIP file with `Content-Type: application/zip`
 
 **Auth Required**: Yes
 
-**Permission Required**: `templates_create`
+**Permission Required**: `templates_create`; saving an existing template also takes edit access to it (the template's creator, or `templates_edit_all`)
 
-Create a new template.
+Create a new template, or save the existing one `template.id` names:
+
+- No `template.id`, or an empty one: the server gives the template a fresh UUID.
+- A UUID no template has: the template is created under it.
+- The id of an existing template (its folder or its database entry): it is saved as **PUT** `/templates/:id` saves it, with the same checks.
+
+A new template's creator is the caller, whatever `creatorId` the body names. Setting `publicationStatus` to `"published"` needs `templates_publish`, and setting `showOnWelcomeScreen` or `order` to other than the template's stored values (for a new template, `false` and `999`) needs `templates_carousel`.
 
 **Request Body:**
 
@@ -934,7 +940,15 @@ Create a new template.
 }
 ```
 
-**Status Code**: `201` for created
+**Status Code**: `201` for created or saved
+
+**Error Cases:**
+
+- `400`: Missing template data, or a `template.id` that isn't a UUID
+- `401`: Not signed in
+- `403`: No `templates_create`, no edit access to the existing template, or publishing or changing the welcome-screen settings without the permission for it
+- `404`: The id names a template folder without its database entry
+- `500`: Save failed
 
 ---
 
@@ -946,7 +960,7 @@ Create a new template.
 
 **Permission Check**: Edit access, publication status change permission, carousel permission
 
-Update an existing template.
+Update an existing template. Without `templates_edit_all`, the caller stays the template's creator whatever `creatorId` the body names.
 
 **Path Params:**
 
@@ -1163,9 +1177,11 @@ Upload a file to template directory (typically images).
 
 **Auth Required**: Yes
 
-**Permission Required**: `templates_create`
+**Permission Required**: `templates_create`; importing over an existing template also takes edit access to it
 
-Import template(s) from a ZIP archive.
+Import a template from a ZIP archive: its `template.json`, at the root or in a folder named by the template's id (as Export lays it out), and the files beside it. The template's id is `template.json`'s `id`, or, for a zip that holds only files, the name of its folder; it must be a UUID. A template with that id is updated, otherwise a new one is created.
+
+Before anything is written to the template's folder, the import checks edit access to an existing template, and applies the publication status and carousel checks of **PUT** `/templates/:id` to `template.json` (for a new template, against `false` and `999`). The zip is unpacked into a temporary folder, removed afterwards, and its files land only in the template's folder. The template keeps the creator its database entry names; a new one's creator is the importer. Its `template.json` names that creator.
 
 **Query Params:**
 
@@ -1192,7 +1208,10 @@ Import template(s) from a ZIP archive.
 
 **Error Cases:**
 
-- `400`: No file or not a ZIP archive
+- `400`: No file, not a ZIP archive, a template id that isn't a UUID, or a zip of only files for a template that doesn't exist
+- `401`: Not signed in
+- `403`: No `templates_create`, no edit access to the existing template, or publishing or changing the welcome-screen settings without the permission for it
+- `404`: The id names a template folder without its database entry
 - `500`: Import failed
 
 ---
@@ -1714,6 +1733,8 @@ All file serving endpoints (`/images`, `/videos`), the template image rename and
 - No `..` sequences allowed
 - No backslashes allowed
 - No absolute paths (starting with `/`)
+
+A template id that `POST /templates` or `POST /templates/import` takes from the request must be a UUID (`isUuid` in the same file).
 
 ### Content Moderation
 

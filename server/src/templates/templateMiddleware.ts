@@ -126,6 +126,134 @@ export function verifyTemplateAccess() {
   };
 }
 
+/** The template fields that need a permission to write, beyond edit access */
+type GuardedTemplateFields = Partial<
+  Pick<StoryTemplate, "publicationStatus" | "showOnWelcomeScreen" | "order">
+>;
+
+/** A World's stored welcome-screen settings, as the templates table holds them */
+type WelcomeScreenSettings = { showOnWelcomeScreen: boolean; orderValue: number };
+
+/** A new World's welcome-screen settings, as TemplateService gives them: not shown, last */
+const NEW_WORLD_WELCOME_SCREEN: WelcomeScreenSettings = {
+  showOnWelcomeScreen: false,
+  orderValue: 999,
+};
+
+/**
+ * Answers 403 and returns false if the template sets the publication status
+ * "published" and the user lacks templates_publish
+ */
+function ensurePublishPermission(
+  req: express.Request,
+  res: express.Response,
+  template: GuardedTemplateFields | undefined,
+  requestId: string
+): boolean {
+  if (
+    template?.publicationStatus === "published" &&
+    !req.userPermissions?.includes("templates_publish")
+  ) {
+    Logger.Route.warn(
+      `User ${req.user?.id} attempted to publish a template without permission`
+    );
+    sendError(
+      res,
+      "Insufficient permissions to publish templates",
+      403,
+      requestId
+    );
+    return false;
+  }
+  return true;
+}
+
+/** Whether the template sets any welcome-screen setting at all */
+function setsWelcomeScreen(template: GuardedTemplateFields | undefined): boolean {
+  return (
+    template?.showOnWelcomeScreen !== undefined || template?.order !== undefined
+  );
+}
+
+/**
+ * Answers 403 and returns false if the template changes the welcome-screen
+ * settings from `current` and the user lacks templates_carousel
+ */
+function ensureCarouselPermission(
+  req: express.Request,
+  res: express.Response,
+  template: GuardedTemplateFields | undefined,
+  current: WelcomeScreenSettings,
+  requestId: string
+): boolean {
+  const isShowOnWelcomeScreenChanging =
+    template?.showOnWelcomeScreen !== undefined &&
+    template.showOnWelcomeScreen !== current.showOnWelcomeScreen;
+  const isOrderChanging =
+    template?.order !== undefined && template.order !== current.orderValue;
+
+  if (
+    (isShowOnWelcomeScreenChanging || isOrderChanging) &&
+    !req.userPermissions?.includes("templates_carousel")
+  ) {
+    Logger.Route.warn(
+      `User ${req.user?.id} attempted to change carousel settings without permission`
+    );
+    sendError(
+      res,
+      "Insufficient permissions to change carousel settings",
+      403,
+      requestId
+    );
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Checks the publication and welcome-screen fields of a template the request
+ * writes, as saving a World with PUT /templates/:id checks them: publishing
+ * needs templates_publish, and changing the welcome-screen settings from the
+ * World's stored ones needs templates_carousel. `templateId` names the
+ * existing World, or is null for a new one, whose settings are compared with
+ * a new World's (not shown, last). Otherwise answers the request (403, or 404
+ * for an existing World without its entry) and returns false.
+ */
+export async function ensureTemplateFieldPermissions(
+  req: express.Request,
+  res: express.Response,
+  template: GuardedTemplateFields | undefined,
+  templateId: string | null,
+  requestId: string
+): Promise<boolean> {
+  if (!ensurePublishPermission(req, res, template, requestId)) {
+    return false;
+  }
+  if (!setsWelcomeScreen(template)) {
+    return true;
+  }
+
+  let current = NEW_WORLD_WELCOME_SCREEN;
+  if (templateId !== null) {
+    try {
+      const entry = await templateDbService.findTemplateEntryById(templateId);
+      if (!entry) {
+        sendError(res, "Template not found", 404, requestId);
+        return false;
+      }
+      current = entry;
+    } catch (error) {
+      Logger.Route.error(
+        `Error checking carousel permission for ${templateId}`,
+        error
+      );
+      sendError(res, "Failed to verify carousel permission", 500, requestId);
+      return false;
+    }
+  }
+  return ensureCarouselPermission(req, res, template, current, requestId);
+}
+
 /**
  * Middleware to verify that a user can change the publication status
  * If the template has publication status "Published", user must have templates_publish permission
@@ -136,35 +264,15 @@ export function verifyPublicationStatusPermission(
   next: express.NextFunction
 ) {
   const requestId = req.body?.requestId || "unknown";
-  const template = req.body?.template;
-
-  // If template doesn't have publication status set, continue
-  if (!template?.publicationStatus) {
-    return next();
+  if (ensurePublishPermission(req, res, req.body?.template, requestId)) {
+    next();
   }
-
-  // If the template has publication status "Published", check permissions
-  if (template.publicationStatus === "published") {
-    // Check if user has templates_publish permission
-    if (!req.userPermissions?.includes("templates_publish")) {
-      Logger.Route.warn(
-        `User ${req.user?.id} attempted to publish a template without permission`
-      );
-      return sendError(
-        res,
-        "Insufficient permissions to publish templates",
-        403,
-        requestId
-      );
-    }
-  }
-
-  next();
 }
 
 /**
  * Middleware to verify that a user can change the welcome screen settings
- * Only checks permissions if the template has welcome screen settings that are being CHANGED
+ * of the World named by the route's :id. Only checks permissions if the
+ * template has welcome screen settings that are being CHANGED
  */
 export async function verifyCarouselPermission(
   req: express.Request,
@@ -173,65 +281,18 @@ export async function verifyCarouselPermission(
 ) {
   const requestId = req.body?.requestId || "unknown";
   const template = req.body?.template;
-  const templateId = req.params?.id;
 
-  // If template doesn't have welcome screen settings, continue
+  // Publishing is checked by verifyPublicationStatusPermission
   if (
-    template?.showOnWelcomeScreen === undefined &&
-    template?.order === undefined
-  ) {
-    return next();
-  }
-
-  try {
-    // Get the current template from database to compare values
-    const currentTemplate = await templateDbService.findTemplateEntryById(
-      templateId
-    );
-
-    if (!currentTemplate) {
-      return sendError(res, "Template not found", 404, requestId);
-    }
-
-    // Check if carousel-related fields are actually being changed
-    const isShowOnWelcomeScreenChanging =
-      template.showOnWelcomeScreen !== undefined &&
-      template.showOnWelcomeScreen !== currentTemplate.showOnWelcomeScreen;
-
-    const isOrderChanging =
-      template.order !== undefined &&
-      template.order !== currentTemplate.orderValue; // Note: DB field is 'orderValue'
-
-    // If neither field is changing, allow the request to proceed
-    if (!isShowOnWelcomeScreenChanging && !isOrderChanging) {
-      return next();
-    }
-
-    // Check if user has templates_carousel permission
-    if (!req.userPermissions?.includes("templates_carousel")) {
-      Logger.Route.warn(
-        `User ${req.user?.id} attempted to change carousel settings without permission`
-      );
-      return sendError(
-        res,
-        "Insufficient permissions to change carousel settings",
-        403,
-        requestId
-      );
-    }
-
-    next();
-  } catch (error) {
-    Logger.Route.error(
-      `Error checking carousel permission for ${templateId}`,
-      error
-    );
-    return sendError(
+    await ensureTemplateFieldPermissions(
+      req,
       res,
-      "Failed to verify carousel permission",
-      500,
+      { showOnWelcomeScreen: template?.showOnWelcomeScreen, order: template?.order },
+      req.params?.id,
       requestId
-    );
+    )
+  ) {
+    next();
   }
 }
 

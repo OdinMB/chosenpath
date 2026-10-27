@@ -1,3 +1,13 @@
+import { validate as isUuidString } from "uuid";
+
+/**
+ * Whether a value is a UUID, the form a World's id takes: safe to use as a
+ * folder name as it is
+ */
+export function isUuid(value: unknown): value is string {
+  return typeof value === "string" && isUuidString(value);
+}
+
 /**
  * Validates that path parameters don't contain directory traversal sequences
  * @param paths Path strings to validate (anything else counts as unsafe)

@@ -29,7 +29,7 @@ import {
   sendRateLimited,
   sendModerationBlocked,
 } from "shared/responseUtils.js";
-import { TemplateService } from "./TemplateService.js";
+import { TemplateService, TemplateImportError } from "./TemplateService.js";
 import { templateDbService, TemplateDB } from "./TemplateDbService.js";
 import {
   verifyUser,
@@ -37,11 +37,14 @@ import {
 } from "../users/authMiddleware.js";
 import {
   verifyTemplateEditAccess,
+  ensureTemplateEditAccess,
+  ensureTemplateFieldPermissions,
   verifyTemplateCreatePermission,
   verifyPublicationStatusPermission,
   verifyCarouselPermission,
   hasTemplateAccess,
 } from "./templateMiddleware.js";
+import { isUuid } from "shared/safePaths.js";
 import {
   getStoragePath,
   addDirectoryToZip,
@@ -491,7 +494,7 @@ router.post("/templates/export", verifyUser(), async (req, res) => {
 // TEMPLATE MODIFICATION ROUTES
 // ========================
 
-// Create a new template
+// Create a new template, or save the existing one the body's id names
 router.post(
   "/templates",
   verifyUser(),
@@ -507,22 +510,58 @@ router.post(
         return sendBadRequest(res, "Missing template data", requestId);
       }
 
-      // Pass creator ID, username, and permissions to the service method
-      const creatorId = req.user?.id;
-      const creatorUsername = req.user?.username;
+      // A new template gets a fresh UUID unless the body names one
+      const requestedId: unknown = template.id;
+      let existingId: string | null = null;
+      if (requestedId !== undefined && requestedId !== null && requestedId !== "") {
+        if (!isUuid(requestedId)) {
+          return sendBadRequest(res, "Template ID must be a UUID", requestId);
+        }
+        if (await templateService.templateExists(requestedId)) {
+          existingId = requestedId;
+        }
+      }
+
+      // Saving an existing template takes what PUT /templates/:id takes
+      if (
+        existingId !== null &&
+        !(await ensureTemplateEditAccess(req, res, existingId, requestId))
+      ) {
+        return;
+      }
+      if (
+        !(await ensureTemplateFieldPermissions(req, res, template, existingId, requestId))
+      ) {
+        return;
+      }
+
+      const userId = req.user?.id;
+      const username = req.user?.username;
       const userPermissions = req.userPermissions || [];
-      const createdTemplate = await templateService.createOrUpdateTemplate(
-        template,
-        creatorId,
-        creatorUsername,
-        userPermissions
-      );
+      const savedTemplate =
+        existingId !== null
+          ? await templateService.updateTemplate(
+              existingId,
+              template,
+              userId,
+              username,
+              userPermissions
+            )
+          : await templateService.createTemplate(
+              template,
+              userId,
+              username,
+              userPermissions
+            );
 
       Logger.Route.log(
-        `Created/Updated template ${createdTemplate.id}: ${createdTemplate.title}`
+        `${existingId !== null ? "Updated" : "Created"} template ${savedTemplate.id}: ${savedTemplate.title}`
       );
-      sendSuccess(res, { template: createdTemplate }, requestId, 201);
+      sendSuccess(res, { template: savedTemplate }, requestId, 201);
     } catch (error) {
+      if ((error as Error).message.includes("not found")) {
+        return sendNotFound(res, "Template not found", requestId);
+      }
       Logger.Route.error("Error creating template", error);
       sendError(res, "Failed to create template", 500, requestId, error);
     }
@@ -553,7 +592,8 @@ router.put(
         id,
         template,
         currentUserId,
-        currentUsername
+        currentUsername,
+        req.userPermissions || []
       );
 
       Logger.Route.log(`Updated template ${id}: ${updatedTemplate.title}`);
@@ -875,11 +915,25 @@ router.post(
     }
 
     try {
-      // Use the service method to handle the business logic
+      // Before anything is written: an existing template takes edit access,
+      // and its fields take what saving it with PUT /templates/:id takes
       const result = await templateService.importTemplateFromZip(
         uploadedFile.buffer,
-        req.user?.id || ""
+        { id: req.user?.id || "", username: req.user?.username },
+        async ({ id, template, exists }) =>
+          (!exists || (await ensureTemplateEditAccess(req, res, id, requestId))) &&
+          (!template ||
+            (await ensureTemplateFieldPermissions(
+              req,
+              res,
+              template,
+              exists ? id : null,
+              requestId
+            )))
       );
+      if (!result) {
+        return; // refused, and answered
+      }
 
       Logger.Route.log(
         `Imported template ${result.template.id}: ${result.template.title} (${result.filesImported} files)`
@@ -897,6 +951,9 @@ router.post(
         requestId
       );
     } catch (error) {
+      if (error instanceof TemplateImportError) {
+        return sendBadRequest(res, error.message, requestId);
+      }
       Logger.Route.error(`Error importing template`, error);
       sendError(res, "Failed to import template", 500, requestId, error);
     }

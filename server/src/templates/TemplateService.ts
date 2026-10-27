@@ -25,6 +25,7 @@ function withKidAges(value: unknown): Pick<StoryTemplate, "kidAges"> {
   return kidAges ? { kidAges } : {};
 }
 import { ensureStorageDirectory, getStoragePath } from "shared/storageUtils.js";
+import { isUuid } from "shared/safePaths.js";
 import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
 import { iterationStep } from "game/services/storyTextSteps.js";
@@ -33,10 +34,24 @@ import {
   extractAndAnalyzeTemplateZip,
   copyTemplateFiles,
   cleanupTempFiles,
+  TemplateExtractionResult,
 } from "./templateZipUtils.js";
 import path from "path";
 import fsSync from "fs";
 import fs from "fs/promises";
+
+/** A zip that can't be imported as it is: the request is answered with 400 */
+export class TemplateImportError extends Error {}
+
+/** The World a zip import would write, as the import's `mayWrite` check sees it */
+export interface TemplateZipImport {
+  /** The World's id, a UUID */
+  id: string;
+  /** The zip's template.json, or null when the zip holds only files for an existing World */
+  template: Partial<StoryTemplate> | null;
+  /** Whether a World with this id exists: its folder, or its database entry */
+  exists: boolean;
+}
 
 export class TemplateService {
   private storagePath: string;
@@ -467,120 +482,27 @@ export class TemplateService {
   }
 
   /**
-   * Create or update a template (upsert operation)
+   * Whether a World with this id exists: its folder, or its database entry.
+   * Only for an id already checked to be safe as a folder name (isUuid).
    */
-  async createOrUpdateTemplate(
-    template: Partial<StoryTemplate>,
-    creatorId?: string,
-    creatorUsername?: string,
-    userPermissions: string[] = []
-  ): Promise<StoryTemplate> {
-    try {
-      // Generate ID if not provided
-      if (!template.id) {
-        template.id = uuidv4();
-      }
-
-      // Check if template already exists
-      const existingTemplate = await this.getTemplateById(template.id);
-      const existingDbEntry = await templateDbService.findTemplateEntryById(
-        template.id
-      );
-
-      if (existingTemplate || existingDbEntry) {
-        // Template exists, update it
-        this.logger.log(`Template ${template.id} already exists, updating`);
-        return await this.updateTemplate(
-          template.id,
-          template,
-          creatorId,
-          creatorUsername
-        );
-      } else {
-        // Template doesn't exist, create it (inline to avoid circular dependency)
-        this.logger.log(`Template ${template.id} doesn't exist, creating new`);
-
-        const fullTemplate: StoryTemplate = this.withCheckedBackgroundValues(
-          this.createFullTemplateObject(template, userPermissions)
-        );
-
-        // Set creator information on creation
-        if (creatorId) {
-          fullTemplate.creatorId = creatorId;
-          fullTemplate.creatorUsername = creatorUsername || undefined;
-        }
-
-        // Set containsImages default based on user permissions
-        if (fullTemplate.containsImages === undefined) {
-          fullTemplate.containsImages =
-            userPermissions.includes("templates_images");
-        }
-
-        // Keep existing timestamps if provided
-        if (template.createdAt) {
-          fullTemplate.createdAt = template.createdAt;
-        }
-        if (template.updatedAt) {
-          fullTemplate.updatedAt = template.updatedAt;
-        }
-
-        // Create directory for this template
-        const templateDir = path.join(this.storagePath, fullTemplate.id);
-        if (!fsSync.existsSync(templateDir)) {
-          await fs.mkdir(templateDir, { recursive: true });
-        }
-
-        // Write template.json to the template directory
-        const templateFilePath = path.join(templateDir, "template.json");
-        await fs.writeFile(
-          templateFilePath,
-          JSON.stringify(fullTemplate, null, 2)
-        );
-
-        // Use the containsImages value from the template itself
-        const containsImages = fullTemplate.containsImages;
-
-        // Create database entry
-        await templateDbService.createTemplateEntry({
-          id: fullTemplate.id,
-          creatorId: fullTemplate.creatorId || null,
-          publicationStatus: fullTemplate.publicationStatus,
-          carouselOrder: fullTemplate.showOnWelcomeScreen
-            ? fullTemplate.order
-            : null,
-          containsImages,
-          title: fullTemplate.title,
-          teaser: fullTemplate.teaser,
-          gameMode: fullTemplate.gameMode,
-          tags: fullTemplate.tags,
-          playerCountMin: fullTemplate.playerCountMin,
-          playerCountMax: fullTemplate.playerCountMax,
-          maxTurnsMin: fullTemplate.maxTurnsMin,
-          maxTurnsMax: fullTemplate.maxTurnsMax,
-          difficultyLevels: fullTemplate.difficultyLevels,
-          showOnWelcomeScreen: fullTemplate.showOnWelcomeScreen,
-          orderValue: fullTemplate.order,
-        });
-
-        this.logger.log(
-          `Created template ${fullTemplate.id}: ${fullTemplate.title}`
-        );
-        return fullTemplate;
-      }
-    } catch (error) {
-      this.logger.error("Failed to create or update template", error);
-      throw new Error("Failed to create or update story template");
+  async templateExists(id: string): Promise<boolean> {
+    if (fsSync.existsSync(path.join(this.storagePath, id))) {
+      return true;
     }
+    return Boolean(await templateDbService.findTemplateEntryById(id));
   }
 
   /**
-   * Update a template
+   * Update a template. The caller has checked edit access: an account
+   * without templates_edit_all edits only a World it made, which stays its
+   * own whatever creator the update names.
    */
   async updateTemplate(
     id: string,
     template: Partial<StoryTemplate>,
     currentUserId?: string,
-    currentUsername?: string
+    currentUsername?: string,
+    userPermissions: string[] = []
   ): Promise<StoryTemplate> {
     try {
       // Check if template exists
@@ -608,7 +530,11 @@ export class TemplateService {
       });
 
       // Handle creator information on update
-      if (currentUserId) {
+      if (currentUserId && !userPermissions.includes("templates_edit_all")) {
+        // Only the World's creator may edit it without templates_edit_all
+        mergedTemplate.creatorId = currentUserId;
+        mergedTemplate.creatorUsername = currentUsername;
+      } else if (currentUserId) {
         if (!mergedTemplate.creatorId) {
           // If creatorId is empty, set to current user
           mergedTemplate.creatorId = currentUserId;
@@ -953,21 +879,42 @@ export class TemplateService {
 
   /**
    * Import template from a zip buffer - extracts template ID from zip structure
-   * Creates new template if it doesn't exist, updates existing template otherwise
+   * Creates new template if it doesn't exist, updates existing template otherwise.
+   * The zip is unpacked into a temporary folder; nothing is written to the
+   * World's folder until the World id has proved a UUID and `mayWrite` has
+   * allowed the write. `mayWrite` answers the request itself when it refuses,
+   * and the import then returns null. The World's creator stays the one its
+   * database entry names, or becomes the importer, in its template.json too.
+   * Throws TemplateImportError for a zip that can't be imported as it is.
    */
   async importTemplateFromZip(
     zipBuffer: Buffer,
-    creatorId: string
+    importer: { id: string; username?: string },
+    mayWrite: (world: TemplateZipImport) => Promise<boolean>
   ): Promise<{
     template: StoryTemplate;
     filesImported: number;
     files: string[];
     isNewTemplate: boolean;
-  }> {
+  } | null> {
+    let extraction: TemplateExtractionResult | undefined;
     try {
       // Extract and analyze the zip structure
-      const { templateId, sourceDir, tempExtractDir, tempZipPath } =
-        await extractAndAnalyzeTemplateZip(zipBuffer);
+      extraction = await extractAndAnalyzeTemplateZip(zipBuffer);
+      const { templateId, template, sourceDir } = extraction;
+
+      if (!isUuid(templateId)) {
+        throw new TemplateImportError("The zip's template ID must be a UUID");
+      }
+      const exists = await this.templateExists(templateId);
+      if (!exists && !template) {
+        throw new TemplateImportError(
+          "The zip has no template.json for a new template"
+        );
+      }
+      if (!(await mayWrite({ id: templateId, template, exists }))) {
+        return null;
+      }
 
       // Check if template already exists
       const existingTemplate = await this.getTemplateById(templateId);
@@ -978,9 +925,6 @@ export class TemplateService {
 
       // Copy files from extracted location to template directory
       const copiedFiles = await copyTemplateFiles(sourceDir, templateDir);
-
-      // Clean up temporary files
-      await cleanupTempFiles(tempZipPath, tempExtractDir);
 
       // Load the updated template
       const updatedTemplate = await this.getTemplateById(templateId);
@@ -995,17 +939,25 @@ export class TemplateService {
       const existingDbEntry = await templateDbService.findTemplateEntryById(
         templateId
       );
-      let finalCreatorId: string | null = null;
+      // The database entry's creator stays; without one, the importer becomes it
+      const finalCreatorId = existingDbEntry?.creatorId || importer.id;
+      const finalCreatorUsername =
+        finalCreatorId === importer.id
+          ? importer.username
+          : existingDbEntry?.creatorUsername || undefined;
+      if (
+        updatedTemplate.creatorId !== finalCreatorId ||
+        updatedTemplate.creatorUsername !== finalCreatorUsername
+      ) {
+        updatedTemplate.creatorId = finalCreatorId;
+        updatedTemplate.creatorUsername = finalCreatorUsername;
+        await fs.writeFile(
+          path.join(templateDir, "template.json"),
+          JSON.stringify(updatedTemplate, null, 2)
+        );
+      }
 
       if (existingDbEntry) {
-        // If database entry exists and has a creator_id, keep it intact
-        if (existingDbEntry.creatorId) {
-          finalCreatorId = existingDbEntry.creatorId;
-        } else {
-          // If database entry exists but has no creator_id, assign the current user
-          finalCreatorId = creatorId;
-        }
-
         // Update the existing database entry
         await templateDbService.updateTemplateEntry(templateId, {
           creatorId: finalCreatorId,
@@ -1030,7 +982,7 @@ export class TemplateService {
         // Create new database entry with the current user as creator
         await templateDbService.createTemplateEntry({
           id: templateId,
-          creatorId: creatorId,
+          creatorId: finalCreatorId,
           publicationStatus: updatedTemplate.publicationStatus,
           carouselOrder: updatedTemplate.showOnWelcomeScreen
             ? updatedTemplate.order
@@ -1063,8 +1015,15 @@ export class TemplateService {
         isNewTemplate,
       };
     } catch (error) {
+      if (error instanceof TemplateImportError) {
+        throw error;
+      }
       this.logger.error("Failed to import template from zip", error);
       throw new Error("Failed to import template from zip");
+    } finally {
+      if (extraction) {
+        await cleanupTempFiles(extraction.tempZipPath, extraction.tempExtractDir);
+      }
     }
   }
 }
