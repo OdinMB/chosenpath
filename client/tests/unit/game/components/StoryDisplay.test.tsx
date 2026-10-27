@@ -379,6 +379,15 @@ describe("StoryDisplay at the story's end", () => {
     );
   });
 
+  it("hands the recap where the story's outcomes ended, as the state says", () => {
+    const outcomesAtEnd = [
+      { id: "shared_harbour", owner: "shared" as const, question: "Does the harbour reopen?", milestones: ["The fleet sails home."], intended: 1, complete: true },
+    ];
+    renderStory(ended, 2, { gameOver: true, outcomesAtEnd });
+
+    expect(lastRecap().outcomes).toBe(outcomesAtEnd);
+  });
+
   it("leaves through the game's own exit, which knows whether the player has an account", () => {
     const onLeaveStory = jest.fn();
     renderStory(ended, 2, { gameOver: true }, {}, { onLeaveStory, signedIn: true });

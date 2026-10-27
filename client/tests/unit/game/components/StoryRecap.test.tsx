@@ -114,6 +114,24 @@ describe("StoryRecap", () => {
     );
   });
 
+  const QUESTIONS = "Where the story&#x27;s questions landed";
+
+  it("shows where the story's questions landed after the path and before the way out", () => {
+    const outcomes = [
+      { id: "shared_harbour", owner: "shared" as const, question: "Does the harbour reopen?", milestones: [], intended: 1, complete: false },
+    ];
+    const html = renderMarkup(<StoryRecap {...props({ outcomes })} />);
+
+    expect(html.indexOf(QUESTIONS)).toBeGreaterThan(html.indexOf("Pay the guard to look away"));
+    expect(html.indexOf(QUESTIONS)).toBeLessThan(html.indexOf("My Stories"));
+    expect(accessibleText(html)).toContain("Does the harbour reopen?");
+  });
+
+  it("shows no such section when the state names no outcomes", () => {
+    expect(renderMarkup(<StoryRecap {...props()} />)).not.toContain(QUESTIONS);
+    expect(renderMarkup(<StoryRecap {...props({ outcomes: [] })} />)).not.toContain(QUESTIONS);
+  });
+
   it("leads a signed-in player back to My Stories or home", () => {
     const onLeave = jest.fn();
 

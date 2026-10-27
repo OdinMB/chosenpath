@@ -203,6 +203,7 @@ export function StoryDisplay({
             <StoryRecap
               beats={beatHistory}
               stats={storyState}
+              outcomes={storyState.outcomesAtEnd}
               signedIn={signedIn}
               onLeave={onLeaveStory}
             />

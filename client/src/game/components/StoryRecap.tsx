@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import type { Beat } from "core/types";
+import type { Beat, OutcomeAtEnd } from "core/types";
 import { Icons, PrimaryButton } from "components/ui";
 import { riskDisplayText } from "game/hooks/useChoiceFormatting";
+import { StoryOutcomes } from "./StoryOutcomes";
 import {
   storyPath,
   type PathLever,
@@ -13,8 +14,8 @@ import {
 /*
  * The recap below a story's ending: the player's path, turn by turn (what
  * they chose and how it turned out), so a group can walk back through its
- * decisions; then a way out. It uses no hooks, so its buttons' handlers can
- * be reached in a test without a DOM.
+ * decisions; where the story's questions landed; then a way out. It uses no
+ * hooks, so its buttons' handlers can be reached in a test without a DOM.
  */
 
 export const MY_STORIES_PATH = "/users/my-stories";
@@ -112,6 +113,8 @@ interface StoryRecapProps {
   /** The player's beats, the ending's last. */
   beats: Beat[];
   stats: PathStats;
+  /** Where the story's outcomes ended (the state's outcomesAtEnd); none shows no section. */
+  outcomes?: OutcomeAtEnd[];
   /** My Stories needs an account; a player who joined without one goes home. */
   signedIn: boolean;
   /** Leaves the story for a page of the site. */
@@ -121,6 +124,7 @@ interface StoryRecapProps {
 export function StoryRecap({
   beats,
   stats,
+  outcomes,
   signedIn,
   onLeave,
 }: StoryRecapProps) {
@@ -150,6 +154,7 @@ export function StoryRecap({
           ))}
         </ol>
       )}
+      <StoryOutcomes outcomes={outcomes} />
       <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
         {signedIn && (
           <PrimaryButton
