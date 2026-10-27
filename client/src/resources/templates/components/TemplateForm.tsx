@@ -24,6 +24,11 @@ import { TemplateWarningModals } from "./TemplateWarningModals";
 import { TemplateValidationCard } from "./TemplateValidationCard";
 import { useTemplateWarnings } from "../hooks/useTemplateWarnings";
 import { useAiDraftForm } from "../hooks/useAiDraftForm";
+import {
+  lostReflectionQuestions,
+  outcomesAfterAccepting,
+  templateOutcomes,
+} from "../utils/aiReflectionQuestions";
 
 interface TemplateFormProps {
   initialTemplate: StoryTemplate;
@@ -75,6 +80,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handleStatsChange,
     handleStoryElementsChange,
     handleOutcomesChange,
+    handleReflectionQuestionsChange,
+    handleOutcomesReplaced,
     handlePlayerChange,
     handleCharacterSelectionIntroductionChange,
     handlePublicationStatusChange,
@@ -246,6 +253,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       handleStoryElementsChange(data.storyElements as StoryElement[]);
     } else if (sectionKey === "sharedOutcomes" && data.sharedOutcomes) {
       handleOutcomesChange(data.sharedOutcomes as Outcome[]);
+      handleOutcomesReplaced();
     } else if (sectionKey === "stats" && data.statGroups) {
       handleStatsChange({
         statGroups: data.statGroups,
@@ -255,6 +263,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     } else if (sectionKey === "players") {
       if (data.player1) {
         handlePlayerChange(data);
+        handleOutcomesReplaced();
       }
 
       if (data.characterSelectionIntroduction) {
@@ -466,6 +475,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             handleStatsChange={handleStatsChange}
             handleStoryElementsChange={handleStoryElementsChange}
             handleOutcomesChange={handleOutcomesChange}
+            handleReflectionQuestionsChange={handleReflectionQuestionsChange}
             handlePlayerChange={handlePlayerChange}
             handleCharacterSelectionIntroductionChange={
               handleCharacterSelectionIntroductionChange
@@ -519,6 +529,20 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         onAcceptSection={handleAcceptSectionUpdate}
         playerOptions={getPlayerOptionsFromStoryTemplate(iterationData)}
         originalPlayerStats={formData.playerStats || []}
+        lostReflectionQuestions={{
+          sharedOutcomes: lostReflectionQuestions(
+            formData.reflectionQuestions,
+            templateOutcomes(formData),
+            outcomesAfterAccepting(formData, "sharedOutcomes", iterationData)
+          ),
+          players: iterationData.player1
+            ? lostReflectionQuestions(
+                formData.reflectionQuestions,
+                templateOutcomes(formData),
+                outcomesAfterAccepting(formData, "players", iterationData)
+              )
+            : [],
+        }}
       />
 
       {/* Add the revert history modal */}

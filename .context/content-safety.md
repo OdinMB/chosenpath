@@ -33,10 +33,11 @@ Both refusals reuse copy that already existed.
 
 A blocked request gets the responses that existed before. Stories and templates return the moderation-blocked response, which the client shows as the content-moderation notification. Image requests return the `CONTENT_POLICY` image error.
 
-Two things are not screened by this filter:
+Three things are not screened by this filter:
 
 - In-game image prompts. The story model writes them, from a premise that was already screened.
 - Generated beat text.
+- Reflection questions (`core/types/reflectionQuestions.ts`): what a World's author writes for each outcome in the editor, or whoever starts several stories at once for those stories, shown under the outcome on the end screen. No model ever sees them (`StorySetupPromptService` leaves them out of AI Iteration's template JSON), so they are like the rest of a World's hand-written text, which is not screened either. The schema bounds them (at most 5 per outcome, 300 characters each), and the server refuses anything beyond it with 400. Only a signed-in account sets them: the author's need edit access to the World, and a start that sends its own without a sign-in is refused with 401. A Kids World's questions reach children: the author's go to every story of that World, and a several-stories start's only to the stories its account started.
 
 **The filter check (2026-09-27).** Before the filter moved off gpt-4.1-mini, a fixed test set of 37 cases went through the production filter path (these prompts, the fail-closed retry, the role's retries, timeout and cap) on today's model and on Luna low. The set is `server/src/evals/textModelEval/filterCases.ts`: 11 clearly allowed (real premises from the eval, three of them dark, three read-with-kids, three image requests), 6 borderline but allowed by the written rules, 5 per Art. 5 rule 1 and rule 2 and 4 for rule 3 (image requests with and without reference images; two read-with-kids premises), and 6 for the older rules (copyright, hate, gore, hardcore, self-harm). No real person is named in it. The gate: an arm must refuse every must-refuse case and allow every clearly allowed one.
 
@@ -72,6 +73,7 @@ This covers beat images, the custom-story cover and custom-story portraits. The 
 - The filter is an LLM classifier, so the text it screens can try to steer it (prompt injection). The image model's own moderation is the backstop.
 - Reference images are not inspected. Only the request text is judged, and no vision moderation runs.
 - Images that people upload (template zip import, file upload) are not screened.
+- Reflection questions are not screened, in Kids Worlds too. They reach children of a Kids World unchecked, as its other hand-written text does. Screening them would mean the filter's fail-closed refusal on a save or a start.
 - The category comes from the client. A client that omits it gets the default moderation, which is the owner's baseline.
 - The editor's moderation follows the saved tags. Images generated before a "Kids" tag is saved, or before the template is saved at all, use `low`, and a later tag does not regenerate them.
 - There is no coaching category. The coach and therapist pages link to future-self stories, so coaching gets the future-self treatment (the Thread reminder); a coaching story set up another way cannot be told apart.

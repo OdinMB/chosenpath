@@ -1,5 +1,5 @@
 import express from "express";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { templateUpload } from "./templateUpload.js";
 
 // Extended request interface for multer file uploads
@@ -20,6 +20,9 @@ import {
   TemplateMetadata,
   PlayerCount,
   AI_TEXT_PROVENANCE,
+  StoryTemplate,
+  TemplateReflectionQuestionsInfo,
+  readReflectionQuestions,
 } from "core/types/index.js";
 import {
   sendSuccess,
@@ -30,6 +33,7 @@ import {
   sendModerationBlocked,
 } from "shared/responseUtils.js";
 import { TemplateService, TemplateImportError } from "./TemplateService.js";
+import { templateReflectionOutcomes } from "./templateReflectionQuestions.js";
 import { templateDbService, TemplateDB } from "./TemplateDbService.js";
 import {
   verifyUser,
@@ -111,6 +115,29 @@ const convertDbEntriesToMetadata = (
     convertDbEntryToMetadata(entry, includeCreatorInfo)
   );
 };
+
+/**
+ * Reads the reflection questions a save sends into the template it saves,
+ * trimmed (none: undefined, which removes them), and answers 400 with the
+ * limits for questions beyond them (core's reflectionQuestionsSchema),
+ * returning false. A save that sends none keeps the World's.
+ */
+function readSavedReflectionQuestions(
+  template: Partial<StoryTemplate>,
+  res: Response,
+  requestId: string
+): boolean {
+  if (typeof template !== "object" || !("reflectionQuestions" in template)) {
+    return true;
+  }
+  const read = readReflectionQuestions(template.reflectionQuestions);
+  if ("problem" in read) {
+    sendBadRequest(res, read.problem, requestId);
+    return false;
+  }
+  template.reflectionQuestions = read.questions ?? undefined;
+  return true;
+}
 
 // Get published template metadata for browsing (public endpoint)
 router.get("/templates/published", async (req, res) => {
@@ -383,6 +410,54 @@ router.get(
   }
 );
 
+// A World's outcome questions with the author's reflection questions, for a
+// signed-in account that may read the World and starts several stories from
+// it (TemplateReflectionQuestionsInfo). An account that may not read it gets
+// the refusal a visitor who isn't signed in gets, as GET /templates/:id does.
+router.get(
+  "/templates/:id/reflection-questions",
+  verifyUser({ required: false }),
+  async (req, res) => {
+    const { id } = req.params;
+    const requestId = req.query.requestId as string;
+    const refuse = () => sendError(res, "Authentication required", 401, requestId);
+
+    try {
+      if (!req.user) {
+        return refuse();
+      }
+      let mayRead: boolean;
+      try {
+        mayRead = await hasTemplateAccess(id, req.user.id, req.userPermissions || [], false);
+      } catch (error) {
+        if ((error as Error).message === "Template not found") {
+          return sendNotFound(res, "Template not found", requestId);
+        }
+        throw error;
+      }
+      if (!mayRead) {
+        return refuse();
+      }
+
+      const template = await templateService.getTemplateById(id);
+      if (!template) {
+        return sendNotFound(res, "Template not found", requestId);
+      }
+
+      // The answer depends on who is signed in, so no shared cache may keep it
+      res.set("Cache-Control", "private, no-store");
+      sendSuccess<TemplateReflectionQuestionsInfo>(
+        res,
+        { outcomes: templateReflectionOutcomes(template) },
+        requestId
+      );
+    } catch (error) {
+      Logger.Route.error(`Error retrieving reflection questions of template ${id}`, error);
+      sendError(res, "Failed to retrieve the World's reflection questions", 500, requestId, error);
+    }
+  }
+);
+
 // ========================
 // EXPORT ROUTES
 // ========================
@@ -540,6 +615,9 @@ router.post(
       ) {
         return;
       }
+      if (!readSavedReflectionQuestions(template, res, requestId)) {
+        return;
+      }
 
       const userId = req.user?.id;
       const username = req.user?.username;
@@ -590,6 +668,9 @@ router.put(
       const { template } = updateRequest;
       if (!template) {
         return sendBadRequest(res, "Missing template data", requestId);
+      }
+      if (!readSavedReflectionQuestions(template, res, requestId)) {
+        return;
       }
 
       const currentUserId = req.user?.id;

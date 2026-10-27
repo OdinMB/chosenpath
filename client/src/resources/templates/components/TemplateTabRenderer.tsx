@@ -27,6 +27,7 @@ import {
 } from "core/types";
 import { TabType } from "../hooks/useTemplateForm";
 import { worldPlaysContests } from "../utils/outcomeResolutions";
+import { lostReflectionQuestions, templateOutcomes } from "../utils/aiReflectionQuestions";
 
 interface TabRendererProps {
   activeTab: TabType;
@@ -82,6 +83,7 @@ interface TabRendererProps {
   }) => void;
   handleStoryElementsChange: (elements: StoryElement[]) => void;
   handleOutcomesChange: (outcomes: Outcome[]) => void;
+  handleReflectionQuestionsChange: (outcomeId: string, questions: string[]) => void;
   handlePlayerChange: (update: Partial<StoryTemplate>) => void;
   handleCharacterSelectionIntroductionChange: (
     intro: CharacterSelectionIntroduction
@@ -163,6 +165,7 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
     handleStatsChange,
     handleStoryElementsChange,
     handleOutcomesChange,
+    handleReflectionQuestionsChange,
     handlePlayerChange,
     handleCharacterSelectionIntroductionChange,
     handleImageInstructionsChange,
@@ -342,6 +345,8 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
         <OutcomesTab
           outcomes={formData.sharedOutcomes || []}
           onChange={handleOutcomesChange}
+          reflectionQuestions={formData.reflectionQuestions}
+          onReflectionQuestionsChange={handleReflectionQuestionsChange}
           playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
           onPlayerOptionsChange={handlePlayerChange}
           playerStats={formData.playerStats || []}
@@ -426,6 +431,11 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
           handleAiDraftPromptChange={handleAiDraftPromptChange}
           handleAiDraftPlayerCountChange={handleAiDraftPlayerCountChange}
           onBack={() => setActiveTab("basic")}
+          lostReflectionQuestions={lostReflectionQuestions(
+            formData.reflectionQuestions,
+            templateOutcomes(formData),
+            []
+          )}
         />
       );
 

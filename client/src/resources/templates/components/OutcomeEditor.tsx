@@ -1,6 +1,6 @@
-import React from "react";
-import { Outcome, ResolutionType } from "core/types";
-import { ExpandableItem } from "components";
+import React, { useMemo } from "react";
+import { Outcome, ResolutionType, filledReflectionQuestions } from "core/types";
+import { ExpandableItem, ReflectionQuestionsField } from "components";
 import { Input, Select } from "components/ui";
 import { AcademyContextButton } from "components";
 import { useOutcomeEditor } from "../hooks/useOutcomeEditor";
@@ -23,7 +23,16 @@ interface OutcomeEditorProps {
   shared?: boolean;
   /** The World plays contests (two or more players, competitive or cooperative-competitive): only then does a shared outcome offer the Contest kind */
   contests?: boolean;
+  /** The World's reflection questions for this outcome */
+  reflectionQuestions?: string[];
+  /** Takes the outcome's reflection questions on Save, without blank ones; without it, the form shows none */
+  onReflectionQuestionsChange?: (questions: string[]) => void;
 }
+
+/** What the outcome's form edits: the outcome, and its reflection questions, which the World keeps beside it. */
+type OutcomeDraft = { outcome: Outcome; reflectionQuestions: string[] };
+
+const NO_QUESTIONS: string[] = [];
 
 export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
   outcome,
@@ -35,9 +44,34 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
   readOnly = false,
   shared = false,
   contests = false,
+  reflectionQuestions = NO_QUESTIONS,
+  onReflectionQuestionsChange,
 }) => {
   const { handleResolutionTypeChange, handleResolutionFieldChange } =
     useOutcomeEditor([], undefined, readOnly);
+
+  // The same draft until the outcome or its questions change, so an edit in progress isn't reset
+  const draft = useMemo<OutcomeDraft>(
+    () => ({ outcome, reflectionQuestions }),
+    [outcome, reflectionQuestions]
+  );
+
+  const renderDraftForm = (
+    data: OutcomeDraft,
+    onChange: (updated: OutcomeDraft) => void
+  ) => (
+    <div className="flex-1 space-y-4">
+      {renderOutcomeForm(data.outcome, (updated) => onChange({ ...data, outcome: updated }))}
+      {onReflectionQuestionsChange && (
+        <ReflectionQuestionsField
+          id={data.outcome.id}
+          questions={data.reflectionQuestions}
+          onChange={(questions) => onChange({ ...data, reflectionQuestions: questions })}
+          readOnly={readOnly}
+        />
+      )}
+    </div>
+  );
 
   const renderOutcomeForm = (
     data: Outcome,
@@ -242,17 +276,30 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
     );
   };
 
+  // Folded away, the outcome still says it holds reflection questions
+  const questionCount = onReflectionQuestionsChange ? reflectionQuestions.length : 0;
+
   return (
     <ExpandableItem
       id={outcome.id}
       title={outcome.question || `Outcome ${index + 1}`}
-      data={outcome}
+      description={
+        questionCount > 0 ? (
+          <span className="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">
+            {questionCount === 1 ? "1 reflection question" : `${questionCount} reflection questions`}
+          </span>
+        ) : undefined
+      }
+      data={draft}
       editingSet={editingOutcomes}
       setEditing={setEditingOutcomes}
       onDelete={() => onDelete(index)}
-      onSave={(updatedOutcome) => onUpdate(index, updatedOutcome)}
-      renderEditForm={renderOutcomeForm}
-      isSaveDisabled={(data) => !data.question}
+      onSave={(saved) => {
+        onUpdate(index, saved.outcome);
+        onReflectionQuestionsChange?.(filledReflectionQuestions(saved.reflectionQuestions));
+      }}
+      renderEditForm={renderDraftForm}
+      isSaveDisabled={(data) => !data.outcome.question}
       readOnly={readOnly}
     />
   );

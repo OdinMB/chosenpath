@@ -18,9 +18,12 @@ Every state the server sends a player comes from `Story.filterStateForPlayer(slo
   - `owner` is `"shared"` or the player's seat;
   - `milestones` are the texts reached, in order;
   - `intended` is the number of milestones that resolves the outcome;
-  - `complete` says whether the outcome reached that number. When false, it stopped at `milestones.length` of `intended`.
+  - `complete` says whether the outcome reached that number. When false, it stopped at `milestones.length` of `intended`;
+  - `reflectionQuestions`, only on an outcome that has some: the questions people wrote for players to think about once the story is over (below).
 
   `outcomesAtEnd` itself never carries possible resolutions, resonance or other players' own outcomes; the exposure above still sends this player's own resolutions and resonance. The ending's milestones are recorded before any state at the end goes out (`handleProgression` applies the ending's changes before it returns the story that is stored and sent; `StoryProgressionService.ending.test.ts` pins it), so the counts are the recorded ones. They match what `outcomeStatesAtEnding` (`server/src/game/services/endingStates.ts`) told the ending's prompt, since it adds the ending's milestones before they are recorded. Both read through `core/utils/outcomeStates.ts`.
+
+- **Reflection questions (`StoryState.reflectionQuestions`, since 2026-10-27):** a template's story keeps, by outcome id, the reflection questions of the outcomes it plays (the shared ones and its seats' own): those of a several-stories start, which sends them with every start in place of the World's (`POST /stories/template`'s `reflectionQuestions`; `{}` for none), else the World's (`StoryTemplate.reflectionQuestions`, written in the editor's Outcomes tab under each outcome). `createStoryStateFromTemplate` keeps them, leaving out a World's that its file holds in a form `reflectionQuestionsSchema` can't read, and the field is absent where none is left. A custom story has none. They go out only at the end, each outcome's in its `outcomesAtEnd` item, so a player never gets another player's own outcome's; the end screen lists them under that outcome's progress card. No model sees them: they are in no prompt, and AI Iteration's template JSON leaves them out. The limits are core's (`core/types/reflectionQuestions.ts`): at most 5 for an outcome, each with text and at most 300 characters.
 
 ### Checks and repairs on model replies
 

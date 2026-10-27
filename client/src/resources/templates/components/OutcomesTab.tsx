@@ -3,7 +3,14 @@ import { PrimaryButton, Icons } from "components/ui";
 import { AcademyContextCard } from "./AcademyContextCard";
 import { AiIterationCard } from "./AiIterationCard";
 import { AcademyContextButton } from "components";
-import { Outcome, PlayerOptionsGeneration, PlayerSlot, Stat } from "core/types";
+import {
+  Outcome,
+  PlayerOptionsGeneration,
+  PlayerSlot,
+  ReflectionQuestions,
+  Stat,
+  reflectionQuestionsOf,
+} from "core/types";
 // MAX_PLAYERS handled within PlayerOutcomesAll
 import { OutcomeEditor } from "./OutcomeEditor";
 import { useOutcomeEditor } from "../hooks/useOutcomeEditor";
@@ -13,6 +20,10 @@ interface OutcomesTabProps {
   outcomes: Outcome[];
   onChange?: (outcomes: Outcome[]) => void;
   readOnly?: boolean;
+  /** The World's reflection questions, by outcome id */
+  reflectionQuestions?: ReflectionQuestions;
+  /** Takes an outcome's reflection questions on its Save; without it, the outcomes show none */
+  onReflectionQuestionsChange?: (outcomeId: string, questions: string[]) => void;
   // Optional: enable listing/editing player-specific outcomes here too
   playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   onPlayerOptionsChange?: (
@@ -35,6 +46,8 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
   outcomes,
   onChange,
   readOnly = false,
+  reflectionQuestions,
+  onReflectionQuestionsChange,
   playerOptions,
   onPlayerOptionsChange,
   playerStats,
@@ -63,8 +76,8 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <AcademyContextCard
             lectureHref="/academy/outcomes-milestones-resolutions"
-            blurb="Outcomes are the questions that every story in your World will answer."
-            blurbShort="Outcomes are the questions that every story in your World will answer."
+            blurb="Outcomes are the questions that every story in your World will answer. Each can carry reflection questions, shown under it at the end of a story."
+            blurbShort="Outcomes are the questions that every story in your World will answer. Each can carry reflection questions for the end of a story."
           />
           <AiIterationCard
             onRequestIteration={async (feedback, sections) => {
@@ -147,6 +160,11 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
           readOnly={readOnly}
           shared
           contests={contests}
+          reflectionQuestions={reflectionQuestionsOf(reflectionQuestions, outcome.id)}
+          onReflectionQuestionsChange={
+            onReflectionQuestionsChange &&
+            ((questions) => onReflectionQuestionsChange(outcome.id, questions))
+          }
         />
       ))}
 
@@ -162,6 +180,8 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
           }
           playerStats={playerStats as Stat[]}
           readOnly={readOnly}
+          reflectionQuestions={reflectionQuestions}
+          onReflectionQuestionsChange={onReflectionQuestionsChange}
         />
       )}
     </div>

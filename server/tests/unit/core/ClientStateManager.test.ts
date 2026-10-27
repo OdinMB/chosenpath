@@ -191,3 +191,46 @@ describe("ClientStateManager.filterStateForPlayer: the outcomes at the end", () 
     expect(state.outcomesAtEnd).toEqual([]);
   });
 });
+
+describe("ClientStateManager.filterStateForPlayer: reflection questions at the end", () => {
+  const reflection = {
+    [HARBOUR]: ["Who decided the harbour mattered most?", "What did it cost the town?"],
+    [RING]: ["Would you expose it again?"],
+    [HIDEOUT]: ["Whom did the hideout keep safe?"],
+  };
+
+  it("sends an outcome's reflection questions with it once the story is over, and no field where it has none", () => {
+    const sent = soloEnding({ written: true }).clone({ reflectionQuestions: reflection }).filterStateForPlayer("player1");
+
+    expect(sent.outcomesAtEnd?.map(({ id, reflectionQuestions }) => ({ id, reflectionQuestions }))).toEqual([
+      { id: HARBOUR, reflectionQuestions: ["Who decided the harbour mattered most?", "What did it cost the town?"] },
+      { id: RING, reflectionQuestions: ["Would you expose it again?"] },
+      { id: HOME, reflectionQuestions: undefined },
+    ]);
+    expect(sent.outcomesAtEnd?.find((item) => item.id === HOME)).not.toHaveProperty("reflectionQuestions");
+  });
+
+  it("sends the questions nowhere else, and none before the end", () => {
+    const story = soloEnding({ written: true }).clone({ reflectionQuestions: reflection });
+    const atEnd = story.filterStateForPlayer("player1");
+    const before = story.clone({ maxTurns: 20 }).filterStateForPlayer("player1");
+
+    expect("reflectionQuestions" in atEnd).toBe(false);
+    expect(JSON.stringify(before)).not.toContain("Would you expose it again?");
+  });
+
+  it("never sends a player the questions on another player's own outcome", () => {
+    const story = groupEnding().clone({ reflectionQuestions: reflection });
+
+    expect(JSON.stringify(story.filterStateForPlayer("player1"))).not.toContain("Whom did the hideout keep safe?");
+    expect(story.filterStateForPlayer("player2").outcomesAtEnd?.find((item) => item.id === HIDEOUT)).toMatchObject({
+      reflectionQuestions: ["Whom did the hideout keep safe?"],
+    });
+  });
+
+  it("sends each outcome as before in a story with no reflection questions", () => {
+    const sent = soloEnding({ written: true }).filterStateForPlayer("player1").outcomesAtEnd ?? [];
+
+    for (const item of sent) expect(item).not.toHaveProperty("reflectionQuestions");
+  });
+});

@@ -8,6 +8,7 @@ import {
   BeatType,
   AI_TEXT_PROVENANCE,
   OutcomeAtEnd,
+  reflectionQuestionsOf,
 } from "../types/index.js";
 import { outcomeState, outcomesInPlay } from "../utils/outcomeStates.js";
 
@@ -146,8 +147,9 @@ export class ClientStateManager {
    * outcomes and the player's own, with their questions and the milestones
    * they reached. By the time a state at the end is sent, the ending's
    * milestones are recorded, so none are added (outcomeStatesAtEnding adds
-   * them for the ending's prompt, before they are). Other players' own
-   * outcomes, possible resolutions and resonance stay out.
+   * them for the ending's prompt, before they are). An outcome with
+   * reflection questions carries them. Other players' own outcomes, possible
+   * resolutions and resonance stay out.
    */
   private outcomesAtEnd(
     state: StoryState,
@@ -155,6 +157,7 @@ export class ClientStateManager {
   ): OutcomeAtEnd[] {
     return outcomesInPlay(state, [playerSlot]).map(({ owner, outcome }) => {
       const { intended, complete } = outcomeState(owner, outcome);
+      const reflectionQuestions = reflectionQuestionsOf(state.reflectionQuestions, outcome.id);
       return {
         id: outcome.id,
         owner,
@@ -162,6 +165,7 @@ export class ClientStateManager {
         milestones: [...(outcome.milestones ?? [])],
         intended,
         complete,
+        ...(reflectionQuestions ? { reflectionQuestions: [...reflectionQuestions] } : {}),
       };
     });
   }

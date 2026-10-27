@@ -15,6 +15,10 @@ The server creates the tables at startup (`initializeDatabase` in `server/src/sh
 - **Template data**: JSON files in `/data/templates/[uuid]/`
 - **Images**: Generated/uploaded images organized by story/template ID
 
+Optional fields, added without a migration (a file without one reads as before):
+
+- `reflectionQuestions` (since 2026-10-27), by outcome id, at most 5 strings of at most 300 characters each (`core/types/reflectionQuestions.ts`): in a template's `template.json`, the author's, kept only for outcomes it holds; in a story's state, those of the outcomes it plays, from its several-stories start or its World. Absent where there are none. Export and import carry the template's in `template.json`.
+
 ### Local development database
 
 A local Postgres in Docker, filled with synthetic (made-up) data, so the app runs on your machine and logged-in flows can be tried without production data.

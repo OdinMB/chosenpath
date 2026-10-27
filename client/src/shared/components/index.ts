@@ -1,6 +1,7 @@
 export { AppLogo } from "./AppLogo";
 export { ArrayField } from "./ArrayField";
 export { ExpandableItem } from "./ExpandableItem";
+export { ReflectionQuestionsField } from "./ReflectionQuestionsField";
 export { ImageCard } from "./ImageCard";
 export { CoverCard } from "./CoverCard";
 export { StoryCard } from "./StoryCard";

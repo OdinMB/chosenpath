@@ -150,6 +150,18 @@ describe("MultiStoryStartField, ticked", () => {
     expect(panelClass(render(true))).toMatch(/\bborder-l-8\b/);
   });
 
+  it("shows what else the stories take (their reflection questions) at the panel's end, only while ticked", () => {
+    const withExtra = (enabled: boolean) =>
+      renderMarkup(
+        <MultiStoryStartField enabled={enabled} count={4} onEnabledChange={jest.fn()} onCountChange={jest.fn()}>
+          <p id="extra-settings">More for these stories</p>
+        </MultiStoryStartField>
+      );
+
+    expect(withExtra(true)).toMatch(/printable cards[\s\S]*<p id="extra-settings">/);
+    expect(withExtra(false)).not.toContain("extra-settings");
+  });
+
   it("locks every control while stories are starting", () => {
     const html = render(true, 5, true);
 

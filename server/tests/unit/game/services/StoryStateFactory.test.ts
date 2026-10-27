@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { CharacterBackground, StoryTemplate } from "core/types/index.js";
+import type { CharacterBackground, Outcome, StoryTemplate } from "core/types/index.js";
 import { GameModes, PublicationStatus } from "core/types/index.js";
-import { stat } from "../../../helpers/textFixtures.js";
+import { outcome, stat } from "../../../helpers/textFixtures.js";
 
 // The template's images are read from disk; a story from a template without images
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,5 +128,73 @@ describe("createStoryStateFromTemplate: the read-with-kids setting", () => {
     expect(start(kids({ tags: ["Fiction"], kidAges: { min: 6, max: 8 } })).kidAges).toBeUndefined();
     expect(start(kids({ tags: ["Kids"], kidAges: { min: 9, max: 4 } })).kidAges).toBeUndefined();
     expect(start(kids({ tags: ["Kids"], kidAges: null })).kidAges).toBeUndefined();
+  });
+});
+
+/*
+ * Reflection questions: a World's author writes them for its outcomes, and
+ * whoever starts several stories at once can set others for those stories.
+ * A story keeps the ones for the outcomes it plays, by outcome id.
+ */
+describe("createStoryStateFromTemplate: reflection questions", () => {
+  const seat = (outcomes: Outcome[]) => ({ outcomes, possibleCharacterIdentities: [], possibleCharacterBackgrounds: [background([])] });
+  const world = (overrides: Partial<StoryTemplate> = {}) =>
+    ({
+      ...template([]),
+      playerCountMax: 3,
+      sharedOutcomes: [outcome("shared_harbour")],
+      player1: seat([outcome("player1_name")]),
+      player2: seat([outcome("player2_hideout")]),
+      player3: seat([outcome("player3_vow")]),
+      ...overrides,
+    }) as StoryTemplate;
+  const WORLD_QUESTIONS = {
+    shared_harbour: ["Who decided the harbour mattered most?"],
+    player2_hideout: ["Whom did the hideout keep safe?"],
+    player3_vow: ["Was the vow worth keeping?"],
+  };
+  const startFor = (source: StoryTemplate, seats: number, batch?: Record<string, string[]>) =>
+    createStoryStateFromTemplate(
+      "story-1",
+      source,
+      seats as 1 | 2 | 3,
+      10,
+      false,
+      false,
+      { title: "Balanced", modifier: 0 },
+      Object.fromEntries(Array.from({ length: seats }, (_, i) => [`player${i + 1}`, `CODE${i + 1}`])),
+      batch
+    );
+
+  it("gives a story the World's questions for the outcomes it plays: the shared ones and the seats in play", () => {
+    const state = startFor(world({ reflectionQuestions: WORLD_QUESTIONS }), 2);
+
+    expect(state.reflectionQuestions).toEqual({
+      shared_harbour: ["Who decided the harbour mattered most?"],
+      player2_hideout: ["Whom did the hideout keep safe?"],
+    });
+  });
+
+  it("gives a story the questions a several-stories start set in place of the World's", () => {
+    const state = startFor(world({ reflectionQuestions: WORLD_QUESTIONS }), 1, {
+      player1_name: ["What would you call yourself now?"],
+      player2_hideout: ["Not a seat in this story"],
+    });
+
+    expect(state.reflectionQuestions).toEqual({ player1_name: ["What would you call yourself now?"] });
+  });
+
+  it("gives a story none where the several-stories start took them all away", () => {
+    expect(startFor(world({ reflectionQuestions: WORLD_QUESTIONS }), 2, {})).not.toHaveProperty("reflectionQuestions");
+  });
+
+  it("starts a story from a World without questions as before", () => {
+    expect(startFor(world(), 3)).not.toHaveProperty("reflectionQuestions");
+  });
+
+  it("leaves out questions stored in a form it can't read", () => {
+    const unreadable = { shared_harbour: "Who decided?" } as unknown as Record<string, string[]>;
+
+    expect(startFor(world({ reflectionQuestions: unreadable }), 1)).not.toHaveProperty("reflectionQuestions");
   });
 });

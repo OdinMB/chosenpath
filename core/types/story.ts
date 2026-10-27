@@ -22,6 +22,7 @@ import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { SwitchAnalysis } from "./switch.js";
 import { ThreadAnalysis } from "./thread.js";
 import { AiContentProvenance } from "./provenance.js";
+import { ReflectionQuestions } from "./reflectionQuestions.js";
 import { MAX_PLAYERS } from "../config.js";
 
 /**
@@ -386,6 +387,12 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   coverImageReferenceIds?: string[];
   /** A template tagged Kids: the children's ages its stories are read with (the read-with-kids setting); null clears it on save. */
   kidAges?: KidAges | null;
+  /**
+   * The author's reflection questions, by outcome id, shown under each outcome on its stories' end screen. Only for
+   * outcomes the World holds, at most 5 each (reflectionQuestionsSchema); absent where there are none. Never sent to a
+   * model.
+   */
+  reflectionQuestions?: ReflectionQuestions;
 };
 
 /**
@@ -476,6 +483,12 @@ export type StoryState = {
    */
   camps?: Camps;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
+  /**
+   * A template's story: the reflection questions for the outcomes it plays, by outcome id, from its World or from the
+   * several-stories start that set its own. Absent where there are none. Sent to a player only at the end, with each of
+   * their outcomes (OutcomeAtEnd); never sent to a model.
+   */
+  reflectionQuestions?: ReflectionQuestions;
 };
 
 /**
@@ -494,6 +507,8 @@ export type OutcomeAtEnd = {
   intended: number;
   /** Whether it reached its intended number of milestones, or more. When false, it stopped at milestones.length of intended. */
   complete: boolean;
+  /** The questions people wrote for players to reflect on about it (StoryState.reflectionQuestions); absent where there are none. */
+  reflectionQuestions?: string[];
 };
 
 // Direct type definition for ClientStoryState

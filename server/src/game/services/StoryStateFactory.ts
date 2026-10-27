@@ -5,9 +5,14 @@ import {
   DifficultyLevel,
   PlayerCount,
   Outcome,
+  PlayerOptionsGeneration,
+  ReflectionQuestions,
   categoryFromTemplateTags,
+  keptReflectionQuestions,
   kidAgesFrom,
+  readReflectionQuestions,
 } from "core/types/index.js";
+import { outcomesInPlay } from "core/utils/outcomeStates.js";
 import {
   checkStoryStateBackgrounds,
   describeBackgroundFixes,
@@ -25,6 +30,7 @@ import { Logger } from "shared/logger.js";
  * @param pregenerateBeats Whether to pregenerate story beats
  * @param difficultyLevel The chosen difficulty level for this story
  * @param playerCodes The player codes to include in the state
+ * @param batchReflectionQuestions A several-stories start's reflection questions, in place of the template's (none: {})
  * @returns A complete StoryState ready to be used in a Story instance
  */
 export function createStoryStateFromTemplate(
@@ -35,7 +41,8 @@ export function createStoryStateFromTemplate(
   generateImages: boolean,
   pregenerateBeats: boolean,
   difficultyLevel: DifficultyLevel,
-  playerCodes: Record<PlayerSlot, string> // also used to determine the number of players
+  playerCodes: Record<PlayerSlot, string>, // also used to determine the number of players
+  batchReflectionQuestions?: ReflectionQuestions
 ): StoryState {
   const sharedStatValues = template.sharedStats.map((stat) => ({
     statId: stat.id,
@@ -80,9 +87,10 @@ export function createStoryStateFromTemplate(
   // Only include active players based on the requested player count
   const relevantPlayerSlots = Object.keys(playerCodes);
   for (const slot of relevantPlayerSlots) {
-    // Cast slot to keyof StoryTemplate to access player options
-    const playerSlot = slot as keyof typeof template;
-    const playerOptions = template[playerSlot];
+    // A seat's options, as far as the template holds any (checked below)
+    const playerOptions = template[slot as keyof typeof template] as
+      | PlayerOptionsGeneration
+      | undefined;
 
     if (!playerOptions || typeof playerOptions !== "object") {
       throw new Error(`Template missing options for player slot: ${slot}`);
@@ -112,6 +120,13 @@ export function createStoryStateFromTemplate(
     );
   }
 
+  // The reflection questions for the outcomes this story plays: the several-stories start's, else the World's
+  const reflectionQuestions = keptReflectionQuestions(
+    batchReflectionQuestions ?? worldReflectionQuestions(template),
+    outcomesInPlay(storyState).map(({ outcome }) => outcome.id)
+  );
+  if (reflectionQuestions) storyState.reflectionQuestions = reflectionQuestions;
+
   // Templates saved before the check (or imported as files) can hold
   // background values of the wrong type; the story starts with them read by type
   const { state: checkedState, fixed } =
@@ -125,6 +140,12 @@ export function createStoryStateFromTemplate(
   }
 
   return checkedState;
+}
+
+/** The template's reflection questions, if it holds them in a form they can be read in. */
+function worldReflectionQuestions(template: StoryTemplate): ReflectionQuestions | undefined {
+  const read = readReflectionQuestions(template.reflectionQuestions);
+  return "questions" in read ? (read.questions ?? undefined) : undefined;
 }
 
 /**

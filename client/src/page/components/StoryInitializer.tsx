@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, type ReactNode } from "react";
 import {
   PlayerCount,
   GameMode,
@@ -88,6 +88,8 @@ interface StoryInitializerProps {
   onPlayerCountChange?: (playerCount: PlayerCount) => void;
   onPromptChange?: (prompt: string) => void;
   isSparse?: boolean;
+  /** More that an AI Draft overrides, in its warning; a World with it is always warned, sparse or not */
+  overrideNotice?: ReactNode;
 }
 
 export const StoryInitializer = ({
@@ -104,6 +106,7 @@ export const StoryInitializer = ({
   onPlayerCountChange,
   onPromptChange,
   isSparse = true,
+  overrideNotice,
 }: StoryInitializerProps) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -676,7 +679,7 @@ export const StoryInitializer = ({
       };
 
       // Check if template is not sparse and show warning
-      if (!isSparse) {
+      if (!isSparse || overrideNotice) {
         setPendingSetupOptions(setupOptions);
         setShowOverrideWarning(true);
         return;
@@ -1469,6 +1472,7 @@ export const StoryInitializer = ({
               All your current story elements, characters, settings, and
               configurations will be overwritten. This action cannot be undone.
             </p>
+            {overrideNotice}
             <p className="text-sm font-semibold">
               Are you sure you want to continue?
             </p>

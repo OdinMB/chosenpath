@@ -7,6 +7,7 @@ import type {
   CreateStoryFromTemplateRequest,
   CreateStoryInfo,
 } from "core/types/api";
+import type { ReflectionQuestions } from "core/types";
 import { authApi } from "../../shared/auth/authApi";
 import { addCodeSetStartedForOthers } from "../../shared/utils/codeSetUtils";
 import { useSession } from "../../shared/session/useSession";
@@ -100,16 +101,22 @@ export function severalStoriesHeading(count: number, startsLeft?: number | null)
 
 /**
  * What each start sends, and how many: the settings without unique images
- * (several image starts would use up the image limit at once), and the count
- * within 2 to 12 and the starts left.
+ * (several image starts would use up the image limit at once), the batch's
+ * reflection questions if it has any to send (in place of the World's), and
+ * the count within 2 to 12 and the starts left.
  */
 export function multiStoryRequest(
   settings: CreateStoryFromTemplateRequest,
   count: number,
-  startsLeft?: number | null
+  startsLeft?: number | null,
+  reflectionQuestions?: ReflectionQuestions
 ): { request: CreateStoryFromTemplateRequest; count: number } {
   return {
-    request: { ...settings, generateImages: false },
+    request: {
+      ...settings,
+      generateImages: false,
+      ...(reflectionQuestions ? { reflectionQuestions } : {}),
+    },
     count: storiesToStart(count, startsLeft),
   };
 }
@@ -154,9 +161,15 @@ export function useMultiStoryCreation() {
   const startStories = async (
     settings: CreateStoryFromTemplateRequest,
     requestedCount: number,
-    startsLeft?: number | null
+    startsLeft?: number | null,
+    reflectionQuestions?: ReflectionQuestions
   ): Promise<MultiStartOutcome> => {
-    const { request, count } = multiStoryRequest(settings, requestedCount, startsLeft);
+    const { request, count } = multiStoryRequest(
+      settings,
+      requestedCount,
+      startsLeft,
+      reflectionQuestions
+    );
     setIsStarting(true);
     const signedIn = await stillSignedIn();
     if (signedIn !== true) {

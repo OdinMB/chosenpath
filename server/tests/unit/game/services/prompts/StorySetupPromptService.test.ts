@@ -72,4 +72,12 @@ describe("StorySetupPromptService.createIterationPrompt", () => {
     expect(prompt).not.toContain("librarian_odin");
     expect(prompt).not.toMatch(/creatorId|creatorUsername/);
   });
+
+  it("sends the model nothing of the reflection questions the World's author wrote: the prompt is the one without them", () => {
+    const withQuestions = { ...fullTemplate, reflectionQuestions: { shared_flood: ["Who kept the books dry?"] } };
+
+    const sent = StorySetupPromptService.createIterationPrompt(feedback, 1, GameModes.SinglePlayer, 25, ["guidelines"], withQuestions);
+
+    expect(sent).toBe(prompt);
+  });
 });

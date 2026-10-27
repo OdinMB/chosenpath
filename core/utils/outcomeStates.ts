@@ -1,6 +1,5 @@
 import type { Outcome } from "../types/outcome.js";
 import type { PlayerSlot } from "../types/player.js";
-import type { StoryState } from "../types/story.js";
 
 /*
  * Where a story's outcomes stand: each outcome's milestones against the
@@ -16,13 +15,16 @@ export type OutcomeState = { id: string; owner: string; milestones: number; inte
 /** An outcome and whose it is: "shared", or the seat whose own it is. */
 export type OutcomeInPlay = { owner: "shared" | PlayerSlot; outcome: Outcome };
 
+/** Where outcomes are held: a story's state, or a template's seats as its players. */
+type OutcomeHolder = { sharedOutcomes?: Outcome[]; players: Partial<Record<PlayerSlot, { outcomes?: Outcome[] }>> };
+
 /**
  * The story's outcomes: the shared ones first, then each seat's own in turn,
  * every seat unless `seats` names some. An id already read (a shared outcome a
  * template copied into a player's list) is read once.
  */
 export function outcomesInPlay(
-  state: Pick<StoryState, "sharedOutcomes" | "players">,
+  state: OutcomeHolder,
   seats: readonly PlayerSlot[] = Object.keys(state.players)
 ): OutcomeInPlay[] {
   const lists = [

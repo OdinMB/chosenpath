@@ -5,6 +5,7 @@ export * from "./video.js";
 export * from "./outcome.js";
 export * from "./player.js";
 export * from "./provenance.js";
+export * from "./reflectionQuestions.js";
 export * from "./stat.js";
 export * from "./story.js";
 export * from "./storyElement.js";

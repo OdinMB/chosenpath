@@ -23,6 +23,8 @@ interface MultiStoryStartFieldProps {
   disabled?: boolean;
   /** The account's starts left; null or left out while not known. */
   startsLeft?: StartsLeft | null;
+  /** More the stories take while ticked (their reflection questions), at the panel's end. */
+  children?: ReactNode;
 }
 
 /** The id of the note next to Start, which the Start button points to. */
@@ -101,6 +103,7 @@ export function MultiStoryStartField({
   onCountChange,
   disabled = false,
   startsLeft = null,
+  children,
 }: MultiStoryStartFieldProps) {
   const navigate = useNavigate();
   const maxCount = storyCountMax(startsLeft?.remaining);
@@ -242,6 +245,8 @@ export function MultiStoryStartField({
             printable cards to hand out: one per seat, with its code and a QR
             code.
           </p>
+
+          {children}
         </div>
       )}
     </div>

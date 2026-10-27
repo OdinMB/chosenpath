@@ -101,16 +101,26 @@ describe("StoryOutcomes", () => {
     expect(elements(list, "li").map(spoken)).toEqual(["The storm wall holds.", "The fleet sails home."]);
   });
 
-  it("says in words whether each question was resolved or left open, with a check on a resolved one hidden from screen readers", () => {
+  it("says in words whether each question was resolved or left open, in the same plain look either way (no check, no success colour)", () => {
     const resolved = render([HARBOUR]);
     const open = render([NAME]);
+    /** The class of the status line that says this. */
+    const statusClass = (html: string, words: string) =>
+      new RegExp(`<p class="([^"]*)">${words}</p>`).exec(html)?.[1];
+    /** The classes of the card, the bar's filled segments and the status line, which say nothing of how it ended. */
+    const looks = (html: string) => [
+      html.match(/<li class="flex"><div class="([^"]*)"/)?.[1],
+      html.match(/<span class="h-2 flex-1 rounded-full (bg-[\w-]+)"/)?.[1],
+    ];
 
     expect(spoken(resolved)).toContain(
       "Shared: Does the harbour reopen before winter? Resolved The storm wall holds. The fleet sails home."
     );
     expect(spoken(open)).toContain("Yours: Does the keeper clear the family name? Left open The ledger is found.");
-    expect(resolved).toMatch(/<span aria-hidden="true"[^>]*><svg/);
-    expect(open).not.toMatch(/<svg/);
+    expect(resolved).not.toMatch(/<svg/);
+    expect(resolved).not.toMatch(/accent/);
+    expect(statusClass(resolved, "Resolved")).toBe(statusClass(open, "Left open"));
+    expect(looks(resolved)).toEqual(looks(open));
   });
 
   it("says so when a question reached no milestone, with an empty bar", () => {
@@ -144,5 +154,38 @@ describe("StoryOutcomes", () => {
     for (const tag of marked) {
       expect(attribute(tag, "data-digital-source-type")).toBe(TRAINED_ALGORITHMIC_MEDIA);
     }
+  });
+
+  describe("reflection questions", () => {
+    const REFLECT = ["Who paid for the storm wall?", "Would you have sailed home?"];
+    /** Each card's markup, from its heading to the next card's. */
+    const cards = (html: string) => html.split("<h3").slice(1);
+
+    it("lists a question's reflection questions under its card, after its milestones, under a heading of their own", () => {
+      const html = render([outcome({ ...HARBOUR, reflectionQuestions: REFLECT }), NAME]);
+      const [harbour = "", name = ""] = cards(html);
+
+      expect(elements(harbour, "h4").map(spoken)).toEqual(["Questions to reflect on"]);
+      const [list = ""] = elements(harbour, "ul");
+      expect(elements(list, "li").map(spoken)).toEqual(REFLECT);
+      expect(spoken(harbour)).toMatch(/The fleet sails home\. Questions to reflect on Who paid for the storm wall\?/);
+      expect(name).not.toContain("Questions to reflect on");
+    });
+
+    it("shows nothing more on a card without reflection questions", () => {
+      const html = render([HARBOUR, outcome({ ...NAME, reflectionQuestions: [] })]);
+
+      expect(html).not.toContain("reflect");
+      expect(elements(html, "h4")).toEqual([]);
+    });
+
+    it("marks no reflection question as AI-generated: people write them", () => {
+      const html = render([outcome({ ...HARBOUR, reflectionQuestions: REFLECT })]);
+
+      for (const marked of aiMarked(html)) {
+        for (const question of REFLECT) expect(marked).not.toContain(question);
+      }
+      expect(aiMarked(html)).toEqual(["Does the harbour reopen before winter?", "The storm wall holds. The fleet sails home."]);
+    });
   });
 });

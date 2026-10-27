@@ -12,12 +12,15 @@ import {
   PublicationStatusType,
   Stat,
   TemplateIterationSections,
+  REFLECTION_QUESTIONS_PROBLEM,
   kidAgesFrom,
+  readReflectionQuestions,
 } from "core/types/index.js";
 import {
   checkTemplateBackgrounds,
   describeBackgroundFixes,
 } from "core/utils/statValueCheck.js";
+import { withReflectionQuestions } from "./templateReflectionQuestions.js";
 
 /** A template's read-with-kids setting as it is saved: whole ages from 2 to 14, or none at all (a cleared or invalid value). */
 function withKidAges(value: unknown): Pick<StoryTemplate, "kidAges"> {
@@ -200,7 +203,8 @@ export class TemplateService {
       };
     });
 
-    return filledTemplate as StoryTemplate;
+    // The author's reflection questions, for the outcomes it holds
+    return withReflectionQuestions(filledTemplate as StoryTemplate, baseTemplate.reflectionQuestions);
   }
 
   /**
@@ -515,19 +519,26 @@ export class TemplateService {
       // Merge existing data with the updates, then check the backgrounds
       // against the stats the template holds after the update; an update that
       // carries the read-with-kids setting replaces it with its valid value or,
-      // cleared (null) or not ages, removes it
+      // cleared (null) or not ages, removes it. The reflection questions, the
+      // update's or else the existing ones, stay only for the outcomes the
+      // template holds after it
       const merged: StoryTemplate = {
         ...existingTemplate,
         ...template,
         updatedAt: new Date().toISOString(),
       };
       delete merged.kidAges;
-      const mergedTemplate: StoryTemplate = this.withCheckedBackgroundValues({
-        ...merged,
-        ...withKidAges(
-          "kidAges" in template ? template.kidAges : existingTemplate.kidAges
-        ),
-      });
+      const mergedTemplate: StoryTemplate = this.withCheckedBackgroundValues(
+        withReflectionQuestions(
+          {
+            ...merged,
+            ...withKidAges(
+              "kidAges" in template ? template.kidAges : existingTemplate.kidAges
+            ),
+          },
+          merged.reflectionQuestions
+        )
+      );
 
       // Handle creator information on update
       if (currentUserId && !userPermissions.includes("templates_edit_all")) {
@@ -915,6 +926,10 @@ export class TemplateService {
       if (!(await mayWrite({ id: templateId, template, exists }))) {
         return null;
       }
+      // Its reflection questions take the editor's limits (reflectionQuestionsSchema)
+      if (template && "problem" in readReflectionQuestions(template.reflectionQuestions)) {
+        throw new TemplateImportError(REFLECTION_QUESTIONS_PROBLEM);
+      }
 
       // Check if template already exists
       const existingTemplate = await this.getTemplateById(templateId);
@@ -926,11 +941,19 @@ export class TemplateService {
       // Copy files from extracted location to template directory
       const copiedFiles = await copyTemplateFiles(sourceDir, templateDir);
 
-      // Load the updated template
-      const updatedTemplate = await this.getTemplateById(templateId);
-      if (!updatedTemplate) {
+      // Load the updated template, its reflection questions trimmed and kept
+      // only for the outcomes it holds
+      const loadedTemplate = await this.getTemplateById(templateId);
+      if (!loadedTemplate) {
         throw new Error("Failed to load template after import");
       }
+      const updatedTemplate = withReflectionQuestions(
+        loadedTemplate,
+        loadedTemplate.reflectionQuestions
+      );
+      let rewrite =
+        JSON.stringify(updatedTemplate.reflectionQuestions) !==
+        JSON.stringify(loadedTemplate.reflectionQuestions);
 
       // Use the template's containsImages value instead of checking filesystem
       const containsImages = updatedTemplate.containsImages || false;
@@ -951,6 +974,9 @@ export class TemplateService {
       ) {
         updatedTemplate.creatorId = finalCreatorId;
         updatedTemplate.creatorUsername = finalCreatorUsername;
+        rewrite = true;
+      }
+      if (rewrite) {
         await fs.writeFile(
           path.join(templateDir, "template.json"),
           JSON.stringify(updatedTemplate, null, 2)

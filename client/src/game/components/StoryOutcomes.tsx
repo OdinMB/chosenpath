@@ -1,5 +1,5 @@
 import type { OutcomeAtEnd } from "core/types";
-import { ColoredBox, Icons } from "components/ui";
+import { ColoredBox } from "components/ui";
 import { AI_GENERATED_TEXT_ATTRIBUTES } from "../utils/aiContentMarkers";
 
 /*
@@ -8,7 +8,9 @@ import { AI_GENERATED_TEXT_ATTRIBUTES } from "../utils/aiContentMarkers";
  * own), each with the milestones it reached against the number that resolves
  * it. The milestones are the narrator's and the questions come from the setup
  * or the template, so both carry the AI-text markers, as the state's
- * provenance does (.context/ai-transparency.md).
+ * provenance does (.context/ai-transparency.md). Under them, the reflection
+ * questions a World's author or whoever started the story wrote, if any,
+ * without markers.
  */
 
 const OUTCOMES_TITLE_ID = "story-outcomes-title";
@@ -28,7 +30,6 @@ function countOf(reached: number, total: number): string {
 function MilestoneBar({ outcome }: { outcome: OutcomeAtEnd }) {
   const { reached, total } = progressOf(outcome);
   const count = countOf(reached, total);
-  const fill = outcome.complete ? "bg-accent" : "bg-secondary";
   return (
     <div className="mt-4 flex items-center gap-3">
       <div
@@ -43,7 +44,7 @@ function MilestoneBar({ outcome }: { outcome: OutcomeAtEnd }) {
         {Array.from({ length: total }, (_, index) => (
           <span
             key={index}
-            className={`h-2 flex-1 rounded-full ${index < reached ? fill : "bg-primary-100"}`}
+            className={`h-2 flex-1 rounded-full ${index < reached ? "bg-secondary" : "bg-primary-100"}`}
           />
         ))}
       </div>
@@ -54,33 +55,42 @@ function MilestoneBar({ outcome }: { outcome: OutcomeAtEnd }) {
   );
 }
 
+/**
+ * Resolved or left open, in words and the same plain look: a question can be
+ * resolved against the players, so neither reads as a success.
+ */
 function Status({ complete }: { complete: boolean }) {
-  if (complete) {
-    return (
-      <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-accent-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary">
-        <span aria-hidden="true" className="text-accent">
-          <Icons.Check className="h-4 w-4" />
-        </span>
-        Resolved
-      </p>
-    );
-  }
   return (
     <p className="mt-3 inline-flex items-center rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary-700">
-      Left open
+      {complete ? "Resolved" : "Left open"}
     </p>
+  );
+}
+
+/** The questions people wrote for this outcome, to think about once the story is over: their own words, so no AI-text markers. */
+function ReflectionQuestions({ questions }: { questions?: string[] }) {
+  if (!questions?.length) return null;
+  return (
+    <div className="mt-5 border-t border-primary-100 pt-4">
+      <h4 className="font-montserrat text-xs font-semibold uppercase tracking-wider text-primary-600">
+        Questions to reflect on
+      </h4>
+      <ul className="mt-2 list-disc space-y-1.5 pl-5 text-base text-primary marker:text-primary-600">
+        {questions.map((question, index) => (
+          <li key={index} className="pl-1">
+            {question}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
 function OutcomeCard({ outcome }: { outcome: OutcomeAtEnd }) {
   return (
     <li className="flex">
-      {/* A resolved question's card has the accent edge; an open one's stays grey */}
-      <ColoredBox
-        leftBorder
-        colorType={outcome.complete ? "accent" : "grey"}
-        className="flex w-full flex-col p-4 md:p-5"
-      >
+      {/* The same grey edge whether the question was resolved or left open */}
+      <ColoredBox leftBorder colorType="grey" className="flex w-full flex-col p-4 md:p-5">
         <h3>
           <span className="block font-montserrat text-xs font-semibold uppercase tracking-wider text-primary-600">
             {outcome.owner === "shared" ? "Shared" : "Yours"}
@@ -111,6 +121,7 @@ function OutcomeCard({ outcome }: { outcome: OutcomeAtEnd }) {
         ) : (
           <p className="mt-4 text-base italic text-primary-600">No milestones reached.</p>
         )}
+        <ReflectionQuestions questions={outcome.reflectionQuestions} />
       </ColoredBox>
     </li>
   );

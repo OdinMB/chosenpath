@@ -5,7 +5,11 @@ import {
   GenerateTemplateRequest,
   TemplateIterationRequest,
 } from "core/types/admin";
-import { GetTemplateImagesResponse } from "core/types/api";
+import {
+  GetTemplateImagesResponse,
+  TemplateReflectionOutcome,
+  TemplateReflectionQuestionsInfo,
+} from "core/types/api";
 
 /**
  * Template API functions that can be used in both admin and user contexts.
@@ -67,6 +71,19 @@ export const templateApi = {
       `/templates/${templateId}`
     );
     return response.template;
+  },
+
+  /**
+   * A World's outcome questions with the author's reflection questions, for
+   * starting several stories from it (signed in, with read access)
+   */
+  getReflectionQuestions: async (
+    templateId: string
+  ): Promise<TemplateReflectionOutcome[]> => {
+    const response = await apiClient.get<TemplateReflectionQuestionsInfo>(
+      `/templates/${encodeURIComponent(templateId)}/reflection-questions`
+    );
+    return response.outcomes;
   },
 
   /**

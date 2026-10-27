@@ -15,6 +15,7 @@ import {
   PlayerCount,
   KidAges,
   StoryCategory,
+  withOutcomeReflectionQuestions,
 } from "core/types";
 import { Logger } from "shared/logger";
 import { readKidAgesField } from "shared/utils/kidAgesField";
@@ -41,6 +42,7 @@ import {
   invalidateTemplateImagesCache,
 } from "./useTemplateImages";
 import { generateIdFromName } from "shared/utils/idGeneration";
+import { reflectionQuestionsHeldBy } from "../utils/aiReflectionQuestions";
 
 // Types for deferred image operations
 interface PendingImageOperation {
@@ -651,6 +653,8 @@ export function useTemplateForm({
         ...kidsSetting,
         updatedAt: new Date().toISOString(),
       };
+      // The reflection questions of the outcomes whose ids the draft kept; the rest go with their outcomes
+      updatedTemplateData.reflectionQuestions = reflectionQuestionsHeldBy(updatedTemplateData);
 
       // Delete the temporary generated template since we only needed its content
       if (generatedTemplateData.id !== formData.id) {
@@ -895,6 +899,17 @@ export function useTemplateForm({
 
   const handleOutcomesChange = (outcomes: Outcome[]) =>
     setFormData((prev) => ({ ...prev, sharedOutcomes: outcomes }));
+
+  // An outcome's reflection questions, kept beside the outcomes by outcome id
+  const handleReflectionQuestionsChange = (outcomeId: string, questions: string[]) =>
+    setFormData((prev) => ({
+      ...prev,
+      reflectionQuestions: withOutcomeReflectionQuestions(prev.reflectionQuestions, outcomeId, questions),
+    }));
+
+  // After an accepted AI change replaced outcomes: the questions of the outcomes still held, by id
+  const handleOutcomesReplaced = () =>
+    setFormData((prev) => ({ ...prev, reflectionQuestions: reflectionQuestionsHeldBy(prev) }));
 
   const handlePlayerChange = (update: Partial<StoryTemplate>): void => {
     // go through playerX attributes
@@ -1151,6 +1166,8 @@ export function useTemplateForm({
     handleStatsChange,
     handleStoryElementsChange,
     handleOutcomesChange,
+    handleReflectionQuestionsChange,
+    handleOutcomesReplaced,
     handlePlayerChange,
     handleCharacterSelectionIntroductionChange,
     handlePublicationStatusChange,

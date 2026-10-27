@@ -27,6 +27,8 @@ import {
   MultiStoryStartNote,
   START_NOTE_ID,
 } from "./MultiStoryStartField";
+import { ReflectionQuestionsPanel } from "./ReflectionQuestionsPanel";
+import { useBatchReflectionQuestions } from "page/hooks/useBatchReflectionQuestions";
 
 type ConfigurableTemplate = TemplateMetadata;
 
@@ -58,6 +60,13 @@ export function TemplateConfigurator() {
   const { startsLeft, refresh: refreshStartsLeft } = useStartsLeft(startsSeveral, user);
   const noStartsLeft =
     startsSeveral && storiesToStart(storyCount, startsLeft?.remaining) === 0;
+  // Their reflection questions, the World's to start with, loaded once several
+  // stories are chosen, and again for a new sign-in if that load failed
+  const batchReflection = useBatchReflectionQuestions(
+    template?.id ?? "",
+    startsSeveral,
+    user
+  );
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
     useState<DifficultyLevel>(() => {
       return getDefaultDifficultyLevel();
@@ -151,7 +160,8 @@ export function TemplateConfigurator() {
       const outcome = await multiStart.startStories(
         settings,
         storyCount,
-        startsLeft?.remaining
+        startsLeft?.remaining,
+        batchReflection.requestQuestions(playerCount)
       );
       if (outcome === "signed-out") {
         // The starts left are read again once signed in (useStartsLeft)
@@ -413,7 +423,16 @@ export function TemplateConfigurator() {
               onCountChange={setStoryCount}
               disabled={isLoading || multiStart.isStarting}
               startsLeft={startsLeft}
-            />
+            >
+              <ReflectionQuestionsPanel
+                status={batchReflection.status}
+                outcomes={batchReflection.outcomesFor(playerCount)}
+                questions={batchReflection.drafts}
+                open={batchReflection.open}
+                onToggle={batchReflection.toggle}
+                onChange={batchReflection.setQuestions}
+              />
+            </MultiStoryStartField>
           )}
 
           {startsSeveral && signInLapsed && (

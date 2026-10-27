@@ -11,7 +11,7 @@ import type { SpendBucket } from "core/types/api.js";
 
 const isOverCeiling = jest.fn<(bucket: SpendBucket) => Promise<boolean>>();
 const createStory = jest.fn<() => Promise<void>>();
-const createStoryFromTemplate = jest.fn<() => Promise<boolean>>();
+const createStoryFromTemplate = jest.fn<(...args: unknown[]) => Promise<boolean>>();
 const getStoryPlayerByCode =
   jest.fn<(code: string) => Promise<{ storyId: string; playerSlot: string } | undefined>>();
 
@@ -29,7 +29,7 @@ jest.unstable_mockModule("../../../src/stories/StoryDbService.js", () => ({
 }));
 
 const { default: router } = await import("../../../src/stories/storyRoutes.js");
-const { addressKey, checkRateLimit } = await import("../../../src/shared/rateLimiter.js");
+const { accountKey, addressKey, checkRateLimit } = await import("../../../src/shared/rateLimiter.js");
 
 type Sent = { statusCode: number; body: Record<string, unknown> };
 type Handler = (req: Request, res: Response, next: () => void) => Promise<void> | void;
@@ -300,6 +300,63 @@ describe("GET /stories/starts-left", () => {
     expect(throughMiddleware.body.data).toBeUndefined();
     expect(handlerAlone.statusCode).toBe(401);
     expect(handlerAlone.body.data).toBeUndefined();
+  });
+});
+
+/*
+ * Several stories at once: whoever starts them, signed in, can set reflection
+ * questions for the World's outcomes, sent with every start of the batch.
+ */
+describe("a World start's reflection questions", () => {
+  const handler = () => handlerOf("post", "/stories/template");
+  const lastArgument = () => createStoryFromTemplate.mock.calls[0]?.at(-1);
+
+  /** A signed-in start from an account no other test uses. */
+  function signedIn(body: Record<string, unknown>): Partial<Request> & { accountId: string } {
+    const request = fromNewAddress(body);
+    const accountId = `starter-${addressCounter}`;
+    return { ...request, accountId, user: { id: accountId } as Request["user"] };
+  }
+
+  it("passes the questions a signed-in start sends on, as they read, to the story it creates", async () => {
+    await call(handler(), signedIn({ generateImages: false, reflectionQuestions: { shared_harbour: [" Who paid? "] } }));
+
+    expect(lastArgument()).toEqual({ shared_harbour: ["Who paid?"] });
+  });
+
+  it("passes none on for a start that sends none, so the story takes the World's", async () => {
+    await call(handler(), fromNewAddress({ generateImages: false }));
+
+    expect(lastArgument()).toBeUndefined();
+  });
+
+  it("refuses questions from a start that isn't signed in with 401, creating and counting nothing", async () => {
+    const request = fromNewAddress({ generateImages: false, reflectionQuestions: { shared_harbour: ["Who paid?"] } });
+
+    const sent = await call(handler(), request);
+
+    expect(sent.statusCode).toBe(401);
+    expect(sent.body.errorMessage).toBe("Authentication required");
+    expect(createStoryFromTemplate).not.toHaveBeenCalled();
+    expect(isOverCeiling).not.toHaveBeenCalled();
+    expect(checkRateLimit(addressKey(request.address), "initialize_story").requestsRemaining).toBe(
+      RATE_LIMITS.initialize_story.maxRequests
+    );
+  });
+
+  it("refuses questions beyond the limits with 400, saying what they are, creating and counting nothing", async () => {
+    const request = signedIn({ generateImages: false, reflectionQuestions: { shared_harbour: ["x".repeat(301)] } });
+
+    const sent = await call(handler(), request);
+
+    expect(sent.statusCode).toBe(400);
+    expect(sent.body.errorMessage).toBe(
+      "Reflection questions: at most 5 for each outcome, each one with text and at most 300 characters."
+    );
+    expect(createStoryFromTemplate).not.toHaveBeenCalled();
+    expect(checkRateLimit(accountKey(request.accountId), "initialize_story_text").requestsRemaining).toBe(
+      RATE_LIMITS.initialize_story_text.maxRequests
+    );
   });
 });
 

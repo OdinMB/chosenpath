@@ -57,8 +57,11 @@ type SetupCall = {
   learning: boolean;
 };
 
-/** Template fields that identify its creator; they never go to the model. */
-const CREATOR_FIELDS = new Set(["creatorId", "creatorUsername"]);
+/**
+ * Template fields that never go to the model: those that identify its creator, and the reflection questions people
+ * write for the end screen (no section the model rewrites holds them).
+ */
+const UNSENT_FIELDS = new Set(["creatorId", "creatorUsername", "reflectionQuestions"]);
 
 const ALL_SECTIONS = Object.keys(templateIterationSections) as TemplateIterationSections[];
 
@@ -104,7 +107,7 @@ export class StorySetupPromptService {
     sections: TemplateIterationSections[],
     template: object
   ): string {
-    const templateJson = JSON.stringify(Object.fromEntries(Object.entries(template).filter(([key]) => !CREATOR_FIELDS.has(key))));
+    const templateJson = JSON.stringify(Object.fromEntries(Object.entries(template).filter(([key]) => !UNSENT_FIELDS.has(key))));
     const call: SetupCall = { players: playerCount, mode: gameMode, kind: "iteration", sections, maxTurns, kids: false, olderKids: false, learning: false };
     return this.buildPrompt(call, feedback, templateJson);
   }

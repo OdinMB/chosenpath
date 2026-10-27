@@ -3,6 +3,8 @@ import { StoryInitializer } from "page/components/StoryInitializer";
 import { ImageCard } from "shared/components/ImageCard";
 import { PrimaryButton, Icons } from "components/ui";
 import { GameModes, KidAges, PlayerCount, StoryCategory } from "core/types";
+import { ReflectionQuestionsLossNotice } from "./ReflectionQuestionsLossNotice";
+import type { LostReflectionQuestions } from "../utils/aiReflectionQuestions";
 
 interface AiDraftTabProps {
   isSparse: boolean;
@@ -27,6 +29,8 @@ interface AiDraftTabProps {
   handleAiDraftPromptChange: (prompt: string) => void;
   handleAiDraftPlayerCountChange: (playerCount: PlayerCount) => void;
   onBack: () => void;
+  /** The World's reflection questions, outcome by outcome: a draft replaces the outcomes, and these with them */
+  lostReflectionQuestions?: LostReflectionQuestions[];
 }
 
 export const AiDraftTab: React.FC<AiDraftTabProps> = ({
@@ -39,6 +43,7 @@ export const AiDraftTab: React.FC<AiDraftTabProps> = ({
   handleAiDraftPromptChange,
   handleAiDraftPlayerCountChange,
   onBack,
+  lostReflectionQuestions = [],
 }) => {
   // Control visibility of AI Draft initializer when template is not sparse
   const [showAIDraftContent, setShowAIDraftContent] = useState<boolean>(isSparse);
@@ -84,6 +89,17 @@ export const AiDraftTab: React.FC<AiDraftTabProps> = ({
           onPlayerCountChange={handleAiDraftPlayerCountChange}
           onPromptChange={handleAiDraftPromptChange}
           isSparse={isSparse}
+          overrideNotice={
+            lostReflectionQuestions.length > 0 ? (
+              <ReflectionQuestionsLossNotice
+                id="ai-draft-reflection-loss"
+                lead={(count) =>
+                  `AI Draft writes new outcomes, and removes ${count} with the ones it replaces:`
+                }
+                lost={lostReflectionQuestions}
+              />
+            ) : undefined
+          }
         />
       )}
     </div>

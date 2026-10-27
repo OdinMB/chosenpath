@@ -7,6 +7,7 @@ import {
   IMAGE_SIZES,
   StoryCategory,
   KidAges,
+  ReflectionQuestions,
   kidAgeAnswer,
   kidAgesFromPremise,
 } from "core/types/index.js";
@@ -397,9 +398,11 @@ export class StoryCreationService {
     pregenerateBeats: boolean,
     difficultyLevel: DifficultyLevel,
     res: Response,
-    creatorId?: string
+    creatorId?: string,
+    reflectionQuestions?: ReflectionQuestions
   ): Promise<boolean> {
-    // Answers the request itself; resolves true only when the story was created
+    // Answers the request itself; resolves true only when the story was created.
+    // reflectionQuestions: a several-stories start's, read by the route, in place of the template's
     Logger.Route.log(
       `Creating story from template: ${templateId} for ${playerCount} players, difficulty: ${difficultyLevel.title}`
     );
@@ -480,7 +483,8 @@ export class StoryCreationService {
         generateImages,
         pregenerateBeats,
         difficultyLevel,
-        playerCodes
+        playerCodes,
+        reflectionQuestions
       );
       Logger.Route.log(`Created story state from template for: ${storyId}`);
       console.log(

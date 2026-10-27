@@ -16,6 +16,8 @@ import {
   MediaTab,
 } from ".";
 import { Logger } from "shared/logger";
+import { ReflectionQuestionsLossNotice } from "./ReflectionQuestionsLossNotice";
+import type { LostReflectionQuestions } from "../utils/aiReflectionQuestions";
 
 type ModalTabType =
   | "guidelines"
@@ -36,7 +38,16 @@ interface AiIterationModalProps {
   ) => void;
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
   originalPlayerStats?: Stat[];
+  /** The World's reflection questions that accepting a section removes with the outcomes it replaces */
+  lostReflectionQuestions?: Partial<
+    Record<"sharedOutcomes" | "players", LostReflectionQuestions[]>
+  >;
 }
+
+const LOSS_NOTICE_IDS = {
+  sharedOutcomes: "ai-outcomes-reflection-loss",
+  players: "ai-players-reflection-loss",
+};
 
 export const AiIterationModal: React.FC<AiIterationModalProps> = ({
   isOpen,
@@ -45,8 +56,11 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
   onAcceptSection,
   playerOptions,
   originalPlayerStats = [],
+  lostReflectionQuestions = {},
 }) => {
   const { activeTab, setActiveTab } = useTabs<ModalTabType>("guidelines");
+  const outcomesLoss = lostReflectionQuestions.sharedOutcomes ?? [];
+  const playersLoss = lostReflectionQuestions.players ?? [];
 
   // Log the iterationData when it changes to debug
   useEffect(() => {
@@ -184,10 +198,20 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
               <PrimaryButton
                 onClick={() => onAcceptSection("sharedOutcomes", iterationData)}
                 leftIcon={<Icons.Check className="h-4 w-4" />}
+                aria-describedby={
+                  outcomesLoss.length > 0 ? LOSS_NOTICE_IDS.sharedOutcomes : undefined
+                }
               >
                 Accept Outcomes
               </PrimaryButton>
             </div>
+            <ReflectionQuestionsLossNotice
+              id={LOSS_NOTICE_IDS.sharedOutcomes}
+              lead={(count) =>
+                `Accepting these outcomes removes ${count}, with the outcomes they replace:`
+              }
+              lost={outcomesLoss}
+            />
             <OutcomesTab
               outcomes={iterationData.sharedOutcomes}
               onChange={() => {}}
@@ -235,10 +259,20 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
                   onAcceptSection("players", iterationData);
                 }}
                 leftIcon={<Icons.Check className="h-4 w-4" />}
+                aria-describedby={
+                  playersLoss.length > 0 ? LOSS_NOTICE_IDS.players : undefined
+                }
               >
                 Accept Player Options
               </PrimaryButton>
             </div>
+            <ReflectionQuestionsLossNotice
+              id={LOSS_NOTICE_IDS.players}
+              lead={(count) =>
+                `Accepting these player options removes ${count}, with the outcomes they replace:`
+              }
+              lost={playersLoss}
+            />
             <PlayersTab
               playerOptions={playerOptions}
               onChange={() => {}}

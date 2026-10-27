@@ -25,7 +25,12 @@ import {
   StartsLeftInfo,
   UpdateStoryStatusRequest,
 } from "core/types/api.js";
-import { PlayerCount, isStoryCategory, kidAgesFrom } from "core/types/index.js";
+import {
+  PlayerCount,
+  isStoryCategory,
+  kidAgesFrom,
+  readReflectionQuestions,
+} from "core/types/index.js";
 import { DEFAULT_SELECTED_DIFFICULTY_MODIFIER, RATE_LIMITS } from "core/config.js";
 import { verifyUser } from "../users/authMiddleware.js";
 import { v4 as uuidv4 } from "uuid";
@@ -140,6 +145,21 @@ router.post(
   async (req, res) => {
     const requestId = req.body?.requestId || "unknown";
 
+    // A several-stories start's reflection questions, in place of the World's:
+    // only a signed-in start sends them, and either refusal comes before the
+    // start is counted
+    const sentQuestions = (req.body as CreateStoryFromTemplateRequest | undefined)
+      ?.reflectionQuestions;
+    if (sentQuestions !== undefined && !req.user) {
+      sendError(res, "Authentication required", 401, requestId);
+      return;
+    }
+    const reflection = readReflectionQuestions(sentQuestions);
+    if ("problem" in reflection) {
+      sendError(res, reflection.problem, 400, requestId);
+      return;
+    }
+
     let admitted: StartAdmission | null = null;
     try {
       admitted = await admitStoryStart(
@@ -171,7 +191,8 @@ router.post(
         reqPregenerateBeats,
         reqDifficultyLevel,
         res,
-        creatorId
+        creatorId,
+        reflection.questions ?? undefined
       );
 
       // A refused start (no such World, a player count it doesn't take, a

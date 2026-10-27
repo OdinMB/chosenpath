@@ -501,6 +501,9 @@ Create a story from an existing template.
     title: string,
     modifier: number
   },
+  // A several-stories start, signed in only: reflection questions by outcome id, in place
+  // of the World's ({} for none). Absent: the story takes the World's.
+  reflectionQuestions?: Record<string, string[]>,
   requestId?: string
 }
 ```
@@ -519,10 +522,12 @@ Create a story from an existing template.
 }
 ```
 
-Template-based stories are created synchronously and are ready immediately (no polling needed).
+Template-based stories are created synchronously and are ready immediately (no polling needed). The story keeps the reflection questions of the outcomes it plays (`StoryState.reflectionQuestions`).
 
 **Error Cases:**
 
+- `401` "Authentication required": `reflectionQuestions` sent without a sign-in; refused before the start is counted
+- `400`: Reflection questions beyond `reflectionQuestionsSchema` (`core/types/reflectionQuestions.ts`: at most 5 per outcome, each with text and at most 300 characters), with the message `REFLECTION_QUESTIONS_PROBLEM`; refused before the start is counted
 - `400`: Player count outside the template's limits, or the template can't start a story for that many players (no outcomes on the shared list or the seats in play, or a multiplayer story without a shared outcome; `core/utils/outcomeReadiness.ts`)
 - `404`: Template not found
 - `429`: Rate limit exceeded
@@ -911,6 +916,40 @@ Get list of images and manifest for template.
 
 ---
 
+### Get Template Reflection Questions
+
+**GET** `/templates/:id/reflection-questions`
+
+**Auth Required**: Yes
+
+**Permission Check**: Read access (published or private templates for any signed-in account; a draft or one in review for its creator or `templates_see_all`)
+
+The outcomes a template's stories can play, for the several-stories start on the template configurator, which prefills its reflection questions from them: the shared outcomes first, then each seat's own up to `playerCountMax`, each with its question and the author's reflection questions. Never an outcome's possible resolutions or resonance. The answer carries `Cache-Control: private, no-store`, since it depends on who is signed in.
+
+**Response:**
+
+```typescript
+{
+  success: true,
+  data: {
+    outcomes: Array<{
+      id: string,
+      owner: "shared" | "player1" | "player2" | "player3",
+      question: string,
+      reflectionQuestions: string[]  // [] where there are none
+    }>  // TemplateReflectionQuestionsInfo
+  },
+  requestId: string
+}
+```
+
+**Error Cases:**
+
+- `401` "Authentication required": not signed in, or signed in without read access (the same refusal either way, as for `GET /templates/:id`)
+- `404`: Template not found
+
+---
+
 ### Export Templates
 
 **POST** `/templates/export`
@@ -957,6 +996,8 @@ Create a new template, or save the existing one `template.id` names:
 
 A new template's creator is the caller, whatever `creatorId` the body names. Setting `publicationStatus` to `"published"` needs `templates_publish`, and setting `showOnWelcomeScreen` or `order` to other than the template's stored values (for a new template, `false` and `999`) needs `templates_carousel`.
 
+`template.reflectionQuestions` (optional, by outcome id) is read with `reflectionQuestionsSchema`, trimmed, and kept only for outcomes the template holds; as for **PUT** `/templates/:id`.
+
 **Request Body:**
 
 ```typescript
@@ -982,7 +1023,7 @@ A new template's creator is the caller, whatever `creatorId` the body names. Set
 
 **Error Cases:**
 
-- `400`: Missing template data, or a `template.id` that isn't a UUID
+- `400`: Missing template data, a `template.id` that isn't a UUID, or reflection questions beyond `reflectionQuestionsSchema` (message `REFLECTION_QUESTIONS_PROBLEM`)
 - `401`: Not signed in
 - `403`: No `templates_create`, no edit access to the existing template, or publishing or changing the welcome-screen settings without the permission for it
 - `404`: The id names a template folder without its database entry
@@ -999,6 +1040,8 @@ A new template's creator is the caller, whatever `creatorId` the body names. Set
 **Permission Check**: Edit access, publication status change permission, carousel permission
 
 Update an existing template. Without `templates_edit_all`, the caller stays the template's creator whatever `creatorId` the body names.
+
+Reflection questions: a body with `template.reflectionQuestions` replaces the template's (trimmed; none, `null` or `{}` removes them), one without it keeps them. Either way the saved template keeps only the questions of outcomes it holds after the update, and drops the field when none is left. Questions beyond `reflectionQuestionsSchema` (`core/types/reflectionQuestions.ts`) answer `400` with `REFLECTION_QUESTIONS_PROBLEM`, writing nothing.
 
 **Path Params:**
 
@@ -1219,7 +1262,7 @@ Upload a file to template directory (typically images).
 
 Import a template from a ZIP archive: its `template.json`, at the root or in a folder named by the template's id (as Export lays it out), and the files beside it. The template's id is `template.json`'s `id`, or, for a zip that holds only files, the name of its folder; it must be a UUID. A template with that id is updated, otherwise a new one is created.
 
-Before anything is written to the template's folder, the import checks edit access to an existing template, and applies the publication status and carousel checks of **PUT** `/templates/:id` to `template.json` (for a new template, against `false` and `999`). The zip is unpacked into a temporary folder, removed afterwards, and its files land only in the template's folder. The template keeps the creator its database entry names; a new one's creator is the importer. Its `template.json` names that creator.
+Before anything is written to the template's folder, the import checks edit access to an existing template, and applies the publication status and carousel checks of **PUT** `/templates/:id` to `template.json` (for a new template, against `false` and `999`). The zip is unpacked into a temporary folder, removed afterwards, and its files land only in the template's folder. The template keeps the creator its database entry names; a new one's creator is the importer. Its `template.json` names that creator. A `template.json` whose `reflectionQuestions` are beyond `reflectionQuestionsSchema` is refused with `400` (`REFLECTION_QUESTIONS_PROBLEM`) before anything is written; the imported template keeps them trimmed, and only those of outcomes it holds.
 
 **Query Params:**
 

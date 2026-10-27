@@ -7,6 +7,8 @@ import {
 } from "./index.js";
 import { PublicUser } from "./user.js";
 import { GameMode, KidAges, StoryCategory } from "./story.js";
+import type { PlayerSlot } from "./player.js";
+import type { ReflectionQuestions } from "./reflectionQuestions.js";
 
 /*
  * Bases
@@ -110,6 +112,11 @@ export interface CreateStoryFromTemplateRequest extends ClientRequest {
   generateImages: boolean;
   pregenerateBeats?: boolean;
   difficultyLevel: DifficultyLevel;
+  /**
+   * A several-stories start: the reflection questions for the World's outcomes, by outcome id, in place of the
+   * World's ({} for none). Absent: the story takes the World's. Read with reflectionQuestionsSchema; 400 beyond it.
+   */
+  reflectionQuestions?: ReflectionQuestions;
 }
 export interface CreateStoryInfo {
   storyId: string;
@@ -314,6 +321,23 @@ export interface GenerateElementImageRequest extends ClientRequest {
   referenceImageIds?: string[];
   size?: ImageSize;
   quality?: ImageQuality;
+}
+
+/**
+ * A World's reflection questions, for whoever starts several stories from it
+ * (GET /templates/:id/reflection-questions): each outcome its seats can play,
+ * the shared ones first, with its question and the author's reflection
+ * questions. Never an outcome's possible resolutions or resonance.
+ */
+export interface TemplateReflectionOutcome {
+  id: string;
+  owner: "shared" | PlayerSlot;
+  question: string;
+  /** The author's, in order; [] where there are none. */
+  reflectionQuestions: string[];
+}
+export interface TemplateReflectionQuestionsInfo {
+  outcomes: TemplateReflectionOutcome[];
 }
 
 /**

@@ -161,6 +161,7 @@ const worldJson = (fields: Record<string, unknown>): string =>
 type Answer = {
   status: number;
   body: { data?: Record<string, unknown>; errorMessage?: string };
+  cacheControl?: string;
 };
 
 const app = express();
@@ -172,10 +173,10 @@ let port = 0;
 
 /** Sends a request to the template routes as the app would, with the caller's session cookie. */
 async function send(
-  method: "POST" | "PUT",
+  method: "GET" | "POST" | "PUT",
   url: string,
   caller: PublicUser | undefined,
-  payload: { json?: unknown; zip?: Buffer }
+  payload: { json?: unknown; zip?: Buffer } = {}
 ): Promise<Answer> {
   const headers: Record<string, string> = {};
   let data: Buffer | undefined;
@@ -200,7 +201,11 @@ async function send(
         response.on("data", (chunk: Buffer) => chunks.push(chunk));
         response.on("end", () => {
           const text = Buffer.concat(chunks).toString("utf8");
-          resolve({ status: response.statusCode ?? 0, body: text ? JSON.parse(text) : {} });
+          resolve({
+            status: response.statusCode ?? 0,
+            body: text ? JSON.parse(text) : {},
+            cacheControl: response.headers["cache-control"],
+          });
         });
       }
     );
@@ -647,5 +652,156 @@ describe("POST /templates/import of a new World", () => {
     for (const name of added) {
       expect(name.startsWith(storedKey(NEW_ID) + path.sep)).toBe(true);
     }
+  });
+});
+
+/*
+ * Reflection questions: the World's author writes them for its outcomes, by
+ * outcome id. A save or an import takes them only within the limits the
+ * editor sets (core's reflectionQuestionsSchema), and a World keeps only those
+ * of the outcomes it holds. Whoever starts several stories reads them with the
+ * World's outcome questions, to set their own.
+ */
+describe("reflection questions on a World", () => {
+  const outcomeOf = (id: string) => ({
+    id,
+    question: `Question of ${id}?`,
+    possibleResolutions: { favorable: "Won.", mixed: "Half won.", unfavorable: "Lost." },
+    resonance: "It matters.",
+    intendedNumberOfMilestones: 2,
+    milestones: [],
+  });
+  const seat = (...ids: string[]) => ({
+    outcomes: ids.map(outcomeOf),
+    possibleCharacterIdentities: [],
+    possibleCharacterBackgrounds: [],
+  });
+  const withOutcomes = {
+    playerCountMax: 2,
+    sharedOutcomes: [outcomeOf("shared_harbour")],
+    player1: seat("player1_name"),
+    player2: seat("player2_hideout"),
+    player3: seat("player3_vow"),
+  };
+  const QUESTIONS = { shared_harbour: ["Who paid for it?"], player2_hideout: ["Whom did it keep safe?"] };
+  const TOO_MANY = { shared_harbour: ["1?", "2?", "3?", "4?", "5?", "6?"] };
+  const PROBLEM = "Reflection questions: at most 5 for each outcome, each one with text and at most 300 characters.";
+
+  const save = (template: Record<string, unknown>) =>
+    send("PUT", `/templates/${WORLD_ID}`, CREATOR, { json: { template } });
+
+  it("keeps the questions a save sends for the World's outcomes, and leaves out those of outcomes it doesn't hold", async () => {
+    const answer = await save({ ...withOutcomes, reflectionQuestions: { ...QUESTIONS, player9_gone: ["Who?"] } });
+
+    expect(answer.status).toBe(200);
+    expect(worldFile(WORLD_ID).reflectionQuestions).toEqual(QUESTIONS);
+  });
+
+  it("keeps a World's questions through a save that doesn't send them, and removes them on one that sends none", async () => {
+    await save({ ...withOutcomes, reflectionQuestions: QUESTIONS });
+
+    await save({ title: "Lantern Coast, renamed" });
+    expect(worldFile(WORLD_ID).reflectionQuestions).toEqual(QUESTIONS);
+
+    await save({ reflectionQuestions: { shared_harbour: [] } });
+    expect(worldFile(WORLD_ID)).not.toHaveProperty("reflectionQuestions");
+  });
+
+  it("drops the questions of an outcome the save removes", async () => {
+    await save({ ...withOutcomes, reflectionQuestions: QUESTIONS });
+
+    await save({ sharedOutcomes: [] });
+
+    expect(worldFile(WORLD_ID).reflectionQuestions).toEqual({ player2_hideout: ["Whom did it keep safe?"] });
+  });
+
+  it("refuses a save or a new World beyond the limits with 400, saying what they are, writing nothing", async () => {
+    const before = everythingStored();
+
+    const saved = await save({ ...withOutcomes, reflectionQuestions: TOO_MANY });
+    const created = await create(CREATOR, { title: "New", ...withOutcomes, reflectionQuestions: TOO_MANY });
+
+    expect([saved.status, created.status]).toEqual([400, 400]);
+    expect(saved.body.errorMessage).toBe(PROBLEM);
+    expect(created.body.errorMessage).toBe(PROBLEM);
+    expect(everythingStored()).toEqual(before);
+  });
+
+  it("takes a World's questions from its zip, and refuses a zip beyond the limits with 400, writing nothing", async () => {
+    const before = everythingStored();
+    const refused = await importZip(CREATOR, {
+      "template.json": worldJson({ ...withOutcomes, reflectionQuestions: TOO_MANY }),
+    });
+
+    expect(refused.status).toBe(400);
+    expect(refused.body.errorMessage).toBe(PROBLEM);
+    expect(everythingStored()).toEqual(before);
+
+    const imported = await importZip(CREATOR, {
+      "template.json": worldJson({ ...withOutcomes, reflectionQuestions: QUESTIONS }),
+    });
+
+    expect(imported.status).toBe(200);
+    expect(worldFile(WORLD_ID).reflectionQuestions).toEqual(QUESTIONS);
+  });
+
+  describe("GET /templates/:id/reflection-questions", () => {
+    const read = (caller: PublicUser | undefined) =>
+      send("GET", `/templates/${WORLD_ID}/reflection-questions`, caller);
+
+    it("gives the World's outcome questions for its seats, the shared ones first, each with its reflection questions", async () => {
+      await save({ ...withOutcomes, reflectionQuestions: QUESTIONS });
+
+      const answer = await read(CREATOR);
+
+      expect(answer.status).toBe(200);
+      expect(answer.body.data?.outcomes).toEqual([
+        { id: "shared_harbour", owner: "shared", question: "Question of shared_harbour?", reflectionQuestions: ["Who paid for it?"] },
+        { id: "player1_name", owner: "player1", question: "Question of player1_name?", reflectionQuestions: [] },
+        { id: "player2_hideout", owner: "player2", question: "Question of player2_hideout?", reflectionQuestions: ["Whom did it keep safe?"] },
+      ]);
+    });
+
+    it("never gives an outcome's possible resolutions or resonance", async () => {
+      await save({ ...withOutcomes, reflectionQuestions: QUESTIONS });
+
+      const text = JSON.stringify((await read(CREATOR)).body);
+
+      for (const hidden of ["Won.", "Half won.", "Lost.", "It matters."]) expect(text).not.toContain(hidden);
+    });
+
+    it("gives a published World's questions to any signed-in account, and a draft's only to those who may read it", async () => {
+      await save({ ...withOutcomes });
+
+      expect((await read(ADMIN)).status).toBe(200);
+      expect((await read(PLAYER)).status).toBe(401);
+
+      await send("PUT", `/templates/${WORLD_ID}`, ADMIN, { json: { template: { publicationStatus: "published" } } });
+
+      expect((await read(PLAYER)).status).toBe(200);
+    });
+
+    it("refuses a signed-in account that may not read the draft as it refuses a visitor who isn't signed in", async () => {
+      await save({ ...withOutcomes });
+
+      const signedIn = await read(PLAYER);
+      const signedOut = await read(undefined);
+
+      expect(signedIn.status).toBe(401);
+      expect(signedIn.status).toBe(signedOut.status);
+      expect(signedIn.body.errorMessage).toBe(signedOut.body.errorMessage);
+    });
+
+    it("keeps its answer out of shared caches, since it depends on who is signed in", async () => {
+      await save({ ...withOutcomes, reflectionQuestions: QUESTIONS });
+
+      expect((await read(CREATOR)).cacheControl).toBe("private, no-store");
+    });
+
+    it("answers 404 for a World that doesn't exist", async () => {
+      const answer = await send("GET", `/templates/${NEW_ID}/reflection-questions`, ADMIN);
+
+      expect(answer.status).toBe(404);
+    });
   });
 });

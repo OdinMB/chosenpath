@@ -1,5 +1,12 @@
 import React from "react";
-import { PlayerOptionsGeneration, PlayerSlot, Stat, Outcome } from "core/types";
+import {
+  PlayerOptionsGeneration,
+  PlayerSlot,
+  Stat,
+  Outcome,
+  ReflectionQuestions,
+  reflectionQuestionsOf,
+} from "core/types";
 import { MAX_PLAYERS } from "core/config";
 import { PrimaryButton, Icons, Select } from "components/ui";
 import { AcademyContextButton } from "components";
@@ -38,6 +45,10 @@ interface PlayerOutcomesAllProps {
   ) => void;
   playerStats: Stat[];
   readOnly?: boolean;
+  /** The World's reflection questions, by outcome id */
+  reflectionQuestions?: ReflectionQuestions;
+  /** Takes an outcome's reflection questions on its Save; without it, the outcomes show none */
+  onReflectionQuestionsChange?: (outcomeId: string, questions: string[]) => void;
 }
 
 export const OutcomePlayerSection: React.FC<PlayerOutcomesAllProps> = ({
@@ -45,6 +56,8 @@ export const OutcomePlayerSection: React.FC<PlayerOutcomesAllProps> = ({
   onPlayerOptionsChange,
   playerStats,
   readOnly = false,
+  reflectionQuestions,
+  onReflectionQuestionsChange,
 }) => {
   const {
     editingOutcomes,
@@ -145,6 +158,11 @@ export const OutcomePlayerSection: React.FC<PlayerOutcomesAllProps> = ({
                   handleUpdateOutcome(slot, idx, updatedOutcome as Outcome);
                 }}
                 readOnly={readOnly}
+                reflectionQuestions={reflectionQuestionsOf(reflectionQuestions, outcome.id)}
+                onReflectionQuestionsChange={
+                  onReflectionQuestionsChange &&
+                  ((questions) => onReflectionQuestionsChange(outcome.id, questions))
+                }
               />
             ))}
           </div>
