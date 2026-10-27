@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLoaderData } from "react-router-dom";
 import { PlayerCount, DifficultyLevel, TemplateMetadata } from "core/types";
-import { PrimaryButton, Icons, InfoIcon } from "components/ui";
+import { PrimaryButton, Icons, InfoIcon, Notification } from "components/ui";
 import { DISABLE_PREGENERATION_FOR_MULTIPLAYER } from "core/config";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
@@ -17,6 +17,7 @@ import {
 } from "page/hooks/useMultiStoryCreation";
 import { notificationService } from "shared/notifications/notificationService";
 import { useAuth } from "client/shared/auth/useAuth";
+import { useUserAccountModal } from "users/hooks/useUserAccountModal";
 import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
 import { DifficultySlider } from "./DifficultySlider";
 import { MultiStoryStartField } from "./MultiStoryStartField";
@@ -42,6 +43,10 @@ export function TemplateConfigurator() {
   const [storyCount, setStoryCount] = useState(STORY_COUNT_MIN);
   const multiStart = useMultiStoryCreation();
   const startsSeveral = Boolean(user) && startSeveral;
+  // A several-stories start whose sign-in lapsed asks to sign in here, keeping
+  // the form, and says why until the next start
+  const { openLoginModal, AccountModal } = useUserAccountModal();
+  const [signInLapsed, setSignInLapsed] = useState(false);
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
     useState<DifficultyLevel>(() => {
       return getDefaultDifficultyLevel();
@@ -126,7 +131,12 @@ export function TemplateConfigurator() {
     };
 
     if (startsSeveral) {
-      await multiStart.startStories(settings, storyCount);
+      setSignInLapsed(false);
+      const outcome = await multiStart.startStories(settings, storyCount);
+      if (outcome === "signed-out") {
+        setSignInLapsed(true);
+        openLoginModal();
+      }
       return;
     }
 
@@ -381,6 +391,15 @@ export function TemplateConfigurator() {
             />
           )}
 
+          {startsSeveral && signInLapsed && (
+            <Notification
+              type="warning"
+              title="Please sign in again"
+              message="You're no longer signed in, so no stories were started. Sign in, then start them again."
+              dismissible={false}
+            />
+          )}
+
           <SetupAiNotice
             source="template"
             images={generateImages && !startsSeveral}
@@ -420,6 +439,8 @@ export function TemplateConfigurator() {
             </PrimaryButton>
           </div>
         </form>
+        {/* Outside the form: events bubble through the modal's portal, so a sign-in inside it would submit this form too */}
+        <AccountModal />
       </div>
     </div>
   );

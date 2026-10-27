@@ -20,6 +20,7 @@ jest.mock("../../../../src/shared/session/useSession", () => ({
 }));
 jest.mock("../../../../src/shared/utils/codeSetUtils", () => ({
   getAllUniqueCodesFromStorage: () => [],
+  getCodesStartedForOthers: () => [],
   generateJoinLink: (code: string) => `https://join.example/game/${code}`,
 }));
 // The info icon's tooltip only opens on hover: show its content inline

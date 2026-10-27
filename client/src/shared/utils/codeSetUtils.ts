@@ -2,6 +2,10 @@ import { Logger } from "../logger.js";
 import { API_CONFIG } from "../../config"; // Import API_CONFIG
 
 const LOCAL_STORAGE_KEY = "playerCodeSets";
+// The stored codes started for other players to play, under a key of their
+// own: the code sets keep their format, which a page that predates the marks
+// reads, and clears when it finds anything else.
+const STARTED_FOR_OTHERS_KEY = "playerCodesStartedForOthers";
 const logger = Logger.App; // Changed from Logger.Util to Logger.App
 
 /**
@@ -100,6 +104,45 @@ export function addCodeSetToStorage(newCodeSet: string[]): void {
     "Total sets:",
     existingCodeSets.length
   );
+}
+
+/**
+ * The stored codes that a start made for other players to play ("Start
+ * several stories at once"). They are never linked to this device's account.
+ * Unreadable marks read as none.
+ */
+export function getCodesStartedForOthers(): string[] {
+  try {
+    const marks: unknown = JSON.parse(
+      localStorage.getItem(STARTED_FOR_OTHERS_KEY) ?? "[]"
+    );
+    return Array.isArray(marks) &&
+      marks.every((code) => typeof code === "string")
+      ? marks
+      : [];
+  } catch (error) {
+    logger.error("Error reading the codes started for others", error);
+    return [];
+  }
+}
+
+/**
+ * Stores a story's code set like any other, so the story shows among this
+ * device's stories, and marks its codes as started for other players. Marks
+ * of codes no longer stored are dropped.
+ */
+export function addCodeSetStartedForOthers(codeSet: string[]): void {
+  addCodeSetToStorage(codeSet);
+  const stored = new Set(getAllUniqueCodesFromStorage());
+  const marks = new Set(
+    getCodesStartedForOthers().filter((code) => stored.has(code))
+  );
+  codeSet.filter((code) => stored.has(code)).forEach((code) => marks.add(code));
+  try {
+    localStorage.setItem(STARTED_FOR_OTHERS_KEY, JSON.stringify([...marks]));
+  } catch (error) {
+    logger.error("Error marking codes as started for others", error);
+  }
 }
 
 /**

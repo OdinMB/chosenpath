@@ -7,7 +7,8 @@ import type {
   CreateStoryFromTemplateRequest,
   CreateStoryInfo,
 } from "core/types/api";
-import { addCodeSetToStorage } from "../../shared/utils/codeSetUtils";
+import { authApi } from "../../shared/auth/authApi";
+import { addCodeSetStartedForOthers } from "../../shared/utils/codeSetUtils";
 import { useSession } from "../../shared/session/useSession";
 
 /*
@@ -16,7 +17,29 @@ import { useSession } from "../../shared/session/useSession";
  * the ordinary start route and its limits. Each story has its own seat codes
  * and as many seats as the form's player count; the created stories go on to
  * the printable seat cards.
+ *
+ * The stories belong to the signed-in account, so the start first asks the
+ * server who that is: started after the sign-in lapsed, they would belong to
+ * no account. Each story's codes are stored on this device, so the stories
+ * show among its stories, marked as started for other players: their seats
+ * are never linked to this account.
  */
+
+/** How a several-stories start ended: some started, none did, or the sign-in had lapsed. */
+export type MultiStartOutcome = "started" | "not-started" | "signed-out";
+
+/**
+ * Whether the server still knows who is signed in, or undefined when the
+ * check itself failed (the API client has announced why).
+ */
+export async function stillSignedIn(): Promise<boolean | undefined> {
+  try {
+    return (await authApi.getCurrentUser()) !== null;
+  } catch (error) {
+    Logger.App.warn("Could not check the sign-in before starting stories", error);
+    return undefined;
+  }
+}
 
 export const STORY_COUNT_MIN = 2;
 export const STORY_COUNT_MAX = 12;
@@ -83,25 +106,31 @@ export function useMultiStoryCreation() {
 
   /**
    * Starts the stories and opens their seat cards; stays on the form when not
-   * even the first one started.
+   * even the first one started, or when the sign-in has lapsed (the form then
+   * asks the person to sign in again).
    */
   const startStories = async (
     settings: CreateStoryFromTemplateRequest,
     requestedCount: number
-  ): Promise<void> => {
+  ): Promise<MultiStartOutcome> => {
     const { request, count } = multiStoryRequest(settings, requestedCount);
     setIsStarting(true);
+    const signedIn = await stillSignedIn();
+    if (signedIn !== true) {
+      setIsStarting(false);
+      return signedIn === false ? "signed-out" : "not-started";
+    }
+
     const started = await startSequentially<CreateStoryInfo>(count, async () => {
       const info = await storyApi.createStoryFromTemplate(request);
-      // Each story's codes are kept on this device, as for a single start
       const codes = Object.values(info.codes);
-      if (codes.length > 0) addCodeSetToStorage(codes);
+      if (codes.length > 0) addCodeSetStartedForOthers(codes);
       return info;
     });
     refreshStoredCodeSets();
     setIsStarting(false);
 
-    if (started.length === 0) return;
+    if (started.length === 0) return "not-started";
     if (started.length < count) {
       notificationService.addNotification({
         type: "warning",
@@ -111,6 +140,7 @@ export function useMultiStoryCreation() {
       });
     }
     navigate(seatCardsPath(started.map((story) => story.storyId)));
+    return "started";
   };
 
   return { isStarting, startStories };

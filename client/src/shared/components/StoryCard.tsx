@@ -7,7 +7,11 @@ import { PlayerCode } from "./PlayerCode";
 import { useAuth } from "client/shared/auth/useAuth";
 import { useState } from "react";
 import { getDifficultyDescription } from "core/utils/difficultyUtils.ts";
-import { getAllUniqueCodesFromStorage } from "shared/utils/codeSetUtils";
+import {
+  getAllUniqueCodesFromStorage,
+  getCodesStartedForOthers,
+} from "shared/utils/codeSetUtils";
+import { linkableCodes } from "shared/utils/linkableCodes";
 import { userStoriesApi } from "client/shared/apiClient";
 import { Logger } from "shared/logger";
 import { useSession } from "client/shared/session/useSession";
@@ -419,22 +423,17 @@ export const StoryCard = ({
           </div>
         )}
 
-        {/* Link to my account button for local-code stories not yet linked to user */}
+        {/* Link to my account: seat codes stored on this device, never seats started for other players */}
         {user &&
           !showArchivedContent &&
           (() => {
-            const localCodes = getAllUniqueCodesFromStorage();
-            const linkableCodes = players
-              .filter(
-                (p) =>
-                  p.code &&
-                  localCodes.includes(p.code) &&
-                  (!p.userId || p.userId !== user.id) &&
-                  p.status === "active"
-              )
-              .map((p) => p.code!)
-              .filter(Boolean);
-            if (linkableCodes.length === 0) return null;
+            const codesToLink = linkableCodes(
+              story,
+              user.id,
+              getAllUniqueCodesFromStorage(),
+              getCodesStartedForOthers()
+            );
+            if (codesToLink.length === 0) return null;
             return (
               <div className="mt-3 flex justify-center">
                 <Tooltip
@@ -446,7 +445,7 @@ export const StoryCard = ({
                     size="sm"
                     onClick={async () => {
                       try {
-                        for (const code of linkableCodes) {
+                        for (const code of codesToLink) {
                           try {
                             await userStoriesApi.linkStoryToAccount(code);
                           } catch (e) {

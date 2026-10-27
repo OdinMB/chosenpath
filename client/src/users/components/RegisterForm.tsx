@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "client/shared/auth/useAuth";
 import { PrimaryButton } from "shared/components/ui";
-import { notificationService } from "shared/notifications/notificationService.js";
+import { notificationService } from "shared/notifications/notificationService";
 
 // Password criteria utility functions
 const MIN_PASSWORD_LENGTH = 8;
