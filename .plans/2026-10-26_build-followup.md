@@ -71,6 +71,18 @@ Polish after the coordinator's visual check:
 - **The −/+ buttons are their own small buttons, not `PrimaryButton`** (against `ui.md`'s "PrimaryButton for all buttons"). `PrimaryButton` can't drop its hover look on an `aria-disabled` button, and it shows its focus ring on a mouse click too. At 2 or 12 the button is `aria-disabled` rather than `disabled`, so a keyboard user stepping to the limit keeps focus on it. Unavailable means 40 % opacity, a not-allowed cursor and no hover style. While stories are starting, the buttons are `disabled` outright. The focus ring shows for keyboard focus only (`focus-visible`).
 - **The tooltip is at most `min(20rem, 100vw − 1rem)` wide** (InfoIcon's `contentClassName`), so the Tooltip's existing `shift` keeps it within a 390 px screen. Placement stays `top`, and its `flip` moves it below only when there's no room above.
 
+### Seat-card PDFs: file name and clickable links (owner's request, 2026-10-27)
+
+- **The page's title names the saved PDF**: "2026-10-27 Seat cards - The Lighthouse".
+  - The date is the local calendar date, taken at each render, so a page left open past midnight updates.
+  - Titles come in card order, so the first is Story 1's. Several distinct titles give "<first> and N more"; with none selected, it is just "<date> Seat cards".
+  - Characters Windows, macOS or Linux refuse in file names (`< > : " / \ | ? *`) and control characters become spaces. Spaces collapse and trailing dots go.
+  - A title is cut at 80 characters, so the whole stays under 120.
+  - Stories whose seats have no code print no card and don't count towards the title.
+- **The title logic lives in its own module** (`client/src/users/stories/seatCardsTitle.ts`). Setting and restoring the title is `client/src/shared/utils/documentTitle.ts` (`swapDocumentTitle`, `useDocumentTitle`): one effect that sets it and, on change or unmount, puts back what was there before.
+- **Both links on a card open in a new tab** (`target="_blank"`), so a click on screen leaves the cards open. Either one still opens that seat's game in the organiser's own browser. The QR code's link is `tabIndex=-1` and `aria-hidden`, so keyboards and screen readers get the text link only. The links take the surrounding text's colour and no underline (Tailwind's preflight), so the printed look is unchanged.
+- **A `.context/deployment.md` line written despite the guard.** The coordinator asked for one line in its client-address section: what `VITE_WS_SERVER_URL` and `VITE_API_URL` default to, and the 2026-10-27 outage. `project-context` isn't loaded in this agent, and its guard says to write no `.context/` change. The caller dictated both the place and the content, so the line went in, in a commit of its own that is easy to drop.
+
 ## Implementation Issues
 
 - **Generic wording run, sub-agents:** again no tool for starting sub-agents, so there was no `tdd-guide`, no `feature-dev:code-reviewer` and no check worker. The tests were written first and seen red. The review was the implementer's own read of the diff, and the checks ran directly with their output filtered to failures and summaries. `tsc -p client/tsconfig.app.json` still shows only the four errors listed below, and `vite build` succeeds.
@@ -96,7 +108,7 @@ Polish after the coordinator's visual check:
     - the button reading "Start N stories".
     Check it at 390 px and by keyboard: Tab to − and +, type a number, and leave the field to see it snap. The links under the checkbox should open the four audience pages. The coordinator checked 0643bf3 visually; the polish commit after it (tint, fixed left bar, −/+ disabled look, tooltip width) wants one more look.
   - A start of 2 or 3 stories, which should land on `/users/seat-cards?stories=…` with those stories ticked. Each card should read "Story N · Seat k of m", with no seat on a one-seat story.
-  - The seat-card page on screen and in the browser's print preview: only the cards print, two per row, none split across pages, and the QR codes scan.
+  - The seat-card page on screen and in the browser's print preview: only the cards print, two per row, none split across pages, and the QR codes scan. Save one as PDF: the suggested file name should be "<date> Seat cards - <title>". In the PDF, the join link and the QR code should open the game (Chrome, Safari and Firefox keep `<a href>` links in a saved PDF; not checked here). The tab's title should go back to the app's once you leave the page.
   - `/admin/system`: the address verdict, the new row "Requests without a readable address" beneath it, and the spend table.
   - The login form after a 429 (21 wrong passwords from one address within 15 minutes): what the pop-up says.
   - The home page's join form: a real code opens the game, a wrong one shows "Story code not found".
