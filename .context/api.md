@@ -1255,15 +1255,17 @@ Binary image file with appropriate headers.
 
 ### Rename Template Image
 
-**POST** `/images/templates/:templateId/rename`
+**POST** `/images/templates/:id/rename`
 
-**Auth Required**: Yes (implied by template modification)
+**Auth Required**: Yes
 
-Rename image when story element ID changes.
+**Permission Check**: Edit access required (the template's creator, or `templates_edit_all`)
+
+Rename image when story element ID changes. The template editor calls it after a save that changed an element's id.
 
 **Path Params:**
 
-- `templateId`: Template ID
+- `id`: Template ID
 
 **Request Body:**
 
@@ -1288,19 +1290,28 @@ Rename image when story element ID changes.
 }
 ```
 
+**Error Cases:**
+
+- `400`: Missing or invalid element ids
+- `401`: Not signed in
+- `403`: No edit access to this template
+- `404`: Template not found
+
 ---
 
 ### Delete Template Image
 
-**DELETE** `/images/templates/:templateId/element/:elementId`
+**DELETE** `/images/templates/:id/element/:elementId`
 
-**Auth Required**: Yes (implied by template modification)
+**Auth Required**: Yes
 
-Delete image for a story element.
+**Permission Check**: Edit access required (the template's creator, or `templates_edit_all`)
+
+Delete the stored image (`images/<elementId>.jpeg`) for a story element. No client code calls it yet.
 
 **Path Params:**
 
-- `templateId`: Template ID
+- `id`: Template ID
 - `elementId`: Story element ID
 
 **Query Params:**
@@ -1319,6 +1330,13 @@ Delete image for a story element.
   requestId: string
 }
 ```
+
+**Error Cases:**
+
+- `400`: Invalid element id
+- `401`: Not signed in
+- `403`: No edit access to this template
+- `404`: Template not found
 
 ---
 
@@ -1691,7 +1709,7 @@ Loads library data via `libraryLoader`.
 
 ### Path Traversal Protection
 
-All file serving endpoints (`/images`, `/videos`) validate path parameters to prevent directory traversal attacks:
+All file serving endpoints (`/images`, `/videos`), the template image rename and delete endpoints, and `/image-generation/template/*` (its `templateId`, element id, player slot and reference image ids; `validateSafePaths` in `server/src/shared/safePaths.ts`) validate path parameters to prevent directory traversal attacks:
 
 - No `..` sequences allowed
 - No backslashes allowed

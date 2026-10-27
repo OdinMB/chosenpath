@@ -263,10 +263,60 @@ export function verifyImageGenerationPermission(
 }
 
 /**
- * Middleware to verify a user can edit a template
- * User must either:
+ * Checks that the request's user can edit a template: they must either
  * 1. Have 'templates_edit_all' permission, OR
  * 2. Be the creator of the template (checked via database)
+ * Otherwise answers the request (404 for an unknown template, 403 without
+ * edit access) and returns false.
+ */
+export async function ensureTemplateEditAccess(
+  req: express.Request,
+  res: express.Response,
+  templateId: string,
+  requestId: string
+): Promise<boolean> {
+  try {
+    const hasAccess = await hasTemplateAccess(
+      templateId,
+      req.user?.id,
+      req.userPermissions || [],
+      true // requireEditAccess = true
+    );
+
+    if (!hasAccess) {
+      Logger.Route.warn(
+        `User ${
+          req.user?.id || "anonymous"
+        } attempted to edit template ${templateId} without permission`
+      );
+      sendError(
+        res,
+        "You don't have permission to edit this template",
+        403,
+        requestId
+      );
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    // Check if it's a "Template not found" error
+    if ((error as Error).message === "Template not found") {
+      sendError(res, "Template not found", 404, requestId);
+      return false;
+    }
+    Logger.Route.error(
+      `Error checking template edit access for ${templateId}`,
+      error
+    );
+    sendError(res, "Failed to verify template edit access", 500, requestId);
+    return false;
+  }
+}
+
+/**
+ * Middleware to verify a user can edit the template named by the route's :id
+ * (see ensureTemplateEditAccess)
  */
 export function verifyTemplateEditAccess() {
   return async (
@@ -281,44 +331,8 @@ export function verifyTemplateEditAccess() {
       return sendError(res, "Template ID is required", 400, requestId);
     }
 
-    try {
-      const hasAccess = await hasTemplateAccess(
-        id,
-        req.user?.id,
-        req.userPermissions || [],
-        true // requireEditAccess = true
-      );
-
-      if (!hasAccess) {
-        Logger.Route.warn(
-          `User ${
-            req.user?.id || "anonymous"
-          } attempted to edit template ${id} without permission`
-        );
-        return sendError(
-          res,
-          "You don't have permission to edit this template",
-          403,
-          requestId
-        );
-      }
-
+    if (await ensureTemplateEditAccess(req, res, id, requestId)) {
       next();
-    } catch (error) {
-      // Check if it's a "Template not found" error
-      if ((error as Error).message === "Template not found") {
-        return sendError(res, "Template not found", 404, requestId);
-      }
-      Logger.Route.error(
-        `Error checking template edit access for ${id}`,
-        error
-      );
-      return sendError(
-        res,
-        "Failed to verify template edit access",
-        500,
-        requestId
-      );
     }
   };
 }

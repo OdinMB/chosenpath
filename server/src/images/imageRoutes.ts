@@ -7,32 +7,11 @@ import {
   getStoryImagesDirectoryPath,
 } from "shared/storageUtils.js";
 import { sendError, sendNotFound, sendSuccess } from "shared/responseUtils.js";
+import { validateSafePaths } from "shared/safePaths.js";
 import fsSync from "fs";
 import type { RenameTemplateImageRequest } from "core/types/api.js";
-
-/**
- * Validates that path parameters don't contain directory traversal sequences
- * @param paths Array of path strings to validate
- * @returns true if all paths are safe, false otherwise
- */
-function validateSafePaths(...paths: string[]): boolean {
-  // Only check for dangerous patterns, not regular path separators
-  // The filePath parameter is expected to contain forward slashes for subdirectories
-  return paths.every(pathParam => {
-    if (!pathParam || typeof pathParam !== 'string') return false;
-    
-    // Check for directory traversal attempts
-    if (pathParam.includes('..')) return false;
-    
-    // Check for backslashes (Windows path separators that shouldn't be in URLs)
-    if (pathParam.includes('\\')) return false;
-    
-    // Check for absolute paths (starting with /)
-    if (pathParam.startsWith('/')) return false;
-    
-    return true;
-  });
-}
+import { verifyUser } from "../users/authMiddleware.js";
+import { verifyTemplateEditAccess } from "../templates/templateMiddleware.js";
 
 const imageRouter = express.Router();
 
@@ -177,76 +156,85 @@ imageRouter.get("/stories/:storyId/:path(*)", async (req, res) => {
   }
 });
 
-// Template image management endpoints
+// Template image management endpoints: they change a template, so only
+// someone with edit access to it (its creator, or templates_edit_all) may call them
 
 /**
  * Rename template images when story element IDs change
- * POST /api/images/templates/:templateId/rename
+ * POST /images/templates/:id/rename
  */
-imageRouter.post("/templates/:templateId/rename", async (req, res) => {
-  const { templateId } = req.params;
-  const { oldElementId, newElementId } = req.body as RenameTemplateImageRequest;
-  const requestId = req.body.requestId || "unknown";
+imageRouter.post(
+  "/templates/:id/rename",
+  verifyUser(),
+  verifyTemplateEditAccess(),
+  async (req, res) => {
+    const { id: templateId } = req.params;
+    const { oldElementId, newElementId } =
+      req.body as RenameTemplateImageRequest;
+    const requestId = req.body.requestId || "unknown";
 
-  try {
-    // Validate input and prevent path traversal
-    if (
-      !oldElementId ||
-      !newElementId ||
-      !validateSafePaths(templateId, oldElementId, newElementId)
-    ) {
-      return sendError(res, "Invalid parameters", 400, requestId);
-    }
+    try {
+      // Validate input and prevent path traversal
+      if (
+        !oldElementId ||
+        !newElementId ||
+        !validateSafePaths(templateId, oldElementId, newElementId)
+      ) {
+        return sendError(res, "Invalid parameters", 400, requestId);
+      }
 
-    // Get image file paths
-    const oldImagePath = getStorageFilePath(
-      "templates",
-      path.join(templateId, "images", `${oldElementId}.jpeg`)
-    );
-    const newImagePath = getStorageFilePath(
-      "templates",
-      path.join(templateId, "images", `${newElementId}.jpeg`)
-    );
+      // Get image file paths
+      const oldImagePath = getStorageFilePath(
+        "templates",
+        path.join(templateId, "images", `${oldElementId}.jpeg`)
+      );
+      const newImagePath = getStorageFilePath(
+        "templates",
+        path.join(templateId, "images", `${newElementId}.jpeg`)
+      );
 
-    // Check if old image exists
-    if (!fsSync.existsSync(oldImagePath)) {
-      // No image to rename, this is fine
+      // Check if old image exists
+      if (!fsSync.existsSync(oldImagePath)) {
+        // No image to rename, this is fine
+        return sendSuccess(
+          res,
+          { success: true, message: "No image found to rename" },
+          requestId
+        );
+      }
+
+      // Rename the image file
+      fsSync.renameSync(oldImagePath, newImagePath);
+
+      Logger.Route.log(
+        `Renamed template image: ${oldElementId} -> ${newElementId} for template ${templateId}`
+      );
+
       return sendSuccess(
         res,
-        { success: true, message: "No image found to rename" },
+        { success: true, message: "Image renamed successfully" },
         requestId
       );
+    } catch (error) {
+      Logger.Route.error(
+        `Error renaming template image: ${templateId}/${oldElementId} -> ${newElementId}`,
+        error
+      );
+      return sendError(res, "Failed to rename image", 500, requestId, error);
     }
-
-    // Rename the image file
-    fsSync.renameSync(oldImagePath, newImagePath);
-
-    Logger.Route.log(
-      `Renamed template image: ${oldElementId} -> ${newElementId} for template ${templateId}`
-    );
-
-    return sendSuccess(
-      res,
-      { success: true, message: "Image renamed successfully" },
-      requestId
-    );
-  } catch (error) {
-    Logger.Route.error(
-      `Error renaming template image: ${templateId}/${oldElementId} -> ${newElementId}`,
-      error
-    );
-    return sendError(res, "Failed to rename image", 500, requestId, error);
   }
-});
+);
 
 /**
  * Delete template images when story elements are deleted
- * DELETE /api/images/templates/:templateId/element/:elementId
+ * DELETE /images/templates/:id/element/:elementId
  */
 imageRouter.delete(
-  "/templates/:templateId/element/:elementId",
+  "/templates/:id/element/:elementId",
+  verifyUser(),
+  verifyTemplateEditAccess(),
   async (req, res) => {
-    const { templateId, elementId } = req.params;
+    const { id: templateId, elementId } = req.params;
     const requestId = (req.query.requestId as string) || "unknown";
 
     try {
@@ -258,7 +246,7 @@ imageRouter.delete(
       // Get image file path
       const imagePath = getStorageFilePath(
         "templates",
-        path.join(templateId, "images", `${elementId}.jpg`)
+        path.join(templateId, "images", `${elementId}.jpeg`)
       );
 
       // Check if image exists and delete it

@@ -39,6 +39,8 @@ import { sendRateLimited, sendError } from "../shared/responseUtils.js";
 import { verifyUser, checkPermissions } from "../users/authMiddleware.js";
 import { ContentFilterService } from "../game/services/ContentFilterService.js";
 import { TemplateService } from "../templates/TemplateService.js";
+import { ensureTemplateEditAccess } from "../templates/templateMiddleware.js";
+import { validateSafePaths } from "../shared/safePaths.js";
 import { screenImageRequest } from "./imageRequestScreening.js";
 import { imageModerationForTemplate } from "./imageSafety.js";
 
@@ -134,6 +136,26 @@ const mapTemplateReferences = (
 };
 
 /**
+ * Answers the request and returns false unless every id is safe in a storage
+ * path (400) and the caller may edit the template (404, 403). Runs before
+ * anything reads the template's files or calls a model, so a refused request
+ * costs nothing.
+ */
+const mayWriteTemplateImages = async (
+  req: express.Request,
+  res: express.Response,
+  requestId: string,
+  templateId: string,
+  ids: unknown[]
+): Promise<boolean> => {
+  if (!validateSafePaths(templateId, ...ids)) {
+    sendError(res, "Invalid parameters", 400, requestId);
+    return false;
+  }
+  return ensureTemplateEditAccess(req, res, templateId, requestId);
+};
+
+/**
  * Generate an image for a story element in a template
  */
 router.post(
@@ -192,6 +214,15 @@ router.post(
 
       // Build references (optional, up to 2)
       const references = mapTemplateReferences(templateId, referenceImageIds);
+
+      const referenceIds = references.map((reference) => reference.id);
+      if (
+        !(await mayWriteTemplateImages(req, res, requestId, templateId, [
+          elementId,
+          ...referenceIds,
+        ]))
+      )
+        return;
 
       await screenImageRequest(
         contentFilter,
@@ -300,6 +331,13 @@ router.post(
       if (validationError)
         return sendError(res, validationError, 400, requestId);
 
+      if (
+        !(await mayWriteTemplateImages(req, res, requestId, templateId, [
+          playerSlot,
+        ]))
+      )
+        return;
+
       await screenImageRequest(contentFilter, appearance, imageInstructions, 0);
 
       const imagePath = await aiImageGenerator.generatePlayerImageForTemplate(
@@ -390,6 +428,18 @@ router.post(
 
       // Build references (optional, up to 2)
       const references = mapTemplateReferences(templateId, referenceImageIds);
+
+      const referenceIds = references.map((reference) => reference.id);
+      if (
+        !(await mayWriteTemplateImages(
+          req,
+          res,
+          requestId,
+          templateId,
+          referenceIds
+        ))
+      )
+        return;
 
       await screenImageRequest(
         contentFilter,
