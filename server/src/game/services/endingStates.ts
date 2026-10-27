@@ -1,4 +1,7 @@
 import type { Story } from "core/models/Story.js";
+import { outcomeState, outcomesInPlay, type OutcomeState } from "core/utils/outcomeStates.js";
+
+export type { OutcomeState };
 
 /*
  * Where each outcome stands once the ending's milestones are added (the
@@ -11,11 +14,9 @@ import type { Story } from "core/models/Story.js";
  * milestones haven't finished. Since the owner's decision of 2026-10-01 ("Only
  * what was played") the beat repairs keep no other milestone the ending writes
  * (milestoneNotPlayed in beatRepairs.ts), so these counts are what the ending
- * leaves.
+ * leaves: once it is written, each player's state carries them as recorded
+ * (ClientStateManager's outcomesAtEnd).
  */
-
-/** Where an outcome stands once this beat's milestones are added: shared, or a player's own (by seat). */
-export type OutcomeState = { id: string; owner: string; milestones: number; intended: number; complete: boolean };
 
 /**
  * Each outcome of the story after the ending's milestones: its recorded
@@ -29,20 +30,7 @@ export function outcomeStatesAtEnding(story: Story): OutcomeState[] {
   if (story.getCurrentBeatType() !== "ending") return [];
   const resolved = story.getResolvedThreadAnalysis()?.threads ?? [];
   const added = (id: string) => resolved.filter((thread) => thread.outcomeId === id).length;
-  const lists = [
-    { owner: "shared", outcomes: story.getSharedOutcomes() },
-    ...story.getPlayerSlots().map((slot) => ({ owner: slot, outcomes: story.getPlayer(slot)?.outcomes ?? [] })),
-  ];
-  const seen = new Set<string>();
-  return lists.flatMap(({ owner, outcomes }) =>
-    outcomes.flatMap((outcome): OutcomeState[] => {
-      if (seen.has(outcome.id)) return [];
-      seen.add(outcome.id);
-      const milestones = (outcome.milestones?.length ?? 0) + added(outcome.id);
-      const intended = outcome.intendedNumberOfMilestones;
-      return [{ id: outcome.id, owner, milestones, intended, complete: milestones >= intended }];
-    })
-  );
+  return outcomesInPlay(story.getState()).map(({ owner, outcome }) => outcomeState(owner, outcome, added(outcome.id)));
 }
 
 /** The ending prompt's two standing lines: the complete outcomes and the unfinished ones; a player's own outcome carries its seat in a group. */

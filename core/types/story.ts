@@ -478,6 +478,24 @@ export type StoryState = {
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
 };
 
+/**
+ * Where one of the story's outcomes ended, as a player's state carries it once
+ * the story is over: its question and the milestones it reached. Never its
+ * possible resolutions or its resonance.
+ */
+export type OutcomeAtEnd = {
+  id: string;
+  /** "shared" for one of the story's shared outcomes; otherwise the viewing player's seat, for their own. */
+  owner: "shared" | PlayerSlot;
+  question: string;
+  /** The milestones it reached, in the order reached. */
+  milestones: string[];
+  /** The number of milestones that resolves it. */
+  intended: number;
+  /** Whether it reached its intended number of milestones, or more. When false, it stopped at milestones.length of intended. */
+  complete: boolean;
+};
+
 // Direct type definition for ClientStoryState
 export type ClientStoryState = {
   id: string;
@@ -502,6 +520,11 @@ export type ClientStoryState = {
   category?: StoryCategory;
   pendingPlayers: PlayerSlot[];
   gameOver: boolean;
+  /**
+   * Only once the story is over (gameOver): where each outcome ended, the
+   * shared ones first, then this player's own. Absent before the end.
+   */
+  outcomesAtEnd?: OutcomeAtEnd[];
   /** Marks the story text in this state as AI-generated, for machines. */
   provenance?: AiContentProvenance;
 };

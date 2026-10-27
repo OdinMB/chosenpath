@@ -7,7 +7,9 @@ import {
   Beat,
   BeatType,
   AI_TEXT_PROVENANCE,
+  OutcomeAtEnd,
 } from "../types/index.js";
+import { outcomeState, outcomesInPlay } from "../utils/outcomeStates.js";
 
 /**
  * Manages client state filtering operations for Story class
@@ -32,7 +34,7 @@ export class ClientStateManager {
 
     // Filter the current player's data
     let playerData = filteredState.players[playerSlot];
-    // Filter out outcomes if they exist
+    // Filter out outcomes if they exist (at the end, outcomesAtEnd tells where they ended)
     if (playerData.outcomes) {
       delete playerData.outcomes;
     }
@@ -109,6 +111,8 @@ export class ClientStateManager {
       [playerSlot]: filteredState.playerCodes[playerSlot],
     };
 
+    const gameOver = currentBeatType === "ending";
+
     // Return only the properties needed for the client
     return {
       id: filteredState.id,
@@ -131,9 +135,35 @@ export class ClientStateManager {
       pendingPlayers: filteredState.characterSelectionCompleted
         ? pendingPlayers
         : pendingCharacterSelections,
-      gameOver: currentBeatType === "ending",
+      gameOver,
+      ...(gameOver ? { outcomesAtEnd: this.outcomesAtEnd(state, playerSlot) } : {}),
       provenance: AI_TEXT_PROVENANCE,
     } as ClientStoryState;
+  }
+
+  /**
+   * Where each outcome ended, for a player once the story is over: the shared
+   * outcomes and the player's own, with their questions and the milestones
+   * they reached. By the time a state at the end is sent, the ending's
+   * milestones are recorded, so none are added (outcomeStatesAtEnding adds
+   * them for the ending's prompt, before they are). Other players' own
+   * outcomes, possible resolutions and resonance stay out.
+   */
+  private outcomesAtEnd(
+    state: StoryState,
+    playerSlot: PlayerSlot
+  ): OutcomeAtEnd[] {
+    return outcomesInPlay(state, [playerSlot]).map(({ owner, outcome }) => {
+      const { intended, complete } = outcomeState(owner, outcome);
+      return {
+        id: outcome.id,
+        owner,
+        question: outcome.question,
+        milestones: [...(outcome.milestones ?? [])],
+        intended,
+        complete,
+      };
+    });
   }
 
   /**

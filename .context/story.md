@@ -5,6 +5,23 @@
 - Don't add any complicated StoryState browsing and manipulation logic in other parts of the app.
 - Keep story manipulation logic centralized in these domain models
 
+### What each player's state carries (`ClientStoryState`)
+
+Every state the server sends a player comes from `Story.filterStateForPlayer(slot)`, which `ClientStateManager.filterStateForPlayer` builds (type in `core/types/story.ts`). It sends a fixed list of fields. The story's guidelines, story elements, world facts and phases never go out. Its shared outcomes go out only at the end, in `outcomesAtEnd`.
+
+- **The player's own data:** without their `outcomes`. Their beats lose `plan` and `summary`, and an undecided beat's challenge options lose their odds (`basePoints`, `modifiersToSuccessRate`, `riskType`).
+- **Other players:** only name, pronouns, appearance, fluff and identity and background choices. `characterSelectionOptions` and `playerCodes` hold this player's entry only.
+- **Known exposure, not yet closed:** this player's `characterSelectionOptions` entry goes out whole, in every state for the whole story. It holds the seat's own outcomes as they were set up, with `question`, `possibleResolutions` and `resonance`. The client doesn't read them, but they reach the browser.
+- **Stats:** hidden ones are left out, and the rest lose the fields the model uses (`convertToClientStat`).
+- **`gameOver`:** true once the current beat type is `ending`.
+- **`outcomesAtEnd`:** sent only when `gameOver` is true, and absent before. It says where each outcome ended: the shared outcomes first, then this player's own, an outcome a template copied into both lists once. Each item is `{ id, owner, question, milestones, intended, complete }`:
+  - `owner` is `"shared"` or the player's seat;
+  - `milestones` are the texts reached, in order;
+  - `intended` is the number of milestones that resolves the outcome;
+  - `complete` says whether the outcome reached that number. When false, it stopped at `milestones.length` of `intended`.
+
+  `outcomesAtEnd` itself never carries possible resolutions, resonance or other players' own outcomes; the exposure above still sends this player's own resolutions and resonance. The ending's milestones are recorded before any state at the end goes out (`handleProgression` applies the ending's changes before it returns the story that is stored and sent; `StoryProgressionService.ending.test.ts` pins it), so the counts are the recorded ones. They match what `outcomeStatesAtEnding` (`server/src/game/services/endingStates.ts`) told the ending's prompt, since it adds the ending's milestones before they are recorded. Both read through `core/utils/outcomeStates.ts`.
+
 ### Checks and repairs on model replies
 
 The game keeps what a model reply means, not only what matches an id exactly. Each repair is a `Repair` record (`server/src/game/services/textRepairs.ts`); `logRepairs` prints one `[LLM] repair` line per reply with the role, story id, turn and the count per kind (notes apart). The line carries no story text and no model-written ids; the records do, for tests and the eval, which checks replies after these repairs and counts them per kind (`.context/text-model-eval.md`, "Checks on what the game keeps").
