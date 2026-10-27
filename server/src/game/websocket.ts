@@ -291,27 +291,12 @@ export class GameWebSocketServer {
               return;
             }
 
-            // Process the request using the GameHandler
+            // The GameHandler answers once it has queued the selection; this returns when
+            // the queue has recorded it, and needs no second answer (the client never got one)
             await this.gameHandler.selectCharacter(
               socket,
               data.identityIndex,
               data.backgroundIndex
-            );
-
-            // Send immediate success response that the request was accepted
-            socket.emit("response", {
-              type: "select_character_response",
-              status: ResponseStatus.SUCCESS,
-              requestId: data.requestId || crypto.randomUUID(),
-              timestamp: Date.now(),
-              data: {
-                identityIndex: data.identityIndex,
-                backgroundIndex: data.backgroundIndex,
-              },
-            });
-            Logger.Websocket.log(
-              "[WebSocket] select_character_response with identityIndex:",
-              data.identityIndex
             );
           } catch (error) {
             Logger.Websocket.error(
@@ -480,19 +465,8 @@ export class GameWebSocketServer {
               return;
             }
 
+            // As for select_character: answered once queued, returns once recorded
             await this.gameHandler.makeChoice(socket, data.optionIndex);
-
-            socket.emit("response", {
-              type: "make_choice_response",
-              status: ResponseStatus.SUCCESS,
-              requestId: data.requestId || crypto.randomUUID(),
-              timestamp: Date.now(),
-              data: { optionIndex: data.optionIndex },
-            });
-            Logger.Websocket.log(
-              "[WebSocket] make_choice_response with optionIndex:",
-              data.optionIndex
-            );
           } catch (error) {
             Logger.Websocket.error("[WebSocket] Error making choice:", error);
             socket.emit("response", {

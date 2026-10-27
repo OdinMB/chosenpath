@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { OperationErrorEvent, QueueableOperation } from "../../../../src/game/queue.js";
+import type { OperationCompletedEvent, OperationErrorEvent, QueueableOperation } from "../../../../src/game/queue.js";
 import { BaseQueueProcessor } from "../../../../src/game/services/QueueProcessor.js";
 
 /*
@@ -161,5 +161,38 @@ describe("BaseQueueProcessor: the failure path", () => {
     const lines = warn.mock.calls.map((call) => String(call[0]));
     expect(lines.some((line) => line.includes("sending it once more") && line.includes("Error"))).toBe(true);
     expect(lines.join("\n")).not.toContain("turn failed");
+  });
+});
+
+/*
+ * The queue's completion path: an operation that runs through is reported
+ * (operationCompleted) by its id, so whoever waits on it (GameHandler, for a
+ * player's choice) stops waiting.
+ */
+describe("BaseQueueProcessor: the completion path", () => {
+  let completed: OperationCompletedEvent[];
+
+  beforeEach(() => {
+    completed = [];
+    queue.events.on("operationCompleted", (event: OperationCompletedEvent) => completed.push(event));
+  });
+
+  it("reports each operation that runs through, by its id, and never one that fails", async () => {
+    queue.failures.set("broken", 1);
+    const done = await add("other", "image");
+    const failed = await add("other", "broken");
+    await drained();
+
+    expect(completed).toEqual([{ queueId: "game-1", operationId: done }]);
+    expect(errors).toEqual([expect.objectContaining({ operationId: failed })]);
+  });
+
+  it("counts an operation as finished by the time its completion is reported", async () => {
+    const whenReported: boolean[] = [];
+    queue.events.on("operationCompleted", () => whenReported.push(queue.hasUnfinished("game-1")));
+    await add("other", "image");
+    await drained();
+
+    expect(whenReported).toEqual([false]);
   });
 });

@@ -131,9 +131,16 @@ export interface OperationErrorEvent {
   stack?: string;
 }
 
+/** An operation that ran through (BaseQueueProcessor); a failed one is an OperationErrorEvent instead. */
+export interface OperationCompletedEvent {
+  queueId: string;
+  operationId: string;
+}
+
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
   operationError: (event: OperationErrorEvent) => void;
+  operationCompleted: (event: OperationCompletedEvent) => void;
   storyInitialized: (event: { gameId: string; story: Story }) => void;
   newOperation: () => void;
 }

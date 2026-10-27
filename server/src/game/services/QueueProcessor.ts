@@ -247,6 +247,7 @@ export abstract class BaseQueueProcessor<
             -5
           )}`
         );
+        this.events.emit("operationCompleted", { queueId, operationId });
       } catch (error) {
         if (!this.resendFailed(operation, error)) {
           this.handleOperationError(operation, error);

@@ -104,32 +104,35 @@ describe("GameHandler: a turn that fails for good", () => {
   });
 });
 
+/** A story where player1 may choose, or pick a character. */
+const ownStory = {
+  getPlayer: () => ({ beatHistory: [{ choice: -1 }] }),
+  getCurrentBeatType: () => "thread",
+  getState: () => ({
+    characterSelectionOptions: { player1: { possibleCharacterIdentities: [{}], possibleCharacterBackgrounds: [{}] } },
+    characterSelectionCompleted: false,
+  }),
+};
+/** Lets the handler queue the operation and wait on it. */
+const queued = () => new Promise((resolve) => setImmediate(resolve));
+/** A player's own operation, its friendly failure line, and how the player sends it. */
+const ownCases: [string, string, (socket: FakeSocket) => Promise<void>][] = [
+  ["recordChoice", "Unable to process your choice. Please try again.", (socket) => handler.makeChoice(socket as never, 0)],
+  ["recordCharacterSelection", "Unable to save your character choice. Please try again.", (socket) => handler.selectCharacter(socket as never, 0, 0)],
+];
+const queuesOwnOperation = () => {
+  getPlayerBySocket.mockReturnValue({ storyId: "game-1", playerSlot: "player1" });
+  getStory.mockResolvedValue(ownStory);
+  addOperation.mockResolvedValue("op-own");
+};
+
 describe("GameHandler: a player's own choice or character selection that fails in the queue", () => {
   /** A write error's text, which names the server's data path. */
   const RAW = "ENOSPC: no space left on device, open 'D:\\srv\\data\\stories\\game-1.json'";
-  const story = {
-    getPlayer: () => ({ beatHistory: [{ choice: -1 }] }),
-    getCurrentBeatType: () => "thread",
-    getState: () => ({
-      characterSelectionOptions: { player1: { possibleCharacterIdentities: [{}], possibleCharacterBackgrounds: [{}] } },
-      characterSelectionCompleted: false,
-    }),
-  };
-  /** Lets the handler queue the operation and wait on it. */
-  const queued = () => new Promise((resolve) => setImmediate(resolve));
 
-  beforeEach(() => {
-    getPlayerBySocket.mockReturnValue({ storyId: "game-1", playerSlot: "player1" });
-    getStory.mockResolvedValue(story);
-    addOperation.mockResolvedValue("op-own");
-  });
+  beforeEach(queuesOwnOperation);
 
-  const cases: [string, string, (socket: FakeSocket) => Promise<void>][] = [
-    ["recordChoice", "Unable to process your choice. Please try again.", (socket) => handler.makeChoice(socket as never, 0)],
-    ["recordCharacterSelection", "Unable to save your character choice. Please try again.", (socket) => handler.selectCharacter(socket as never, 0, 0)],
-  ];
-
-  it.each(cases)("answers a failed %s with its friendly line only, never the error's own text", async (operationType, friendly, send) => {
+  it.each(ownCases)("answers a failed %s with its friendly line only, never the error's own text", async (operationType, friendly, send) => {
     const [chooser] = sockets;
     const pending = send(chooser);
     await queued();
@@ -140,6 +143,68 @@ describe("GameHandler: a player's own choice or character selection that fails i
     const sent = chooser.emit.mock.calls.map((call) => JSON.stringify(call)).join("\n");
     expect(sent).toContain(friendly);
     expect(sent).not.toContain("ENOSPC");
+  });
+});
+
+/*
+ * A choice or character selection the queue has recorded ends its caller's
+ * wait. Before, nothing ended it: each one waited for the connection's life,
+ * and the player's disconnect failed every one they had ever sent, logging a
+ * failed choice for each.
+ */
+describe("GameHandler: a player's own choice or character selection the queue records", () => {
+  const recorded = { queueId: "game-1", operationId: "op-own" };
+  /** Where the request stands now: recorded, failed, or still waiting on the queue. */
+  const standing = (pending: Promise<void>) =>
+    Promise.race([
+      pending.then(
+        () => "recorded",
+        (error: Error) => `failed: ${error.message}`
+      ),
+      queued().then(() => "waiting"),
+    ]);
+  const errorsLogged = () =>
+    (console.error as jest.MockedFunction<typeof console.error>).mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+
+  beforeEach(queuesOwnOperation);
+
+  it.each(ownCases)("ends the wait of a %s once the queue has recorded it, and not before", async (_operationType, _friendly, send) => {
+    const pending = send(sockets[0]!);
+    await queued();
+    expect(await standing(pending)).toBe("waiting");
+
+    events.emit("operationCompleted", { ...recorded, operationId: "op-another" });
+    expect(await standing(pending)).toBe("waiting");
+
+    events.emit("operationCompleted", recorded);
+    expect(await standing(pending)).toBe("recorded");
+  });
+
+  it.each(ownCases)("leaves nothing of a recorded %s for the player's disconnect to fail or log", async (_operationType, _friendly, send) => {
+    const pending = send(sockets[0]!);
+    await queued();
+    events.emit("operationCompleted", recorded);
+    expect(await standing(pending)).toBe("recorded");
+
+    handler.unregisterSocket("socket-player1");
+
+    expect(errorsLogged()).not.toContain("Socket disconnected");
+  });
+
+  it.each(ownCases)("still fails a %s that the player's disconnect interrupts", async (_operationType, _friendly, send) => {
+    const pending = send(sockets[0]!);
+    await queued();
+
+    handler.unregisterSocket("socket-player1");
+
+    expect(await standing(pending)).toBe("failed: Socket disconnected");
+    expect(errorsLogged()).toContain("Socket disconnected");
+  });
+
+  it("stops listening for recorded operations once disposed", () => {
+    expect(events.listenerCount("operationCompleted")).toBe(1);
+    handler.dispose();
+    expect(events.listenerCount("operationCompleted")).toBe(0);
   });
 });
 

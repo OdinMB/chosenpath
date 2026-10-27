@@ -4,7 +4,7 @@ import type { PlayerSlot } from "core/types/index.js";
 import { StoryRepository } from "../stories/StoryRepository.js";
 import { connectionManager } from "server/game/ConnectionManager.js";
 import { gameQueueProcessor } from "./services/GameQueueProcessor.js";
-import type { OperationErrorEvent } from "./queue.js";
+import type { OperationCompletedEvent, OperationErrorEvent } from "./queue.js";
 import type {
   SelectCharacterResponse,
   MakeChoiceResponse,
@@ -28,6 +28,7 @@ function waitsForItsTurn(story: Story): boolean {
 export class GameHandler {
   protected storyRepository: StoryRepository;
   private sockets: Map<string, Socket> = new Map();
+  /** A player's choices and character selections in the queue, by operation id, until the queue records or fails them. */
   private pendingOperations: Map<
     string,
     { resolve: () => void; reject: (error: Error) => void; socketId: string }
@@ -37,6 +38,7 @@ export class GameHandler {
     { resolve: () => void; codes: Record<PlayerSlot, string>; socketId: string }
   >();
   private operationErrorHandler: (event: OperationErrorEvent) => void;
+  private operationCompletedHandler: (event: OperationCompletedEvent) => void;
 
   constructor() {
     this.storyRepository = StoryRepository.getInstance();
@@ -44,10 +46,12 @@ export class GameHandler {
 
     // Create bound handlers for events
     this.operationErrorHandler = this.handleOperationError.bind(this);
+    this.operationCompletedHandler = this.handleOperationCompleted.bind(this);
 
     // A failed operation reaches its players (a turn only after its one resend, GameQueueProcessor).
     // This listener was lost in 2025-05 beside the removed storyInitialized one, so no failure reached anyone.
     gameQueueProcessor.events.on("operationError", this.operationErrorHandler);
+    gameQueueProcessor.events.on("operationCompleted", this.operationCompletedHandler);
   }
 
   public registerSocket(socket: Socket): void {
@@ -189,6 +193,27 @@ export class GameHandler {
     }
   }
 
+  /**
+   * A player's choice or character selection the queue has recorded: its
+   * wait ends, so pendingOperations holds only what is still in the queue and
+   * a disconnect fails only that. Before, nothing ended it: every one waited
+   * for the connection's life and its disconnect failed them all, each logged
+   * as a failed choice.
+   */
+  private handleOperationCompleted(event: OperationCompletedEvent): void {
+    const operation = this.pendingOperations.get(event.operationId);
+    if (!operation) return;
+    this.pendingOperations.delete(event.operationId);
+    operation.resolve();
+  }
+
+  /** Waits until the queue records the player's operation; rejects when it fails or the player disconnects. */
+  private waitForOperation(operationId: string, socketId: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.pendingOperations.set(operationId, { resolve, reject, socketId });
+    });
+  }
+
   async makeChoice(socket: Socket, optionIndex: number) {
     console.log(
       `\n====== [GameHandler] Processing choice: ${optionIndex} ======`
@@ -236,14 +261,7 @@ export class GameHandler {
         requestResponse
       );
 
-      // Create a promise that will resolve when the operation is complete
-      await new Promise<void>((resolve, reject) => {
-        this.pendingOperations.set(operationId, {
-          resolve,
-          reject,
-          socketId: socket.id,
-        });
-      });
+      await this.waitForOperation(operationId, socket.id);
     } catch (error) {
       Logger.Websocket.error("[GameHandler] Error processing choice:", error);
       socket.emit("error", {
@@ -313,14 +331,7 @@ export class GameHandler {
         requestResponse
       );
 
-      // Create a promise that will resolve when the operation is complete
-      await new Promise<void>((resolve, reject) => {
-        this.pendingOperations.set(operationId, {
-          resolve,
-          reject,
-          socketId: socket.id,
-        });
-      });
+      await this.waitForOperation(operationId, socket.id);
     } catch (error) {
       Logger.Websocket.error(
         "[GameHandler] Error processing character selection:",
@@ -525,6 +536,7 @@ export class GameHandler {
     console.log("[GameHandler] Disposing GameHandler instance");
 
     gameQueueProcessor.events.off("operationError", this.operationErrorHandler);
+    gameQueueProcessor.events.off("operationCompleted", this.operationCompletedHandler);
 
     // Clear all maps
     this.sockets.clear();
