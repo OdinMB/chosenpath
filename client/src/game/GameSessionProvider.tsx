@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useReducer } from "react";
 import type {
   ClientStoryState,
+  GameErrorNotification,
   WSServerMessage,
   RateLimitInfo,
 } from "core/types";
@@ -185,11 +186,13 @@ export function GameSessionProvider({
     wsService.onMessage("error", (data: WSServerMessage) => {
       // A failed turn, choice or character selection: shown where the game waited (TurnFailedNotice)
       if (data.type === "game_error_notification") {
-        const failure = turnFailureFrom(data, storyStateRef.current);
+        // The check alone doesn't narrow: WSErrorResponse and WSRateLimitedResponse type `type` as any string
+        const notification = data as GameErrorNotification;
+        const failure = turnFailureFrom(notification, storyStateRef.current);
         if (failure) {
           logger.warn(
-            `[GameSessionProvider] Turn failed (${data.operationType}):`,
-            data.error
+            `[GameSessionProvider] Turn failed (${notification.operationType}):`,
+            notification.error
           );
           // The selection the server failed on is no longer on its way
           wsService.removeBackgroundOperation("select_character");
