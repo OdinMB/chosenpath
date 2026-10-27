@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   CLIENT_API_PREFIX,
   CLOSED_PROXY_URL,
+  DEFAULT_SEED,
   EXIT_CODES,
   GROUP_GAME_MODES,
   GUARD_TEST_CASES,
@@ -30,6 +31,7 @@ import {
   SERVER_CONFIG_NAMES,
   siteOriginBundleProblems,
   siteOriginLiterals,
+  STORY_LENGTHS,
   targetProblems,
   type CreatedTargets,
   type Env,
@@ -374,6 +376,21 @@ describe("the parameters and the output folder", () => {
     expect(parseArgs(["--out=/tmp/x", "--steps", "my-steps.mjs", "--pg-bin", "/opt/pg/bin"])).toMatchObject({ steps: "my-steps.mjs", pgBin: "/opt/pg/bin" });
     expect(parseArgs(["--out", "/tmp/x"]).groupMode).toBeUndefined();
     expect(parseArgs(["--out", "/tmp/x", "--group-mode", "competitive"]).groupMode).toBe("competitive");
+    expect(parseArgs(["--out", "/tmp/x", "--story-length", "3", "--seed=7"])).toMatchObject({ storyLength: 3, seed: 7 });
+    expect(parseArgs(["--out", "/tmp/x"])).toMatchObject({ storyLength: undefined, seed: DEFAULT_SEED });
+  });
+
+  it("takes story lengths from the shortest the engine ends on its count to the longest the editor offers, and whole seeds", () => {
+    expect(STORY_LENGTHS.max).toBe(MAX_TURNS);
+    expect(parseArgs(["--out", "/tmp/x", "--story-length", String(STORY_LENGTHS.min)]).storyLength).toBe(STORY_LENGTHS.min);
+    expect(parseArgs(["--out", "/tmp/x", "--story-length", String(STORY_LENGTHS.max)]).storyLength).toBe(STORY_LENGTHS.max);
+    for (const turns of [String(STORY_LENGTHS.min - 1), String(STORY_LENGTHS.max + 1), "3.5", "abc"]) {
+      expect(() => parseArgs(["--out", "/tmp/x", `--story-length=${turns}`])).toThrow("--story-length takes a whole number of turns from 3 to 25");
+    }
+    expect(parseArgs(["--out", "/tmp/x", "--seed", "0"]).seed).toBe(0);
+    for (const seed of ["-1", "1.5", "seven", String(2 ** 31)]) {
+      expect(() => parseArgs(["--out", "/tmp/x", `--seed=${seed}`])).toThrow("--seed takes a whole number");
+    }
   });
 
   it("takes every multiplayer game mode for the group World, and only those", () => {

@@ -2,7 +2,7 @@
 
 export type FixtureTemplate = { premise: string; playerCount: number; playerCountMin?: number; maxTurns: number; gameMode: string };
 
-export type ProvisionedTemplate = { id: string; title: string; playerCountMin: number; playerCountMax: number; gameMode: string };
+export type ProvisionedTemplate = { id: string; title: string; playerCountMin: number; playerCountMax: number; gameMode: string; maxTurns: number };
 
 export declare function apiSession(origin: string): {
   request: (method: string, apiPath: string, body?: unknown) => Promise<{ status: number; json: unknown }>;
@@ -11,7 +11,7 @@ export declare function apiSession(origin: string): {
 
 export declare function fixtureTemplates(
   fixtureVars: { template: FixtureTemplate; groupTemplate: FixtureTemplate },
-  options?: { groupMode?: string }
+  options?: { groupMode?: string; storyLength?: number }
 ): { template: FixtureTemplate; groupTemplate: FixtureTemplate };
 
 export declare function provisionTemplates<Name extends string>(

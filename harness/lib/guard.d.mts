@@ -46,6 +46,8 @@ export type HarnessArgs = {
   out: string | undefined;
   steps: string | undefined;
   groupMode: string | undefined;
+  storyLength: number | undefined;
+  seed: number;
   viewport: string;
   timeoutSeconds: number;
   pgBin: string | undefined;
@@ -64,6 +66,8 @@ export declare const DEVELOPMENT_CORS_ORIGINS: string[];
 export declare const SERVER_CONFIG_NAMES: string[];
 export declare const VIEWPORTS: Record<string, Record<string, unknown>>;
 export declare const GROUP_GAME_MODES: string[];
+export declare const STORY_LENGTHS: { min: number; max: number };
+export declare const DEFAULT_SEED: number;
 export declare const USAGE: string;
 
 export declare function platformVariables(parentEnv: Env, platform: string): Record<string, string>;

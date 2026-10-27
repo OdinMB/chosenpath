@@ -1,12 +1,15 @@
 // A fake OpenAI-compatible API for the harness, listening on 127.0.0.1 only.
 // Chat completions answer with an instance of the request's JSON schema
 // (response_format json_schema, or the forced tool's parameters), filled with
-// readable placeholder prose; image generations and edits answer with a
-// placeholder picture of the requested size. Nothing here calls out.
+// readable placeholder prose, with the story-specific variety of
+// fake-story.mjs read from the request and a seed; image generations and
+// edits answer with a placeholder picture of the requested size. Nothing here
+// calls out.
 
 import http from "node:http";
 import { createRequire } from "node:module";
 import { deflateSync } from "node:zlib";
+import { EMPTY_REQUEST, STORY_HINTS, readRequest, requestText, seededRandom, varietyKey } from "./fake-story.mjs";
 
 const NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
 
@@ -96,30 +99,63 @@ export function arrayLength(schema) {
  * their bounds, enums take their first value unless a hint says otherwise.
  * A list of player seats holds each seat once per reply (seatList).
  * `offset` starts the counter behind every number, so replies to different
- * requests never repeat an id or a line.
+ * requests never repeat an id or a line. `request` is what the request's
+ * text says (fake-story.mjs, readRequest) and `seed` seeds the hints' variety,
+ * drawn from the seed and what the request is (varietyKey), not from `offset`:
+ * the same seed and request give the same risks, points, bonuses and stat
+ * moves at any offset, the ids and lines around them differing.
  */
-export function instanceFromSchema(rootSchema, hints = DEFAULT_HINTS, { offset = 0 } = {}) {
-  const state = { counter: offset, ids: [], placedSeats: new Set(), root: rootSchema, hints };
-  return generate(rootSchema, { key: undefined, index: 0, path: [], depth: 0 }, state);
+export function instanceFromSchema(rootSchema, hints = DEFAULT_HINTS, { offset = 0, seed = 1, request = EMPTY_REQUEST } = {}) {
+  const random = seededRandom(seed, varietyKey(request, rootSchema));
+  const seats = Object.keys(rootSchema?.properties ?? {}).filter((key) => SEAT.test(key));
+  const state = { counter: offset, ids: [], placedSeats: new Set(), root: rootSchema, hints, request, random, shift: Math.floor(random() * 60), seats };
+  // The hints read discriminators through the definitions a schema refers to
+  state.deref = (schema) => dereferenced(schema, state);
+  return generate(rootSchema, { key: undefined, index: 0, indexes: [], path: [], depth: 0 }, state);
 }
 
-/** Product-specific preferences, keyed by property name: kept small, everything else is generic. */
+/**
+ * Product-specific preferences, keyed by property name: kept small, everything
+ * else is generic. A hint is a list of preferred values, or a function that
+ * returns the value (undefined leaves it to the generic filler); the story's
+ * own (fake-story.mjs, STORY_HINTS) read the request and the seed.
+ */
 export const DEFAULT_HINTS = {
   enum: {
     // Stats as percentages read naturally as numbers on screen
     type: ["percentage", "number"],
     imageSource: ["none"],
     resourceType: ["normal"],
-    riskType: ["normal"],
+    ...STORY_HINTS.enum,
   },
   boolean: {
     isAppropriate: true,
   },
+  length: STORY_HINTS.length,
+  number: STORY_HINTS.number,
+  string: STORY_HINTS.string,
+  union: STORY_HINTS.union,
 };
 
 function next(state) {
   state.counter += 1;
   return state.counter;
+}
+
+/** The hint of this kind for the value's property name, if there is one. */
+function hintFor(state, kind, ctx) {
+  const hint = state.hints[kind]?.[ctx.key];
+  return typeof hint === "function" ? hint : undefined;
+}
+
+/** A schema with its $ref, if any, resolved against the root (a definition that is itself a $ref, too, a few deep). */
+function dereferenced(schema, state) {
+  let resolved = schema;
+  for (let depth = 0; depth < 8 && typeof resolved?.$ref === "string"; depth++) {
+    const { $ref: pointer, ...rest } = resolved;
+    resolved = { ...(resolvePointer(state.root, pointer) ?? {}), ...rest };
+  }
+  return resolved;
 }
 
 function generate(schema, ctx, state) {
@@ -151,7 +187,9 @@ function generate(schema, ctx, state) {
   }
   const union = schema.anyOf ?? schema.oneOf;
   if (Array.isArray(union) && union.length > 0) {
-    const choice = union.find((option) => option && option.type !== "null") ?? union[0];
+    const variants = union.map((option) => dereferenced(option, state));
+    const hinted = hintFor(state, "union", ctx)?.(variants, ctx, state);
+    const choice = hinted ?? variants.find((option) => option && option.type !== "null") ?? variants[0];
     return generate({ description: schema.description, ...choice }, deeper, state);
   }
   let type = schema.type;
@@ -163,8 +201,10 @@ function generate(schema, ctx, state) {
     case "array":
       return generateArray(schema, deeper, state);
     case "integer":
-    case "number":
-      return placeholderNumber(schema, type === "integer");
+    case "number": {
+      const hinted = hintFor(state, "number", ctx)?.(schema, ctx, state);
+      return typeof hinted === "number" ? withinBounds(schema, hinted, type === "integer") : placeholderNumber(schema, type === "integer");
+    }
     case "boolean": {
       const hinted = state.hints.boolean?.[ctx.key];
       return typeof hinted === "boolean" ? hinted : true;
@@ -180,9 +220,10 @@ function generateObject(schema, ctx, state) {
   const result = {};
   const properties = schema.properties ?? {};
   const required = Array.isArray(schema.required) ? schema.required : Object.keys(properties);
+  const siblings = Object.keys(properties);
   for (const [key, child] of Object.entries(properties)) {
     if (!required.includes(key)) continue;
-    result[key] = generate(child, { ...ctx, key, path: [...ctx.path, key], parentKey: ctx.key }, state);
+    result[key] = generate(child, { ...ctx, key, path: [...ctx.path, key], parentKey: ctx.key, siblings }, state);
   }
   const names = schema.propertyNames?.enum;
   if (Object.keys(properties).length === 0 && Array.isArray(names) && schema.additionalProperties) {
@@ -218,22 +259,34 @@ function seatList(schema, seats, state) {
 }
 
 function generateArray(schema, ctx, state) {
+  const indexes = ctx.indexes ?? [];
   if (Array.isArray(schema.items)) {
-    return schema.items.map((item, index) => generate(item, { ...ctx, index, listKey: ctx.key }, state));
+    return schema.items.map((item, index) => generate(item, { ...ctx, index, indexes: [...indexes, index], listKey: ctx.key }, state));
   }
   const seats = seatValues(schema.items, state);
   if (seats) return seatList(schema, seats, state);
-  const count = arrayLength(schema);
+  const hinted = hintFor(state, "length", ctx)?.(schema, ctx, state);
+  const count = typeof hinted === "number" ? withinItemBounds(schema, hinted) : arrayLength(schema);
   const items = [];
   for (let index = 0; index < count; index++) {
-    items.push(generate(schema.items ?? {}, { ...ctx, index, listKey: ctx.key, key: ctx.key }, state));
+    items.push(generate(schema.items ?? {}, { ...ctx, index, indexes: [...indexes, index], listKey: ctx.key, key: ctx.key }, state));
   }
   return items;
 }
 
+/** A hinted list length kept within the schema's item bounds. */
+function withinItemBounds(schema, count) {
+  const min = typeof schema.minItems === "number" ? schema.minItems : 0;
+  const max = typeof schema.maxItems === "number" ? schema.maxItems : Number.POSITIVE_INFINITY;
+  return Math.max(min, Math.min(max, Math.max(0, Math.floor(count))));
+}
+
 function pickEnum(values, ctx, state) {
   const preferred = state.hints.enum?.[ctx.key];
-  if (Array.isArray(preferred)) {
+  if (typeof preferred === "function") {
+    const hit = preferred(values, ctx, state);
+    if (hit !== undefined && values.includes(hit)) return hit;
+  } else if (Array.isArray(preferred)) {
     const hit = preferred.find((value) => values.includes(value));
     if (hit !== undefined) return hit;
   }
@@ -245,11 +298,25 @@ function pickEnum(values, ctx, state) {
   return values[0];
 }
 
-function placeholderNumber(schema, integer) {
+function numberBounds(schema, integer) {
   let min = typeof schema.minimum === "number" ? schema.minimum : undefined;
   let max = typeof schema.maximum === "number" ? schema.maximum : undefined;
   if (typeof schema.exclusiveMinimum === "number") min = schema.exclusiveMinimum + (integer ? 1 : 0.5);
   if (typeof schema.exclusiveMaximum === "number") max = schema.exclusiveMaximum - (integer ? 1 : 0.5);
+  return { min, max };
+}
+
+/** A hinted number kept within the schema's bounds (and whole, for an integer). */
+function withinBounds(schema, value, integer) {
+  const { min, max } = numberBounds(schema, integer);
+  let kept = integer ? Math.round(value) : value;
+  if (min !== undefined) kept = Math.max(min, kept);
+  if (max !== undefined) kept = Math.min(max, kept);
+  return kept;
+}
+
+function placeholderNumber(schema, integer) {
+  const { min, max } = numberBounds(schema, integer);
   let value = 0;
   if (min !== undefined && max !== undefined) value = (min + max) / 2;
   else if (min !== undefined) value = Math.max(min, 0);
@@ -292,8 +359,11 @@ function placeholderString(ctx, state, schema) {
   const key = String(ctx.key ?? "");
   const description = String(schema.description ?? "");
   const n = next(state);
+  const hinted = hintFor(state, "string", ctx)?.(schema, ctx, state);
   let value;
-  if (schema.format === "uuid") {
+  if (typeof hinted === "string") {
+    value = hinted;
+  } else if (schema.format === "uuid") {
     value = `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
   } else if (schema.format === "date-time") {
     value = new Date(0).toISOString();
@@ -305,7 +375,8 @@ function placeholderString(ctx, state, schema) {
     value = idFor(ctx, state);
   } else if (ID_REFERENCE.test(key)) {
     value = referencedId(ctx, state) ?? `${snake(key.replace(/_?id$/i, ""))}_${n}`;
-  } else if (/paragraph/i.test(description) || key === "text" && /beat|narrative/i.test(description)) {
+  } else if (/paragraph/i.test(description) || (key === "text" && ctx.parentKey !== "options" && /beat|narrative/i.test(description))) {
+    // A beat's own text; an option's stays one marked line, which the journeys find the choices by
     const paragraphs = [];
     for (let p = 0; p < 5; p++) paragraphs.push(prose(3, n + p * 3));
     value = `${PLACEHOLDER_MARK} ${paragraphs.join("\n\n")}`;
@@ -463,15 +534,19 @@ function usage(prompt, completion) {
   };
 }
 
-/** The chat completion a request gets: a schema instance, or plain placeholder prose. */
-export function chatCompletion(body, sequence) {
+/**
+ * The chat completion a request gets: a schema instance, with the variety the
+ * request's text and `seed` give it (fake-story.mjs), or plain placeholder prose.
+ */
+export function chatCompletion(body, sequence, { seed = 1 } = {}) {
   const model = typeof body?.model === "string" ? body.model : "fake-model";
   const prompt = JSON.stringify(body?.messages ?? []);
   const wanted = requestedSchema(body);
   const id = `chatcmpl-harness-${sequence}`;
   const created = Math.floor(Date.now() / 1000);
   if (wanted) {
-    const instance = JSON.stringify(instanceFromSchema(wanted.schema, DEFAULT_HINTS, { offset: sequence * 1000 }));
+    const request = readRequest(requestText(body));
+    const instance = JSON.stringify(instanceFromSchema(wanted.schema, DEFAULT_HINTS, { offset: sequence * 1000, seed, request }));
     const message =
       wanted.as === "tool"
         ? {
@@ -525,8 +600,9 @@ function sendJson(res, status, value) {
  * Starts the fake API on 127.0.0.1 and a port the system picks.
  * `record` gets one entry per request (method, path, model, kind, status), never prompt text.
  * `sharpFrom` is a path inside the package that depends on sharp (for JPEG placeholders).
+ * `seed` seeds the variety of its replies (risks, points, bonuses, stat values and moves).
  */
-export async function startFakeOpenAI({ record = () => {}, sharpFrom } = {}) {
+export async function startFakeOpenAI({ record = () => {}, sharpFrom, seed = 1 } = {}) {
   let sequence = 0;
   const server = http.createServer(async (req, res) => {
     sequence += 1;
@@ -541,7 +617,7 @@ export async function startFakeOpenAI({ record = () => {}, sharpFrom } = {}) {
       }
       if (req.method === "POST" && path === "/chat/completions") {
         const body = JSON.parse(raw.toString("utf8") || "{}");
-        const completion = chatCompletion(body, seq);
+        const completion = chatCompletion(body, seq, { seed });
         record({ method: req.method, path, model: body.model, kind: requestedSchema(body) ? "structured" : "text", status: 200 });
         if (body.stream) {
           res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });

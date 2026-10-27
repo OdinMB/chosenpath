@@ -494,12 +494,25 @@ export const VIEWPORTS = {
 /** The game modes `--group-mode` takes for the group fixture World: core's GameModes for more than one player. */
 export const GROUP_GAME_MODES = ["cooperative", "cooperative-competitive", "competitive"];
 
+/**
+ * The turns `--story-length` takes for both fixture Worlds: from the shortest
+ * story the engine ends on its count (a switch and a two-beat chapter) to the
+ * longest the template editor offers (core/config.ts's MAX_TURNS).
+ */
+export const STORY_LENGTHS = { min: 3, max: 25 };
+
+/** The seed the fake model's variety takes when `--seed` names none. */
+export const DEFAULT_SEED = 1;
+
 export const USAGE = `Usage: node harness/run.mjs --out <folder> [options]
 
   --out <folder>          New or empty folder outside the repository; everything the run writes goes here
   --steps <module>        Browser steps: a module exporting default async ({ page, baseUrl, login, shot, log, finding, newPage, fixture, viewport }) => {}
-                          (default: the built-in smoke journey, harness/steps/smoke.mjs; harness/steps/group.mjs plays a group story)
+                          (default: the built-in smoke journey, harness/steps/smoke.mjs; harness/steps/group.mjs plays a group story,
+                          harness/steps/ending.mjs plays a single-player story to its ending)
   --group-mode <mode>     The group World's game mode: ${GROUP_GAME_MODES.join(", ")} (default: fixture-vars.json's, cooperative)
+  --story-length <turns>  Both fixture Worlds' length, ${STORY_LENGTHS.min} to ${STORY_LENGTHS.max} turns (default: fixture-vars.json's, 5)
+  --seed <n>              Seeds the fake model's risks, points, bonuses and stat moves, a whole number (default ${DEFAULT_SEED})
   --viewport <name>       desktop (1440x900, default) or mobile (390x844, touch)
   --timeout <seconds>     Stop everything and fail after this long (default 600)
   --pg-bin <folder>       Folder holding initdb and postgres (default: PATH, then /usr/lib/postgresql/*/bin)
@@ -508,11 +521,24 @@ export const USAGE = `Usage: node harness/run.mjs --out <folder> [options]
 
 /** The run's parameters; throws a usage error for anything it does not take. */
 export function parseArgs(argv) {
-  const args = { out: undefined, steps: undefined, groupMode: undefined, viewport: "desktop", timeoutSeconds: 600, pgBin: undefined, guardTest: undefined, help: false };
+  const args = {
+    out: undefined,
+    steps: undefined,
+    groupMode: undefined,
+    storyLength: undefined,
+    seed: DEFAULT_SEED,
+    viewport: "desktop",
+    timeoutSeconds: 600,
+    pgBin: undefined,
+    guardTest: undefined,
+    help: false,
+  };
   const takesValue = {
     "--out": "out",
     "--steps": "steps",
     "--group-mode": "groupMode",
+    "--story-length": "storyLength",
+    "--seed": "seed",
     "--viewport": "viewport",
     "--timeout": "timeoutSeconds",
     "--pg-bin": "pgBin",
@@ -535,6 +561,16 @@ export function parseArgs(argv) {
   if (!args.out) throw new Error(`--out is required\n\n${USAGE}`);
   if (!(args.viewport in VIEWPORTS)) throw new Error(`--viewport takes ${Object.keys(VIEWPORTS).join(" or ")}`);
   if (args.groupMode !== undefined && !GROUP_GAME_MODES.includes(args.groupMode)) throw new Error(`--group-mode takes ${GROUP_GAME_MODES.join(", ")}`);
+  if (args.storyLength !== undefined) {
+    const turns = Number(args.storyLength);
+    if (!Number.isInteger(turns) || turns < STORY_LENGTHS.min || turns > STORY_LENGTHS.max) {
+      throw new Error(`--story-length takes a whole number of turns from ${STORY_LENGTHS.min} to ${STORY_LENGTHS.max}`);
+    }
+    args.storyLength = turns;
+  }
+  const seed = Number(args.seed);
+  if (!Number.isInteger(seed) || seed < 0 || seed > 2 ** 31 - 1) throw new Error("--seed takes a whole number from 0 to 2147483647");
+  args.seed = seed;
   const seconds = Number(args.timeoutSeconds);
   if (!Number.isFinite(seconds) || seconds <= 0) throw new Error("--timeout takes a number of seconds above 0");
   args.timeoutSeconds = seconds;

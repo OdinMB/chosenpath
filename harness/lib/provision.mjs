@@ -68,12 +68,14 @@ function expectOk(response, what) {
 /**
  * The templates a run makes, by the name a journey reads them under
  * (fixture.template, fixture.groupTemplate): fixture-vars.json's, the group
- * one in the game mode --group-mode names, if it names one.
+ * one in the game mode --group-mode names, if it names one, and both of the
+ * length --story-length names, if it names one.
  */
-export function fixtureTemplates(fixtureVars, { groupMode } = {}) {
+export function fixtureTemplates(fixtureVars, { groupMode, storyLength } = {}) {
+  const length = storyLength ? { maxTurns: storyLength } : {};
   return {
-    template: fixtureVars.template,
-    groupTemplate: { ...fixtureVars.groupTemplate, ...(groupMode ? { gameMode: groupMode } : {}) },
+    template: { ...fixtureVars.template, ...length },
+    groupTemplate: { ...fixtureVars.groupTemplate, ...(groupMode ? { gameMode: groupMode } : {}), ...length },
   };
 }
 
@@ -99,12 +101,12 @@ async function draftAndPublish(api, name, template) {
   const playerCountMin = template.playerCountMin ?? template.playerCount;
   const range = playerCountMin === template.playerCount ? {} : { playerCountMin, playerCountMax: template.playerCount };
   expectOk(await api.request("PUT", `/templates/${id}`, { template: { publicationStatus: "published", ...range } }), `publishing the fixture ${name}`);
-  return { id, title, playerCountMin, playerCountMax: template.playerCount, gameMode: template.gameMode };
+  return { id, title, playerCountMin, playerCountMax: template.playerCount, gameMode: template.gameMode, maxTurns: template.maxTurns };
 }
 
 /**
  * Signs in once as the fixture editor and makes each template, in order.
- * Returns each one's id, title, player range and game mode under its name.
+ * Returns each one's id, title, player range, game mode and length in turns under its name.
  */
 export async function provisionTemplates(origin, { editor, templates }) {
   const api = apiSession(origin);
