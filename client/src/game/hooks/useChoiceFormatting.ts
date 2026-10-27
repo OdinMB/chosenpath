@@ -5,6 +5,20 @@ import {
   RISKY_DISTRIBUTION,
 } from "core/types";
 
+/** An option's risk as the game names it: High, Balanced or Low. */
+export function riskDisplayText(riskType?: string): string {
+  switch (riskType) {
+    case "risky":
+      return "High";
+    case "normal":
+      return "Balanced";
+    case "safe":
+      return "Low";
+    default:
+      return "Unknown";
+  }
+}
+
 interface UseChoiceFormattingResult {
   formatRiskDistribution: (riskType?: string) => string;
   getResourceTypeInfo: (resourceType?: string) => string;
@@ -53,24 +67,10 @@ export const useChoiceFormatting = (): UseChoiceFormattingResult => {
     }
   }, []);
 
-  // Convert risk type to display text
-  const getRiskDisplayText = useCallback((riskType?: string): string => {
-    switch (riskType) {
-      case "risky":
-        return "High";
-      case "normal":
-        return "Balanced";
-      case "safe":
-        return "Low";
-      default:
-        return "Unknown";
-    }
-  }, []);
-
   return {
     formatRiskDistribution,
     getResourceTypeInfo,
     getColor,
-    getRiskDisplayText,
+    getRiskDisplayText: riskDisplayText,
   };
 };

@@ -19,6 +19,8 @@ import {
 type LayoutProps = {
   onChoiceSelected: (optionIndex: number) => void;
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;
+  onExitGame: (to?: string) => void;
+  signedIn?: boolean;
 };
 // The game screen is a marker; its handlers are kept for the tests to call
 const mockLayoutProps: LayoutProps[] = [];
@@ -39,12 +41,14 @@ jest.mock("../../../src/game/GameService", () => ({
 jest.mock("../../../src/game/WebSocketService", () => ({
   wsService: { setExternalJoinCode: jest.fn(), sendMessage: jest.fn() },
 }));
+const mockNavigate = jest.fn();
 jest.mock("react-router-dom", () => ({
   useParams: () => ({ code: "CODE-1" }),
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
 }));
+let mockUser: { id: string } | null = null;
 jest.mock("../../../src/shared/auth/useAuth", () => ({
-  useAuth: () => ({ user: null }),
+  useAuth: () => ({ user: mockUser }),
 }));
 jest.mock("../../../src/shared/session/useSession", () => ({
   useSession: () => ({
@@ -108,5 +112,50 @@ describe("GamePage: the player sends a choice or character again through the gam
     expect(gameService.selectCharacter).toHaveBeenCalledWith(0, 1);
     expect(clearTurnFailure).toHaveBeenCalledTimes(1);
     expect(calledBefore(clearTurnFailure, jest.mocked(gameService.selectCharacter))).toBe(true);
+  });
+});
+
+describe("GamePage: leaving the story", () => {
+  const removeItem = jest.fn();
+  const global = globalThis as { localStorage?: unknown };
+  let storageBefore: unknown;
+
+  beforeEach(() => {
+    jest.spyOn(console, "info").mockImplementation(() => undefined);
+    storageBefore = global.localStorage;
+    global.localStorage = { removeItem };
+    removeItem.mockClear();
+    mockNavigate.mockClear();
+    jest.mocked(gameService.exitStory).mockClear();
+  });
+
+  afterEach(() => {
+    global.localStorage = storageBefore;
+    mockUser = null;
+  });
+
+  it("leaves for the page the end of the story offers, through the game's exit", () => {
+    const { onExitGame } = gameScreen();
+
+    onExitGame("/users/my-stories");
+
+    expect(gameService.exitStory).toHaveBeenCalledTimes(1);
+    expect(removeItem).toHaveBeenCalledWith("sessionId");
+    expect(mockNavigate).toHaveBeenCalledWith("/users/my-stories");
+  });
+
+  it("leaves for the home page when no page is given, as the sidebar's Leave Story does", () => {
+    const { onExitGame } = gameScreen();
+
+    onExitGame();
+
+    expect(gameService.exitStory).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith("/");
+  });
+
+  it("tells the game screen whether the player has an account", () => {
+    expect(gameScreen().signedIn).toBe(false);
+    mockUser = { id: "user-1" };
+    expect(gameScreen().signedIn).toBe(true);
   });
 });

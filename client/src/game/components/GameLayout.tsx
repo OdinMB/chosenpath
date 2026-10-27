@@ -21,12 +21,15 @@ import { DiscordButton } from "shared/components/DiscordButton";
 import { TurnFailedNotice } from "./TurnFailedNotice";
 
 interface Props {
-  onExitGame: () => void;
+  /** Leaves the story, for the home page unless another page of the site is given. */
+  onExitGame: (to?: string) => void;
   onChoiceSelected: (optionIndex: number) => void;
   onCharacterSelected?: (
     identityIndex: number,
     backgroundIndex: number
   ) => void;
+  /** Whether the player has an account. */
+  signedIn?: boolean;
 }
 
 function StatGroup({
@@ -120,6 +123,7 @@ export function GameLayout({
   onExitGame,
   onChoiceSelected,
   onCharacterSelected,
+  signedIn = false,
 }: Props) {
   const { storyState, turnFailure, tryAgain } = useGameSession();
   const [showStats, setShowStats] = useState(false);
@@ -159,7 +163,7 @@ export function GameLayout({
       z-20 md:z-0 
       transform transition-transform duration-200 ease-in-out 
       ${showStats ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-      overflow-y-auto md:overflow-visible 
+      overflow-y-auto md:overflow-visible
       p-4 flex flex-col
     `;
 
@@ -176,7 +180,7 @@ export function GameLayout({
           onOpenFeedbackModal={() => setIsFeedbackModalOpen(true)}
         />
         <PrimaryButton
-          onClick={onExitGame}
+          onClick={() => onExitGame()}
           className="w-full"
           rightIcon={<Icons.LogOut />}
         >
@@ -330,13 +334,16 @@ export function GameLayout({
           />
         </section>
 
-        <div className="mt-8 w-full">
-          <PendingPlayers
-            pendingPlayers={storyState.pendingPlayers}
-            numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
-            currentPlayer={playerSlot}
-          />
-        </div>
+        {/* An ended story waits for no one: its ending offers no choices */}
+        {!storyState.gameOver && (
+          <div className="mt-8 w-full">
+            <PendingPlayers
+              pendingPlayers={storyState.pendingPlayers}
+              numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
+              currentPlayer={playerSlot}
+            />
+          </div>
+        )}
 
         {renderFooter()}
       </aside>
@@ -402,7 +409,11 @@ export function GameLayout({
               )}
             </div>
           ) : (
-            <StoryDisplay onChoiceSelected={onChoiceSelected} />
+            <StoryDisplay
+              onChoiceSelected={onChoiceSelected}
+              onLeaveStory={onExitGame}
+              signedIn={signedIn}
+            />
           )}
         </main>
       </div>

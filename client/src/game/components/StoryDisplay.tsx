@@ -9,12 +9,21 @@ import { LoadingSpinner } from "components/ui";
 import { AiNotice } from "shared/components/AiNotice";
 import { useBeatAiNotice } from "../hooks/useBeatAiNotice";
 import { TurnFailedNotice } from "./TurnFailedNotice";
+import { StoryRecap } from "./StoryRecap";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
+  /** Leaves the story for a page of the site, from the recap at its end. */
+  onLeaveStory: (to: string) => void;
+  /** Whether the player has an account, so the recap can offer My Stories. */
+  signedIn?: boolean;
 }
 
-export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
+export function StoryDisplay({
+  onChoiceSelected,
+  onLeaveStory,
+  signedIn = false,
+}: StoryDisplayProps) {
   const { storyState, isRequestPending, turnFailure, tryAgain } =
     useGameSession();
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -100,6 +109,10 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   // Should include a placeholder beat if the latest beat has a confirmed choice
   const totalBeatsCount = beatHistory.length + (hasConfirmedChoice ? 1 : 0);
 
+  // The story is over and its ending is on screen: the recap follows it
+  const isShowingEnding =
+    Boolean(storyState?.gameOver) && isViewingLatestBeat && !isShowingPlaceholder;
+
   // Base case - no story state yet
   if (!storyState) {
     return null;
@@ -173,6 +186,14 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               localSelectedChoice={localSelectedChoice}
               isRequestPending={isRequestPending}
               onChoiceSelected={handleChoiceClick}
+            />
+          )}
+          {isShowingEnding && (
+            <StoryRecap
+              beats={beatHistory}
+              stats={storyState}
+              signedIn={signedIn}
+              onLeave={onLeaveStory}
             />
           )}
           {/* Where the story waits (the next beat, or a choice that failed on the latest), never below an earlier beat */}

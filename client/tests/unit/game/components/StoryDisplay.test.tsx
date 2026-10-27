@@ -1,5 +1,6 @@
 import type { Beat, ClientStoryState } from "core/types";
 import { StoryDisplay } from "../../../../src/game/components/StoryDisplay";
+import type { StoryRecap } from "../../../../src/game/components/StoryRecap";
 import {
   GameSessionContext,
   type GameSessionContextType,
@@ -33,6 +34,15 @@ jest.mock("../../../../src/game/components/NextBeatPlaceholder", () => ({
       ? "[next beat, no spinner]"
       : "[next beat is being written]",
 }));
+// The recap is a marker; its props are kept for the tests to check
+type RecapProps = Parameters<typeof StoryRecap>[0];
+const mockRecapProps: RecapProps[] = [];
+jest.mock("../../../../src/game/components/StoryRecap", () => ({
+  StoryRecap: (props: RecapProps) => {
+    mockRecapProps.push(props);
+    return "[recap]";
+  },
+}));
 // The notice as it is, with the handler its button gets kept for the tests to press
 const mockNoticeProps: { onTryAgain: () => void }[] = [];
 jest.mock("../../../../src/game/components/TurnFailedNotice", () => {
@@ -62,7 +72,8 @@ function renderStory(
   beats: Beat[],
   displayedBeatIndex: number | null,
   overrides: Partial<ClientStoryState> = {},
-  session: Partial<GameSessionContextType> = {}
+  session: Partial<GameSessionContextType> = {},
+  display: { signedIn?: boolean; onLeaveStory?: (to: string) => void } = {}
 ): string {
   jest.mocked(useStoryBeatState).mockReturnValue({
     displayedBeatIndex,
@@ -84,7 +95,11 @@ function renderStory(
     <GameSessionContext.Provider
       value={{ ...gameSession(storyState), ...session }}
     >
-      <StoryDisplay onChoiceSelected={jest.fn()} />
+      <StoryDisplay
+        onChoiceSelected={jest.fn()}
+        onLeaveStory={display.onLeaveStory ?? jest.fn()}
+        signedIn={display.signedIn ?? false}
+      />
     </GameSessionContext.Provider>
   );
 }
@@ -254,5 +269,43 @@ describe("StoryDisplay's Try again", () => {
 
     expect(tryAgain).toHaveBeenCalledTimes(1);
     expect(beatState.showChoiceSent).not.toHaveBeenCalled();
+  });
+});
+
+describe("StoryDisplay at the story's end", () => {
+  const ended = [beat("Arrival"), beat("Crossroads"), beat("The End", -1)];
+  const lastRecap = (): RecapProps => mockRecapProps[mockRecapProps.length - 1]!;
+
+  beforeEach(() => {
+    mockRecapProps.length = 0;
+  });
+
+  it("shows the recap below the ending, from the player's beats and the story's stats", () => {
+    const html = renderStory(ended, 2, { gameOver: true });
+
+    expect(html.indexOf("[recap]")).toBeGreaterThan(html.indexOf("[beat: The End]"));
+    expect(lastRecap().beats).toBe(ended);
+    expect(lastRecap().stats).toEqual(
+      expect.objectContaining({ playerStats: [], sharedStats: [] })
+    );
+  });
+
+  it("leaves through the game's own exit, which knows whether the player has an account", () => {
+    const onLeaveStory = jest.fn();
+    renderStory(ended, 2, { gameOver: true }, {}, { onLeaveStory, signedIn: true });
+
+    expect(lastRecap().onLeave).toBe(onLeaveStory);
+    expect(lastRecap().signedIn).toBe(true);
+  });
+
+  it("shows no recap while the story goes on", () => {
+    expect(renderStory(ended, 2, { gameOver: false })).not.toContain("[recap]");
+  });
+
+  it("shows no recap on an earlier beat the player looks back at", () => {
+    const html = renderStory(ended, 0, { gameOver: true });
+
+    expect(html).toContain("[beat: Arrival]");
+    expect(html).not.toContain("[recap]");
   });
 });
