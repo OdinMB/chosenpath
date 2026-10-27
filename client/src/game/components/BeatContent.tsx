@@ -229,8 +229,9 @@ export const BeatContent: React.FC<BeatContentProps> = ({
         previousBeatIndex !== null &&
         renderPreviousChoice(previousBeatIndex)}
 
-      {/* Show story title on first beat */}
-      {displayedBeatIndex === 0 && (
+      {/* The story's title on its first beat, and again on its ending */}
+      {(displayedBeatIndex === 0 ||
+        (storyState.gameOver && isViewingLatestBeat)) && (
         <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 text-primary">
           {storyState.title}
         </h1>

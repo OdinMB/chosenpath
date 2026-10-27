@@ -6,6 +6,7 @@ import {
 } from "../../../../src/game/GameSessionContext";
 import { accessibleText, renderMarkup } from "../../../helpers/staticMarkup";
 import {
+  beat,
   clientStoryState,
   gameSession,
   player,
@@ -15,9 +16,13 @@ import {
 jest.mock("../../../../src/config", () =>
   jest.requireActual("../../../__mocks__/client/config")
 );
-// The story view (react-markdown, which Jest cannot parse) is not on screen while characters are picked
+// The story view (react-markdown, which Jest cannot parse) is a marker; its handlers are kept for the tests to check
+const mockStoryProps: { onExitGame: (to: string) => void }[] = [];
 jest.mock("../../../../src/game/components/StoryDisplay", () => ({
-  StoryDisplay: () => "[story]",
+  StoryDisplay: (props: { onExitGame: (to: string) => void }) => {
+    mockStoryProps.push(props);
+    return "[story]";
+  },
 }));
 
 const TURN_FAILED = "Unable to save your character choice. Please try again.";
@@ -57,5 +62,27 @@ describe("GameLayout while the other players pick their characters", () => {
     expect(html).toContain('role="alert"');
     expect(accessibleText(html)).toContain(`${TURN_FAILED} Try again`);
     expect(html).not.toContain("Setting up the story...");
+  });
+});
+
+describe("GameLayout once the story is under way", () => {
+  it("gives the story view the way out of the story, for the closing card's buttons", () => {
+    const onExitGame = jest.fn();
+    const storyState = clientStoryState({
+      gameOver: true,
+      players: { player1: player([beat("The End", -1)]) },
+    });
+    mockStoryProps.length = 0;
+
+    const html = renderMarkup(
+      <GameSessionContext.Provider value={gameSession(storyState)}>
+        <GameLayout onExitGame={onExitGame} onChoiceSelected={jest.fn()} />
+      </GameSessionContext.Provider>
+    );
+
+    expect(html).toContain("[story]");
+    expect(mockStoryProps[mockStoryProps.length - 1]?.onExitGame).toBe(
+      onExitGame
+    );
   });
 });

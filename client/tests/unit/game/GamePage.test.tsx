@@ -17,6 +17,7 @@ import {
  */
 
 type LayoutProps = {
+  onExitGame: (to?: string) => void;
   onChoiceSelected: (optionIndex: number) => void;
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;
 };
@@ -39,9 +40,10 @@ jest.mock("../../../src/game/GameService", () => ({
 jest.mock("../../../src/game/WebSocketService", () => ({
   wsService: { setExternalJoinCode: jest.fn(), sendMessage: jest.fn() },
 }));
+const mockNavigate = jest.fn();
 jest.mock("react-router-dom", () => ({
   useParams: () => ({ code: "CODE-1" }),
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
 }));
 jest.mock("../../../src/shared/auth/useAuth", () => ({
   useAuth: () => ({ user: null }),
@@ -108,5 +110,43 @@ describe("GamePage: the player sends a choice or character again through the gam
     expect(gameService.selectCharacter).toHaveBeenCalledWith(0, 1);
     expect(clearTurnFailure).toHaveBeenCalledTimes(1);
     expect(calledBefore(clearTurnFailure, jest.mocked(gameService.selectCharacter))).toBe(true);
+  });
+});
+
+describe("GamePage: the player leaves the story", () => {
+  const removeItem = jest.fn();
+
+  beforeEach(() => {
+    jest.spyOn(console, "info").mockImplementation(() => undefined);
+    mockNavigate.mockClear();
+    removeItem.mockClear();
+    jest.mocked(gameService.exitStory).mockClear();
+    Object.defineProperty(globalThis, "localStorage", {
+      value: { removeItem },
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, "localStorage");
+  });
+
+  it("exits the story and goes to the page the closing card asks for", () => {
+    const { onExitGame } = gameScreen();
+
+    onExitGame("/users/my-stories");
+
+    expect(gameService.exitStory).toHaveBeenCalledTimes(1);
+    expect(removeItem).toHaveBeenCalledWith("sessionId");
+    expect(mockNavigate).toHaveBeenCalledWith("/users/my-stories");
+  });
+
+  it("goes home when no page is asked for, as Leave Story does", () => {
+    const { onExitGame } = gameScreen();
+
+    onExitGame();
+
+    expect(gameService.exitStory).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith("/");
   });
 });

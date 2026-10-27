@@ -9,12 +9,15 @@ import { LoadingSpinner } from "components/ui";
 import { AiNotice } from "shared/components/AiNotice";
 import { useBeatAiNotice } from "../hooks/useBeatAiNotice";
 import { TurnFailedNotice } from "./TurnFailedNotice";
+import { StoryEndCard } from "./StoryEndCard";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
+  /** Leaves the story for the given page (the closing card's buttons). */
+  onExitGame: (to: string) => void;
 }
 
-export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
+export function StoryDisplay({ onChoiceSelected, onExitGame }: StoryDisplayProps) {
   const { storyState, isRequestPending, turnFailure, tryAgain } =
     useGameSession();
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -100,6 +103,13 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   // Should include a placeholder beat if the latest beat has a confirmed choice
   const totalBeatsCount = beatHistory.length + (hasConfirmedChoice ? 1 : 0);
 
+  // The story's ending is on screen: the closing card goes below it
+  const isShowingEnding =
+    Boolean(storyState?.gameOver) &&
+    isViewingLatestBeat &&
+    !isShowingPlaceholder &&
+    currentBeat !== null;
+
   // Base case - no story state yet
   if (!storyState) {
     return null;
@@ -174,6 +184,9 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               isRequestPending={isRequestPending}
               onChoiceSelected={handleChoiceClick}
             />
+          )}
+          {isShowingEnding && (
+            <StoryEndCard storyState={storyState} onExitGame={onExitGame} />
           )}
           {/* Where the story waits (the next beat, or a choice that failed on the latest), never below an earlier beat */}
           {turnFailure && (isShowingPlaceholder || isViewingLatestBeat) && (

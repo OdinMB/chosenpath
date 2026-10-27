@@ -202,7 +202,8 @@ export const GamePage: React.FC = () => {
     }
   }, [error]);
 
-  const handleExitGame = useCallback(() => {
+  // Leave Story goes home; the closing card's buttons name their page
+  const handleExitGame = useCallback((to: string = "/") => {
     Logger.App.info("handleExitGame called");
     setIsExiting(true);
 
@@ -214,7 +215,7 @@ export const GamePage: React.FC = () => {
     setSessionId(null); // Clear session ID on client side
     localStorage.removeItem("sessionId"); // Explicitly remove from localStorage
     fetchStoryFeed(); // Update the story feed after exiting
-    navigate("/"); // Navigate to home
+    navigate(to);
   }, [navigate, setSessionId, sessionId, fetchStoryFeed]);
 
   const handleChoiceSelected = useCallback(

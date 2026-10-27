@@ -21,7 +21,8 @@ import { DiscordButton } from "shared/components/DiscordButton";
 import { TurnFailedNotice } from "./TurnFailedNotice";
 
 interface Props {
-  onExitGame: () => void;
+  /** Leaves the story, for the given page or home. */
+  onExitGame: (to?: string) => void;
   onChoiceSelected: (optionIndex: number) => void;
   onCharacterSelected?: (
     identityIndex: number,
@@ -176,7 +177,7 @@ export function GameLayout({
           onOpenFeedbackModal={() => setIsFeedbackModalOpen(true)}
         />
         <PrimaryButton
-          onClick={onExitGame}
+          onClick={() => onExitGame()}
           className="w-full"
           rightIcon={<Icons.LogOut />}
         >
@@ -402,7 +403,10 @@ export function GameLayout({
               )}
             </div>
           ) : (
-            <StoryDisplay onChoiceSelected={onChoiceSelected} />
+            <StoryDisplay
+              onChoiceSelected={onChoiceSelected}
+              onExitGame={onExitGame}
+            />
           )}
         </main>
       </div>
