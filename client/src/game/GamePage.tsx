@@ -6,6 +6,8 @@ import { beatCountOf } from "./turnFailure";
 import { wsService } from "./WebSocketService";
 import { Logger } from "shared/logger";
 import { GameLayout } from "./components/GameLayout";
+import { StoryLoadFailed } from "./components/StoryLoadFailed";
+import { describeLoadFailure, waitsForStory } from "./storyLoadFailure";
 import { useAuth } from "client/shared/auth/useAuth";
 import { useSession } from "shared/session/useSession";
 import { addCodeSetToStorage } from "shared/utils/codeSetUtils";
@@ -31,6 +33,7 @@ export const GamePage: React.FC = () => {
     setIsLoading,
     isRequestPending,
     clearTurnFailure,
+    loadFailure,
   } = useGameSession();
   const { code: joinCode } = useParams<{ code?: string }>();
   const navigate = useNavigate();
@@ -76,6 +79,11 @@ export const GamePage: React.FC = () => {
 
     if (isExiting) {
       Logger.App.log("GamePage: Currently exiting, aborting effect logic.");
+      return;
+    }
+
+    // The server answered no: asked again, it would only refuse again
+    if (!waitsForStory(loadFailure)) {
       return;
     }
 
@@ -164,6 +172,7 @@ export const GamePage: React.FC = () => {
     setIsLoading,
     user,
     isExiting,
+    loadFailure,
   ]);
 
   // Effect to store the joinCode once the game is successfully loaded/verified
@@ -260,6 +269,17 @@ export const GamePage: React.FC = () => {
       <div className="app flex items-center justify-center min-h-screen">
         <p className="text-primary-600">Exiting game...</p>
       </div>
+    );
+  }
+
+  // The story couldn't be opened: said in place of the spinner
+  if (!storyState && loadFailure) {
+    return (
+      <StoryLoadFailed
+        notice={describeLoadFailure(loadFailure)}
+        onTryAgain={() => window.location.reload()}
+        onGoHome={() => navigate("/")}
+      />
     );
   }
 

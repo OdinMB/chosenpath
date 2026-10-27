@@ -31,11 +31,15 @@ type ServerResponse =
   | WSRateLimitedResponse;
 
 // Helper functions to create properly typed WSServerMessage objects
-function createRateLimitedMessage(rateLimit: RateLimitInfo): WSServerMessage {
+function createRateLimitedMessage(
+  rateLimit: RateLimitInfo,
+  operationType: string
+): WSServerMessage {
   // This is for the custom format expected by SessionProvider
   return {
     type: "rate_limited",
     rateLimit,
+    operationType,
   } as unknown as WSServerMessage;
 }
 
@@ -387,7 +391,7 @@ export class WebSocketService {
         );
         const handler = this.messageHandlers.get("rate_limited");
         if (handler) {
-          handler(createRateLimitedMessage(data.rateLimit));
+          handler(createRateLimitedMessage(data.rateLimit, requestType));
         }
         return;
       }

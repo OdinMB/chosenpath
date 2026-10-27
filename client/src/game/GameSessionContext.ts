@@ -1,6 +1,7 @@
 import { createContext } from "react";
 import type { ClientStoryState, RateLimitInfo } from "core/types";
 import type { TryAgainRequest, TurnFailure } from "./turnFailure";
+import type { StoryLoadFailure } from "./storyLoadFailure";
 
 // Define the GameSessionContext type
 export interface GameSessionContextType {
@@ -31,6 +32,8 @@ export interface GameSessionContextType {
    * again beside it (it comes back if that send is rate limited)
    */
   clearTurnFailure: () => void;
+  /** Why the page couldn't open its story, until a story arrives (StoryLoadFailed) */
+  loadFailure: StoryLoadFailure | null;
 }
 
 // Create the context

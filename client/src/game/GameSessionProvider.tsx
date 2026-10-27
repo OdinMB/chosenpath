@@ -11,6 +11,12 @@ import { useSession } from "../shared/session/useSession.js";
 import { GameSessionContext } from "./GameSessionContext";
 import { gameService } from "./GameService";
 import { failureOnScreen, NO_FAILURE, turnFailureFrom } from "./turnFailure";
+import {
+  loadFailureFrom,
+  loadFailureFromLimit,
+  STORY_LOAD_TIMEOUT_MS,
+  type StoryLoadFailure,
+} from "./storyLoadFailure";
 
 // Create a dedicated logger for game session operations
 const logger = Logger.App;
@@ -38,6 +44,10 @@ export function GameSessionProvider({
     NO_FAILURE
   );
   const turnFailure = failureState.shown;
+  // Why the page couldn't open its story (StoryLoadFailed); a story arriving ends it
+  const [loadFailure, setLoadFailure] = useState<StoryLoadFailure | null>(
+    null
+  );
 
   // Use refs to track states without causing effect reruns
   const isLoadingRef = useRef(isLoading);
@@ -47,6 +57,7 @@ export function GameSessionProvider({
   const showStory = useCallback((state: ClientStoryState | null) => {
     storyStateRef.current = state;
     setStoryState(state);
+    if (state) setLoadFailure(null);
   }, []);
 
   // "Try again": the notice goes, the selection the server failed on stops waiting, and what the story is missing is sent
@@ -180,6 +191,13 @@ export function GameSessionProvider({
         setIsLoading(false);
         // A send that was turned away ("Try again", or the player's own): the failure still stands
         dispatchFailure({ type: "rateLimited" });
+        // The code check turned away before any story opened: the page says how long to wait
+        const failure = loadFailureFromLimit(
+          "operationType" in data ? String(data.operationType) : "unknown",
+          data.rateLimit,
+          storyStateRef.current !== null
+        );
+        if (failure) setLoadFailure(failure);
       }
     });
 
@@ -197,6 +215,21 @@ export function GameSessionProvider({
           // The selection the server failed on is no longer on its way
           wsService.removeBackgroundOperation("select_character");
           dispatchFailure({ type: "failed", failure });
+          setIsLoading(false);
+          return;
+        }
+
+        // The code check refused or failed before any story opened: the page says so (StoryLoadFailed)
+        const loadFailed = loadFailureFrom(
+          notification,
+          storyStateRef.current !== null
+        );
+        if (loadFailed) {
+          logger.warn(
+            "[GameSessionProvider] The story could not be opened:",
+            notification.error
+          );
+          setLoadFailure(loadFailed);
           setIsLoading(false);
           return;
         }
@@ -290,6 +323,16 @@ export function GameSessionProvider({
     }
   }, [rateLimit]);
 
+  // No story and no answer in time: the page says so, and still opens the story if it comes
+  useEffect(() => {
+    if (storyState || loadFailure) return;
+    const timer = setTimeout(
+      () => setLoadFailure({ kind: "noAnswer" }),
+      STORY_LOAD_TIMEOUT_MS
+    );
+    return () => clearTimeout(timer);
+  }, [storyState, loadFailure]);
+
   useEffect(() => {
     if (connectionStale) {
       // Show a notification to the user that they need to refresh
@@ -322,6 +365,7 @@ export function GameSessionProvider({
     turnFailure,
     tryAgain,
     clearTurnFailure,
+    loadFailure,
   };
 
   return (
