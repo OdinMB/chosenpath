@@ -2,11 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
 import http from "node:http";
 import type net from "node:net";
 import { startFrontDoor, type FrontDoor } from "../../../../harness/lib/front-door.mjs";
-import { provisionTemplate } from "../../../../harness/lib/provision.mjs";
+import { fixtureTemplates, provisionTemplates } from "../../../../harness/lib/provision.mjs";
 import { CSRF_COOKIE, csrfFailure } from "../../../src/shared/csrf.js";
 
 /*
- * How the harness makes its fixture template (harness/lib/provision.mjs):
+ * How the harness makes its fixture templates (harness/lib/provision.mjs):
  * through the front door, as the browser calls the API, against a stub that
  * answers the four routes it uses the way the server does (the CSRF cookie
  * on a first request, the product's own double-submit check, the auth
@@ -57,8 +57,13 @@ beforeAll(async () => {
         return success(200, { user: { email: body.email } });
       }
       if (jar.authToken !== "signed-in") return failure(401, "Not signed in");
-      if (req.method === "POST" && req.url === "/templates/generate") return success(201, { template: { id: "tpl-1", title: "A harbour town" } });
-      if (req.method === "PUT" && req.url === "/templates/tpl-1") return success(200, { template: { id: "tpl-1", ...body.template } });
+      if (req.method === "POST" && req.url === "/templates/generate") {
+        if (body?.playerCount > 3) return failure(500, "Failed to generate template");
+        const drafted = body?.playerCount === 3 ? { id: "tpl-2", title: "An island in winter" } : { id: "tpl-1", title: "A harbour town" };
+        return success(201, { template: drafted });
+      }
+      const put = /^\/templates\/(tpl-[12])$/.exec(String(req.url));
+      if (req.method === "PUT" && put) return success(200, { template: { id: put[1], ...body.template } });
       return failure(404, "Not found");
     });
   });
@@ -73,15 +78,17 @@ afterAll(async () => {
   await new Promise<void>((resolve) => upstream.close(() => resolve()));
 });
 
-const fixture = {
-  editor: { email: "editor@example.com", password: "fixture-editor-password" },
-  template: { premise: "A harbour town", playerCount: 1, maxTurns: 5, gameMode: "single-player" },
-};
+const editor = { email: "editor@example.com", password: "fixture-editor-password" };
+const solo = { premise: "A harbour town", playerCount: 1, maxTurns: 5, gameMode: "single-player" };
+const group = { premise: "An island in winter", playerCount: 3, playerCountMin: 2, maxTurns: 5, gameMode: "cooperative" };
+const fixture = { editor, templates: { template: solo } };
 
-describe("provisioning the fixture template", () => {
+describe("provisioning the fixture templates", () => {
   it("signs in, drafts the template from the premise and publishes it, sending the CSRF token on every change", async () => {
     calls.length = 0;
-    await expect(provisionTemplate(frontDoor.origin, fixture)).resolves.toEqual({ id: "tpl-1", title: "A harbour town" });
+    await expect(provisionTemplates(frontDoor.origin, fixture)).resolves.toEqual({
+      template: { id: "tpl-1", title: "A harbour town", playerCountMin: 1, playerCountMax: 1, gameMode: "single-player" },
+    });
     expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
       "GET /templates/published",
       "POST /auth/login",
@@ -93,12 +100,48 @@ describe("provisioning the fixture template", () => {
     expect(calls[3].body).toEqual({ template: { publicationStatus: "published" } });
   });
 
+  it("signs in once for both Worlds, and publishes the group one, drafted for three seats, for two to three players", async () => {
+    calls.length = 0;
+    await expect(provisionTemplates(frontDoor.origin, { editor, templates: { template: solo, groupTemplate: group } })).resolves.toEqual({
+      template: { id: "tpl-1", title: "A harbour town", playerCountMin: 1, playerCountMax: 1, gameMode: "single-player" },
+      groupTemplate: { id: "tpl-2", title: "An island in winter", playerCountMin: 2, playerCountMax: 3, gameMode: "cooperative" },
+    });
+    expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
+      "GET /templates/published",
+      "POST /auth/login",
+      "POST /templates/generate",
+      "PUT /templates/tpl-1",
+      "POST /templates/generate",
+      "PUT /templates/tpl-2",
+    ]);
+    expect(calls[4].body).toEqual({ prompt: "An island in winter", playerCount: 3, maxTurns: 5, gameMode: "cooperative", generateImages: false });
+    expect(calls[5].body).toEqual({ template: { publicationStatus: "published", playerCountMin: 2, playerCountMax: 3 } });
+  });
+
+  it("says which World failed, and why", async () => {
+    await expect(
+      provisionTemplates(frontDoor.origin, { editor, templates: { template: solo, groupTemplate: { ...group, playerCount: 4 } } })
+    ).rejects.toThrow("drafting the fixture groupTemplate failed (HTTP 500: Failed to generate template)");
+  });
+
   it("says which step failed, and why, when the editor can't sign in", async () => {
     editorPassword = "a different password";
     try {
-      await expect(provisionTemplate(frontDoor.origin, fixture)).rejects.toThrow(/signing in as the fixture editor.*HTTP 401: Invalid credentials/);
+      await expect(provisionTemplates(frontDoor.origin, fixture)).rejects.toThrow(/signing in as the fixture editor.*HTTP 401: Invalid credentials/);
     } finally {
       editorPassword = "fixture-editor-password";
     }
+  });
+});
+
+describe("the Worlds a run makes", () => {
+  const fixtureVars = { template: solo, groupTemplate: group };
+
+  it("are fixture-vars.json's, under the names a journey reads them by", () => {
+    expect(fixtureTemplates(fixtureVars)).toEqual({ template: solo, groupTemplate: group });
+  });
+
+  it("take the group World's game mode from --group-mode, and leave the single-player one alone", () => {
+    expect(fixtureTemplates(fixtureVars, { groupMode: "competitive" })).toEqual({ template: solo, groupTemplate: { ...group, gameMode: "competitive" } });
   });
 });

@@ -94,11 +94,12 @@ export function arrayLength(schema) {
  * id field that names another list (statId, outcomeId, …) points at an id
  * generated earlier in the same reply. Booleans are true, numbers sit inside
  * their bounds, enums take their first value unless a hint says otherwise.
+ * A list of player seats holds each seat once per reply (seatList).
  * `offset` starts the counter behind every number, so replies to different
  * requests never repeat an id or a line.
  */
 export function instanceFromSchema(rootSchema, hints = DEFAULT_HINTS, { offset = 0 } = {}) {
-  const state = { counter: offset, ids: [], root: rootSchema, hints };
+  const state = { counter: offset, ids: [], placedSeats: new Set(), root: rootSchema, hints };
   return generate(rootSchema, { key: undefined, index: 0, path: [], depth: 0 }, state);
 }
 
@@ -192,10 +193,36 @@ function generateObject(schema, ctx, state) {
   return result;
 }
 
+const SEAT = /^player\d+$/;
+
+/** The seats a list's items name, when every value its items' enum allows is a player seat (player1, player2, …). */
+function seatValues(itemSchema, state) {
+  const schema = typeof itemSchema?.$ref === "string" ? { ...(resolvePointer(state.root, itemSchema.$ref) ?? {}), ...itemSchema } : itemSchema;
+  const values = schema?.enum;
+  return Array.isArray(values) && values.length > 0 && values.every((value) => typeof value === "string" && SEAT.test(value)) ? values : undefined;
+}
+
+/**
+ * A list of player seats (a switch's or a thread's players): every seat not
+ * yet listed in this reply, so the first such list groups all the players
+ * and later ones hold none, as the planners must place each player exactly
+ * once (planChecks.ts). A list with a minimum fills up from the first seat.
+ */
+function seatList(schema, seats, state) {
+  const max = typeof schema.maxItems === "number" ? schema.maxItems : Number.POSITIVE_INFINITY;
+  const min = typeof schema.minItems === "number" ? schema.minItems : 0;
+  const list = seats.filter((seat) => !state.placedSeats.has(seat)).slice(0, max);
+  for (const seat of list) state.placedSeats.add(seat);
+  for (let i = 0; list.length < min; i++) list.push(seats[i % seats.length]);
+  return list;
+}
+
 function generateArray(schema, ctx, state) {
   if (Array.isArray(schema.items)) {
     return schema.items.map((item, index) => generate(item, { ...ctx, index, listKey: ctx.key }, state));
   }
+  const seats = seatValues(schema.items, state);
+  if (seats) return seatList(schema, seats, state);
   const count = arrayLength(schema);
   const items = [];
   for (let index = 0; index < count; index++) {

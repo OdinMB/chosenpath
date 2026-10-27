@@ -6,6 +6,7 @@ import {
   CLIENT_API_PREFIX,
   CLOSED_PROXY_URL,
   EXIT_CODES,
+  GROUP_GAME_MODES,
   GUARD_TEST_CASES,
   PLANTED_VARIABLE,
   apiUrlLiterals,
@@ -25,11 +26,16 @@ import {
   plantGuardTest,
   productEnvironment,
   rewriteApiUrls,
+  rewriteSiteOrigins,
   SERVER_CONFIG_NAMES,
+  siteOriginBundleProblems,
+  siteOriginLiterals,
   targetProblems,
   type CreatedTargets,
   type Env,
 } from "../../../../harness/lib/guard.mjs";
+import { MAX_PLAYERS, MAX_TURNS, MIN_TURNS } from "core/config.js";
+import { GameModes } from "core/types/index.js";
 import { connectTarget, describeTarget } from "../../../../harness/lib/net-guard.mjs";
 import { dbConnectionSettings } from "../../../src/shared/dbSettings.js";
 import { checkDevSeedTarget } from "../../../src/scripts/devSeedGuard.js";
@@ -309,6 +315,52 @@ describe("the client bundle", () => {
     expect(clientBundleProblems([{ name: "assets/index.js", text: "" }], literals)).toEqual([expect.stringContaining(CLIENT_API_PREFIX)]);
     expect(clientBundleProblems([ok], [])).toEqual([expect.stringContaining("could not be read")]);
   });
+
+  // The site origins every join link, seat card QR code and copied invite link is built from (generateJoinLink)
+  const originLiterals = siteOriginLiterals(coreConfig);
+  const host = "127.0.0.1:41000";
+  const productionHost = JSON.parse(originLiterals[1] ?? "[]")[0];
+
+  it("finds core/config.ts's site origins and rewrites both lists to the front door's host", () => {
+    expect(originLiterals).toEqual(['["localhost:5173"]', expect.stringMatching(/^\["[^"]+"\]$/)]);
+    const { code, replaced } = rewriteSiteOrigins(coreConfig, originLiterals, host);
+    expect(replaced).toBe(2);
+    expect(code).not.toContain("localhost:5173");
+    expect(siteOriginLiterals(code)).toEqual([`["${host}"]`, `["${host}"]`]);
+    // The API URLs are left to their own rewrite
+    expect(apiUrlLiterals(code)).toEqual(literals);
+  });
+
+  it("reads no site origins from a form it doesn't know, so the build stops", () => {
+    expect(siteOriginLiterals("DEFAULT_CORS_ORIGIN: origins,")).toEqual([]);
+    expect(siteOriginLiterals('DEFAULT_CORS_ORIGIN: isDevelopment ? [] : ["example.invalid"],')).toEqual([]);
+    expect(siteOriginLiterals('DEFAULT_CORS_ORIGIN: isDevelopment ? [devOrigin] : ["example.invalid"],')).toEqual([]);
+  });
+
+  it("refuses a bundle whose join links could lead anywhere but the front door", () => {
+    const ok = { name: "assets/index.js", text: `const c={DEFAULT_CORS_ORIGIN:x?["${host}"]:["${host}"]};const copy="Listed on ${productionHost}."` };
+    expect(siteOriginBundleProblems([ok], originLiterals, host)).toEqual([]);
+    expect(siteOriginBundleProblems([ok, { name: "assets/chunk.js", text: 'join("http://localhost:5173/game/ABC")' }], originLiterals, host)).toEqual([
+      "assets/chunk.js still links to the development site's origin",
+    ]);
+    expect(siteOriginBundleProblems([ok, { name: "index.html", text: "<a href=http://localhost:5173/>" }], originLiterals, host)).toEqual([
+      "index.html still links to the development site's origin",
+    ]);
+    expect(siteOriginBundleProblems([ok, { name: "assets/config.js", text: `x?["${host}"]:${originLiterals[1]}` }], originLiterals, host)).toEqual([
+      "assets/config.js still links to the production site's origin",
+    ]);
+    expect(siteOriginBundleProblems([{ name: "assets/index.js", text: "" }], originLiterals, host)).toEqual([`no script in the bundle links to the front door's ${host}`]);
+    expect(siteOriginBundleProblems([ok], [], host)).toEqual([expect.stringContaining("could not be read")]);
+    expect(siteOriginBundleProblems([ok], originLiterals, "localhost:41000")).toEqual([expect.stringContaining("not the front door's on 127.0.0.1")]);
+  });
+
+  it("passes a client built with both rewrites through both checks", () => {
+    const { code: api } = rewriteApiUrls(coreConfig, literals);
+    const { code } = rewriteSiteOrigins(api, originLiterals, host);
+    const bundle = [{ name: "assets/index.js", text: code }];
+    expect(clientBundleProblems(bundle, literals)).toEqual([]);
+    expect(siteOriginBundleProblems(bundle, originLiterals, host)).toEqual([]);
+  });
 });
 
 describe("the parameters and the output folder", () => {
@@ -320,6 +372,14 @@ describe("the parameters and the output folder", () => {
       guardTest: "target",
     });
     expect(parseArgs(["--out=/tmp/x", "--steps", "my-steps.mjs", "--pg-bin", "/opt/pg/bin"])).toMatchObject({ steps: "my-steps.mjs", pgBin: "/opt/pg/bin" });
+    expect(parseArgs(["--out", "/tmp/x"]).groupMode).toBeUndefined();
+    expect(parseArgs(["--out", "/tmp/x", "--group-mode", "competitive"]).groupMode).toBe("competitive");
+  });
+
+  it("takes every multiplayer game mode for the group World, and only those", () => {
+    expect([...GROUP_GAME_MODES].sort()).toEqual(Object.values(GameModes).filter((mode) => mode !== GameModes.SinglePlayer).sort());
+    expect(() => parseArgs(["--out", "/tmp/x", "--group-mode", "single-player"])).toThrow("--group-mode takes");
+    expect(() => parseArgs(["--out", "/tmp/x", "--group-mode=versus"])).toThrow("--group-mode takes");
   });
 
   it("refuses what it does not take", () => {
@@ -350,6 +410,18 @@ describe("the fixtures", () => {
 
   it("name a database the dev seed's own guard accepts on the harness's host", () => {
     expect(checkDevSeedTarget(freshEnvironment(), { host: "127.0.0.1", database: fixtureVars.server.DB_DATABASE })).toEqual({ ok: true });
+  });
+
+  it("describe Worlds the template editor could make: one for a single player, one drafted for three seats that starts stories of two or three", () => {
+    const { template, groupTemplate } = fixtureVars;
+    expect(template).toMatchObject({ playerCount: 1, gameMode: GameModes.SinglePlayer });
+    expect(groupTemplate).toMatchObject({ playerCount: MAX_PLAYERS, playerCountMin: 2 });
+    expect(GROUP_GAME_MODES).toContain(groupTemplate.gameMode);
+    for (const world of [template, groupTemplate]) {
+      expect(world.maxTurns).toBeGreaterThanOrEqual(MIN_TURNS);
+      expect(world.maxTurns).toBeLessThanOrEqual(MAX_TURNS);
+      expect(world.premise.length).toBeGreaterThan(0);
+    }
   });
 
   it("set no variable the guard would refuse, and look like no real credential", () => {

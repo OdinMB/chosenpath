@@ -360,16 +360,21 @@ export function apiUrlLiterals(coreConfigSource) {
   return [match[1], match[2]];
 }
 
-/** core/config.ts with its API URL literals replaced; `replaced` counts them (0 means the build must stop). */
-export function rewriteApiUrls(source, literals, prefix = CLIENT_API_PREFIX) {
+/** Every occurrence of each literal replaced with `replacement`; `replaced` counts them. */
+function replaceLiterals(source, literals, replacement) {
   let code = String(source);
   let replaced = 0;
   for (const literal of literals) {
     const parts = code.split(literal);
     replaced += parts.length - 1;
-    code = parts.join(JSON.stringify(prefix));
+    code = parts.join(replacement);
   }
   return { code, replaced };
+}
+
+/** core/config.ts with its API URL literals replaced; `replaced` counts them (0 means the build must stop). */
+export function rewriteApiUrls(source, literals, prefix = CLIENT_API_PREFIX) {
+  return replaceLiterals(source, literals, JSON.stringify(prefix));
 }
 
 /** The built client calls no API but the front door's: no hard-coded API URL survives, and the prefix is there. */
@@ -384,6 +389,61 @@ export function clientBundleProblems(files, literals, prefix = CLIENT_API_PREFIX
   }
   if (!files.some((file) => /\.m?js$/.test(file.name) && file.text.includes(JSON.stringify(prefix)))) {
     problems.push(`no script in the bundle calls the front door's ${prefix}`);
+  }
+  return problems;
+}
+
+/** The hosts in a list literal as core/config.ts writes DEFAULT_CORS_ORIGIN's (["localhost:5173"]), or undefined for any other form. */
+function hostList(literal) {
+  try {
+    const hosts = JSON.parse(literal);
+    return Array.isArray(hosts) && hosts.length > 0 && hosts.every((host) => typeof host === "string" && host !== "") ? hosts : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The site's own origins that core/config.ts's getApiConfig hard-codes
+ * (DEFAULT_CORS_ORIGIN's development and production lists). The client
+ * builds every join link from the first of them (generateJoinLink: seat
+ * cards, their QR codes, the copied invite link), so in the harness's
+ * browser, which runs as development, those links would name the
+ * development server's port. The client build replaces both lists with the
+ * front door's host. Fails closed: an unexpected form returns none.
+ */
+export function siteOriginLiterals(coreConfigSource) {
+  const match = String(coreConfigSource).match(/DEFAULT_CORS_ORIGIN:\s*isDevelopment\s*\?\s*(\[[^\]]*\])\s*:\s*(\[[^\]]*\])/);
+  if (!match || !hostList(match[1]) || !hostList(match[2])) return [];
+  return [match[1], match[2]];
+}
+
+/** core/config.ts with its site origin lists replaced by one holding the front door's host; `replaced` counts them (0 means the build must stop). */
+export function rewriteSiteOrigins(source, literals, host) {
+  return replaceLiterals(source, literals, JSON.stringify([host]));
+}
+
+/**
+ * The built client links to no site but the front door: the development
+ * host (a port where another server may listen) appears nowhere, the
+ * production list is gone from every script, and the front door's host,
+ * on 127.0.0.1, is there. The production host itself is in the site's copy,
+ * so only its list is looked for.
+ */
+export function siteOriginBundleProblems(files, literals, host) {
+  const lists = literals.map(hostList);
+  if (literals.length !== 2 || lists.some((list) => !list)) {
+    return ["core/config.ts's site origins could not be read, so the bundle's join links cannot be checked"];
+  }
+  if (!/^127\.0\.0\.1:\d+$/.test(String(host))) return ["the join links' host is not the front door's on 127.0.0.1"];
+  const [developmentHosts, productionHosts] = lists;
+  const problems = [];
+  for (const file of files) {
+    if (developmentHosts.some((developmentHost) => file.text.includes(developmentHost))) problems.push(`${file.name} still links to the development site's origin`);
+    if (/\.m?js$/.test(file.name) && file.text.includes(JSON.stringify(productionHosts))) problems.push(`${file.name} still links to the production site's origin`);
+  }
+  if (!files.some((file) => /\.m?js$/.test(file.name) && file.text.includes(JSON.stringify(host)))) {
+    problems.push(`no script in the bundle links to the front door's ${host}`);
   }
   return problems;
 }
@@ -431,11 +491,15 @@ export const VIEWPORTS = {
   mobile: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
 };
 
+/** The game modes `--group-mode` takes for the group fixture World: core's GameModes for more than one player. */
+export const GROUP_GAME_MODES = ["cooperative", "cooperative-competitive", "competitive"];
+
 export const USAGE = `Usage: node harness/run.mjs --out <folder> [options]
 
   --out <folder>          New or empty folder outside the repository; everything the run writes goes here
-  --steps <module>        Browser steps: a module exporting default async ({ page, baseUrl, login, shot, log, newPage, fixture }) => {}
-                          (default: the built-in smoke journey, harness/steps/smoke.mjs)
+  --steps <module>        Browser steps: a module exporting default async ({ page, baseUrl, login, shot, log, finding, newPage, fixture, viewport }) => {}
+                          (default: the built-in smoke journey, harness/steps/smoke.mjs; harness/steps/group.mjs plays a group story)
+  --group-mode <mode>     The group World's game mode: ${GROUP_GAME_MODES.join(", ")} (default: fixture-vars.json's, cooperative)
   --viewport <name>       desktop (1440x900, default) or mobile (390x844, touch)
   --timeout <seconds>     Stop everything and fail after this long (default 600)
   --pg-bin <folder>       Folder holding initdb and postgres (default: PATH, then /usr/lib/postgresql/*/bin)
@@ -444,8 +508,16 @@ export const USAGE = `Usage: node harness/run.mjs --out <folder> [options]
 
 /** The run's parameters; throws a usage error for anything it does not take. */
 export function parseArgs(argv) {
-  const args = { out: undefined, steps: undefined, viewport: "desktop", timeoutSeconds: 600, pgBin: undefined, guardTest: undefined, help: false };
-  const takesValue = { "--out": "out", "--steps": "steps", "--viewport": "viewport", "--timeout": "timeoutSeconds", "--pg-bin": "pgBin", "--guard-test": "guardTest" };
+  const args = { out: undefined, steps: undefined, groupMode: undefined, viewport: "desktop", timeoutSeconds: 600, pgBin: undefined, guardTest: undefined, help: false };
+  const takesValue = {
+    "--out": "out",
+    "--steps": "steps",
+    "--group-mode": "groupMode",
+    "--viewport": "viewport",
+    "--timeout": "timeoutSeconds",
+    "--pg-bin": "pgBin",
+    "--guard-test": "guardTest",
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
@@ -462,6 +534,7 @@ export function parseArgs(argv) {
   if (args.help) return args;
   if (!args.out) throw new Error(`--out is required\n\n${USAGE}`);
   if (!(args.viewport in VIEWPORTS)) throw new Error(`--viewport takes ${Object.keys(VIEWPORTS).join(" or ")}`);
+  if (args.groupMode !== undefined && !GROUP_GAME_MODES.includes(args.groupMode)) throw new Error(`--group-mode takes ${GROUP_GAME_MODES.join(", ")}`);
   const seconds = Number(args.timeoutSeconds);
   if (!Number.isFinite(seconds) || seconds <= 0) throw new Error("--timeout takes a number of seconds above 0");
   args.timeoutSeconds = seconds;

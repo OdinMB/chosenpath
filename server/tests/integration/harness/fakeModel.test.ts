@@ -127,6 +127,67 @@ describe("the harness's fake model, read by the product", () => {
     expect(requests.filter((r) => r.kind === "unhandled" || r.kind === "error")).toEqual([]);
   }, 60_000);
 
+  // The harness's group World (fixture-vars.json's groupTemplate, run.mjs's --group-mode)
+  it.each([GameModes.Cooperative, GameModes.CooperativeCompetitive, GameModes.Competitive])(
+    "drafts a %s template for three seats that starts stories of two or three, and plays two turns of three players",
+    async (gameMode) => {
+      const generator = new AIStoryGenerator();
+      const setup = await generator.generateTemplateSetup("A quiet harbour town", 3, gameMode, 5);
+
+      // As TemplateService.generateTemplate saves it, published with the range the harness gives it
+      const template = {
+        ...setup,
+        id: "harness-group-template",
+        playerCountMin: 2,
+        playerCountMax: 3,
+        gameMode,
+        maxTurnsMin: 5,
+        maxTurnsMax: 5,
+        tags: [],
+        containsImages: false,
+      } as unknown as Parameters<typeof createStoryStateFromTemplate>[1];
+      expect(templateStartProblem(template, 3)).toBeNull();
+      expect(templateStartProblem(template, 2)).toBeNull();
+
+      const difficulty = template.difficultyLevels?.[0] ?? { title: "Balanced", modifier: 0 };
+      const seats = ["player1", "player2", "player3"] as const;
+      let story = Story.create(
+        createStoryStateFromTemplate("harness-group-story", template, 3, 5, false, false, difficulty, {
+          player1: "code-1",
+          player2: "code-2",
+          player3: "code-3",
+        })
+      );
+      for (const seat of seats) {
+        const options = story.getState().characterSelectionOptions[seat];
+        expect(options.possibleCharacterIdentities.length).toBeGreaterThan(0);
+        expect(options.possibleCharacterBackgrounds.length).toBeGreaterThan(0);
+        story = story.setCharacterSelection(seat, options.possibleCharacterIdentities[0], options.possibleCharacterBackgrounds[0], 0, 0);
+      }
+
+      // The first turn (a switch every player is in), then the first thread, which groups every player
+      story = await nextTurn(generator, story.completeCharacterSelection());
+      for (const seat of seats) {
+        const beat = story.getCurrentBeat(seat);
+        expect(beat?.text).toContain(PLACEHOLDER_MARK);
+        expect(beat?.options.length).toBeGreaterThanOrEqual(2);
+        // The group journey finds each seat's choices by this text (harness/steps/group.mjs)
+        for (const option of beat?.options ?? []) expect(option.text).toContain("(placeholder ");
+        story = BeatResolutionService.resolveChoice(story.updateChoice(seat, 0), seat, 0, difficulty);
+      }
+      const firstTexts = Object.fromEntries(seats.map((seat) => [seat, (story.getCurrentBeat(seat)?.options ?? []).map((option) => option.text)]));
+      story = await nextTurn(generator, story);
+      for (const seat of seats) {
+        expect(story.getState().players[seat].beatHistory).toHaveLength(2);
+        const options = story.getCurrentBeat(seat)?.options ?? [];
+        expect(options.length).toBeGreaterThanOrEqual(2);
+        expect(options.some((option) => !firstTexts[seat].includes(option.text))).toBe(true);
+      }
+      expect(requests.filter((r) => r.kind === "unhandled" || r.kind === "error")).toEqual([]);
+    },
+    60_000
+  );
+
   it("lets a premise through the content filter", async () => {
     const verdict = await new ContentFilterService().isAppropriatePrompt("A quiet harbour town");
     expect(verdict.isAppropriate).toBe(true);

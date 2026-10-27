@@ -22,5 +22,12 @@
     "playerCount": 1,
     "maxTurns": 5,
     "gameMode": "single-player"
+  },
+  "groupTemplate": {
+    "premise": "Three keepers share one lighthouse, one boat and one long winter on a storm-cut island",
+    "playerCount": 3,
+    "playerCountMin": 2,
+    "maxTurns": 5,
+    "gameMode": "cooperative"
   }
 }

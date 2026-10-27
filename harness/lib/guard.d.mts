@@ -45,6 +45,7 @@ export type FixtureVars = { server: Record<string, string> };
 export type HarnessArgs = {
   out: string | undefined;
   steps: string | undefined;
+  groupMode: string | undefined;
   viewport: string;
   timeoutSeconds: number;
   pgBin: string | undefined;
@@ -62,6 +63,7 @@ export declare const CLIENT_API_PREFIX: string;
 export declare const DEVELOPMENT_CORS_ORIGINS: string[];
 export declare const SERVER_CONFIG_NAMES: string[];
 export declare const VIEWPORTS: Record<string, Record<string, unknown>>;
+export declare const GROUP_GAME_MODES: string[];
 export declare const USAGE: string;
 
 export declare function platformVariables(parentEnv: Env, platform: string): Record<string, string>;
@@ -92,6 +94,9 @@ export declare function blockedWebSocketPattern(frontDoorPort: number): RegExp;
 export declare function apiUrlLiterals(coreConfigSource: string): string[];
 export declare function rewriteApiUrls(source: string, literals: string[], prefix?: string): { code: string; replaced: number };
 export declare function clientBundleProblems(files: { name: string; text: string }[], literals: string[], prefix?: string): string[];
+export declare function siteOriginLiterals(coreConfigSource: string): string[];
+export declare function rewriteSiteOrigins(source: string, literals: string[], host: string): { code: string; replaced: number };
+export declare function siteOriginBundleProblems(files: { name: string; text: string }[], literals: string[], host: string): string[];
 export declare const EXIT_CODES: {
   ok: 0;
   setup: 1;

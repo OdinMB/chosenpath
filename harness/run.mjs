@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 // The local harness: Chosen Path in a real browser on a hermetic local copy.
 //
-//   node harness/run.mjs --out <folder> [--steps <module>] [--viewport desktop|mobile]
-//                        [--timeout <seconds>] [--pg-bin <folder>] [--guard-test=<case>]
+//   node harness/run.mjs --out <folder> [--steps <module>] [--group-mode <mode>]
+//                        [--viewport desktop|mobile] [--timeout <seconds>]
+//                        [--pg-bin <folder>] [--guard-test=<case>]
 //
 // It starts a throwaway PostgreSQL, a fake OpenAI-compatible API, the seed,
 // the server, a client build and a front door, all on 127.0.0.1, all writing
 // under --out; checks the guard in every product process; prints
 // `hermetic-guard: ok port <n>` (the front door's port); provisions a playable
-// template; runs the browser journey; and stops and removes everything.
+// single-player template and a group one; runs the browser journey; and stops
+// and removes everything.
 // harness/README.md has the parameters, the output and the guard.
 
 import { spawnSync } from "node:child_process";
@@ -34,11 +36,13 @@ import {
   platformVariables,
   productEnvironment,
   proxyVariables,
+  siteOriginBundleProblems,
+  siteOriginLiterals,
 } from "./lib/guard.mjs";
 import { installConnectGuard, installListenGuard } from "./lib/net-guard.mjs";
 import { findPgBin, startPostgres } from "./lib/postgres.mjs";
 import { markerLog, startChild } from "./lib/processes.mjs";
-import { provisionTemplate } from "./lib/provision.mjs";
+import { fixtureTemplates, provisionTemplates } from "./lib/provision.mjs";
 
 const HARNESS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.dirname(HARNESS_DIR);
@@ -127,7 +131,16 @@ const gitBefore = gitStatusLines();
 // ---------------------------------------------------------------- finishing, whatever happens
 
 const cleanups = [];
-const summary = { guardLine: null, ports: {}, template: null, screenshots: [], blockedRequests: 0, versions: { node: process.version } };
+const summary = {
+  guardLine: null,
+  ports: {},
+  template: null,
+  groupTemplate: null,
+  screenshots: [],
+  findings: [],
+  blockedRequests: 0,
+  versions: { node: process.version },
+};
 let finishing = false;
 
 function portIsHeld(port) {
@@ -248,6 +261,23 @@ async function main() {
     outDir,
   };
 
+  // The front door, before the client build, which builds its join links on
+  // the front door's host. Until the server listens and the built client has
+  // passed its check, it answers 503
+  let serverPort;
+  const client = { root: undefined };
+  const frontDoorLog = fs.createWriteStream(path.join(layout.logs, "front-door.log"), { flags: "a" });
+  const frontDoor = await startFrontDoor({ upstreamPort: () => serverPort, staticRoot: () => client.root, log: (line) => frontDoorLog.write(`${line}\n`) });
+  allowedPorts.add(frontDoor.port);
+  summary.ports.frontDoor = frontDoor.port;
+  let frontDoorClosed;
+  const closeFrontDoor = () =>
+    (frontDoorClosed ??= (async () => {
+      await frontDoor.close();
+      await new Promise((resolve) => frontDoorLog.end(resolve));
+    })());
+  cleanups.push(closeFrontDoor);
+
   // The client build, alongside the seed and the server
   let build;
   if (!args.guardTest) {
@@ -255,7 +285,19 @@ async function main() {
     const paramsPath = path.join(layout.guard, "client-build.json");
     fs.writeFileSync(
       paramsPath,
-      JSON.stringify({ repoRoot: REPO_ROOT, clientDir: CLIENT_DIR, outDir: layout.clientDist, cacheDir: layout.clientCache, envDir: layout.clientEnv, expectedEnv: env }, null, 2)
+      JSON.stringify(
+        {
+          repoRoot: REPO_ROOT,
+          clientDir: CLIENT_DIR,
+          outDir: layout.clientDist,
+          cacheDir: layout.clientCache,
+          envDir: layout.clientEnv,
+          siteHost: new URL(frontDoor.origin).host,
+          expectedEnv: env,
+        },
+        null,
+        2
+      )
     );
     const markers = markerLog();
     say("building the client");
@@ -361,25 +403,21 @@ async function main() {
     .catch((error) => {
       throw new RunError(EXIT.setup, `${error.message}; see logs/server.log`);
     });
-  const serverPort = listening.listening.port;
+  serverPort = listening.listening.port;
   allowedPorts.add(serverPort);
   summary.ports.server = serverPort;
+  // Closed before the server stops: its kept-alive connections to the server would hold the server's shutdown open
+  cleanups.push(closeFrontDoor);
   say(`server on 127.0.0.1:${serverPort}`);
 
-  // The front door, and the client it serves once the build passed its check
-  const client = { root: undefined };
-  const frontDoorLog = fs.createWriteStream(path.join(layout.logs, "front-door.log"), { flags: "a" });
-  const frontDoor = await startFrontDoor({ upstreamPort: () => serverPort, staticRoot: () => client.root, log: (line) => frontDoorLog.write(`${line}\n`) });
-  allowedPorts.add(frontDoor.port);
-  summary.ports.frontDoor = frontDoor.port;
-  cleanups.push(async () => {
-    await frontDoor.close();
-    await new Promise((resolve) => frontDoorLog.end(resolve));
-  });
-
+  // The client the front door serves, once the build passed its check
   await build;
-  const literals = apiUrlLiterals(fs.readFileSync(path.join(REPO_ROOT, "core", "config.ts"), "utf8"));
-  const bundleProblems = clientBundleProblems(bundleFiles(layout.clientDist), literals);
+  const coreConfig = fs.readFileSync(path.join(REPO_ROOT, "core", "config.ts"), "utf8");
+  const files = bundleFiles(layout.clientDist);
+  const bundleProblems = [
+    ...clientBundleProblems(files, apiUrlLiterals(coreConfig)),
+    ...siteOriginBundleProblems(files, siteOriginLiterals(coreConfig), new URL(frontDoor.origin).host),
+  ];
   if (bundleProblems.length > 0) {
     console.error(`${GUARD_LINE_PREFIX} refused (the client bundle)\n${bundleProblems.map((p) => `  - ${p}`).join("\n")}`);
     throw new RunError(EXIT.refused, "the guard refused the client bundle");
@@ -390,11 +428,16 @@ async function main() {
   console.log(summary.guardLine);
   say(`the local copy is at ${frontDoor.origin}`);
 
-  // A playable template, made through the product's API with the fake model
-  say("drafting and publishing the fixture template");
-  const template = await provisionTemplate(frontDoor.origin, { editor: fixtureVars.editor, template: fixtureVars.template });
+  // Playable templates, made through the product's API with the fake model
+  say("drafting and publishing the fixture templates");
+  const { template, groupTemplate } = await provisionTemplates(frontDoor.origin, {
+    editor: fixtureVars.editor,
+    templates: fixtureTemplates(fixtureVars, { groupMode: args.groupMode }),
+  });
   summary.template = template;
+  summary.groupTemplate = groupTemplate;
   say(`fixture template ${template.id} (${template.title})`);
+  say(`group template ${groupTemplate.id} (${groupTemplate.title}; ${groupTemplate.playerCountMin}-${groupTemplate.playerCountMax} players, ${groupTemplate.gameMode})`);
 
   // The journey
   const journeyLog = fs.createWriteStream(path.join(layout.logs, "journey.log"), { flags: "a" });
@@ -420,6 +463,7 @@ async function main() {
       },
       fixture: {
         template,
+        groupTemplate,
         login: fixtureVars.player,
         placeholderMark: PLACEHOLDER_MARK,
         playwrightVersion: playwright.version,
@@ -431,11 +475,13 @@ async function main() {
         blockedLog.write(`${url}\n`);
       },
       onConsole: (line) => consoleLog.write(`${line}\n`),
+      onFinding: (text) => summary.findings.push(text),
     });
   } catch (error) {
     throw new RunError(EXIT.journey, `the journey failed: ${error.message.split("\n")[0]}; see logs/journey.log and shots/`);
   }
   if (summary.blockedRequests > 0) say(`${summary.blockedRequests} browser request(s) to other hosts were blocked; see logs/blocked-requests.log`);
+  if (summary.findings.length > 0) say(`${summary.findings.length} finding(s) from the journey; see run.json and logs/journey.log`);
   say(`${summary.screenshots.length} screenshot(s) in ${layout.shots}`);
 }
 

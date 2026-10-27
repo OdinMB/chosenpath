@@ -6,12 +6,14 @@ type ViteConfig = Record<string, unknown> & {
   build?: Record<string, unknown>;
 };
 
-export type LocalApiPlugin = {
+export type CoreConfigPlugin = {
   name: string;
   enforce: "pre";
   rewrites: () => number;
   transform(this: { error: (message: string) => never }, code: string, id: string): { code: string; map: null } | null;
 };
+
+export type LocalApiPlugin = CoreConfigPlugin;
 
 export declare function productViteConfig(options: {
   esbuild: { build: (options: Record<string, unknown>) => Promise<{ outputFiles: { text: string }[] }> };
@@ -21,10 +23,12 @@ export declare function productViteConfig(options: {
 
 export declare function localApiPlugin(options: { coreConfigPath: string; literals: string[] }): LocalApiPlugin;
 
+export declare function siteOriginPlugin(options: { coreConfigPath: string; literals: string[]; host: string }): CoreConfigPlugin;
+
 export declare function harnessBuildConfig(
   config: ViteConfig,
   folders: { clientDir: string; outDir: string; cacheDir: string; envDir: string },
-  plugin: unknown
+  plugins: unknown
 ): ViteConfig & {
   configFile: false;
   root: string;

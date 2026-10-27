@@ -1,7 +1,8 @@
 // Fixture content the seed doesn't make, made through the product's own API
-// (through the front door, as the browser calls it): a playable template,
-// drafted by the server from a premise with the fake model and published, so
-// the journey can start a story from the library.
+// (through the front door, as the browser calls it): playable templates,
+// each drafted by the server from a premise with the fake model and
+// published, so a journey can start a story from the library. One is for a
+// single player, one for a group.
 
 import http from "node:http";
 import { CLIENT_API_PREFIX } from "./guard.mjs";
@@ -65,16 +66,25 @@ function expectOk(response, what) {
 }
 
 /**
- * Signs in as the fixture editor, drafts a template from the fixture premise
- * (POST /templates/generate, which runs the content filter and the setup call
- * against the fake model) and publishes it. Returns its id and title.
+ * The templates a run makes, by the name a journey reads them under
+ * (fixture.template, fixture.groupTemplate): fixture-vars.json's, the group
+ * one in the game mode --group-mode names, if it names one.
  */
-export async function provisionTemplate(origin, { editor, template }) {
-  const api = apiSession(origin);
-  // Any GET past the server's CSRF middleware sets the token cookie
-  await api.request("GET", "/templates/published");
-  if (!api.hasCookie(CSRF_COOKIE)) throw new Error("the server set no CSRF cookie");
-  expectOk(await api.request("POST", "/auth/login", { email: editor.email, password: editor.password }), "signing in as the fixture editor (fixture-vars.json's editor; the seed's accounts are in server/src/scripts/devSeedData.ts)");
+export function fixtureTemplates(fixtureVars, { groupMode } = {}) {
+  return {
+    template: fixtureVars.template,
+    groupTemplate: { ...fixtureVars.groupTemplate, ...(groupMode ? { gameMode: groupMode } : {}) },
+  };
+}
+
+/**
+ * Drafts one template from its premise (POST /templates/generate, which runs
+ * the content filter and the setup call against the fake model) for
+ * `playerCount` seats, and publishes it. A template with a smaller
+ * `playerCountMin` is published for that range: drafted for three seats, it
+ * starts stories of two or three.
+ */
+async function draftAndPublish(api, name, template) {
   const generated = expectOk(
     await api.request("POST", "/templates/generate", {
       prompt: template.premise,
@@ -83,9 +93,26 @@ export async function provisionTemplate(origin, { editor, template }) {
       gameMode: template.gameMode,
       generateImages: false,
     }),
-    "drafting the fixture template"
+    `drafting the fixture ${name}`
   );
   const { id, title } = generated.template;
-  expectOk(await api.request("PUT", `/templates/${id}`, { template: { publicationStatus: "published" } }), "publishing the fixture template");
-  return { id, title };
+  const playerCountMin = template.playerCountMin ?? template.playerCount;
+  const range = playerCountMin === template.playerCount ? {} : { playerCountMin, playerCountMax: template.playerCount };
+  expectOk(await api.request("PUT", `/templates/${id}`, { template: { publicationStatus: "published", ...range } }), `publishing the fixture ${name}`);
+  return { id, title, playerCountMin, playerCountMax: template.playerCount, gameMode: template.gameMode };
+}
+
+/**
+ * Signs in once as the fixture editor and makes each template, in order.
+ * Returns each one's id, title, player range and game mode under its name.
+ */
+export async function provisionTemplates(origin, { editor, templates }) {
+  const api = apiSession(origin);
+  // Any GET past the server's CSRF middleware sets the token cookie
+  await api.request("GET", "/templates/published");
+  if (!api.hasCookie(CSRF_COOKIE)) throw new Error("the server set no CSRF cookie");
+  expectOk(await api.request("POST", "/auth/login", { email: editor.email, password: editor.password }), "signing in as the fixture editor (fixture-vars.json's editor; the seed's accounts are in server/src/scripts/devSeedData.ts)");
+  const made = {};
+  for (const [name, template] of Object.entries(templates)) made[name] = await draftAndPublish(api, name, template);
+  return made;
 }
