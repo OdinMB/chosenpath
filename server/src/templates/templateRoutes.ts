@@ -254,10 +254,14 @@ router.get("/templates", verifyUser(), async (req, res) => {
   }
 });
 
-// Get template metadata by ID (public for published/private templates, authenticated for others)
-router.get("/templates/:id", async (req, res) => {
+// Get template metadata by ID. Published and private templates answer everyone
+// alike; a draft or review template opens only for its owner and for users with
+// templates_see_all (admins). Everyone else, signed in or not, gets the one
+// refusal an anonymous visitor gets, so it tells a signed-in visitor no more.
+router.get("/templates/:id", verifyUser({ required: false }), async (req, res) => {
   const { id } = req.params;
   const requestId = req.query.requestId as string;
+  const refuse = () => sendError(res, "Authentication required", 401, requestId);
 
   try {
     // Get template metadata from database
@@ -279,9 +283,9 @@ router.get("/templates/:id", async (req, res) => {
       );
       sendSuccess(res, { template }, requestId);
     } else {
-      // Require authentication and access check for draft/review templates
+      // Draft/review templates: only the owner or templates_see_all
       if (!req.user) {
-        return sendError(res, "Authentication required", 401, requestId);
+        return refuse();
       }
 
       // Use existing access check logic
@@ -295,13 +299,15 @@ router.get("/templates/:id", async (req, res) => {
         );
 
         if (!hasAccess) {
-          return sendError(res, "Insufficient permissions", 403, requestId);
+          return refuse();
         }
 
         const template = convertDbEntryToMetadata(templateEntry, true); // include creator info for authenticated users
         Logger.Route.log(
           `User ${req.user.id} accessed template metadata ${id}`
         );
+        // The answer depends on who is signed in, so no shared cache may keep it
+        res.set("Cache-Control", "private, no-store");
         sendSuccess(res, { template }, requestId);
       } catch (error) {
         if ((error as Error).message === "Template not found") {

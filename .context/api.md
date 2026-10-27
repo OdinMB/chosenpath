@@ -772,7 +772,9 @@ Get all template metadata (admin endpoint).
 
 **GET** `/templates/:id`
 
-Get template metadata by ID. Public for published/private templates, requires auth for draft/review.
+**Auth Required**: No (optional; a draft or review template needs its creator or an admin)
+
+Get template metadata by ID, for the World page (`/templates/:id/configure`). Published and private templates answer everyone alike, without creator info. A draft or review template opens only for its creator and for users with `templates_see_all` (admins): the answer then includes `creatorId` and `creatorUsername` and is sent with `Cache-Control: private, no-store`. Everyone else gets the same `401`, signed in or not; a bad or expired sign-in counts as none.
 
 **Path Params:**
 
@@ -796,8 +798,7 @@ Get template metadata by ID. Public for published/private templates, requires au
 
 **Error Cases:**
 
-- `401`: Authentication required (for draft/review templates)
-- `403`: Insufficient permissions
+- `401`: Authentication required (a draft or review template, for anyone but its creator or an admin)
 - `404`: Template not found
 
 ---
