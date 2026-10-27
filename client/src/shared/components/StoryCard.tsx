@@ -1,4 +1,5 @@
 import { formatRelativeTime } from "../utils/timeUtils";
+import { storyLastPlayed } from "../utils/storyLastPlayed";
 import { CoverCard } from "./CoverCard";
 import { PrimaryButton, InfoIcon, ConfirmDialog, Icons, Tooltip } from "./ui";
 import { ExtendedStoryMetadata, StoryPlayerEntry } from "core/types/api";
@@ -62,15 +63,22 @@ export const StoryCard = ({
 
   const userPlayer = players.find((p: StoryPlayerEntry) => p.isCurrentUser);
 
-  const lastPlayedTime = userPlayer?.lastPlayedAt
-    ? formatRelativeTime(userPlayer.lastPlayedAt)
-    : "Never played";
+  // Any seat's play counts, so a story others played never reads "Never played"
+  const lastPlayed = storyLastPlayed(story);
+  const lastPlayedTime =
+    lastPlayed.kind === "played" ? formatRelativeTime(lastPlayed.at) : null;
+  const playedLine = lastPlayedTime
+    ? `Played ${lastPlayedTime}`
+    : lastPlayed.kind === "never"
+      ? "Never played"
+      : null;
   const createdTime = formatRelativeTime(story.createdAt);
 
   const infoTooltip = (
     <div className="space-y-1 p-1">
       <p>Created: {createdTime}</p>
-      <p>Last played: {lastPlayedTime}</p>
+      {lastPlayedTime && <p>Last played: {lastPlayedTime}</p>}
+      {lastPlayed.kind === "never" && <p>Never played</p>}
     </div>
   );
 
@@ -205,7 +213,7 @@ export const StoryCard = ({
           {/* Mobile: Show last played as text and actions */}
           <div className="flex items-center justify-between sm:hidden">
             <span className={`${sizeClasses.info} text-primary-400`}>
-              {lastPlayedTime === "Never played" ? "Never played" : `Played ${lastPlayedTime}`}
+              {playedLine}
             </span>
             {(onDelete ||
               (onArchive && user && !showArchivedContent) ||
