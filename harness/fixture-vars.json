@@ -1,0 +1,26 @@
+{
+  "_about": "Invented values for the harness's throwaway local copy. None is a credential of any real service, and nothing here reaches anything outside the run. The accounts are the dev seed's synthetic ones, with its documented local password (server/src/scripts/devSeedData.ts, DEV_SEED_PASSWORD); a test keeps them in step.",
+  "server": {
+    "NODE_ENV": "development",
+    "DB_USER": "harness",
+    "DB_PASSWORD": "harness-fixture-db-password",
+    "DB_DATABASE": "harness_dev",
+    "JWT_SECRET": "harness-fixture-jwt-signing-value-for-the-local-copy-only",
+    "OPENAI_API_KEY": "harness-fixture-openai-key",
+    "TRUST_PROXY": "0"
+  },
+  "player": {
+    "email": "dev-player@example.com",
+    "password": "asdF!234"
+  },
+  "editor": {
+    "email": "dev-admin@example.com",
+    "password": "asdF!234"
+  },
+  "template": {
+    "premise": "A harbour town where the lighthouse lamps go out one by one, and someone keeps relighting them",
+    "playerCount": 1,
+    "maxTurns": 5,
+    "gameMode": "single-player"
+  }
+}
