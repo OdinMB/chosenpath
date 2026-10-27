@@ -1,6 +1,7 @@
 import { createContext } from "react";
 import type { ClientStoryState, RateLimitInfo } from "core/types";
 import type { TryAgainRequest, TurnFailure } from "./turnFailure";
+import type { ChoiceLimit } from "./choiceLimit";
 
 // Define the GameSessionContext type
 export interface GameSessionContextType {
@@ -31,6 +32,10 @@ export interface GameSessionContextType {
    * again beside it (it comes back if that send is rate limited)
    */
   clearTurnFailure: () => void;
+  /** The player's choice the server refused for choosing too fast, told below the choices (ChoiceLimitNotice) */
+  choiceLimit: ChoiceLimit | null;
+  /** The player sends a choice again: the notice goes (it comes back if that one is refused too) */
+  clearChoiceLimit: () => void;
 }
 
 // Create the context

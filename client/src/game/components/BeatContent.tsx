@@ -18,6 +18,8 @@ interface BeatContentProps {
   localSelectedChoice: number | undefined;
   isRequestPending: (action: string) => boolean;
   onChoiceSelected: (index: number) => void;
+  /** Shown above the latest beat's choices while they wait for the player's, one on its way included (ChoiceLimitNotice) */
+  choiceNotice?: React.ReactNode;
 }
 
 /**
@@ -33,6 +35,7 @@ export const BeatContent: React.FC<BeatContentProps> = ({
   localSelectedChoice,
   isRequestPending,
   onChoiceSelected,
+  choiceNotice,
 }) => {
   // Check if feedback should be shown for the current beat
   const shouldShowFeedback = () => {
@@ -262,6 +265,12 @@ export const BeatContent: React.FC<BeatContentProps> = ({
           currentBeat,
           currentBeat.choice !== -1 ? currentBeat.choice : localSelectedChoice!
         )}
+
+      {/* Above the latest beat's choices, also while the player's is on its way and they are hidden */}
+      {isViewingLatestBeat &&
+        currentBeat.choice === -1 &&
+        !storyState.gameOver &&
+        choiceNotice}
 
       {/* For the latest beat with no choice, render options as buttons */}
       {isViewingLatestBeat &&

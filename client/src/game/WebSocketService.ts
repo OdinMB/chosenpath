@@ -5,7 +5,6 @@ import {
   StateUpdateNotification,
   StoryCodesNotification,
   GameErrorNotification,
-  RateLimitInfo,
   StoryReadyNotification,
   WSSuccessResponse,
   WSErrorResponse,
@@ -31,14 +30,6 @@ type ServerResponse =
   | WSRateLimitedResponse;
 
 // Helper functions to create properly typed WSServerMessage objects
-function createRateLimitedMessage(rateLimit: RateLimitInfo): WSServerMessage {
-  // This is for the custom format expected by SessionProvider
-  return {
-    type: "rate_limited",
-    rateLimit,
-  } as unknown as WSServerMessage;
-}
-
 function createErrorMessage(
   errorMessage: string,
   operationType?: string
@@ -385,9 +376,10 @@ export class WebSocketService {
           "[WebSocketService] Rate limited:",
           data.rateLimit
         );
+        // As the server sent it: its type names the request it refused
         const handler = this.messageHandlers.get("rate_limited");
         if (handler) {
-          handler(createRateLimitedMessage(data.rateLimit));
+          handler(data);
         }
         return;
       }

@@ -9,14 +9,21 @@ import { LoadingSpinner } from "components/ui";
 import { AiNotice } from "shared/components/AiNotice";
 import { useBeatAiNotice } from "../hooks/useBeatAiNotice";
 import { TurnFailedNotice } from "./TurnFailedNotice";
+import { ChoiceLimitNotice } from "./ChoiceLimitNotice";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
 }
 
 export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
-  const { storyState, isRequestPending, turnFailure, tryAgain } =
-    useGameSession();
+  const {
+    storyState,
+    isRequestPending,
+    turnFailure,
+    tryAgain,
+    choiceLimit,
+    clearChoiceLimit,
+  } = useGameSession();
   const contentRef = React.useRef<HTMLDivElement>(null);
 
   // Use our custom hook for beat state management
@@ -41,14 +48,16 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     displayedBeatIndex
   );
 
-  // Forward choice selections to the parent component
+  // Forward choice selections to the parent component; a refused choice's notice goes as the new one is sent
   const handleChoiceClick = (index: number) => {
+    clearChoiceLimit();
     handleChoiceSelected(index);
     onChoiceSelected(index);
   };
 
   // "Try again" that sends the player's choice again: the options close on it, as after a click
   const handleTryAgain = () => {
+    clearChoiceLimit();
     const sent = tryAgain();
     if (sent?.type === "make_choice") {
       showChoiceSent(sent.optionIndex);
@@ -173,6 +182,8 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               localSelectedChoice={localSelectedChoice}
               isRequestPending={isRequestPending}
               onChoiceSelected={handleChoiceClick}
+              // A choice refused for choosing too fast, above the choices: a live region kept while they are open, so the refusal is announced
+              choiceNotice={<ChoiceLimitNotice limit={choiceLimit} />}
             />
           )}
           {/* Where the story waits (the next beat, or a choice that failed on the latest), never below an earlier beat */}
