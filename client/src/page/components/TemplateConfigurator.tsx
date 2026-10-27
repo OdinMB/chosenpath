@@ -81,6 +81,11 @@ export function TemplateConfigurator() {
     }
   }, [template]);
 
+  // Signing in again answers the lapsed sign-in notice
+  useEffect(() => {
+    setSignInLapsed(false);
+  }, [user]);
+
   // Check for template validity - fail fast if data is missing or invalid
   if (
     !template ||
