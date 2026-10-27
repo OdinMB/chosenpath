@@ -143,6 +143,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
             size="sm"
             onClick={handleAddElement}
             leftIcon={<Icons.Plus className="h-4 w-4" />}
+            aria-label="Add story element"
           />
         )}
       </div>

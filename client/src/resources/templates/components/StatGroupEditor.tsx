@@ -88,6 +88,7 @@ export const StatGroupEditor: React.FC<StatGroupEditorProps> = ({
             size="sm"
             onClick={handleAddGroup}
             leftIcon={<Icons.Plus className="h-4 w-4" />}
+            aria-label="Add stat group"
           ></PrimaryButton>
         )}
       </div>

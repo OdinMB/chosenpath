@@ -78,6 +78,66 @@ export function openingTag(
   return pattern.exec(html)?.[0] ?? "";
 }
 
+export type RoleQuery = "button" | "link" | "img";
+
+export type RenderedRole = {
+  /** Its accessible name: its aria-label, else the text inside it, else its title. */
+  name: string;
+  /** Its title: what a mouse pointer shows on hovering it. */
+  title: string | undefined;
+};
+
+const IMPLICIT_ROLES: Record<string, RoleQuery> = { button: "button", a: "link" };
+const VOID_TAGS = new Set(["img", "input", "br", "hr", "meta", "link", "source"]);
+
+/** The markup inside the element whose opening tag ends at `from`. */
+function innerMarkup(html: string, tag: string, from: number): string {
+  if (VOID_TAGS.has(tag)) return "";
+  const tags = new RegExp(`<(/?)${tag}(?=[\\s>/])[^>]*>`, "g");
+  tags.lastIndex = from;
+  let depth = 1;
+  for (let match = tags.exec(html); match; match = tags.exec(html)) {
+    depth += match[1] ? -1 : 1;
+    if (depth === 0) return html.slice(from, match.index);
+  }
+  return html.slice(from);
+}
+
+/**
+ * Every element a screen reader announces with `role`, in document order, as
+ * Testing Library's getAllByRole would find them: a <button>, an <a href>, or
+ * any element whose role attribute says so.
+ */
+export function allByRole(html: string, role: RoleQuery): RenderedRole[] {
+  const found: RenderedRole[] = [];
+  for (const match of html.matchAll(/<(\w+)(\s[^>]*)?>/g)) {
+    const [opening, tag = "", attributes = ""] = match;
+    const explicit = attribute(attributes, "role");
+    const implicit =
+      IMPLICIT_ROLES[tag] === "link" && attribute(attributes, "href") === undefined
+        ? undefined
+        : IMPLICIT_ROLES[tag];
+    if ((explicit ?? implicit) !== role) continue;
+    const inner = innerMarkup(html, tag, (match.index ?? 0) + opening.length);
+    const title = attribute(attributes, "title");
+    found.push({
+      name: attribute(attributes, "aria-label") ?? (accessibleText(inner) || title || ""),
+      title,
+    });
+  }
+  return found;
+}
+
+/** The accessible names of every element with `role`, in document order. */
+export function namesByRole(html: string, role: RoleQuery): string[] {
+  return allByRole(html, role).map((element) => element.name);
+}
+
+/** The element with `role` and accessible name `name`, as getByRole(role, { name }) finds it, or undefined. */
+export function byRole(html: string, role: RoleQuery, name: string): RenderedRole | undefined {
+  return allByRole(html, role).find((element) => element.name === name);
+}
+
 export type RenderedNote = {
   /** The note's accessible name (aria-label). */
   name: string | undefined;

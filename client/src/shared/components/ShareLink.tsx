@@ -9,6 +9,9 @@ interface ShareLinkProps {
   buttonVariant?: "icon" | "primary-outline";
 }
 
+/** The button's name for screen readers; the editor's icon also shows it on hover. */
+const SHARE_LABEL = "Share this World";
+
 export const ShareLink: React.FC<ShareLinkProps> = ({
   templateId,
   className = "",
@@ -32,8 +35,8 @@ export const ShareLink: React.FC<ShareLinkProps> = ({
         <button
           onClick={handleOpenModal}
           className={`text-secondary hover:text-secondary-700 transition-colors ${className}`}
-          aria-label="Share this template"
-          title="Share this World"
+          aria-label={SHARE_LABEL}
+          title={SHARE_LABEL}
           type="button"
         >
           <Icons.Share className="h-5 w-5" />
@@ -48,6 +51,7 @@ export const ShareLink: React.FC<ShareLinkProps> = ({
             leftIcon={<Icons.Share className="h-4 w-4" />}
             className={`h-full ${className}`}
             type="button"
+            aria-label={SHARE_LABEL}
             size="lg"
           >
             {showText ? "Share" : ""}

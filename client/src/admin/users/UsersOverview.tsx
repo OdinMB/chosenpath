@@ -115,6 +115,7 @@ export const UsersOverview = () => {
           variant="outline"
           leftBorder={false}
           leftIcon={<Icons.Refresh className="h-4 w-4" />}
+          aria-label="Refresh users"
         />
       </div>
 

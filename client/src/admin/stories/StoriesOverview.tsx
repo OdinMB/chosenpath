@@ -215,6 +215,7 @@ export const StoriesOverview = () => {
           variant="outline"
           leftBorder={false}
           leftIcon={<Icons.Refresh className="h-4 w-4" />}
+          aria-label="Refresh stories"
         />
       </div>
 

@@ -103,6 +103,7 @@ export function StatListSection({
             onClick={() => onAddStat(type)}
             disabled={statGroups.length === 0}
             leftIcon={<Icons.Plus className="h-4 w-4" />}
+            aria-label={`Add ${type} stat`}
           ></PrimaryButton>
         )}
       </div>

@@ -93,6 +93,7 @@ export const OutcomePlayerSection: React.FC<PlayerOutcomesAllProps> = ({
                     size="sm"
                     onClick={() => handleAddPlayerOutcome(slot)}
                     leftIcon={<Icons.Plus className="h-4 w-4" />}
+                    aria-label={`Add outcome for Player ${i + 1}`}
                   />
                   {hasCopySources && (
                     <Select
@@ -209,6 +210,7 @@ export const OutcomePlayer: React.FC<PlayerOutcomesForPlayerProps> = ({
               leftBorder={false}
               size="sm"
               leftIcon={<Icons.Plus className="h-4 w-4" />}
+              aria-label={`Add outcome for Player ${playerSlot.replace("player", "")}`}
             />
             {Object.entries(playerOptions).some(
               ([otherSlot, otherOptions]) =>

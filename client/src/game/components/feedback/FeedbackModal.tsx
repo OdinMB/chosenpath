@@ -185,6 +185,7 @@ export function FeedbackModal({
                       : "bg-white border-gray-200 text-gray-400 hover:border-green-400 hover:text-green-600 hover:shadow"
                   }`}
                 onClick={() => setRating("positive")}
+                aria-label="Positive feedback"
               >
                 <Icons.ThumbsUp />
               </button>
@@ -197,6 +198,7 @@ export function FeedbackModal({
                       : "bg-white border-gray-200 text-gray-400 hover:border-red-400 hover:text-red-600 hover:shadow"
                   }`}
                 onClick={() => setRating("negative")}
+                aria-label="Negative feedback"
               >
                 <Icons.ThumbsDown />
               </button>

@@ -294,6 +294,7 @@ export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
             <span className="-mt-1">Instructions</span>
           </div>
         }
+        label="Switch and Thread Instructions"
         items={switchAndThreadInstructions}
         onChange={setSwitchAndThreadInstructions}
         placeholder="Add a switch/thread instruction"

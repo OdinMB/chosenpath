@@ -128,6 +128,7 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
             size="sm"
             onClick={handleAddOutcome}
             leftIcon={<Icons.Plus className="h-4 w-4" />}
+            aria-label="Add shared outcome"
           />
         )}
       </div>

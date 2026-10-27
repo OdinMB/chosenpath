@@ -1,9 +1,9 @@
-import { useAuth } from "client/shared/auth/useAuth.js";
+import { useAuth } from "shared/auth/useAuth";
 import { useUserAccountModal } from "../hooks/useUserAccountModal.js";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Icons } from "../../shared/components/ui/Icons";
 import { useMemo } from "react";
-import { useSession } from "client/shared/session/useSession.js";
+import { useSession } from "shared/session/useSession";
 import { ExtendedStoryMetadata } from "core/types/api";
 
 export function UserAccountHeader() {
@@ -41,6 +41,22 @@ export function UserAccountHeader() {
 
     return counts;
   }, [storyFeed, user, isAuthenticated]);
+
+  // What each story counter says on hover, and to a screen reader as its name
+  const singlePlayerLabel = `${
+    derivedCounts.singlePlayerActiveCount
+  } single-player ${
+    derivedCounts.singlePlayerActiveCount === 1 ? "story" : "stories"
+  }`;
+  const multiPlayerLabel = `${
+    derivedCounts.multiPlayerActiveCount
+  } multi-player ${
+    derivedCounts.multiPlayerActiveCount === 1 ? "story" : "stories"
+  }${
+    derivedCounts.multiPlayerPendingCount > 0
+      ? `, ${derivedCounts.multiPlayerPendingCount} pending your action`
+      : ""
+  }`;
 
   const handleLogout = async () => {
     await logout();
@@ -102,19 +118,15 @@ export function UserAccountHeader() {
               >
                 Account
               </a>
-              {/* Story Counts Display */}
+              {/* Story Counts Display: each counter is one image to a screen reader */}
               {!isSessionLoading && derivedCounts && (
                 <div className="flex items-center text-slate-700">
                   {/* Single-player stories */}
                   <div
+                    role="img"
+                    aria-label={singlePlayerLabel}
                     className="flex items-center -ml-1 mr-2 border border-slate-300 rounded-md px-1"
-                    title={`${
-                      derivedCounts.singlePlayerActiveCount
-                    } single-player ${
-                      derivedCounts.singlePlayerActiveCount === 1
-                        ? "story"
-                        : "stories"
-                    }`}
+                    title={singlePlayerLabel}
                   >
                     <Icons.User className="h-4 w-4 mr-0.5 p-[1px]" />
                     <span>{derivedCounts.singlePlayerActiveCount}</span>
@@ -122,18 +134,10 @@ export function UserAccountHeader() {
 
                   {/* Multi-player stories */}
                   <div
+                    role="img"
+                    aria-label={multiPlayerLabel}
                     className="flex items-center border border-slate-300 rounded-md px-1 -ml-1"
-                    title={`${
-                      derivedCounts.multiPlayerActiveCount
-                    } multi-player ${
-                      derivedCounts.multiPlayerActiveCount === 1
-                        ? "story"
-                        : "stories"
-                    }${
-                      derivedCounts.multiPlayerPendingCount > 0
-                        ? `, ${derivedCounts.multiPlayerPendingCount} pending your action`
-                        : ""
-                    }`}
+                    title={multiPlayerLabel}
                   >
                     <Icons.Users className="h-4 w-4" />
                     {derivedCounts.multiPlayerPendingCount > 0 && (

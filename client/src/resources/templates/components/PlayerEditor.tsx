@@ -130,6 +130,8 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
   imageInstructions,
   canGenerateImages = true,
 }) => {
+  const playerName = `Player ${playerSlot.replace("player", "")}`;
+
   // Render form for the ExpandableItem component
   const renderPlayerForm = (
     data: PlayerOptionsGeneration,
@@ -137,10 +139,7 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
   ) => {
     return (
       <div className="flex-1 space-y-8 mr-4">
-        <h2 className="text-xl font-semibold">{`Player ${playerSlot.replace(
-          "player",
-          ""
-        )}`}</h2>
+        <h2 className="text-xl font-semibold">{playerName}</h2>
         {/* Character Identities */}
         <div className="space-y-4">
           <div className="flex justify-between items-center">
@@ -187,6 +186,7 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
                 size="sm"
                 onClick={() => handleAddIdentity(playerSlot)}
                 leftIcon={<Icons.Plus className="h-4 w-4" />}
+                aria-label={`Add identity for ${playerName}`}
               ></PrimaryButton>
             )}
           </div>
@@ -273,6 +273,7 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
                 size="sm"
                 onClick={() => handleAddBackground(playerSlot)}
                 leftIcon={<Icons.Plus className="h-4 w-4" />}
+                aria-label={`Add background for ${playerName}`}
               ></PrimaryButton>
             )}
           </div>
@@ -317,7 +318,7 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
   return (
     <ExpandableItem
       id={playerSlot}
-      title={`Player ${playerSlot.replace("player", "")}`}
+      title={playerName}
       data={options}
       editingSet={editingPlayers}
       setEditing={setEditingPlayers}

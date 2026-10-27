@@ -140,6 +140,11 @@ import { Icons } from 'components/ui'
 // 1. Add to /client/src/shared/components/ui/Icons.tsx
 // 2. Export from Icons object
 // 3. Use consistent naming: PascalCase
+
+// An icon names nothing: a button or link that shows only an icon needs an
+// aria-label saying what it does, and for what where there are several alike
+// ("Add outcome for Player 2"). Text on the button names it itself.
+<PrimaryButton leftIcon={<Icons.Plus className="h-4 w-4" />} aria-label="Add story element" />
 ```
 
 ### Loading States
