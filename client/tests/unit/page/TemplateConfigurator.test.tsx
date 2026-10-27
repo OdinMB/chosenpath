@@ -65,6 +65,14 @@ let mockUser: { id: string } | null = null;
 jest.mock("../../../src/shared/auth/useAuth", () => ({
   useAuth: () => ({ user: mockUser }),
 }));
+// Whether the form asks for the account's starts left
+const mockUseStartsLeft = jest.fn((enabled: boolean) => {
+  void enabled;
+  return { startsLeft: null, refresh: jest.fn() };
+});
+jest.mock("../../../src/page/hooks/useStartsLeft", () => ({
+  useStartsLeft: (enabled: boolean) => mockUseStartsLeft(enabled),
+}));
 
 describe("TemplateConfigurator AI notice", () => {
   it("says next to the Start Story button that an AI system writes the story from this template", () => {
@@ -213,5 +221,18 @@ describe("TemplateConfigurator several stories at once", () => {
     mockUser = { id: "user-1" };
 
     expect(accessibleText(renderMarkup(<TemplateConfigurator />))).not.toMatch(AUDIENCE_WORDS);
+  });
+
+  it("asks for the starts left only once several stories are to start", () => {
+    mockUseStartsLeft.mockClear();
+    mockUser = { id: "user-1" };
+    const signedIn = renderMarkup(<TemplateConfigurator />);
+    mockUser = null;
+    renderMarkup(<TemplateConfigurator />);
+
+    expect(mockUseStartsLeft.mock.calls.map(([enabled]) => enabled)).toEqual([false, false]);
+    // Nothing next to Start for a single story
+    expect(signedIn).not.toContain('id="several-stories-start-note"');
+    expect(openingTag(signedIn, "button", "type", "submit")).not.toContain("aria-describedby");
   });
 });

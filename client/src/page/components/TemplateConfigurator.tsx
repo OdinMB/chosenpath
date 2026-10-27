@@ -11,16 +11,22 @@ import { PlayerCodes } from "./PlayerCodes";
 import { StorySetupFailed } from "./StorySetupFailed";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import {
-  clampStoryCount,
   STORY_COUNT_MIN,
+  startSeveralLabel,
+  storiesToStart,
   useMultiStoryCreation,
 } from "page/hooks/useMultiStoryCreation";
+import { useStartsLeft } from "page/hooks/useStartsLeft";
 import { notificationService } from "shared/notifications/notificationService";
 import { useAuth } from "client/shared/auth/useAuth";
 import { useUserAccountModal } from "users/hooks/useUserAccountModal";
 import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
 import { DifficultySlider } from "./DifficultySlider";
-import { MultiStoryStartField } from "./MultiStoryStartField";
+import {
+  MultiStoryStartField,
+  MultiStoryStartNote,
+  START_NOTE_ID,
+} from "./MultiStoryStartField";
 
 type ConfigurableTemplate = TemplateMetadata;
 
@@ -47,6 +53,11 @@ export function TemplateConfigurator() {
   // the form, and says why until the next start
   const { openLoginModal, AccountModal } = useUserAccountModal();
   const [signInLapsed, setSignInLapsed] = useState(false);
+  // The account's starts left, read once several stories are to start, and
+  // again for a new sign-in
+  const { startsLeft, refresh: refreshStartsLeft } = useStartsLeft(startsSeveral, user);
+  const noStartsLeft =
+    startsSeveral && storiesToStart(storyCount, startsLeft?.remaining) === 0;
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
     useState<DifficultyLevel>(() => {
       return getDefaultDifficultyLevel();
@@ -137,10 +148,18 @@ export function TemplateConfigurator() {
 
     if (startsSeveral) {
       setSignInLapsed(false);
-      const outcome = await multiStart.startStories(settings, storyCount);
+      const outcome = await multiStart.startStories(
+        settings,
+        storyCount,
+        startsLeft?.remaining
+      );
       if (outcome === "signed-out") {
+        // The starts left are read again once signed in (useStartsLeft)
         setSignInLapsed(true);
         openLoginModal();
+      } else if (outcome === "not-started") {
+        // Still on the form: the starts left may have changed elsewhere
+        refreshStartsLeft();
       }
       return;
     }
@@ -393,6 +412,7 @@ export function TemplateConfigurator() {
               onEnabledChange={setStartSeveral}
               onCountChange={setStoryCount}
               disabled={isLoading || multiStart.isStarting}
+              startsLeft={startsLeft}
             />
           )}
 
@@ -433,16 +453,26 @@ export function TemplateConfigurator() {
             <PrimaryButton
               type="submit"
               size="lg"
-              disabled={isLoading || multiStart.isStarting}
+              disabled={isLoading || multiStart.isStarting || noStartsLeft}
               isLoading={isLoading || multiStart.isStarting}
               fullWidth
               className="font-semibold text-lg"
+              aria-describedby={startsSeveral ? START_NOTE_ID : undefined}
             >
               {startsSeveral
-                ? `Start ${clampStoryCount(storyCount)} stories`
+                ? startSeveralLabel(storyCount, startsLeft?.remaining)
                 : "Start Story"}
             </PrimaryButton>
           </div>
+
+          {startsSeveral && (
+            // Close under the buttons, not the form's usual gap away
+            <MultiStoryStartNote
+              count={storyCount}
+              startsLeft={startsLeft}
+              className="!mt-3"
+            />
+          )}
         </form>
         {/* Outside the form: events bubble through the modal's portal, so a sign-in inside it would submit this form too */}
         <AccountModal />

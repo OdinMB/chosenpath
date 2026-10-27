@@ -11,6 +11,7 @@ import {
   addressKey,
   claimRateLimit,
   limitFailures,
+  peekRateLimit,
   type RateLimitClaim,
 } from "shared/rateLimiter.js";
 import { storyStartLimit } from "shared/limitPolicy.js";
@@ -21,10 +22,11 @@ import {
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
   SPEND_CEILING_MESSAGE,
+  StartsLeftInfo,
   UpdateStoryStatusRequest,
 } from "core/types/api.js";
 import { PlayerCount, isStoryCategory, kidAgesFrom } from "core/types/index.js";
-import { DEFAULT_SELECTED_DIFFICULTY_MODIFIER } from "core/config.js";
+import { DEFAULT_SELECTED_DIFFICULTY_MODIFIER, RATE_LIMITS } from "core/config.js";
 import { verifyUser } from "../users/authMiddleware.js";
 import { v4 as uuidv4 } from "uuid";
 import { storyDbService } from "./StoryDbService.js";
@@ -180,6 +182,35 @@ router.post(
       Logger.Route.error("Failed to create story from template", error);
       sendError(res, "Failed to create story", 500, requestId, error);
     }
+  }
+);
+
+// The signed-in account's own story starts without images, as "Start several
+// stories at once" makes them: how many are left and when the allowance
+// renews. It reads the count the start route claims from (limitPolicy.ts)
+// without claiming one or starting a window.
+router.get(
+  "/stories/starts-left",
+  verifyUser({ required: true }),
+  (req: Request, res: Response) => {
+    const requestId = (req.query.requestId as string) || uuidv4();
+    if (!req.user) {
+      sendError(res, "Authentication required", 401, requestId);
+      return;
+    }
+    const limit = storyStartLimit(req.user.id, false, requestAddress(req));
+    const { requestsRemaining, timeRemaining } = peekRateLimit(limit.key, limit.action);
+    const { maxRequests, windowMs } = RATE_LIMITS[limit.action];
+    sendSuccess<StartsLeftInfo>(
+      res,
+      {
+        remaining: requestsRemaining,
+        limit: maxRequests,
+        windowMs,
+        resetsInMs: timeRemaining > 0 ? timeRemaining : null,
+      },
+      requestId
+    );
   }
 );
 

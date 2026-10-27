@@ -7,6 +7,7 @@ import {
   claimRateLimit,
   incrementRateLimit,
   limitFailures,
+  peekRateLimit,
   seatKey,
 } from "../../../src/shared/rateLimiter.js";
 
@@ -203,6 +204,89 @@ describe("claimRateLimit", () => {
 
     expect(checkRateLimit(key, "verify_code").requestsRemaining).toBe(
       RATE_LIMITS.verify_code.maxRequests - 1
+    );
+  });
+});
+
+describe("peekRateLimit", () => {
+  it("reads a key's running count however often, without counting a request", () => {
+    const key = accountKey(fresh("teacher"));
+    const { maxRequests } = RATE_LIMITS.initialize_story_text;
+    for (let i = 0; i < 3; i++) incrementRateLimit(key, "initialize_story_text");
+
+    for (let i = 0; i < maxRequests * 2; i++) {
+      expect(peekRateLimit(key, "initialize_story_text")).toMatchObject({
+        isLimited: false,
+        requestsRemaining: maxRequests - 3,
+        maxRequests,
+      });
+    }
+
+    const claims = Array.from({ length: maxRequests }, () =>
+      claimRateLimit(key, "initialize_story_text")
+    );
+    expect(claims.filter((claim) => claim.claimed)).toHaveLength(maxRequests - 3);
+  });
+
+  it("says how long the running window has left", () => {
+    jest.useFakeTimers();
+    const key = accountKey(fresh("teacher"));
+    const { windowMs } = RATE_LIMITS.initialize_story_text;
+    incrementRateLimit(key, "initialize_story_text");
+
+    jest.advanceTimersByTime(20 * 60 * 1000);
+
+    expect(peekRateLimit(key, "initialize_story_text").timeRemaining).toBe(
+      windowMs - 20 * 60 * 1000
+    );
+  });
+
+  it("starts no window: a key read before its first request still gets a whole window from that request", () => {
+    jest.useFakeTimers();
+    const key = accountKey(fresh("teacher"));
+    const { maxRequests, windowMs } = RATE_LIMITS.initialize_story_text;
+
+    expect(peekRateLimit(key, "initialize_story_text")).toEqual({
+      isLimited: false,
+      timeRemaining: 0,
+      requestsRemaining: maxRequests,
+      maxRequests,
+      windowMs,
+    });
+    jest.advanceTimersByTime(windowMs / 2);
+    incrementRateLimit(key, "initialize_story_text");
+    jest.advanceTimersByTime(windowMs / 2 + 1);
+
+    // Had the read started the window, it would have ended by now
+    expect(peekRateLimit(key, "initialize_story_text")).toMatchObject({
+      requestsRemaining: maxRequests - 1,
+      timeRemaining: windowMs / 2 - 1,
+    });
+  });
+
+  it("has the whole allowance back once the window has ended", () => {
+    jest.useFakeTimers();
+    const key = accountKey(fresh("teacher"));
+    const { maxRequests, windowMs } = RATE_LIMITS.initialize_story_text;
+    useUp(key, "initialize_story_text");
+    expect(peekRateLimit(key, "initialize_story_text").isLimited).toBe(true);
+
+    jest.advanceTimersByTime(windowMs + 1);
+
+    expect(peekRateLimit(key, "initialize_story_text")).toMatchObject({
+      isLimited: false,
+      requestsRemaining: maxRequests,
+      timeRemaining: 0,
+    });
+  });
+
+  it("reads only the key it is given", () => {
+    const used = accountKey(fresh("teacher"));
+    const other = accountKey(fresh("teacher"));
+    useUp(used, "initialize_story_text");
+
+    expect(peekRateLimit(other, "initialize_story_text").requestsRemaining).toBe(
+      RATE_LIMITS.initialize_story_text.maxRequests
     );
   });
 });

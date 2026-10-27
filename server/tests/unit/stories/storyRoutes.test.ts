@@ -44,15 +44,41 @@ function handlerOf(method: "get" | "post", path: string): Handler {
   return handle;
 }
 
-async function call(handler: Handler, req: Partial<Request>): Promise<Sent> {
-  const sent: Sent[] = [];
-  const res = {
+function responseInto(sent: Sent[]): Response {
+  return {
     req: { originalUrl: "/stories" },
     status(statusCode: number) {
       return { json: (body: Record<string, unknown>) => sent.push({ statusCode, body }) };
     },
   } as unknown as Response;
-  await handler({ query: {}, body: {}, headers: {}, params: {}, ...req } as Request, res, jest.fn());
+}
+
+const requestFrom = (req: Partial<Request>): Request =>
+  ({ query: {}, body: {}, headers: {}, params: {}, cookies: {}, ...req }) as Request;
+
+async function call(handler: Handler, req: Partial<Request>): Promise<Sent> {
+  const sent: Sent[] = [];
+  await handler(requestFrom(req), responseInto(sent), jest.fn());
+  return sent[0] ?? { statusCode: 0, body: {} };
+}
+
+/** Runs the route's whole stack, its middleware first, as Express would. */
+async function callRoute(method: "get" | "post", path: string, req: Partial<Request>): Promise<Sent> {
+  const layer = router.stack.find(
+    (entry) => entry.route?.path === path && (entry.route as unknown as { methods: Record<string, boolean> }).methods[method]
+  );
+  const handlers = (layer?.route?.stack ?? []).map((entry) => entry.handle as Handler);
+  if (handlers.length === 0) throw new Error(`the route ${method} ${path} is missing`);
+  const sent: Sent[] = [];
+  const request = requestFrom(req);
+  const res = responseInto(sent);
+  for (const handler of handlers) {
+    let passedOn = false;
+    await handler(request, res, () => {
+      passedOn = true;
+    });
+    if (!passedOn) break;
+  }
   return sent[0] ?? { statusCode: 0, body: {} };
 }
 
@@ -174,6 +200,106 @@ describe("story start limits", () => {
 
     expect(sent.statusCode).toBe(429);
     expect(isOverCeiling).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /stories/starts-left", () => {
+  const { maxRequests, windowMs } = RATE_LIMITS.initialize_story_text;
+
+  /** A signed-in request from an account no other test uses. */
+  function signedIn(body: Record<string, unknown> = {}): Partial<Request> {
+    const request = fromNewAddress(body);
+    return { ...request, user: { id: `account-${addressCounter}` } as Request["user"] };
+  }
+
+  async function startTextStories(request: Partial<Request>, count: number): Promise<Sent[]> {
+    const sent: Sent[] = [];
+    for (let i = 0; i < count; i++) {
+      sent.push(
+        await call(handlerOf("post", "/stories/template"), {
+          ...request,
+          body: { generateImages: false },
+        })
+      );
+    }
+    return sent;
+  }
+
+  const startsLeft = (request: Partial<Request>) =>
+    call(handlerOf("get", "/stories/starts-left"), request);
+
+  it("answers the account's whole allowance, with nothing to renew, before its first start", async () => {
+    const sent = await startsLeft(signedIn());
+
+    expect(sent.statusCode).toBe(200);
+    expect(sent.body.data).toEqual({
+      remaining: maxRequests,
+      limit: maxRequests,
+      windowMs,
+      resetsInMs: null,
+    });
+  });
+
+  it("answers the starts left after some, and how long until the allowance renews", async () => {
+    const request = signedIn();
+    await startTextStories(request, 3);
+
+    const sent = await startsLeft(request);
+
+    const data = sent.body.data as { remaining: number; resetsInMs: number };
+    expect(data.remaining).toBe(maxRequests - 3);
+    expect(data.resetsInMs).toBeGreaterThan(windowMs - 60 * 1000);
+    expect(data.resetsInMs).toBeLessThanOrEqual(windowMs);
+  });
+
+  it("consumes no start, however often it is read", async () => {
+    const request = signedIn();
+    await startTextStories(request, 3);
+
+    for (let i = 0; i < maxRequests * 2; i++) {
+      const sent = await startsLeft(request);
+      expect((sent.body.data as { remaining: number }).remaining).toBe(maxRequests - 3);
+    }
+    const starts = await startTextStories(request, maxRequests);
+
+    expect(starts.filter((answer) => answer.statusCode !== 429)).toHaveLength(maxRequests - 3);
+    expect((await startsLeft(request)).body.data).toMatchObject({ remaining: 0 });
+  });
+
+  it("reads only the caller's own account, and says nothing else about it", async () => {
+    const busy = signedIn();
+    await startTextStories(busy, 5);
+    const other = signedIn();
+
+    const sent = await startsLeft(other);
+
+    expect((sent.body.data as { remaining: number }).remaining).toBe(maxRequests);
+    expect(Object.keys(sent.body.data as object).sort()).toEqual([
+      "limit",
+      "remaining",
+      "resetsInMs",
+      "windowMs",
+    ]);
+    expect(JSON.stringify(sent.body)).not.toContain((other.user as { id: string }).id);
+  });
+
+  it("counts the account's text starts, not its starts with images", async () => {
+    const request = signedIn();
+    await call(handlerOf("post", "/stories/template"), { ...request, body: { generateImages: true } });
+
+    const sent = await startsLeft(request);
+
+    expect((sent.body.data as { remaining: number }).remaining).toBe(maxRequests);
+  });
+
+  it("refuses a caller who isn't signed in, before reading any count", async () => {
+    const throughMiddleware = await callRoute("get", "/stories/starts-left", fromNewAddress());
+    const handlerAlone = await startsLeft(fromNewAddress());
+
+    expect(throughMiddleware.statusCode).toBe(401);
+    expect(throughMiddleware.body.data).toBeUndefined();
+    expect(handlerAlone.statusCode).toBe(401);
+    expect(handlerAlone.body.data).toBeUndefined();
   });
 });
 

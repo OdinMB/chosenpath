@@ -26,6 +26,8 @@ import {
   CheckStoryStatusResponse,
   StoryStatusInfo,
   CodeExistsResponse,
+  StartsLeftInfo,
+  StartsLeftResponse,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -444,6 +446,14 @@ export const storyApi = {
       `/stories/${encodeURIComponent(code)}/exists`
     );
     return info.exists;
+  },
+
+  /**
+   * The signed-in account's story starts without images left, and when its
+   * allowance renews; reading counts no start
+   */
+  getStartsLeft: async (): Promise<StartsLeftInfo> => {
+    return apiClient.get<StartsLeftResponse["data"]>("/stories/starts-left");
   },
 
   /**

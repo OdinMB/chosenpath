@@ -141,6 +141,22 @@ export interface CodeExistsInfo {
 export interface CodeExistsResponse extends SuccessResponse<CodeExistsInfo> {}
 
 /**
+ * GET /stories/starts-left: the signed-in account's own story starts without
+ * images, as its start limit counts them, read without counting one.
+ */
+export interface StartsLeftInfo {
+  /** Starts the account can still make before its allowance renews */
+  remaining: number;
+  /** Starts allowed in one window */
+  limit: number;
+  /** The window's length */
+  windowMs: number;
+  /** Until the running window ends and the whole allowance is back; null while none runs (nothing counted) */
+  resetsInMs: number | null;
+}
+export interface StartsLeftResponse extends SuccessResponse<StartsLeftInfo> {}
+
+/**
  * The 503's errorMessage when a story start is refused because today's AI
  * spend ceiling for its kind of story is reached (server/src/spend/).
  */

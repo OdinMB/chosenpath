@@ -531,6 +531,43 @@ Template-based stories are created synchronously and are ready immediately (no p
 
 ---
 
+### Get Starts Left
+
+**GET** `/stories/starts-left`
+
+**Auth Required**: Yes (`401` otherwise, and nothing is read)
+
+The signed-in account's own story starts without images: how many it can still make under `initialize_story_text` and when its allowance renews. "Start several stories at once" on a World's settings shows it before Start is pressed (`client/src/page/hooks/useStartsLeft.ts`). Its starts are always text-only, so the count is the one its starts claim from (`storyStartLimit` in `server/src/shared/limitPolicy.ts`).
+
+Reading counts no start and starts no window (`peekRateLimit` in `server/src/shared/rateLimiter.ts`), so it never moves when the allowance renews. It answers the caller's own count only, and nothing else about the account.
+
+**Query Params:**
+
+- `requestId` (optional): Request tracking ID
+
+**Response:** `StartsLeftInfo` (`core/types/api.ts`)
+
+```typescript
+{
+  success: true,
+  data: {
+    remaining: number,          // starts left before the allowance renews
+    limit: number,              // starts per window (RATE_LIMITS.initialize_story_text.maxRequests)
+    windowMs: number,           // the window's length
+    resetsInMs: number | null   // until the running window ends and the whole allowance is back; null while none runs
+  },
+  requestId: string
+}
+```
+
+The window starts with the account's first counted start, so before any start `remaining` equals `limit` and `resetsInMs` is `null`. The time is relative, so the client places it on its own clock.
+
+**Error Cases:**
+
+- `401`: Authentication required
+
+---
+
 ### Check Story Code
 
 **GET** `/stories/:code/exists`
@@ -1753,7 +1790,7 @@ Rate limits are applied to (windows in `RATE_LIMITS`, `core/config.ts`; who coun
 
 - **Login**: `login` per address, failed logins only
 - **Registration**: `register` limit per address, created accounts only
-- **Story Creation**: `initialize_story` per address when signed out; `initialize_story_text` or `initialize_story_images` per account when signed in
+- **Story Creation**: `initialize_story` per address when signed out; `initialize_story_text` or `initialize_story_images` per account when signed in. A signed-in account reads its own `initialize_story_text` count with `GET /stories/starts-left`, which counts nothing
 - **Choices** (socket `make_choice`, `select_character`, `retry_turn`): `make_choice` limit per seat in stories an account started, otherwise per address
 - **Code checks** (socket `verify_code` and `rejoin_session`, `GET /stories/:code/exists`): `verify_code` limit per address, misses only
 - **Template Generation**: `templateGeneration` limit (non-admin)

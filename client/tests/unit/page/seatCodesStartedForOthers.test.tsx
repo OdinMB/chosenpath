@@ -184,6 +184,43 @@ describe("Start several stories at once: a sign-in that has lapsed", () => {
   });
 });
 
+describe("Start several stories at once: the account's starts left", () => {
+  it("checks the sign-in, then starts no more stories than are left, each marked", async () => {
+    jest.mocked(authApi.getCurrentUser).mockResolvedValue(SIGNED_IN);
+    jest
+      .mocked(storyApi.createStoryFromTemplate)
+      .mockResolvedValueOnce(started("story-1"))
+      .mockResolvedValueOnce(started("story-2"));
+
+    const outcome = await hookValue(useMultiStoryCreation).startStories(SETTINGS, 5, 2);
+
+    expect(outcome).toBe("started");
+    expect(authApi.getCurrentUser).toHaveBeenCalledTimes(1);
+    expect(storyApi.createStoryFromTemplate).toHaveBeenCalledTimes(2);
+    expect(getCodesStartedForOthers()).toEqual([
+      "story-1-SEAT-1",
+      "story-1-SEAT-2",
+      "story-2-SEAT-1",
+      "story-2-SEAT-2",
+    ]);
+    // All that could start did, so no "not every story started" warning
+    expect(notificationService.addNotification).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith(
+      "/users/seat-cards?stories=story-1,story-2"
+    );
+  });
+
+  it("starts nothing with no starts left, for the form to read them again", async () => {
+    jest.mocked(authApi.getCurrentUser).mockResolvedValue(SIGNED_IN);
+
+    const outcome = await hookValue(useMultiStoryCreation).startStories(SETTINGS, 3, 0);
+
+    expect(outcome).toBe("not-started");
+    expect(storyApi.createStoryFromTemplate).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
 describe("A single start: seat codes on this device", () => {
   it("stores the story's codes unmarked, as before", async () => {
     jest

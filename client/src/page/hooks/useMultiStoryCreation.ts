@@ -44,32 +44,73 @@ export async function stillSignedIn(): Promise<boolean | undefined> {
 export const STORY_COUNT_MIN = 2;
 export const STORY_COUNT_MAX = 12;
 
-/** The number of stories to start: a whole number from 2 to 12. */
-export function clampStoryCount(count: number): number {
+/**
+ * The most stories to choose: 12, or fewer when fewer starts are left, though
+ * never fewer than 2 (the start then starts what it can). `startsLeft` is
+ * undefined or null while the account's starts left aren't known.
+ */
+export function storyCountMax(startsLeft?: number | null): number {
+  if (startsLeft === undefined || startsLeft === null) return STORY_COUNT_MAX;
+  return Math.max(STORY_COUNT_MIN, Math.min(STORY_COUNT_MAX, startsLeft));
+}
+
+/** The number of stories to start: a whole number from 2 to `max` (12 by default). */
+export function clampStoryCount(count: number, max = STORY_COUNT_MAX): number {
   if (!Number.isFinite(count)) return STORY_COUNT_MIN;
-  return Math.min(STORY_COUNT_MAX, Math.max(STORY_COUNT_MIN, Math.round(count)));
+  return Math.min(max, Math.max(STORY_COUNT_MIN, Math.round(count)));
 }
 
 /**
  * The count one stepper press away, from the count the start would use (an
- * empty field counts as 2), kept within 2 to 12.
+ * empty field counts as 2), kept within 2 to `max`.
  */
-export function stepStoryCount(count: number, step: 1 | -1): number {
-  return clampStoryCount(clampStoryCount(count) + step);
+export function stepStoryCount(
+  count: number,
+  step: 1 | -1,
+  max = STORY_COUNT_MAX
+): number {
+  return clampStoryCount(clampStoryCount(count, max) + step, max);
+}
+
+/** How many stories Start starts: the count chosen, and no more than can start. */
+export function storiesToStart(count: number, startsLeft?: number | null): number {
+  const chosen = clampStoryCount(count);
+  if (startsLeft === undefined || startsLeft === null) return chosen;
+  return Math.min(chosen, Math.max(0, startsLeft));
+}
+
+/**
+ * The Start button's words: the number that will start, or that none are
+ * left (the button is disabled then).
+ */
+export function startSeveralLabel(count: number, startsLeft?: number | null): string {
+  const starting = storiesToStart(count, startsLeft);
+  if (starting === 0) return "No starts left";
+  return starting === 1 ? "Start 1 story" : `Start ${starting} stories`;
+}
+
+/** The panel's heading: the number that will start, or that none can. */
+export function severalStoriesHeading(count: number, startsLeft?: number | null): string {
+  const starting = storiesToStart(count, startsLeft);
+  if (starting === 0) return "No stories can start right now";
+  return starting === 1
+    ? "You're starting 1 story"
+    : `You're starting ${starting} stories at once`;
 }
 
 /**
  * What each start sends, and how many: the settings without unique images
  * (several image starts would use up the image limit at once), and the count
- * within 2 to 12.
+ * within 2 to 12 and the starts left.
  */
 export function multiStoryRequest(
   settings: CreateStoryFromTemplateRequest,
-  count: number
+  count: number,
+  startsLeft?: number | null
 ): { request: CreateStoryFromTemplateRequest; count: number } {
   return {
     request: { ...settings, generateImages: false },
-    count: clampStoryCount(count),
+    count: storiesToStart(count, startsLeft),
   };
 }
 
@@ -105,15 +146,17 @@ export function useMultiStoryCreation() {
   const [isStarting, setIsStarting] = useState(false);
 
   /**
-   * Starts the stories and opens their seat cards; stays on the form when not
-   * even the first one started, or when the sign-in has lapsed (the form then
-   * asks the person to sign in again).
+   * Starts the stories, no more than `startsLeft` when it is known, and opens
+   * their seat cards; stays on the form when not even the first one started,
+   * or when the sign-in has lapsed (the form then asks the person to sign in
+   * again).
    */
   const startStories = async (
     settings: CreateStoryFromTemplateRequest,
-    requestedCount: number
+    requestedCount: number,
+    startsLeft?: number | null
   ): Promise<MultiStartOutcome> => {
-    const { request, count } = multiStoryRequest(settings, requestedCount);
+    const { request, count } = multiStoryRequest(settings, requestedCount, startsLeft);
     setIsStarting(true);
     const signedIn = await stillSignedIn();
     if (signedIn !== true) {

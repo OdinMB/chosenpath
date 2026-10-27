@@ -78,27 +78,52 @@ function currentWindow(
   return window;
 }
 
+/** The action's limit as it stands for a window, or for none (nothing counted yet). */
+function limitInfo(
+  action: RateLimitedAction,
+  window: LimitWindow | undefined,
+  now: number
+): RateLimitInfo {
+  const { maxRequests, windowMs } = RATE_LIMITS[action];
+  const count = window?.count ?? 0;
+  return {
+    isLimited: count >= maxRequests,
+    timeRemaining: window ? Math.max(0, window.resetAt - now) : 0,
+    requestsRemaining: Math.max(0, maxRequests - count),
+    maxRequests,
+    windowMs,
+  };
+}
+
 /** Whether the key has used up the action's requests in its current window. */
 export function checkRateLimit(
   key: string,
   action: RateLimitedAction
 ): RateLimitInfo {
   const now = Date.now();
-  const { maxRequests, windowMs } = RATE_LIMITS[action];
-  const window = currentWindow(key, action, now);
-  const info: RateLimitInfo = {
-    isLimited: window.count >= maxRequests,
-    timeRemaining: Math.max(0, window.resetAt - now),
-    requestsRemaining: Math.max(0, maxRequests - window.count),
-    maxRequests,
-    windowMs,
-  };
+  const { maxRequests } = RATE_LIMITS[action];
+  const info = limitInfo(action, currentWindow(key, action, now), now);
   Logger.Route.log(
     `[RateLimiter] ${kindOf(key)} ${action}: limited ${info.isLimited}, ` +
       `remaining ${info.requestsRemaining}/${maxRequests}, ` +
       `resets in ${Math.ceil(info.timeRemaining / 1000)}s`
   );
   return info;
+}
+
+/**
+ * What checkRateLimit answers, for showing a caller its own allowance: it
+ * counts nothing and starts no window, so reading never moves when the
+ * allowance renews. A key with no running window has its whole allowance and
+ * a timeRemaining of 0.
+ */
+export function peekRateLimit(
+  key: string,
+  action: RateLimitedAction
+): RateLimitInfo {
+  const now = Date.now();
+  const window = windows.get(key)?.get(action);
+  return limitInfo(action, window && window.resetAt > now ? window : undefined, now);
 }
 
 /** Counts one request of the key; a key already at its limit stays there. */

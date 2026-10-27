@@ -3,8 +3,12 @@ import {
   clampStoryCount,
   multiStoryRequest,
   seatCardsPath,
+  severalStoriesHeading,
+  startSeveralLabel,
   startSequentially,
   stepStoryCount,
+  storiesToStart,
+  storyCountMax,
 } from "../../../src/page/hooks/useMultiStoryCreation";
 
 /*
@@ -110,6 +114,50 @@ describe("stepStoryCount", () => {
     expect(stepStoryCount(Number.NaN, -1)).toBe(2);
     expect(stepStoryCount(40, -1)).toBe(11);
     expect(stepStoryCount(5.4, 1)).toBe(6);
+  });
+});
+
+describe("the account's starts left", () => {
+  it("caps the number to choose at the starts left, never below 2 or above 12", () => {
+    expect(storyCountMax(undefined)).toBe(12);
+    expect(storyCountMax(null)).toBe(12);
+    expect(storyCountMax(15)).toBe(12);
+    expect(storyCountMax(7)).toBe(7);
+    expect(storyCountMax(1)).toBe(2);
+    expect(storyCountMax(0)).toBe(2);
+  });
+
+  it("keeps the count and its stepper within that cap", () => {
+    expect(clampStoryCount(8, 7)).toBe(7);
+    expect(clampStoryCount(5, 7)).toBe(5);
+    expect(clampStoryCount(Number.NaN, 7)).toBe(2);
+    expect(stepStoryCount(7, 1, 7)).toBe(7);
+    expect(stepStoryCount(8, -1, 7)).toBe(6);
+  });
+
+  it("starts no more stories than can start, even fewer than 2", () => {
+    expect(storiesToStart(4, undefined)).toBe(4);
+    expect(storiesToStart(40, 15)).toBe(12);
+    expect(storiesToStart(8, 7)).toBe(7);
+    expect(storiesToStart(2, 1)).toBe(1);
+    expect(storiesToStart(2, 0)).toBe(0);
+    expect(multiStoryRequest(SETTINGS, 8, 7).count).toBe(7);
+    expect(multiStoryRequest(SETTINGS, 8).count).toBe(8);
+  });
+
+  it("names on Start the number that will start", () => {
+    expect(startSeveralLabel(4, undefined)).toBe("Start 4 stories");
+    expect(startSeveralLabel(8, 7)).toBe("Start 7 stories");
+    expect(startSeveralLabel(2, 1)).toBe("Start 1 story");
+    // Start is disabled then
+    expect(startSeveralLabel(3, 0)).toBe("No starts left");
+  });
+
+  it("heads the panel with the number that will start", () => {
+    expect(severalStoriesHeading(4, undefined)).toBe("You're starting 4 stories at once");
+    expect(severalStoriesHeading(8, 7)).toBe("You're starting 7 stories at once");
+    expect(severalStoriesHeading(2, 1)).toBe("You're starting 1 story");
+    expect(severalStoriesHeading(3, 0)).toBe("No stories can start right now");
   });
 });
 

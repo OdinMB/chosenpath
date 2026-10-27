@@ -2,11 +2,17 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icons, InfoIcon } from "components/ui";
 import {
-  STORY_COUNT_MAX,
   STORY_COUNT_MIN,
   clampStoryCount,
+  severalStoriesHeading,
   stepStoryCount,
+  storyCountMax,
 } from "page/hooks/useMultiStoryCreation";
+import {
+  startShortfallMessage,
+  startsLeftMessage,
+  type StartsLeft,
+} from "page/utils/startsLeft";
 
 interface MultiStoryStartFieldProps {
   enabled: boolean;
@@ -15,7 +21,12 @@ interface MultiStoryStartFieldProps {
   onEnabledChange: (enabled: boolean) => void;
   onCountChange: (count: number) => void;
   disabled?: boolean;
+  /** The account's starts left; null or left out while not known. */
+  startsLeft?: StartsLeft | null;
 }
+
+/** The id of the note next to Start, which the Start button points to. */
+export const START_NOTE_ID = "several-stories-start-note";
 
 /** The pages that explain starting several stories at once, each for its audience. */
 const AUDIENCE_PAGES = [
@@ -79,8 +90,9 @@ function StepperButton({
 /**
  * "Start several stories at once", for signed-in users on a World's settings:
  * the checkbox, with where the feature is explained, and while it is ticked,
- * the number of stories (2 to 12) at the centre of a highlighted panel, since
- * the form then starts several stories rather than one.
+ * the number of stories (2 to 12, and no more than the account can still
+ * start) at the centre of a highlighted panel, since the form then starts
+ * several stories rather than one, with how many more can start this hour.
  */
 export function MultiStoryStartField({
   enabled,
@@ -88,9 +100,11 @@ export function MultiStoryStartField({
   onEnabledChange,
   onCountChange,
   disabled = false,
+  startsLeft = null,
 }: MultiStoryStartFieldProps) {
   const navigate = useNavigate();
-  const shownCount = clampStoryCount(count);
+  const maxCount = storyCountMax(startsLeft?.remaining);
+  const shownCount = clampStoryCount(count, maxCount);
 
   return (
     // Not ColoredBox: its own bg-white outranks its active tint in the
@@ -157,7 +171,7 @@ export function MultiStoryStartField({
             aria-live="polite"
             className="text-xl md:text-2xl font-semibold text-primary-800"
           >
-            You're starting {shownCount} stories at once
+            {severalStoriesHeading(count, startsLeft?.remaining)}
           </h3>
 
           <div>
@@ -172,7 +186,7 @@ export function MultiStoryStartField({
                 label="One story fewer"
                 atLimit={shownCount <= STORY_COUNT_MIN}
                 disabled={disabled}
-                onStep={() => onCountChange(stepStoryCount(count, -1))}
+                onStep={() => onCountChange(stepStoryCount(count, -1, maxCount))}
               >
                 <Icons.Minus className="h-4 w-4" />
               </StepperButton>
@@ -181,21 +195,23 @@ export function MultiStoryStartField({
                 type="number"
                 inputMode="numeric"
                 min={STORY_COUNT_MIN}
-                max={STORY_COUNT_MAX}
+                max={maxCount}
                 step={1}
                 value={Number.isNaN(count) ? "" : count}
                 onChange={(e) => onCountChange(e.target.valueAsNumber)}
                 // Leaving the field shows the number that will start
                 onBlur={() => onCountChange(shownCount)}
-                aria-describedby="story-count-range"
+                aria-describedby={
+                  startsLeft ? "story-count-range starts-left" : "story-count-range"
+                }
                 className="w-24 h-14 px-2 bg-white border border-accent rounded-md shadow-sm text-center font-montserrat text-3xl md:text-4xl font-semibold text-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 disabled={disabled}
               />
               <StepperButton
                 label="One story more"
-                atLimit={shownCount >= STORY_COUNT_MAX}
+                atLimit={shownCount >= maxCount}
                 disabled={disabled}
-                onStep={() => onCountChange(stepStoryCount(count, 1))}
+                onStep={() => onCountChange(stepStoryCount(count, 1, maxCount))}
               >
                 <Icons.Plus className="h-4 w-4" />
               </StepperButton>
@@ -204,8 +220,21 @@ export function MultiStoryStartField({
               id="story-count-range"
               className="mt-2 text-xs md:text-sm text-primary-600"
             >
-              {STORY_COUNT_MIN} to {STORY_COUNT_MAX} stories
+              {maxCount > STORY_COUNT_MIN
+                ? `${STORY_COUNT_MIN} to ${maxCount} stories`
+                : `${STORY_COUNT_MIN} stories`}
             </p>
+            {startsLeft && (
+              <p
+                id="starts-left"
+                className="mt-3 inline-flex items-start gap-2 text-left text-sm md:text-base font-medium text-primary-800"
+              >
+                <span aria-hidden="true" className="mt-0.5 shrink-0 text-accent-800">
+                  <Icons.Clock className="h-4 w-4 md:h-5 md:w-5" />
+                </span>
+                {startsLeftMessage(startsLeft)}
+              </p>
+            )}
           </div>
 
           <p className="max-w-md mx-auto text-sm md:text-base text-primary-700">
@@ -214,6 +243,38 @@ export function MultiStoryStartField({
             code.
           </p>
         </div>
+      )}
+    </div>
+  );
+}
+
+interface MultiStoryStartNoteProps {
+  /** The number chosen, as typed (see MultiStoryStartField). */
+  count: number;
+  startsLeft?: StartsLeft | null;
+  className?: string;
+}
+
+/**
+ * Next to Start while several stories are to start: when fewer can start
+ * than chosen, how many can and when the rest can. Always rendered, empty
+ * when all can, so a screen reader hears the note as it appears.
+ */
+export function MultiStoryStartNote({
+  count,
+  startsLeft = null,
+  className = "",
+}: MultiStoryStartNoteProps) {
+  const message = startShortfallMessage(clampStoryCount(count), startsLeft);
+  return (
+    <div id={START_NOTE_ID} role="status" className={className}>
+      {message && (
+        <p className="flex items-start gap-2 sm:justify-end text-sm md:text-base font-medium text-primary-800">
+          <span aria-hidden="true" className="mt-0.5 shrink-0 text-tertiary">
+            <Icons.AlertCircle className="h-4 w-4 md:h-5 md:w-5" />
+          </span>
+          {message}
+        </p>
       )}
     </div>
   );
