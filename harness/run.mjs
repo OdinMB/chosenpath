@@ -2,6 +2,7 @@
 // The local harness: Chosen Path in a real browser on a hermetic local copy.
 //
 //   node harness/run.mjs --out <folder> [--steps <module>] [--group-mode <mode>]
+//                        [--story-length <turns>] [--seed <n>]
 //                        [--viewport desktop|mobile] [--timeout <seconds>]
 //                        [--pg-bin <folder>] [--guard-test=<case>]
 //
@@ -139,6 +140,8 @@ const summary = {
   screenshots: [],
   findings: [],
   blockedRequests: 0,
+  seed: args.seed,
+  storyLength: args.storyLength ?? null,
   versions: { node: process.version },
 };
 let finishing = false;
@@ -227,14 +230,18 @@ async function main() {
 
   // The fake model API
   const fakeLog = fs.createWriteStream(path.join(layout.logs, "fake-openai.jsonl"), { flags: "a" });
-  const fake = await startFakeOpenAI({ record: (entry) => fakeLog.write(`${JSON.stringify(entry)}\n`), sharpFrom: path.join(SERVER_DIR, "package.json") });
+  const fake = await startFakeOpenAI({
+    record: (entry) => fakeLog.write(`${JSON.stringify(entry)}\n`),
+    sharpFrom: path.join(SERVER_DIR, "package.json"),
+    seed: args.seed,
+  });
   allowedPorts.add(fake.port);
   summary.ports.fakeOpenAI = fake.port;
   cleanups.push(async () => {
     await fake.close();
     await new Promise((resolve) => fakeLog.end(resolve));
   });
-  say(`fake OpenAI API on 127.0.0.1:${fake.port}`);
+  say(`fake OpenAI API on 127.0.0.1:${fake.port}, seed ${args.seed}`);
 
   // The database
   const pgEnv = { ...platformVariables(process.env, platform), ...homeVariables(layout), ...proxyVariables(), LC_ALL: "C", LANG: "C" };
@@ -432,12 +439,14 @@ async function main() {
   say("drafting and publishing the fixture templates");
   const { template, groupTemplate } = await provisionTemplates(frontDoor.origin, {
     editor: fixtureVars.editor,
-    templates: fixtureTemplates(fixtureVars, { groupMode: args.groupMode }),
+    templates: fixtureTemplates(fixtureVars, { groupMode: args.groupMode, storyLength: args.storyLength }),
   });
   summary.template = template;
   summary.groupTemplate = groupTemplate;
-  say(`fixture template ${template.id} (${template.title})`);
-  say(`group template ${groupTemplate.id} (${groupTemplate.title}; ${groupTemplate.playerCountMin}-${groupTemplate.playerCountMax} players, ${groupTemplate.gameMode})`);
+  say(`fixture template ${template.id} (${template.title}; ${template.maxTurns} turns)`);
+  say(
+    `group template ${groupTemplate.id} (${groupTemplate.title}; ${groupTemplate.playerCountMin}-${groupTemplate.playerCountMax} players, ${groupTemplate.gameMode}, ${groupTemplate.maxTurns} turns)`
+  );
 
   // The journey
   const journeyLog = fs.createWriteStream(path.join(layout.logs, "journey.log"), { flags: "a" });

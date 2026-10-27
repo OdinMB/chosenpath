@@ -49,12 +49,16 @@ const serverPackage = path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 
 let fake: FakeOpenAI;
 const requests: FakeRequestRecord[] = [];
+/** The product's log lines, kept to read its "[LLM] repair" lines */
+const logged: string[] = [];
 const savedBaseUrl = process.env.OPENAI_BASE_URL;
 
 beforeAll(async () => {
   fake = await startFakeOpenAI({ record: (entry) => requests.push(entry), sharpFrom: serverPackage });
   process.env.OPENAI_BASE_URL = fake.baseUrl;
-  jest.spyOn(console, "log").mockImplementation(() => undefined);
+  jest.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    logged.push(args.map(String).join(" "));
+  });
   jest.spyOn(console, "warn").mockImplementation(() => undefined);
 });
 
@@ -74,6 +78,109 @@ async function nextTurn(generator: Generator, story: StoryModel): Promise<StoryM
   const [withBeats, changes] = await generator.generateBeats(current, true);
   return new ChangeService().applyChanges(withBeats, changes);
 }
+
+type Template = Parameters<typeof createStoryStateFromTemplate>[1];
+type Difficulty = Parameters<typeof createStoryStateFromTemplate>[6];
+type Beat = NonNullable<ReturnType<StoryModel["getCurrentBeat"]>>;
+type Seat = "player1" | "player2" | "player3";
+
+/** A World of `maxTurns` turns for these seats, drafted from a premise and saved as TemplateService.generateTemplate saves it. */
+async function draftWorld(generator: Generator, seats: Seat[], gameMode: Parameters<Generator["generateTemplateSetup"]>[2], maxTurns: number): Promise<Template> {
+  const setup = await generator.generateTemplateSetup("A quiet harbour town", seats.length as Parameters<typeof createStoryStateFromTemplate>[2], gameMode, maxTurns);
+  return {
+    ...setup,
+    id: "harness-ending-template",
+    playerCountMin: seats.length,
+    playerCountMax: seats.length,
+    gameMode,
+    maxTurnsMin: maxTurns,
+    maxTurnsMax: maxTurns,
+    tags: [],
+    containsImages: false,
+  } as unknown as Template;
+}
+
+/** A story started on a World, every seat with its first character. */
+function startOn(template: Template, seats: Seat[]) {
+  const maxTurns = (template as unknown as { maxTurnsMin: number }).maxTurnsMin;
+  const difficulty: Difficulty = template.difficultyLevels?.[0] ?? { title: "Balanced", modifier: 0 };
+  const codes = Object.fromEntries(seats.map((seat, i) => [seat, `code-${i + 1}`])) as Parameters<typeof createStoryStateFromTemplate>[7];
+  const playerCount = seats.length as Parameters<typeof createStoryStateFromTemplate>[2];
+  let story = Story.create(createStoryStateFromTemplate("harness-ending-story", template, playerCount, maxTurns, false, false, difficulty, codes));
+  for (const seat of seats) {
+    const options = story.getState().characterSelectionOptions[seat];
+    story = story.setCharacterSelection(seat, options.possibleCharacterIdentities[0], options.possibleCharacterBackgrounds[0], 0, 0);
+  }
+  return { story: story.completeCharacterSelection(), difficulty };
+}
+
+/** A story of `maxTurns` turns on a World drafted for it. */
+async function storyOfLength(generator: Generator, seats: Seat[], gameMode: Parameters<Generator["generateTemplateSetup"]>[2], maxTurns: number) {
+  return startOn(await draftWorld(generator, seats, gameMode, maxTurns), seats);
+}
+
+type PlayedTurn = { turn: number; type: string; beats: Record<Seat, Beat | undefined>; values: string };
+
+/** Plays turns until the story's ending (or `limit` turns), every seat taking a different option each turn; each turn as the seats saw it. */
+async function playToEnding(generator: Generator, start: StoryModel, seats: Seat[], difficulty: Difficulty, limit: number) {
+  let story = start;
+  const played: PlayedTurn[] = [];
+  for (let i = 0; i < limit; i++) {
+    story = await nextTurn(generator, story);
+    const state = story.getState();
+    played.push({
+      turn: story.getCurrentTurn(),
+      type: story.getCurrentBeatType(),
+      beats: Object.fromEntries(seats.map((seat) => [seat, story.getCurrentBeat(seat)])) as Record<Seat, Beat | undefined>,
+      values: JSON.stringify([state.sharedStatValues, ...seats.map((seat) => state.players[seat].statValues)]),
+    });
+    if (story.getCurrentBeatType() === "ending") break;
+    for (const [n, seat] of seats.entries()) {
+      const choice = (i + n) % (story.getCurrentBeat(seat)?.options.length ?? 1);
+      story = BeatResolutionService.resolveChoice(story.updateChoice(seat, choice), seat, choice, difficulty);
+    }
+  }
+  return { story, played };
+}
+
+/** The challenge options a turn offered a seat. */
+function challengeOptions(beat: Beat | undefined) {
+  return (beat?.options ?? []).flatMap((option) => (option.optionType === "challenge" ? [option] : []));
+}
+
+/** The kinds of repair and note the product logged (textRepairs.ts's "[LLM] repair" lines) since line `from`. */
+function repairKindsLogged(from: number): string[] {
+  const kinds = new Set<string>();
+  for (const line of logged.slice(from)) {
+    const match = line.match(/\[LLM\] repair (\{.*\})/);
+    if (!match) continue;
+    const counts = JSON.parse(match[1]) as { repairs?: Record<string, number>; notes?: Record<string, number> };
+    for (const kind of [...Object.keys(counts.repairs ?? {}), ...Object.keys(counts.notes ?? {})]) kinds.add(kind);
+  }
+  return [...kinds];
+}
+
+/**
+ * Repairs that would undo what the fake's story replies are for: a chapter
+ * the engine doesn't play at that length (so the story would not end on its
+ * turn count), options of the wrong type (flattened to a normal risk with no
+ * points or bonuses), stat changes and bonuses on stats or seats the story
+ * lacks or under the wrong group. (A switch plan's pacingNotFollowed is the
+ * milestone arithmetic, which the fake doesn't follow: the product asks once
+ * more and keeps the plan.)
+ */
+const REPAIRS_THE_FAKE_AVOIDS = [
+  "lengthNotAllowed",
+  "durationFromSteps",
+  "optionType",
+  "statChangeUnknown",
+  "statChangeAmbiguous",
+  "statGroupMoved",
+  "statIdSeatForm",
+  "bonusStatUnknown",
+  "bonusStatAmbiguous",
+  "bonusStatIdSeatForm",
+];
 
 describe("the harness's fake model, read by the product", () => {
   it("drafts a startable template and plays two turns of a story from it", async () => {
@@ -187,6 +294,109 @@ describe("the harness's fake model, read by the product", () => {
     },
     60_000
   );
+
+  // run.mjs's --story-length; 25 is the longest World the editor offers
+  it.each([3, 4, 5, 25])(
+    "plays a %i-turn single-player story to its ending, on the beat after its last turn, with choices that differ",
+    async (maxTurns) => {
+      const from = logged.length;
+      const generator = new AIStoryGenerator();
+      const { story: start, difficulty } = await storyOfLength(generator, ["player1"], GameModes.SinglePlayer, maxTurns);
+      const initial = start.getState();
+      // Stats start at different values, not all at zero
+      const starts = [...initial.sharedStatValues, ...initial.players.player1.statValues].map((stat) => stat.value);
+      expect(new Set(starts).size).toBeGreaterThan(1);
+
+      const { story, played } = await playToEnding(generator, start, ["player1"], difficulty, maxTurns + 4);
+
+      // The ending comes as soon as the engine allows: the beat after the last turn, not before
+      expect(played).toHaveLength(maxTurns + 1);
+      expect(played.slice(0, -1).every((turn) => turn.type !== "ending")).toBe(true);
+      expect(played.at(-1)).toMatchObject({ turn: maxTurns + 1, type: "ending" });
+      expect(story.getState().players.player1.beatHistory).toHaveLength(maxTurns + 1);
+      expect(played.at(-1)?.beats.player1?.title).toBe("The End");
+      expect(played.at(-1)?.beats.player1?.text).toContain(PLACEHOLDER_MARK);
+
+      // The turns in chapters offer challenges of every risk, with different points and bonuses on the story's own stats
+      const challenges = played.filter((turn) => turn.type === "thread").flatMap((turn) => challengeOptions(turn.beats.player1));
+      expect(challenges.length).toBeGreaterThanOrEqual(4);
+      expect(new Set(challenges.map((option) => option.riskType))).toEqual(new Set(["safe", "normal", "risky"]));
+      expect(new Set(challenges.map((option) => option.basePoints)).size).toBeGreaterThan(1);
+      const bonuses = challenges.flatMap((option) => option.modifiersToSuccessRate);
+      expect(bonuses.length).toBeGreaterThan(0);
+      for (const bonus of bonuses) expect(story.getStatById(bonus.statId)).not.toBeNull();
+      expect(new Set(bonuses.map((bonus) => bonus.effect)).size).toBeGreaterThan(1);
+      // A switch offers ways to explore
+      for (const turn of played.filter((t) => t.type === "switch")) {
+        expect(turn.beats.player1?.options.every((option) => option.optionType === "exploration")).toBe(true);
+      }
+
+      // Stats move as the story goes
+      expect(new Set(played.map((turn) => turn.values)).size).toBeGreaterThan(1);
+
+      expect(repairKindsLogged(from).filter((kind) => REPAIRS_THE_FAKE_AVOIDS.includes(kind))).toEqual([]);
+      expect(requests.filter((r) => r.kind === "unhandled" || r.kind === "error")).toEqual([]);
+    },
+    120_000
+  );
+
+  it("gives a story the same choices and stat moves when its requests arrive numbered differently, as pregeneration reorders them", async () => {
+    const generator = new AIStoryGenerator();
+    const world = await draftWorld(generator, ["player1"], GameModes.SinglePlayer, 5);
+    /** Each turn's challenges (risk, points, bonuses) and the stats after it */
+    const variety = (played: PlayedTurn[]) =>
+      played.map((turn) => ({
+        turn: turn.turn,
+        type: turn.type,
+        challenges: challengeOptions(turn.beats.player1).map((o) => [o.riskType, o.basePoints, o.modifiersToSuccessRate.map((b) => [b.statId, b.effect])]),
+        values: turn.values,
+      }));
+
+    const first = startOn(world, ["player1"]);
+    const once = await playToEnding(generator, first.story, ["player1"], first.difficulty, 9);
+    // Requests in between, so every request of the second story arrives at another number than the first's
+    const before = requests.length;
+    await new ContentFilterService().isAppropriatePrompt("A quiet harbour town");
+    expect(requests.length).toBeGreaterThan(before);
+    const second = startOn(world, ["player1"]);
+    const again = await playToEnding(generator, second.story, ["player1"], second.difficulty, 9);
+
+    expect(again.played.at(-1)?.type).toBe("ending");
+    expect(variety(again.played)).toEqual(variety(once.played));
+  }, 60_000);
+
+  it("plays a 3-turn cooperative story of three players to its ending, each seat with its own risks and bonuses", async () => {
+    const from = logged.length;
+    const seats: Seat[] = ["player1", "player2", "player3"];
+    const generator = new AIStoryGenerator();
+    const { story: start, difficulty } = await storyOfLength(generator, seats, GameModes.Cooperative, 3);
+
+    const { story, played } = await playToEnding(generator, start, seats, difficulty, 7);
+
+    expect(played.at(-1)).toMatchObject({ turn: 4, type: "ending" });
+    expect(played.slice(0, -1).every((turn) => turn.type !== "ending")).toBe(true);
+    for (const seat of seats) {
+      expect(story.getState().players[seat].beatHistory).toHaveLength(4);
+      expect(played.at(-1)?.beats[seat]?.title).toBe("The End");
+    }
+
+    const sharedIds = new Set(story.getState().sharedStats.map((stat) => stat.id));
+    for (const turn of played.filter((t) => t.type === "thread")) {
+      // Each seat's options start at a different risk
+      expect(new Set(seats.map((seat) => challengeOptions(turn.beats[seat])[0]?.riskType)).size).toBe(seats.length);
+      for (const seat of seats) {
+        for (const bonus of challengeOptions(turn.beats[seat]).flatMap((option) => option.modifiersToSuccessRate)) {
+          expect(story.getStatById(bonus.statId)).not.toBeNull();
+          // A bonus on a player stat names the seat's own
+          if (!sharedIds.has(bonus.statId)) expect(bonus.statId.startsWith(`${seat}_`)).toBe(true);
+        }
+      }
+    }
+    expect(new Set(played.map((turn) => turn.values)).size).toBeGreaterThan(1);
+
+    expect(repairKindsLogged(from).filter((kind) => REPAIRS_THE_FAKE_AVOIDS.includes(kind))).toEqual([]);
+    expect(requests.filter((r) => r.kind === "unhandled" || r.kind === "error")).toEqual([]);
+  }, 60_000);
 
   it("lets a premise through the content filter", async () => {
     const verdict = await new ContentFilterService().isAppropriatePrompt("A quiet harbour town");

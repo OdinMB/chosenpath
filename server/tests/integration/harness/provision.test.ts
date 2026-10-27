@@ -87,7 +87,7 @@ describe("provisioning the fixture templates", () => {
   it("signs in, drafts the template from the premise and publishes it, sending the CSRF token on every change", async () => {
     calls.length = 0;
     await expect(provisionTemplates(frontDoor.origin, fixture)).resolves.toEqual({
-      template: { id: "tpl-1", title: "A harbour town", playerCountMin: 1, playerCountMax: 1, gameMode: "single-player" },
+      template: { id: "tpl-1", title: "A harbour town", playerCountMin: 1, playerCountMax: 1, gameMode: "single-player", maxTurns: 5 },
     });
     expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
       "GET /templates/published",
@@ -103,8 +103,8 @@ describe("provisioning the fixture templates", () => {
   it("signs in once for both Worlds, and publishes the group one, drafted for three seats, for two to three players", async () => {
     calls.length = 0;
     await expect(provisionTemplates(frontDoor.origin, { editor, templates: { template: solo, groupTemplate: group } })).resolves.toEqual({
-      template: { id: "tpl-1", title: "A harbour town", playerCountMin: 1, playerCountMax: 1, gameMode: "single-player" },
-      groupTemplate: { id: "tpl-2", title: "An island in winter", playerCountMin: 2, playerCountMax: 3, gameMode: "cooperative" },
+      template: { id: "tpl-1", title: "A harbour town", playerCountMin: 1, playerCountMax: 1, gameMode: "single-player", maxTurns: 5 },
+      groupTemplate: { id: "tpl-2", title: "An island in winter", playerCountMin: 2, playerCountMax: 3, gameMode: "cooperative", maxTurns: 5 },
     });
     expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
       "GET /templates/published",
@@ -143,5 +143,13 @@ describe("the Worlds a run makes", () => {
 
   it("take the group World's game mode from --group-mode, and leave the single-player one alone", () => {
     expect(fixtureTemplates(fixtureVars, { groupMode: "competitive" })).toEqual({ template: solo, groupTemplate: { ...group, gameMode: "competitive" } });
+  });
+
+  it("are both as long as --story-length says, with or without --group-mode", () => {
+    expect(fixtureTemplates(fixtureVars, { storyLength: 3 })).toEqual({ template: { ...solo, maxTurns: 3 }, groupTemplate: { ...group, maxTurns: 3 } });
+    expect(fixtureTemplates(fixtureVars, { groupMode: "competitive", storyLength: 25 })).toEqual({
+      template: { ...solo, maxTurns: 25 },
+      groupTemplate: { ...group, gameMode: "competitive", maxTurns: 25 },
+    });
   });
 });
