@@ -34,7 +34,7 @@ function viteTempEntries() {
 }
 
 describe("the product's vite config, loaded by the harness", () => {
-  it("comes back with the product's aliases, plugins and postcss path, and writes nothing", () => {
+  it("comes back with the product's aliases and plugins, and writes nothing", () => {
     const script = path.join(scratch, "load-config.mjs");
     fs.writeFileSync(
       script,
@@ -49,7 +49,6 @@ describe("the product's vite config, loaded by the harness", () => {
         "});",
         "process.stdout.write(JSON.stringify({",
         "  alias: config.resolve.alias,",
-        "  postcss: config.css.postcss,",
         "  plugins: config.plugins.flat().map((plugin) => plugin.name),",
         "  outDir: config.build.outDir,",
         "}));",
@@ -68,7 +67,6 @@ describe("the product's vite config, loaded by the harness", () => {
     const loaded = JSON.parse(result.stdout);
     expect(loaded.alias.core).toBe(path.join(repoRoot, "core"));
     expect(loaded.alias.game).toBe(path.join(clientDir, "src", "game"));
-    expect(loaded.postcss).toBe("./postcss.config.cjs");
     expect(loaded.plugins.some((name: string) => name.startsWith("vite:react"))).toBe(true);
     expect(loaded.outDir).toBe("dist");
     expect(viteTempEntries()).toEqual(before);

@@ -5,9 +5,7 @@ import path from "path";
 // Create a configuration object with the correct settings
 const config = {
   plugins: [react()],
-  css: {
-    postcss: "./postcss.config.cjs",
-  },
+  // No css.postcss: Vite finds postcss.config.js in its root, client/.
   resolve: {
     alias: {
       client: path.resolve(__dirname, "./src"),
