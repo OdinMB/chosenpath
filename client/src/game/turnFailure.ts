@@ -58,7 +58,7 @@ export function beatCountOf(state: ClientStoryState): number {
 }
 
 /** What only a story that moved on changes: the player's character, their beats and their latest choice; images never. */
-function progressOf(state: ClientStoryState): string {
+export function progressOf(state: ClientStoryState): string {
   const player = ownPlayer(state);
   const beats = player?.beatHistory ?? [];
   return JSON.stringify([

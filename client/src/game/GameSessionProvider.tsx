@@ -17,6 +17,7 @@ import {
   STORY_LOAD_TIMEOUT_MS,
   type StoryLoadFailure,
 } from "./storyLoadFailure";
+import { choiceLimitOn } from "./choiceLimit";
 
 // Create a dedicated logger for game session operations
 const logger = Logger.App;
@@ -48,6 +49,8 @@ export function GameSessionProvider({
   const [loadFailure, setLoadFailure] = useState<StoryLoadFailure | null>(
     null
   );
+  // The player's choice the server refused for choosing too fast (choiceLimitOn)
+  const [choiceLimit, dispatchChoiceLimit] = useReducer(choiceLimitOn, null);
 
   // Use refs to track states without causing effect reruns
   const isLoadingRef = useRef(isLoading);
@@ -71,6 +74,11 @@ export function GameSessionProvider({
   // The player's own choice or character sent again through the game's controls: the notice goes too
   const clearTurnFailure = useCallback(() => {
     dispatchFailure({ type: "sent" });
+  }, []);
+
+  // The player sends a choice again: the refusal's notice goes until the server refuses that one too
+  const clearChoiceLimit = useCallback(() => {
+    dispatchChoiceLimit({ type: "sent" });
   }, []);
 
   // Keep the refs updated with the latest values
@@ -157,6 +165,7 @@ export function GameSessionProvider({
           showStory(data.state);
           // A failure stands until the story moves on (another player's "Try again" included)
           dispatchFailure({ type: "stateArrived", state: data.state });
+          dispatchChoiceLimit({ type: "stateArrived", state: data.state });
           setIsLoading(false);
         }
       }
@@ -178,6 +187,7 @@ export function GameSessionProvider({
         logger.info("[GameSessionProvider] Story exit confirmed");
         showStory(null);
         dispatchFailure({ type: "exited" });
+        dispatchChoiceLimit({ type: "exited" });
         setSessionId(null);
         setStoryCodes(null);
         localStorage.removeItem("sessionId");
@@ -198,6 +208,14 @@ export function GameSessionProvider({
           storyStateRef.current !== null
         );
         if (failure) setLoadFailure(failure);
+        // A refused choice is told below the choices, with when the player can choose again
+        dispatchChoiceLimit({
+          type: "limited",
+          response: data.type,
+          rateLimit: data.rateLimit,
+          state: storyStateRef.current,
+          now: Date.now(),
+        });
       }
     });
 
@@ -366,6 +384,8 @@ export function GameSessionProvider({
     tryAgain,
     clearTurnFailure,
     loadFailure,
+    choiceLimit,
+    clearChoiceLimit,
   };
 
   return (

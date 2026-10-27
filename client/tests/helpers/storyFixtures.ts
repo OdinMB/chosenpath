@@ -103,5 +103,7 @@ export function gameSession(
     tryAgain: () => null,
     clearTurnFailure: noop,
     loadFailure: null,
+    choiceLimit: null,
+    clearChoiceLimit: noop,
   };
 }
