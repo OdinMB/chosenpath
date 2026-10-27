@@ -102,5 +102,6 @@ export function gameSession(
     turnFailure: null,
     tryAgain: () => null,
     clearTurnFailure: noop,
+    loadFailure: null,
   };
 }

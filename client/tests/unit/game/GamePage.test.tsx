@@ -1,6 +1,11 @@
 import { GamePage } from "../../../src/game/GamePage";
 import { GameSessionContext } from "../../../src/game/GameSessionContext";
 import { gameService } from "../../../src/game/GameService";
+import {
+  describeLoadFailure,
+  type LoadFailureNotice,
+  type StoryLoadFailure,
+} from "../../../src/game/storyLoadFailure";
 import { renderMarkup } from "../../helpers/staticMarkup";
 import {
   beat,
@@ -28,6 +33,19 @@ jest.mock("../../../src/game/components/GameLayout", () => ({
     return "[game layout]";
   },
 }));
+type FailedProps = {
+  notice: LoadFailureNotice;
+  onTryAgain: () => void;
+  onGoHome: () => void;
+};
+// The failure view is a marker too, keeping its props
+const mockFailedProps: FailedProps[] = [];
+jest.mock("../../../src/game/components/StoryLoadFailed", () => ({
+  StoryLoadFailed: (props: FailedProps) => {
+    mockFailedProps.push(props);
+    return "[story load failed]";
+  },
+}));
 jest.mock("../../../src/game/GameService", () => ({
   gameService: {
     makeChoice: jest.fn(),
@@ -39,9 +57,10 @@ jest.mock("../../../src/game/GameService", () => ({
 jest.mock("../../../src/game/WebSocketService", () => ({
   wsService: { setExternalJoinCode: jest.fn(), sendMessage: jest.fn() },
 }));
+const mockNavigate = jest.fn();
 jest.mock("react-router-dom", () => ({
   useParams: () => ({ code: "CODE-1" }),
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
 }));
 jest.mock("../../../src/shared/auth/useAuth", () => ({
   useAuth: () => ({ user: null }),
@@ -60,6 +79,8 @@ beforeEach(() => {
   jest.spyOn(console, "log").mockImplementation(() => undefined);
   jest.spyOn(console, "debug").mockImplementation(() => undefined);
   mockLayoutProps.length = 0;
+  mockFailedProps.length = 0;
+  mockNavigate.mockClear();
   jest.mocked(gameService.makeChoice).mockClear();
   jest.mocked(gameService.selectCharacter).mockClear();
 });
@@ -108,5 +129,41 @@ describe("GamePage: the player sends a choice or character again through the gam
     expect(gameService.selectCharacter).toHaveBeenCalledWith(0, 1);
     expect(clearTurnFailure).toHaveBeenCalledTimes(1);
     expect(calledBefore(clearTurnFailure, jest.mocked(gameService.selectCharacter))).toBe(true);
+  });
+});
+
+/** Renders the game page with no story on screen, or the one given, and the load failure given. */
+function pageWith(loadFailure: StoryLoadFailure | null, withStory = false): string {
+  const session = gameSession(clientStoryState());
+  return renderMarkup(
+    <GameSessionContext.Provider
+      value={{ ...session, storyState: withStory ? session.storyState : null, loadFailure }}
+    >
+      <GamePage />
+    </GameSessionContext.Provider>
+  );
+}
+
+describe("GamePage: the story can't be opened", () => {
+  it("says so in place of the spinner once the code check refuses", () => {
+    const html = pageWith({ kind: "refused" });
+
+    expect(html).toContain("[story load failed]");
+    expect(html).not.toContain("Connecting to Game");
+    expect(mockFailedProps[0]!.notice).toEqual(describeLoadFailure({ kind: "refused" }));
+  });
+
+  it("opens a story that arrives after all", () => {
+    const html = pageWith({ kind: "noAnswer" }, true);
+
+    expect(html).toContain("[game layout]");
+    expect(mockFailedProps).toHaveLength(0);
+  });
+
+  it("goes back to the home page from the failure", () => {
+    pageWith({ kind: "unavailable" });
+
+    mockFailedProps[0]!.onGoHome();
+    expect(mockNavigate).toHaveBeenCalledWith("/");
   });
 });
