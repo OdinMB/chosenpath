@@ -151,6 +151,37 @@ describe("TemplateConfigurator settings", () => {
   });
 });
 
+/** What a checkbox's label holds: its name, when it holds no other control. */
+const labelFor = (html: string, id: string) =>
+  new RegExp(`<label[^>]*for="${id}"[^>]*>([\\s\\S]*?)</label>`).exec(html)?.[1];
+
+describe("TemplateConfigurator info buttons", () => {
+  it.each([
+    [
+      "generate-images",
+      "Add unique images to your story",
+      "About unique images",
+      "The story always has default images. We will add additional ones for your unique story.",
+    ],
+    [
+      "pregenerate-beats",
+      "Reduce wait time after choices",
+      "About reducing wait time",
+      "Creates story content in advance for each possible choice. More expensive but eliminates waiting.",
+    ],
+  ])(
+    "names the %s checkbox by its text alone, with an info button beside it described by its tooltip",
+    (id, text, name, tooltip) => {
+      const html = renderMarkup(<TemplateConfigurator />);
+
+      expect(labelFor(html, id)).toBe(text);
+      const button = openingTag(html, "button", "aria-label", name);
+      expect(attribute(button, "type")).toBe("button");
+      expect(html).toContain(`<span id="${attribute(button, "aria-describedby")}" hidden="">${tooltip}</span>`);
+    }
+  );
+});
+
 describe("TemplateConfigurator several stories at once", () => {
   afterEach(() => {
     mockUser = null;

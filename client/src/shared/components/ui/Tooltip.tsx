@@ -7,6 +7,7 @@ import {
   shift,
   useHover,
   useFocus,
+  useClick,
   useDismiss,
   useRole,
   useInteractions,
@@ -36,6 +37,12 @@ interface TooltipProps {
   className?: string;
   contentClassName?: string;
   disabled?: boolean;
+  /**
+   * Also open and close on a tap, or Enter or Space, on what it wraps: for a
+   * control that only shows the tooltip (an info icon), so touch users can
+   * open it. A mouse click still leaves it to hovering.
+   */
+  openOnClick?: boolean;
 }
 
 export const Tooltip: React.FC<TooltipProps> = ({
@@ -46,6 +53,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   className = "",
   contentClassName = "",
   disabled = false,
+  openOnClick = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const arrowRef = useRef<HTMLDivElement>(null);
@@ -74,12 +82,17 @@ export const Tooltip: React.FC<TooltipProps> = ({
     enabled: !disabled,
   });
   const focus = useFocus(context, { enabled: !disabled });
+  const click = useClick(context, {
+    enabled: openOnClick && !disabled,
+    ignoreMouse: true,
+  });
   const dismiss = useDismiss(context);
   const role = useRole(context, { role: "tooltip" });
 
   const { getReferenceProps, getFloatingProps } = useInteractions([
     hover,
     focus,
+    click,
     dismiss,
     role,
   ]);

@@ -135,7 +135,10 @@ export const TooltipExample: React.FC = () => {
                 className="px-2 py-1 border rounded flex-grow"
                 placeholder="Enter username"
               />
-              <InfoIcon tooltipText="Username must be at least 3 characters" />
+              <InfoIcon
+                label="About the username"
+                tooltipText="Username must be at least 3 characters"
+              />
             </div>
           </div>
 
@@ -145,7 +148,10 @@ export const TooltipExample: React.FC = () => {
               <div className="flex items-center justify-between mb-1">
                 <span className="text-primary flex items-center">
                   Risk Level
-                  <InfoIcon tooltipText="How dangerous your current choices are" />
+                  <InfoIcon
+                    label="About the risk level"
+                    tooltipText="How dangerous your current choices are"
+                  />
                 </span>
                 <span className="text-accent font-bold">Medium</span>
               </div>

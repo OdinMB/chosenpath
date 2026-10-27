@@ -87,6 +87,7 @@ export const PlayerBackgroundEditor: React.FC<PlayerBackgroundEditorProps> = ({
           <div className="flex items-center">
             <h5 className="font-semibold">Initial Stat Values</h5>
             <InfoIcon
+              label="About initial stat values"
               tooltipText="Starting stat values for characters with this background"
               position="right"
               className="ml-2 mt-1"

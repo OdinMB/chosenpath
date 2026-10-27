@@ -1,7 +1,7 @@
 import { KID_AGES_HINT } from "core/types";
 import type { KidAges } from "core/types";
 import { BasicInfoTab } from "../../../../src/resources/templates/components/BasicInfoTab";
-import { accessibleText, renderMarkup } from "../../../helpers/staticMarkup";
+import { accessibleText, openingTag, renderMarkup } from "../../../helpers/staticMarkup";
 
 // The real config reads import.meta.env, which Jest cannot parse
 jest.mock("../../../../src/config", () =>
@@ -88,5 +88,28 @@ describe("BasicInfoTab: the children's ages on a Kids template", () => {
     expect(ageInput(html)).toContain('aria-invalid="true"');
     expect(ageInput(html)).toContain('aria-describedby="template-kid-ages-error"');
     expect(accessibleText(html)).toContain(KID_AGES_HINT);
+  });
+});
+
+describe("BasicInfoTab: what its buttons are named", () => {
+  it("names the Edit buttons of the difficulty levels and the tags after their headings", () => {
+    const html = render(["Fiction"]);
+
+    expect(openingTag(html, "button", "aria-label", "Edit Available Difficulty Levels")).not.toBe("");
+    expect(openingTag(html, "button", "aria-label", "Edit Tags")).not.toBe("");
+    expect(html).not.toContain("[object Object]");
+  });
+
+  it.each([
+    ["About the number of players", "Minimum and maximum number of players allowed"],
+    ["About story length", "Number of decisions players will make in the game"],
+  ])("has an info button named %s that is described by its tooltip", (name, tooltip) => {
+    const html = render(["Fiction"]);
+
+    const button = openingTag(html, "button", "aria-label", name);
+    expect(button).toContain('type="button"');
+    const describedBy = /\saria-describedby="([^"]+)"/.exec(button)?.[1] ?? "";
+    expect(describedBy).not.toBe("");
+    expect(html).toContain(`id="${describedBy}" hidden="">${tooltip}<`);
   });
 });

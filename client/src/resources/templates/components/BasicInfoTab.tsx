@@ -94,6 +94,7 @@ const KidAgesField: React.FC<{
           Children&apos;s ages
         </label>
         <InfoIcon
+          label="About children's ages"
           tooltipText="The age or age range this World's stories are read with. Their turns are written for the youngest child."
           position="right"
           className="mr-2 mt-1"
@@ -277,6 +278,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       <div className="flex items-center gap-4 mb-2">
         <h3 className="font-semibold whitespace-nowrap">Players</h3>
         <InfoIcon
+          label="About the number of players"
           tooltipText="Minimum and maximum number of players allowed"
           position="right"
           className="mr-2 mt-1 -ml-1"
@@ -377,6 +379,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       <div className="flex items-center gap-4 mb-2">
         <h3 className="font-semibold whitespace-nowrap">Length</h3>
         <InfoIcon
+          label="About story length"
           tooltipText="Number of decisions players will make in the game"
           position="right"
           className="mr-2 mt-1 -ml-1"
@@ -433,6 +436,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             />
           </div>
         }
+        label="Available Difficulty Levels"
         data={{ levels: difficultyLevels }}
         editingSet={editingBoxes}
         setEditing={setEditingBoxes}
@@ -583,6 +587,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       <ExpandableItem<{ tags: string[] }>
         id="tags"
         title={<span className="font-semibold">Tags</span>}
+        label="Tags"
         data={{ tags }}
         editingSet={editingBoxes}
         setEditing={setEditingBoxes}
@@ -668,6 +673,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             Show on welcome screen
           </label>
           <InfoIcon
+            label="About the welcome screen"
             tooltipText="When selected, this template will be shown on the welcome screen"
             position="right"
             className="ml-2"

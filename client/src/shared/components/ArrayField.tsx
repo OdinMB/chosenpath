@@ -74,6 +74,10 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
             {showLabel && <h3 className="font-semibold">{title || label}</h3>}
             {tooltipText && (
               <InfoIcon
+                label={`About ${(typeof title === "string"
+                  ? title
+                  : label ?? "this list"
+                ).toLowerCase()}`}
                 tooltipText={tooltipText}
                 position="right"
                 className="ml-2"

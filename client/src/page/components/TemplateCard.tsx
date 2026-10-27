@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { TemplateMetadata } from "core/types";
 import { PrimaryButton } from "components/ui";
 import { sortTagsByCategory } from "client/resources/templates/tagCategories";
@@ -29,6 +30,24 @@ export const TemplateCard = ({
     tag: size === "large" ? "text-sm px-3 py-1" : "text-xs px-2 py-0.5",
   };
 
+  // The title links to the World's page, where Play goes: a plain click goes
+  // there the way Play does; a modified or middle click is the browser's
+  // (a new tab or window)
+  const worldPage = `/templates/${template.id}/configure`;
+  const handleTitleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    event.preventDefault();
+    onPlay(template);
+  };
+
   return (
     <CoverCard
       sourceId={template.id}
@@ -39,7 +58,17 @@ export const TemplateCard = ({
     >
       <div className="flex justify-between items-center mb-2">
         <h3 className={`${sizeClasses.title} text-primary-800`}>
-          {template.title}
+          {showPlayButton ? (
+            <a
+              href={worldPage}
+              onClick={handleTitleClick}
+              className="rounded hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent"
+            >
+              {template.title}
+            </a>
+          ) : (
+            template.title
+          )}
         </h3>
         {showPlayButton && (
           <PrimaryButton onClick={() => onPlay(template)} className="ml-4">

@@ -357,6 +357,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               <option value={PublicationStatus.Private}>Private</option>
             </Select>
             <InfoIcon
+              label="About publication status"
               tooltipText={
                 <div className="text-sm">
                   <div className="mb-2">

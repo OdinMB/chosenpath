@@ -112,6 +112,7 @@ export const StatGroupEditor: React.FC<StatGroupEditorProps> = ({
                   )}
                 </div>
               }
+              label={group.name || `Group ${index + 1}`}
               data={group}
               editingSet={editingGroups}
               setEditing={setEditingGroups}

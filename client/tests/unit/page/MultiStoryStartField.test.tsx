@@ -53,6 +53,19 @@ describe("MultiStoryStartField, not ticked", () => {
     expect(html).not.toContain('id="story-count"');
     expect(html).not.toContain('aria-live="polite"');
   });
+
+  it("names the checkbox by its text alone, with an info button beside it described by its tooltip", () => {
+    const html = render(false);
+
+    expect(/<label[^>]*for="start-several-stories"[^>]*>([\s\S]*?)<\/label>/.exec(html)?.[1]).toBe(
+      "Start several stories at once"
+    );
+    const button = openingTag(html, "button", "aria-label", "About starting several stories");
+    expect(attribute(button, "type")).toBe("button");
+    expect(html).toContain(
+      `<span id="${attribute(button, "aria-describedby")}" hidden="">Starts several copies of this story, all with these settings. Each copy has its own seat codes, for one player or several.</span>`
+    );
+  });
 });
 
 describe("MultiStoryStartField, ticked", () => {

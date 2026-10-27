@@ -307,19 +307,22 @@ export function TemplateConfigurator() {
                     startsSeveral ? "several-stories-images-note" : undefined
                   }
                 />
-                <label
-                  htmlFor="generate-images"
+                {/* The info button beside the label, not in it, so the checkbox's name is the label's text */}
+                <div
                   className={`ml-3 md:ml-4 text-sm md:text-base font-medium ${
                     startsSeveral ? "text-gray-400" : "text-primary"
                   }`}
                 >
-                  Add unique images to your story
+                  <label htmlFor="generate-images">
+                    Add unique images to your story
+                  </label>
                   <InfoIcon
+                    label="About unique images"
                     tooltipText="The story always has default images. We will add additional ones for your unique story."
                     className="ml-2 -mt-0.5"
                     position="top"
                   />
-                </label>
+                </div>
               </div>
               {startsSeveral && (
                 <p
@@ -344,16 +347,18 @@ export function TemplateConfigurator() {
                   (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)
                 }
               />
-              <label
-                htmlFor="pregenerate-beats"
+              <div
                 className={`ml-3 md:ml-4 text-sm md:text-base font-medium ${
                   DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
                     ? "text-gray-400"
                     : "text-primary"
                 }`}
               >
-                Reduce wait time after choices
+                <label htmlFor="pregenerate-beats">
+                  Reduce wait time after choices
+                </label>
                 <InfoIcon
+                  label="About reducing wait time"
                   tooltipText={
                     DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
                       ? "Pregeneration is currently unavailable for multiplayer games."
@@ -362,7 +367,7 @@ export function TemplateConfigurator() {
                   className="ml-2 -mt-0.5"
                   position="top"
                 />
-              </label>
+              </div>
             </div>
           </div>
 

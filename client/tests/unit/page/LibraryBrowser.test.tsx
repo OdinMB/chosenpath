@@ -144,6 +144,26 @@ describe("LibraryBrowser filters", () => {
   });
 });
 
+describe("LibraryBrowser cards", () => {
+  it("links each World's title to its page, beside its Play button", () => {
+    mockFilteredTemplates = libraryWithFilters.templates;
+
+    const html = renderMarkup(<LibraryBrowser />);
+
+    const links = Array.from(html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g), (match) => ({
+      href: attribute(match[1] ?? "", "href"),
+      name: accessibleText(match[2] ?? ""),
+    }));
+    expect(links).toEqual(
+      expect.arrayContaining([
+        { href: "/templates/lighthouse/configure", name: "lighthouse" },
+        { href: "/templates/station/configure", name: "station" },
+      ])
+    );
+    expect(buttonsIn(html).filter((name) => name === "Play")).toHaveLength(2);
+  });
+});
+
 describe("LibraryBrowser results", () => {
   it("shows the no-matches card, not a load failure, when the library loaded and the filters match nothing", () => {
     mockFilteredTemplates = [];

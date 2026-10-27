@@ -44,13 +44,16 @@ import { Tooltip } from './ui/Tooltip';
 
 | Prop               | Type      | Default    | Description                                            |
 | ------------------ | --------- | ---------- | ------------------------------------------------------ |
-| `children`         | ReactNode | (required) | The element that triggers the tooltip on hover         |
+| `children`         | ReactNode | (required) | The element that triggers the tooltip on hover and keyboard focus |
 | `content`          | ReactNode | (required) | Content to display in the tooltip                      |
 | `position`         | Position  | 'top'      | Where to position the tooltip relative to the children |
 | `delay`            | number    | 200        | Delay in ms before showing the tooltip                 |
 | `className`        | string    | ''         | Additional classes for the wrapper element             |
 | `contentClassName` | string    | ''         | Additional classes for the tooltip content             |
 | `disabled`         | boolean   | false      | Whether the tooltip is disabled                        |
+| `openOnClick`      | boolean   | false      | Also opens and closes on a tap, Enter or Space (not a mouse click), for a control that only shows the tooltip, like `InfoIcon` |
+
+For an info icon, use `InfoIcon` with a `label` that says what it explains (`label="About unique images"`). It is a button: keyboard focus or a tap opens its tooltip, and screen readers read the tooltip's text as its description.
 
 ### Position Options
 

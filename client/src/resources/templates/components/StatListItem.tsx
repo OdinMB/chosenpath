@@ -136,6 +136,7 @@ export const StatListItem: React.FC<StatListItemProps> = ({
       <ExpandableItem
         id={stat.id}
         title={statTitle}
+        label={stat.name}
         data={stat}
         editingSet={new Set()} // Always empty since we don't edit in-place
         setEditing={() => onEdit(stat.id)} // Tell parent to edit this stat

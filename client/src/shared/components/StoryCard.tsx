@@ -190,6 +190,7 @@ export const StoryCard = ({
                     {story.difficultyLevel.title}
                   </span>
                   <InfoIcon
+                    label="About this difficulty"
                     tooltipText={getDifficultyDescription(
                       story.difficultyLevel.modifier
                     )}
@@ -271,6 +272,7 @@ export const StoryCard = ({
                     {story.difficultyLevel.title}
                   </span>
                   <InfoIcon
+                    label="About this difficulty"
                     tooltipText={getDifficultyDescription(
                       story.difficultyLevel.modifier
                     )}
@@ -280,6 +282,7 @@ export const StoryCard = ({
                 </span>
               )}
               <InfoIcon
+                label="When this story was created and last played"
                 tooltipText={infoTooltip}
                 position="top"
                 className="mb-1"

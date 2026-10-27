@@ -442,6 +442,7 @@ export const PreviousChoiceVisualizer: React.FC<
                         {getRiskDisplayText(choice.riskType)}
                       </span>
                       <InfoIcon
+                        label="About this risk"
                         className="ml-1 -mt-0.5"
                         tooltipText={formatRiskDistribution(choice.riskType)}
                       />
@@ -453,6 +454,7 @@ export const PreviousChoiceVisualizer: React.FC<
                           {choice.resourceType}
                         </span>
                         <InfoIcon
+                          label={`About this ${choice.resourceType}`}
                           className="ml-1 -mt-0.5"
                           tooltipText={getResourceTypeInfo(choice.resourceType)}
                         />

@@ -114,19 +114,20 @@ export function MultiStoryStartField({
             className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
             disabled={disabled}
           />
-          <label
-            htmlFor="start-several-stories"
-            className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
-          >
-            Start several stories at once
+          {/* The info button beside the label, not in it, so the checkbox's name is the label's text */}
+          <div className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary">
+            <label htmlFor="start-several-stories">
+              Start several stories at once
+            </label>
             <InfoIcon
+              label="About starting several stories"
               tooltipText="Starts several copies of this story, all with these settings. Each copy has its own seat codes, for one player or several."
               className="ml-2 -mt-0.5"
               // Narrow enough for the tooltip's shift to keep it on a phone's screen
               contentClassName="max-w-[min(20rem,calc(100vw-1rem))]"
               position="top"
             />
-          </label>
+          </div>
         </div>
         <p className="mt-1 pl-8 md:pl-10 text-xs md:text-sm text-primary-600">
           See how{" "}

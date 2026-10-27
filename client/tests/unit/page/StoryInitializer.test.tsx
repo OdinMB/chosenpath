@@ -118,6 +118,22 @@ describe("StoryInitializer AI notice", () => {
   });
 });
 
+describe("StoryInitializer wait-time setting", () => {
+  it("names the checkbox by its text alone, with an info button beside it that says what it costs", () => {
+    mockSearch = "step=2&category=enjoy-fiction";
+    const html = renderMarkup(<StoryInitializer onBack={jest.fn()} />);
+
+    expect(/<label[^>]*for="pregenerate-beats"[^>]*>([\s\S]*?)<\/label>/.exec(html)?.[1]).toBe(
+      "Reduce wait time after choices"
+    );
+    const button = openingTag(html, "button", "aria-label", "About reducing wait time");
+    expect(attribute(button, "type")).toBe("button");
+    expect(html).toContain(
+      `<span id="${attribute(button, "aria-describedby")}" hidden="">Creates story content in advance for each possible choice. More expensive but eliminates waiting.</span>`
+    );
+  });
+});
+
 /*
  * The read-with-kids setting (the owner's decision of 2026-10-01): the form
  * takes one age or a range ("5" or "8-10") in a text field, and a value it

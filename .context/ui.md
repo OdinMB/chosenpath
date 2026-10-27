@@ -161,6 +161,11 @@ import { Icons } from 'components/ui'
 >
   <button>Hover me</button>
 </Tooltip>
+
+// An info icon: a button named by its label, whose tooltip opens on hover,
+// keyboard focus or a tap, and whose text screen readers read as its description.
+// Put it beside a checkbox's <label>, not inside it.
+<InfoIcon label="About unique images" tooltipText="Helpful information" />
 ```
 
 ## Responsive Design

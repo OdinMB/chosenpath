@@ -1,4 +1,4 @@
-import React, { ReactNode, useState } from "react";
+import React, { ReactElement, ReactNode, useState } from "react";
 import { PrimaryButton, Icons } from "components/ui";
 
 /**
@@ -19,11 +19,27 @@ interface ActionIcon {
   ariaLabel?: string;
 }
 
-interface ExpandableItemProps<T> {
+/**
+ * The item's title, and the text its buttons are named by ("Edit Tags"). A
+ * title in plain text names them itself; a title in markup needs a label.
+ */
+type ExpandableItemName =
+  | {
+      /** Display name for the item when collapsed */
+      title: string;
+      /** Names the item on its buttons, instead of the title */
+      label?: string;
+    }
+  | {
+      /** Display name for the item when collapsed */
+      title: ReactElement;
+      /** Names the item on its buttons, since its title is markup */
+      label: string;
+    };
+
+type ExpandableItemProps<T> = ExpandableItemName & {
   /** Unique identifier for this item */
   id: string;
-  /** Display name for the item when collapsed */
-  title: ReactNode;
   /** Object that will be edited */
   data: T;
   /** Set of IDs currently being edited */
@@ -52,11 +68,17 @@ interface ExpandableItemProps<T> {
   description?: ReactNode;
   /** Optional custom nodes rendered after the built-in action icons (collapsed header) */
   customActionsRight?: ReactNode;
+};
+
+/** The text that names the item on its buttons. */
+function itemName(title: string | ReactElement, label: string | undefined): string {
+  return label ?? (typeof title === "string" ? title : "");
 }
 
 export function ExpandableItem<T>({
   id,
   title,
+  label,
   data,
   editingSet,
   setEditing,
@@ -71,6 +93,7 @@ export function ExpandableItem<T>({
   customActionsRight,
 }: ExpandableItemProps<T>) {
   const isEditing = editingSet.has(id);
+  const name = itemName(title, label);
   const [isExpanded, setIsExpanded] = useState(false);
   const [localData, setLocalData] = useState<T>(data);
 
@@ -134,7 +157,7 @@ export function ExpandableItem<T>({
           <button
             onClick={handleToggleExpand}
             className="text-gray-500 hover:text-gray-700"
-            aria-label="Collapse"
+            aria-label={`Collapse ${name}`}
           >
             <Icons.ChevronUp className="h-5 w-5" />
           </button>
@@ -172,7 +195,7 @@ export function ExpandableItem<T>({
           <button
             onClick={handleToggleExpand}
             className="ml-4 text-gray-500 hover:text-gray-700 flex-shrink-0"
-            aria-label="Expand"
+            aria-label={`Expand ${name}`}
           >
             <Icons.ChevronDown className="h-5 w-5" />
           </button>
@@ -196,7 +219,7 @@ export function ExpandableItem<T>({
                 <button
                   onClick={handleStartEditing}
                   className="text-secondary hover:text-secondary-700"
-                  aria-label={`Edit ${title}`}
+                  aria-label={`Edit ${name}`}
                 >
                   <Icons.Edit className="h-5 w-5" />
                 </button>
@@ -216,7 +239,7 @@ export function ExpandableItem<T>({
                       actionIcon.className ||
                       "text-blue-500 hover:text-blue-700"
                     }
-                    aria-label={actionIcon.ariaLabel || `Action for ${title}`}
+                    aria-label={actionIcon.ariaLabel || `Action for ${name}`}
                     title={actionIcon.title || ""}
                     disabled={actionIcon.disabled}
                     type="button"
@@ -230,7 +253,7 @@ export function ExpandableItem<T>({
                   <button
                     onClick={onDelete}
                     className="text-tertiary hover:text-tertiary-700"
-                    aria-label={`Remove ${title}`}
+                    aria-label={`Remove ${name}`}
                   >
                     <Icons.Trash className="h-5 w-5" />
                   </button>
