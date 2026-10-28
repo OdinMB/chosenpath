@@ -4,8 +4,11 @@ import { Logger } from "shared/logger.js";
 import {
   sendSuccess,
   sendError,
+  sendBadRequest,
   sendRateLimited,
 } from "shared/responseUtils.js";
+import { isUuid } from "shared/safePaths.js";
+import { ensureTemplateReadAccess } from "server/templates/templateMiddleware.js";
 import { storyCreationService } from "./StoryCreationService.js";
 import {
   addressKey,
@@ -144,12 +147,20 @@ router.post(
   verifyUser({ required: false }),
   async (req, res) => {
     const requestId = req.body?.requestId || "unknown";
+    const body = req.body as Partial<CreateStoryFromTemplateRequest> | undefined;
+
+    // Every refusal up to the start's admission comes before the start is
+    // counted. The World's id names its folder, so it must be a UUID before
+    // anything is looked up by it
+    const templateId: unknown = body?.templateId;
+    if (!isUuid(templateId)) {
+      sendBadRequest(res, "Template ID must be a UUID", requestId);
+      return;
+    }
 
     // A several-stories start's reflection questions, in place of the World's:
-    // only a signed-in start sends them, and either refusal comes before the
-    // start is counted
-    const sentQuestions = (req.body as CreateStoryFromTemplateRequest | undefined)
-      ?.reflectionQuestions;
+    // only a signed-in start sends them
+    const sentQuestions = body?.reflectionQuestions;
     if (sentQuestions !== undefined && !req.user) {
       sendError(res, "Authentication required", 401, requestId);
       return;
@@ -162,16 +173,13 @@ router.post(
 
     let admitted: StartAdmission | null = null;
     try {
-      admitted = await admitStoryStart(
-        req,
-        res,
-        Boolean((req.body as CreateStoryFromTemplateRequest)?.generateImages),
-        requestId
-      );
+      // Only a World its starter may read, as GET /templates/:id reads it
+      if (!(await ensureTemplateReadAccess(req, res, templateId, requestId))) return;
+
+      admitted = await admitStoryStart(req, res, Boolean(body?.generateImages), requestId);
       if (!admitted) return;
 
       const {
-        templateId,
         playerCount: reqPlayerCount,
         maxTurns: reqMaxTurns,
         generateImages: reqGenerateImages,

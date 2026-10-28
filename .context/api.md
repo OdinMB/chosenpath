@@ -480,9 +480,11 @@ Story is generated asynchronously. Client should poll `/stories/:id/status` unti
 
 **POST** `/stories/template`
 
-**Auth Required**: No (optional)
+**Auth Required**: No (optional; a draft or review template needs its creator or an admin)
 
-**Rate Limit**: As for Create Story; a start the creation refuses (`404` no such template, either `400` refusal listed below, `500` a failed write) counts nothing.
+**Permission Check**: Read access to the template, as for **GET** `/templates/:id` (`ensureTemplateReadAccess()` in `server/src/templates/templateMiddleware.ts`): a published or private template starts for anyone, signed in or not; a draft or one in review only for its creator and for users with `templates_see_all` (admins). `templateId` must be a UUID (`isUuid()` in `server/src/shared/safePaths.ts`), checked before anything is looked up by it.
+
+**Rate Limit**: As for Create Story. Every refusal of the request itself (the id, the reflection questions, read access) comes before the start is counted, and a start the creation refuses (`404` no template file, either `400` refusal of the player count listed below, `500` a failed write) counts nothing.
 
 **Spend ceiling**: As for Create Story (`503`)
 
@@ -526,10 +528,11 @@ Template-based stories are created synchronously and are ready immediately (no p
 
 **Error Cases:**
 
-- `401` "Authentication required": `reflectionQuestions` sent without a sign-in; refused before the start is counted
+- `400` "Template ID must be a UUID": `templateId` missing or not a UUID; refused before anything is looked up or counted
+- `401` "Authentication required": `reflectionQuestions` sent without a sign-in, or a draft or review template for anyone but its creator or an admin (the same refusal signed in or not, as for `GET /templates/:id`); refused before the start is counted
 - `400`: Reflection questions beyond `reflectionQuestionsSchema` (`core/types/reflectionQuestions.ts`: at most 5 per outcome, each with text and at most 300 characters), with the message `REFLECTION_QUESTIONS_PROBLEM`; refused before the start is counted
 - `400`: Player count outside the template's limits, or the template can't start a story for that many players (no outcomes on the shared list or the seats in play, or a multiplayer story without a shared outcome; `core/utils/outcomeReadiness.ts`)
-- `404`: Template not found
+- `404`: Template not found (no database entry, refused before the start is counted; or no template file)
 - `429`: Rate limit exceeded
 - `500`: Story creation failed
 - `503`: Today's spend ceiling is reached (`SPEND_CEILING_MESSAGE`)

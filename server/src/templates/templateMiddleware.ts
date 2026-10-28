@@ -75,6 +75,40 @@ export async function hasTemplateAccess(
 }
 
 /**
+ * Checks that the request's user may read a World as GET /templates/:id reads
+ * it: a published or private World for anyone, signed in or not; a draft or
+ * one in review for its creator and for templates_see_all (admins). Otherwise
+ * answers the request with GET's answer (404 for an unknown World, else the
+ * 401 an anonymous visitor gets, signed in or not, so it tells no more) and
+ * returns false.
+ */
+export async function ensureTemplateReadAccess(
+  req: express.Request,
+  res: express.Response,
+  templateId: string,
+  requestId: string
+): Promise<boolean> {
+  try {
+    if (await hasTemplateAccess(templateId, req.user?.id, req.userPermissions || [], false)) {
+      return true;
+    }
+    Logger.Route.warn(
+      `User ${req.user?.id || "anonymous"} attempted to read template ${templateId} without permission`
+    );
+    sendError(res, "Authentication required", 401, requestId);
+    return false;
+  } catch (error) {
+    if ((error as Error).message === "Template not found") {
+      sendError(res, "Template not found", 404, requestId);
+      return false;
+    }
+    Logger.Route.error(`Error checking template read access for ${templateId}`, error);
+    sendError(res, "Failed to verify template access", 500, requestId);
+    return false;
+  }
+}
+
+/**
  * Middleware to check if user can access a specific template
  * Gets templateId from route params
  */
