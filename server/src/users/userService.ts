@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Logger } from "../shared/logger.js";
@@ -14,11 +15,23 @@ interface JwtUserPayload {
   permissions: string[];
   exp: number;
   iat: number;
+  /** The token's own id (signSessionToken); absent on tokens signed before it was added. */
+  jti?: string;
 }
 
 // JWT secret should be in environment variables in production
 const JWT_SECRET = process.env.JWT_SECRET || "development-jwt-secret";
 const SALT_ROUNDS = 10;
+
+/**
+ * Signs a session's token. Each token carries an id of its own (the JWT's
+ * jti), so two sessions of one account opened in the same second, with the
+ * same claims, still get different tokens: the sessions table is keyed by the
+ * token. The claims, and so the token's lifetime, are the caller's.
+ */
+function signSessionToken(payload: Omit<JwtUserPayload, "jti">): string {
+  return jwt.sign(payload, JWT_SECRET, { jwtid: randomUUID() });
+}
 
 /**
  * Create a new user
@@ -123,7 +136,7 @@ export async function authenticateUser(
       iat: Math.floor(now / 1000), // Issued at time for cache validation
     };
 
-    const token = jwt.sign(jwtPayload, JWT_SECRET);
+    const token = signSessionToken(jwtPayload);
 
     await userDbService.createSessionEntry(token, user.id, expiresAt, remember);
     await userDbService.updateUserLastLogin(user.id, now);
@@ -409,7 +422,7 @@ export async function refreshTokenPermissions(
       iat: Math.floor(Date.now() / 1000), // New issued time
     };
 
-    const newToken = jwt.sign(jwtPayload, JWT_SECRET);
+    const newToken = signSessionToken(jwtPayload);
 
     // Update session token in database
     await userDbService.deleteSessionByToken(currentToken);

@@ -167,7 +167,7 @@ Authenticate user and receive auth cookie.
 }
 ```
 
-Sets `authToken` cookie with expiration based on `rememberMe`.
+Sets `authToken` cookie with expiration based on `rememberMe` (24 hours, or 30 days remembered). Each sign-in opens a session of its own with a token of its own, so signing in again, from another device or within the same second, leaves earlier sessions signed in.
 
 **Error Cases:**
 
