@@ -173,6 +173,15 @@ export type PlayerOptionsGeneration = z.infer<
   typeof playerOptionsGenerationSchema
 >;
 
+/**
+ * A seat's character options as its player's state carries them: the
+ * identities and backgrounds they choose from. Never the seat's outcomes.
+ */
+export type ClientCharacterOptions = Pick<
+  PlayerOptionsGeneration,
+  "possibleCharacterIdentities" | "possibleCharacterBackgrounds"
+>;
+
 // Direct type definition for PlayerState
 export type PlayerState = {
   name: string;

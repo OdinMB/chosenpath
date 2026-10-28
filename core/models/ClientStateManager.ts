@@ -100,12 +100,10 @@ export class ClientStateManager {
       .filter((stat: Stat) => stat.isVisible !== false)
       .map((stat: Stat) => this.convertToClientStat(stat));
 
-    // Filter characterSelectionOptions to only include data for this player
-    if (filteredState.characterSelectionOptions) {
-      filteredState.characterSelectionOptions = {
-        [playerSlot]: filteredState.characterSelectionOptions[playerSlot],
-      };
-    }
+    filteredState.characterSelectionOptions = this.characterOptionsFor(
+      filteredState.characterSelectionOptions,
+      playerSlot
+    );
 
     // Remove other players' codes
     filteredState.playerCodes = {
@@ -140,6 +138,25 @@ export class ClientStateManager {
       ...(gameOver ? { outcomesAtEnd: this.outcomesAtEnd(state, playerSlot) } : {}),
       provenance: AI_TEXT_PROVENANCE,
     } as ClientStoryState;
+  }
+
+  /**
+   * This player's character options and no other seat's: the identities and
+   * backgrounds they choose from. Their seat's outcomes stay out (the player's
+   * outcomes go out only at the end, in outcomesAtEnd).
+   */
+  private characterOptionsFor(
+    options: StoryState["characterSelectionOptions"] | undefined,
+    playerSlot: PlayerSlot
+  ): ClientStoryState["characterSelectionOptions"] {
+    const own = options?.[playerSlot];
+    if (!own) return {};
+    return {
+      [playerSlot]: {
+        possibleCharacterIdentities: own.possibleCharacterIdentities,
+        possibleCharacterBackgrounds: own.possibleCharacterBackgrounds,
+      },
+    };
   }
 
   /**

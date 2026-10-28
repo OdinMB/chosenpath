@@ -1,5 +1,7 @@
 import { ClientStateManager } from "core/models/ClientStateManager.js";
+import type { Story } from "core/models/Story.js";
 import { AI_TEXT_PROVENANCE } from "core/types/index.js";
+import type { Outcome, PlayerOptionsGeneration } from "core/types/index.js";
 import { createMockStoryState } from "../../helpers/testHelpers.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../helpers/roundStories.js";
 import { outcomeStatesAtEnding } from "../../../src/game/services/endingStates.js";
@@ -232,5 +234,92 @@ describe("ClientStateManager.filterStateForPlayer: reflection questions at the e
     const sent = soloEnding({ written: true }).filterStateForPlayer("player1").outcomesAtEnd ?? [];
 
     for (const item of sent) expect(item).not.toHaveProperty("reflectionQuestions");
+  });
+});
+
+/** A seat's character options as a setup or a template writes them: its own outcomes beside the identities and backgrounds. */
+function seatOptions(slot: string, outcomes: Outcome[]): PlayerOptionsGeneration {
+  return {
+    outcomes,
+    possibleCharacterIdentities: [0, 1, 2].map((i) => ({
+      name: `${slot} name ${i}`,
+      pronouns: { personal: "they", object: "them", possessive: "their", reflexive: "themselves" },
+      appearance: `${slot} appearance ${i}`,
+    })),
+    possibleCharacterBackgrounds: [0, 1, 2].map((i) => ({
+      title: `${slot} background ${i}`,
+      fluffTemplate: `{name} grew up by the docks (${i}).`,
+      initialPlayerStatValues: [{ statId: "player_nerve", value: 40 + i }],
+    })),
+  };
+}
+
+/** The group story's seats' options: each seat's own outcomes as they were set up, before any milestone. */
+const GROUP_OPTIONS = {
+  player1: seatOptions("player1", [outcome(DEBT)]),
+  player2: seatOptions("player2", [outcome(HIDEOUT, { intendedNumberOfMilestones: 1 })]),
+};
+
+describe("ClientStateManager.filterStateForPlayer: the character options", () => {
+  /** The group story before the character pick, part way and once it is over, its seats' options kept. */
+  function groupStates(): { when: string; story: Story }[] {
+    const ended = groupEnding().clone({ characterSelectionOptions: GROUP_OPTIONS });
+    return [
+      {
+        when: "before the character pick",
+        story: roundStory({ players: 2, turns: 0, maxTurns: 4 }).clone({
+          characterSelectionCompleted: false,
+          characterSelectionOptions: GROUP_OPTIONS,
+        }),
+      },
+      { when: "part way", story: ended.clone({ maxTurns: 20 }) },
+      { when: "once it is over", story: ended },
+    ];
+  }
+
+  it("sends a player the identities and backgrounds they choose from, whole, and nothing else of their seat's options", () => {
+    const state = groupStates()[0]!.story.filterStateForPlayer("player2");
+
+    expect(state.characterSelectionOptions).toEqual({
+      player2: {
+        possibleCharacterIdentities: GROUP_OPTIONS.player2.possibleCharacterIdentities,
+        possibleCharacterBackgrounds: GROUP_OPTIONS.player2.possibleCharacterBackgrounds,
+      },
+    });
+    expect(Object.keys(state.characterSelectionOptions.player2!).sort()).toEqual([
+      "possibleCharacterBackgrounds",
+      "possibleCharacterIdentities",
+    ]);
+  });
+
+  it.each(["player1", "player2"])(
+    "never sends %s an outcome's possible resolutions or resonance, before the pick, part way or at the end",
+    (slot) => {
+      for (const { when, story } of groupStates()) {
+        const sent = JSON.stringify(story.filterStateForPlayer(slot));
+
+        for (const text of ["possibleResolutions", "resonance", "Won.", "Half won.", "Lost.", "It matters."]) {
+          expect({ when, contains: text, sent: sent.includes(text) }).toEqual({ when, contains: text, sent: false });
+        }
+      }
+    }
+  );
+
+  it("sends a player no outcome of their own before the story is over, and at the end only in outcomesAtEnd", () => {
+    for (const { when, story } of groupStates()) {
+      const state = story.filterStateForPlayer("player1");
+      const { outcomesAtEnd, ...rest } = state;
+
+      expect({ when, sent: JSON.stringify(rest).includes(`Question of ${DEBT}?`) }).toEqual({ when, sent: false });
+      if (state.gameOver) {
+        expect(outcomesAtEnd?.find((item) => item.id === DEBT)).toMatchObject({ owner: "player1", question: `Question of ${DEBT}?` });
+      } else {
+        expect(outcomesAtEnd).toBeUndefined();
+      }
+    }
+  });
+
+  it("sends no options for a seat that has none", () => {
+    expect(filtered().characterSelectionOptions).toEqual({});
   });
 });

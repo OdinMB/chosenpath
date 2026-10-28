@@ -3,7 +3,7 @@ import { useGameSession } from "game/useGameSession";
 import {
   CharacterIdentity,
   CharacterBackground,
-  PlayerOptionsGeneration,
+  ClientCharacterOptions,
   ImageUI,
 } from "core/types";
 import { CharacterCard } from "./CharacterCard";
@@ -64,7 +64,7 @@ export function CharacterSelection({
 
   // Get the current player's slot and options
   const playerSlot = Object.keys(storyState.characterSelectionOptions)[0];
-  const options: PlayerOptionsGeneration =
+  const options: ClientCharacterOptions =
     storyState.characterSelectionOptions[playerSlot];
 
   // Check if the current player has already selected a character

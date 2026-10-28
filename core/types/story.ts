@@ -17,6 +17,7 @@ import {
   characterSelectionPlanSchema,
   playerOptionsGenerationSchema,
   PlayerOptionsGeneration,
+  ClientCharacterOptions,
 } from "./player.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { SwitchAnalysis } from "./switch.js";
@@ -524,9 +525,10 @@ export type ClientStoryState = {
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   maxTurns: number;
   characterSelectionCompleted: boolean;
+  /** This player's entry only, without their seat's outcomes. */
   characterSelectionOptions: Record<
     (typeof PLAYER_SLOTS)[number],
-    PlayerOptionsGeneration
+    ClientCharacterOptions
   >;
   characterSelectionIntroduction: CharacterSelectionIntroduction;
   generateImages: boolean;

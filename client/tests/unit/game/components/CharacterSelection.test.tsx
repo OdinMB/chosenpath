@@ -35,7 +35,6 @@ function selectionState(
     },
     characterSelectionOptions: {
       player1: {
-        outcomes: [],
         possibleCharacterIdentities: [
           {
             name: "Mara",
