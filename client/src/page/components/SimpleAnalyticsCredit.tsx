@@ -14,7 +14,7 @@ export function SimpleAnalyticsCredit() {
       referrerPolicy="origin"
       target="_blank"
     >
-      <span className="sa-credit__caption">100% privacy-first analytics</span>{" "}
+      <span className="sa-credit__caption">Privacy-first analytics</span>{" "}
       <span className="sa-credit__byline">
         by{" "}
         <svg

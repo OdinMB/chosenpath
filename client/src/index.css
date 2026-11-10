@@ -135,8 +135,9 @@
 }
 
 /* Simple Analytics free-plan credit (text-link variant from
-   simpleanalytics.com/badges), kept as published there: it inherits the
-   footer's font and colour and makes no third-party request. */
+   simpleanalytics.com/badges): it inherits the footer's font and colour and
+   makes no third-party request. Line height is inherited (their snippet sets
+   1.6) so the line sits like the footer lines above it. */
 a.sa-credit,
 a.sa-credit:visited,
 a.sa-credit:hover,
@@ -144,7 +145,6 @@ a.sa-credit:active {
   all: unset !important;
   display: block !important;
   cursor: pointer !important;
-  line-height: 1.6 !important;
 }
 a.sa-credit:focus-visible {
   outline: 2px solid currentColor !important;

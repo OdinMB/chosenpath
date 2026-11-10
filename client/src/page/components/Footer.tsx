@@ -176,7 +176,7 @@ export function Footer() {
           </a>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-2">
           <SimpleAnalyticsCredit />
         </div>
       </footer>
