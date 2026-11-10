@@ -6,6 +6,7 @@ import {
   useNewsletter,
 } from "resources/newsletter";
 import { DiscordButton, AcademyButton } from "shared/components";
+import { SimpleAnalyticsCredit } from "./SimpleAnalyticsCredit";
 
 function SupportButton() {
   return (
@@ -173,6 +174,10 @@ export function Footer() {
           >
             Proudly open-source
           </a>
+        </div>
+
+        <div className="mt-3">
+          <SimpleAnalyticsCredit />
         </div>
       </footer>
 
